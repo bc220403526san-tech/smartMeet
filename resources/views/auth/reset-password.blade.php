@@ -10,7 +10,7 @@
 <body class="h-screen">
 
 <!-- PARENT DIV -->
-<div class="flex h-full p-10 bg-grey-600">
+<div class="flex h-full p-4 bg-grey-600">
 
     <!-- LEFT SIDEBAR -->
     <div class="w-1/2 relative flex flex-col justify-center items-center shadow-[20px_0_30px_rgba(1,1,1,0.2)]
