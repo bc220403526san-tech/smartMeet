@@ -3,79 +3,140 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/png" href="{{ asset('images/smartMeet-logo.png') }}">
+    <link rel="icon" type="image/png" sizes="96x96" href="{{ asset('images/s-logo.png') }}">
     <title>{{ env('APP_NAME') }}</title>
     @vite(['resources/css/app.css','resources/js/app.js'])
 </head>
-<body class="h-screen">
 
+<body class="min-h-screen bg-gray-50">
 <!-- PARENT DIV -->
-<div class="flex h-full p-4 bg-grey-600">
+<div class="min-h-screen flex flex-col md:flex-row p-3 sm:p-4 md:p-6">
 
-    <!-- LEFT SIDEBAR -->
-    <div class="w-1/2 relative flex flex-col justify-center items-center shadow-[20px_0_30px_rgba(1,1,1,0.2)]
-    rounded-tl-xl / md / lg / xl / 2xl / full  rounded-bl-xl / md / lg / xl / 2xl / full border-l-8">
+    <!-- LEFT SIDEBAR / HERO SECTION -->
+    <x-auth-hero-section
+        title="Welcome to Smartmeet"
+        subtitle="Connect, Meet, Collaborate"
+        image="images/login-illustration.png"
+    />
 
-        <!-- Logo -->
-        <div class="absolute top-0 left-8 flex items-center">
-            <img src="{{ asset('images/smartMeet-logo.png') }}" class="w-30 h-30 object-contain">
-            <h1 class="text-xl font-semibold text-blue-600">SmartMeet</h1>
-        </div>
+    <!-- RIGHT LOGIN CARD SECTION -->
+    <div class="w-full md:w-1/2 flex justify-center items-center bg-blue-50
+    rounded-b-2xl md:rounded-r-2xl md:rounded-bl-none
+    min-h-[55vh] sm:min-h-[60vh] md:min-h-[calc(100vh-3rem)]
+    px-4 py-8 sm:px-6 md:px-8 border-r-4 border-blue-700">
 
-        <!-- Illustration Card -->
-        <div class="mt-10 flex gap-6">
-            <div class="relative w-[500px] h-[500px] flex items-center justify-center rounded-lg overflow-hidden">
-                <img src="{{ asset('images/login-illustration.png') }}" class="w-full h-auto object-contain" alt="Login Illustration">
+        <!-- CARD -->
+        <div class="w-full max-w-md bg-white p-6 rounded-2xl shadow-lg border border-gray-100
+        hover:shadow-xl transition-all duration-300">
 
-                <!-- Text Overlay -->
-                <div class="absolute top-20 left-0 text-left z-10">
-                    <h2 class="text-2xl font-bold mb-2">Welcome to SmartMeet</h2>
-                    <p class="text-gray-600 text-center font-medium">Connect, Meet, Collaborate</p>
+            <!-- ICON + TITLE -->
+            <div class="flex flex-col items-center mb-5">
+                <div class="w-11 h-11 rounded-full bg-blue-50 flex items-center justify-center mb-3">
+                    <svg class="w-5 h-5 text-blue-600" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+                        <polyline points="10 17 15 12 10 7"/>
+                        <line x1="15" y1="12" x2="3" y2="12"/>
+                    </svg>
                 </div>
+                <h2 class="text-lg font-semibold text-gray-800">Welcome back</h2>
+                <p class="text-xs text-gray-400 mt-0.5">Log in to your account to continue</p>
             </div>
-        </div>
-    </div>
 
-    <!-- RIGHT LOGIN CARD -->
-    <div class="w-1/2 flex justify-center items-center bg-blue-50 border-r-8  rounded-tr-lg / md / lg / xl / 2xl / full  rounded-br-lg / md / lg / xl / 2xl / full">
-        <div class="w-[400px] bg-white p-8 rounded-xl shadow-xl hover:shadow-2xl transition-shadow duration-300">
-            <h2 class="text-2xl font-bold mb-6 text-center text-blue-600">Log in</h2>
+            <x-success />
+            <x-error />
 
-            <!-- Form -->
-            <form class="space-y-4">
+            <form action="{{ route('login') }}" method="POST" class="space-y-3">
+                @csrf
+
+                <!-- EMAIL -->
                 <div>
-                    <label class="text-sm text-gray-500">Enter Your Email here:</label>
-                    <input type="email" placeholder="Email"
-                           class="w-full mt-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-200 transition">
+                    <label class="text-xs text-gray-400 block mb-1">Email address</label>
+                    <input type="email" name="email" placeholder="Email"
+                           class="w-full px-3 py-2 text-sm border border-gray-200 bg-gray-50 rounded-xl
+                  focus:ring-2 focus:ring-blue-100 focus:border-blue-400
+                  outline-none transition" required>
                 </div>
 
+                <!-- PASSWORD -->
                 <div>
-                    <label class="text-sm text-gray-500">Enter Your Password here:</label>
-                    <input type="password" placeholder="Password"
-                           class="w-full mt-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-200 transition">
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="text-xs text-gray-400">Password</label>
+                        <a href="{{ route('forgot.password') }}" class="text-xs text-blue-500 hover:underline">Forgot password?</a>
+                    </div>
+                    <input type="password" name="password" placeholder="Please your password"
+                           class="w-full px-3 py-2 text-sm border border-gray-200 bg-gray-50 rounded-xl
+                  focus:ring-2 focus:ring-blue-100 focus:border-blue-400
+                  outline-none transition" required>
                 </div>
 
-                <div>
-                    <label class="text-sm text-gray-500">Select Your Role Below:</label>
-                    <select class="w-full mt-1 p-3 border border-gray-300 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-200 transition">
-                        <option>Role</option>
-                        <option>Admin</option>
-                        <option>Organizer</option>
-                        <option>Participant</option>
-                    </select>
-                </div>
-
-                <button class="w-full bg-blue-500 text-white py-3 rounded-lg shadow-md hover:bg-blue-600 transition-colors duration-300">
+                <!-- LOGIN BUTTON -->
+                <button type="submit"
+                        class="w-full py-2.5 rounded-xl bg-blue-600 text-white text-sm font-medium
+               hover:bg-blue-700 hover:scale-[1.01] transition-all duration-200 mt-1">
                     Log in
                 </button>
+
             </form>
 
-            <p class="text-center mt-3 text-gray-500">
-                <a href="/forgot-password" class="text-blue-500 text-sm hover:underline">Forget Password</a>
+            <!-- DIVIDER -->
+            <div class="flex items-center my-4">
+                <div class="flex-grow border-t border-gray-100"></div>
+                <span class="mx-3 text-gray-300 text-xs">or continue with</span>
+                <div class="flex-grow border-t border-gray-100"></div>
+            </div>
+
+            <!-- SOCIAL BUTTONS -->
+            <div class="flex flex-col gap-2">
+
+                <!-- GOOGLE LOGIN -->
+                <a href="{{ route('social.redirect', 'google') }}"
+                   class="w-full flex items-center justify-center gap-2
+                          border border-gray-200 bg-gray-50 py-2.5 rounded-xl
+                          hover:bg-gray-100 transition text-sm text-gray-600 font-medium">
+
+                    <!-- Google SVG -->
+                    <svg class="w-4 h-4" viewBox="0 0 48 48">
+                        <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.6 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12
+            12-12c3 0 5.7 1.1 7.8 2.9l5.7-5.7C33.9 6.5 29.2 4.5 24 4.5 12.9 4.5 4 13.4 4 24.5S12.9 44.5 24 44.5
+            44 35.6 44 24.5c0-1.3-.1-2.7-.4-4z"/>
+                        <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 16 18.9 12 24 12c3 0 5.7 1.1 7.8 2.9l5.7-5.7C33.9
+            6.5 29.2 4.5 24 4.5c-7.7 0-14.3 4.4-17.7 10.2z"/>
+                        <path fill="#4CAF50" d="M24 44.5c5.1 0 9.8-2 13.4-5.2l-6.2-5.1c-2.1 1.5-4.7 2.3-7.2
+            2.3-5.2 0-9.6-3.3-11.2-7.9l-6.5 5C9.6 40.1 16.3 44.5 24 44.5z"/>
+                        <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-1.1 3-3.5 5.4-6.6 6.9l6.2 5.1c3.6-3.3
+            5.7-8.1 5.7-13.5 0-1.3-.1-2.7-.4-4z"/>
+                    </svg>
+                    Continue with Google
+                </a>
+
+                <!-- FACEBOOK LOGIN -->
+                <a href="{{ route('social.redirect', 'facebook') }}"
+                   class="w-full flex items-center justify-center gap-2
+          border border-blue-200 bg-blue-50 py-2.5 rounded-xl
+          hover:bg-blue-100 transition text-sm text-blue-700 font-medium">
+
+                    <!-- Facebook SVG -->
+                    <svg class="w-4 h-4 text-blue-600" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1
+                 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025
+                 1.792-4.697 4.533-4.697 1.312 0 2.686.236 2.686.236v2.97h-1.513
+                 c-1.491 0-1.956.931-1.956 1.886v2.269h3.328l-.532 3.49h-2.796V24
+                 C19.612 23.094 24 18.1 24 12.073z"/>
+                    </svg>
+
+                    Continue with Facebook
+                </a>
+            </div>
+
+            <!-- SIGN UP -->
+            <p class="text-center mt-4 text-xs text-gray-400">
+                Don't have an account?
+                <a href="{{ route('register') }}" class="text-blue-600 hover:underline font-medium">Sign up</a>
             </p>
+
         </div>
     </div>
-
 </div>
 </body>
 </html>

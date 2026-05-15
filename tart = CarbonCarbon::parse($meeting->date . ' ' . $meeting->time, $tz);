@@ -1,0 +1,14 @@
+[90m= [39m[34;4mApp\Models\Meeting[39;24m {#8107
+    [34mid[39m: [35m1[39m,
+    [34mcreated_at[39m: [32m"[39m[32m2026-05-13 05:56:16[39m[32m"[39m,
+    [34mupdated_at[39m: [32m"[39m[32m2026-05-13 06:41:00[39m[32m"[39m,
+    [34mtitle[39m: [32m"[39m[32mProduct Review[39m[32m"[39m,
+    [34magenda[39m: [36mnull[39m,
+    [34mdescription[39m: [32m"[39m[32mwhuhwuhuh yygg gw66...............[39m[32m"[39m,
+    [34mdate[39m: [32m"[39m[32m2026-05-13[39m[32m"[39m,
+    [34mtime[39m: [32m"[39m[32m11:00:00[39m[32m"[39m,
+    [34mtimezone[39m: [32m"[39m[32mAsia/Karachi[39m[32m"[39m,
+    [34mduration[39m: [35m30[39m,
+    [34mstatus[39m: [32m"[39m[32mcompleted[39m[32m"[39m,
+    [34morganizer_id[39m: [35m5[39m,
+  }
