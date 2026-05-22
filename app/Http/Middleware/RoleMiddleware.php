@@ -16,7 +16,7 @@ class RoleMiddleware
         }
 
         if (Auth::user()->role !== $role) {
-            abort(403, 'Unauthorized Access');
+            return redirect()->route(Auth::user()->role . '.dashboard');
         }
 
         return $next($request);

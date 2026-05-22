@@ -1,9 +1,8 @@
 <?php
 
-namespace App\Console\Commands;
+namespace App\Console\Commands\Console\Commands;
 
 use App\Models\Meeting;
-use Carbon\Carbon;
 use Illuminate\Console\Command;
 
 class UpdateMeetingStatuses extends Command

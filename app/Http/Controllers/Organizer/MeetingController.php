@@ -8,7 +8,7 @@ use App\Models\Meeting;
 use App\Models\MeetingParticipant;
 use App\Models\User;
 
-class OrganizerMeetingController extends Controller
+class MeetingController extends Controller
 {
     /**
      * Display a listing of the resource.

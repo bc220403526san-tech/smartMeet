@@ -11,29 +11,52 @@
 
 <body class="bg-gray-100 h-screen overflow-hidden">
 
-{{-- 1. Checkbox --}}
-<input type="checkbox" id="sidebar-toggle">
+{{-- Overlay --}}
+<div id="overlay" class="fixed inset-0 bg-black/40 z-30 hidden lg:hidden"></div>
 
-{{-- 2. layout-wrapper --}}
-<div class="layout-wrapper flex h-full">
+<div class="flex h-screen overflow-hidden">
 
-    {{-- 3. Overlay --}}
-    <label for="sidebar-toggle" class="sidebar-overlay"></label>
+    {{-- Sidebar --}}
+    <div id="sidebar"
+         class="fixed lg:static inset-y-0 left-0 z-40 shrink-0
+                    -translate-x-full lg:translate-x-0
+                    transition-transform duration-300 ease-in-out">
+        @php
+            $sidebar = 'sidebar.' . Auth::user()->role . '-menu';
+        @endphp
+        <x-dynamic-component :component="$sidebar" />
+    </div>
 
-    {{-- 4. Sidebar --}}
-    <x-sidebar.admin-menu />
+    {{-- Main Area --}}
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
 
-    {{-- 5. Main Area --}}
-    <div class="flex-1 flex flex-col m-2">
+        {{-- Header slot — har page apna header pass karega --}}
+        {{ $header }}
 
-        <!-- CONTENT -->
-        <main class="flex-1 overflow-y-auto rounded-lg">
+        {{-- Page Content --}}
+        <main class="flex-1 overflow-y-auto">
             {{ $slot }}
         </main>
 
     </div>
 
 </div>
+
+<script>
+    const sidebar   = document.getElementById('sidebar');
+    const overlay   = document.getElementById('overlay');
+    const hamburger = document.getElementById('hamburger');
+
+    hamburger?.addEventListener('click', () => {
+        sidebar.classList.toggle('-translate-x-full');
+        overlay.classList.toggle('hidden');
+    });
+
+    overlay.addEventListener('click', () => {
+        sidebar.classList.add('-translate-x-full');
+        overlay.classList.add('hidden');
+    });
+</script>
 
 </body>
 </html>

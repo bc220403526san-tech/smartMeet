@@ -74,7 +74,6 @@
                     <div class="tile-name">
                         <i class="fa fa-crown crown-icon"></i>
                         {{ $organizer->name }}
-                        <span style="font-size:10px;background:rgba(59,130,246,0.3);padding:2px 6px;border-radius:99px;">You</span>
                     </div>
                     <div class="tile-icons">
                         <div class="speaking-indicator" id="speaking-{{ $organizer->id }}" style="display:none;">
@@ -82,12 +81,11 @@
                             <div class="speaking-bar"></div>
                             <div class="speaking-bar"></div>
                         </div>
-                        <div class="mic-off" id="micoff-{{ $organizer->id }}" style="display:flex;">
+                        <div class="mic-off" id="micoff-{{ $organizer->id }}" style="display:none;">
                             <i class="fa fa-microphone-slash"></i>
                         </div>
                     </div>
                 </div>
-                <div class="you-badge">You</div>
             </div>
 
             {{-- Participants Tiles --}}
@@ -96,6 +94,7 @@
                     $p        = $participant->user;
                     $initials = strtoupper(substr($p->name, 0, 1) . substr(strrchr($p->name, ' ') ?: ' ', 1, 1));
                     $color    = $colors[($index + 1) % count($colors)];
+                    $isMe     = $p->id === auth()->id();
                 @endphp
                 <div class="video-tile" id="tile-{{ $p->id }}">
                     <div class="video-placeholder">
@@ -104,7 +103,12 @@
                         </div>
                     </div>
                     <div class="tile-info">
-                        <div class="tile-name">{{ $p->name }}</div>
+                        <div class="tile-name">
+                            {{ $p->name }}
+                            @if($isMe)
+                                <span style="font-size:10px;background:rgba(59,130,246,0.3);padding:2px 6px;border-radius:99px;">You</span>
+                            @endif
+                        </div>
                         <div class="tile-icons">
                             <div class="speaking-indicator" id="speaking-{{ $p->id }}" style="display:none;">
                                 <div class="speaking-bar"></div>
@@ -116,6 +120,9 @@
                             </div>
                         </div>
                     </div>
+                    @if($isMe)
+                        <div class="you-badge">You</div>
+                    @endif
                 </div>
             @endforeach
 
@@ -170,8 +177,8 @@
         <div id="tab-participants" class="panel-hidden" style="display:none;flex:1;overflow-y:auto;padding:12px;">
             <div style="display:flex;flex-direction:column;gap:8px;">
 
-                {{-- Organizer (You) --}}
-                <div style="display:flex;align-items:center;gap:10px;padding:10px;background:rgba(59,130,246,0.08);border-radius:12px;border:1px solid rgba(59,130,246,0.2);">
+                {{-- Organizer --}}
+                <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--surface2);border-radius:12px;border:1px solid var(--border);">
                     <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#06b6d4);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:white;">
                         {{ $orgInitials }}
                     </div>
@@ -179,12 +186,11 @@
                         <div style="font-size:13px;font-weight:600;display:flex;align-items:center;gap:5px;">
                             {{ $organizer->name }}
                             <i class="fa fa-crown" style="color:#fbbf24;font-size:10px;"></i>
-                            <span style="font-size:10px;color:#3b82f6;">(You)</span>
                         </div>
                         <div style="font-size:10px;color:var(--blue);">Organizer</div>
                     </div>
                     <span id="people-online-{{ $organizer->id }}"
-                          style="width:8px;height:8px;background:var(--green);border-radius:50%;"></span>
+                          style="width:8px;height:8px;background:var(--surface2);border-radius:50%;border:1px solid var(--border);"></span>
                 </div>
 
                 {{-- Participants --}}
@@ -193,22 +199,24 @@
                         $p         = $participant->user;
                         $pInitials = strtoupper(substr($p->name, 0, 1) . substr(strrchr($p->name, ' ') ?: ' ', 1, 1));
                         $color     = $colors[($index + 1) % count($colors)];
+                        $isMe      = $p->id === auth()->id();
                     @endphp
-                    <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--surface2);border-radius:12px;border:1px solid var(--border);">
+                    <div style="display:flex;align-items:center;gap:10px;padding:10px;
+                                background:{{ $isMe ? 'rgba(59,130,246,0.08)' : 'var(--surface2)' }};
+                                border-radius:12px;
+                                border:1px solid {{ $isMe ? 'rgba(59,130,246,0.2)' : 'var(--border)' }};">
                         <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,{{ $color }});display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:white;">
                             {{ $pInitials }}
                         </div>
                         <div style="flex:1;">
-                            <div style="font-size:13px;font-weight:600;">{{ $p->name }}</div>
+                            <div style="font-size:13px;font-weight:600;">
+                                {{ $p->name }}
+                                @if($isMe)
+                                    <span style="font-size:10px;color:#3b82f6;">(You)</span>
+                                @endif
+                            </div>
                             <div style="font-size:10px;color:var(--muted);">Participant</div>
                         </div>
-                        <button onclick="toggleParticipantMic('{{ $p->id }}')"
-                                id="participant-mic-btn-{{ $p->id }}"
-                                title="Mute/Unmute"
-                                style="background:none;border:none;cursor:pointer;padding:4px;">
-                            <i class="fa fa-microphone" id="participant-mic-icon-{{ $p->id }}"
-                               style="font-size:13px;color:var(--green);"></i>
-                        </button>
                         <span id="people-online-{{ $p->id }}"
                               style="width:8px;height:8px;background:var(--surface2);border-radius:50%;border:1px solid var(--border);"></span>
                     </div>
@@ -233,29 +241,29 @@
     <div class="ctrl-divider"></div>
 
     <div class="ctrl-btn" onclick="switchTab('transcript', null)">
-        <div class="ctrl-icon" id="ctrl-transcript"><i class="fa fa-closed-captioning"></i></div>
+        <div class="ctrl-icon" id="ctrl-transcript">
+            <i class="fa fa-closed-captioning"></i>
+        </div>
         <span class="ctrl-label">Transcript</span>
     </div>
 
     <div class="ctrl-btn" onclick="switchTab('chat', null)">
-        <div class="ctrl-icon" id="ctrl-chat"><i class="fa fa-comment"></i></div>
+        <div class="ctrl-icon" id="ctrl-chat">
+            <i class="fa fa-comment"></i>
+        </div>
         <span class="ctrl-label">Chat</span>
     </div>
 
     <div class="ctrl-btn" onclick="switchTab('participants', null)">
-        <div class="ctrl-icon" id="ctrl-people"><i class="fa fa-users"></i></div>
+        <div class="ctrl-icon" id="ctrl-people">
+            <i class="fa fa-users"></i>
+        </div>
         <span class="ctrl-label">People</span>
     </div>
 
     <div class="ctrl-divider"></div>
 
-    <div class="ctrl-btn">
-        <button class="btn-end" style="background:var(--red);opacity:0.85;" onclick="cancelMeeting()">
-            <i class="fa fa-ban"></i>
-        </button>
-        <span class="ctrl-label" style="color:var(--red);">Cancel</span>
-    </div>
-
+    {{-- Participant sirf leave kar sakta hai — cancel nahi --}}
     <div class="ctrl-btn">
         <button class="btn-end" onclick="leaveMeeting()">
             <i class="fa fa-phone-slash"></i>
@@ -265,12 +273,6 @@
 
 </div>
 
-{{-- Cancel form --}}
-<form id="cancel-form" action="{{ route('organizer.meetings.cancel', $meeting) }}" method="POST" style="display:none;">
-    @csrf
-    @method('PATCH')
-</form>
-
 <script>
 
     // ── CONFIG ──
@@ -278,9 +280,9 @@
     const MY_USER_ID     = "{{ auth()->id() }}";
     const MY_NAME        = "{{ auth()->user()->name }}";
     const MY_INITIALS    = "{{ strtoupper(substr(auth()->user()->name, 0, 1) . substr(strrchr(auth()->user()->name, ' ') ?: ' ', 1, 1)) }}";
-    const SIGNAL_URL     = "{{ route('organizer.meetings.signal', $meeting) }}";
-    const TRANSCRIPT_URL = "{{ route('organizer.meetings.transcript', $meeting) }}";
-    const LEAVE_URL      = "{{ route('organizer.meetings.index') }}";
+    const SIGNAL_URL     = "{{ route('participant.meetings.signal', $meeting) }}";
+    const TRANSCRIPT_URL = "{{ route('participant.meetings.transcript', $meeting) }}";
+    const LEAVE_URL      = "{{ route('participant.meetings.index') }}";
     const CSRF           = "{{ csrf_token() }}";
 
     const ALL_USER_IDS = @json(
@@ -350,10 +352,9 @@
     let localStream        = null;
     let peers              = {};
     let pendingCandidates  = {};
-    let isMicOn            = false;   // Organizer default OFF
+    let isMicOn            = false;   // Participant bhi default OFF
     let recognition        = null;
     let recognitionRunning = false;
-    const participantMicStatus = {};
 
     const iceConfig = {
         iceServers: [
@@ -383,7 +384,7 @@
                 video: false
             });
 
-            // Organizer mic default OFF
+            // Participant mic bhi default OFF
             localStream.getAudioTracks().forEach(t => t.enabled = false);
             isMicOn = false;
 
@@ -402,6 +403,7 @@
         }
     }
 
+    // ── 2. REVERB SUBSCRIBE ──
     function listenForSignals() {
         if (typeof window.Echo === 'undefined') { console.error('Echo not initialized'); return; }
         window.Echo.channel('meeting.' + MEETING_ID)
@@ -489,6 +491,7 @@
         catch(e) { return sdp; }
     }
 
+    // ── 6. HANDLE SIGNAL ──
     async function handleSignal(data) {
         const from = String(data.fromUserId);
 
@@ -615,7 +618,6 @@
         }
     }
 
-    // ── 8. APNA MIC TOGGLE ──
     function toggleMic() {
         if (!localStream) return;
         isMicOn = !isMicOn;
@@ -647,22 +649,7 @@
         }
     }
 
-    // ── 9. PARTICIPANT MIC TOGGLE ──
-    function toggleParticipantMic(userId) {
-        const isMuted = participantMicStatus[userId] || false;
-        participantMicStatus[userId] = !isMuted;
-        const newMuted = participantMicStatus[userId];
-
-        const icon   = document.getElementById('participant-mic-icon-' + userId);
-        const micOff = document.getElementById('micoff-' + userId);
-
-        sendSignal(userId, newMuted ? 'mute' : 'unmute', { by: MY_USER_ID });
-
-        if (icon)   { icon.className = newMuted ? 'fa fa-microphone-slash' : 'fa fa-microphone'; icon.style.color = newMuted ? 'var(--red)' : 'var(--green)'; }
-        if (micOff) micOff.style.display = newMuted ? 'flex' : 'none';
-    }
-
-    // Start Transcript
+    // ── 9. TRANSCRIPT SETUP ──
     function startTranscript() {
         const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SR) return;
@@ -713,7 +700,6 @@
                 if (isMicOn && !recognitionRunning) startRecognition();
             }, 400);
         };
-        // ✅ Mic OFF hai — abhi start nahi, toggleMic se start hoga
     }
 
     function startRecognition() {
@@ -780,6 +766,7 @@
             </div>`;
         body.appendChild(div);
         body.scrollTop = body.scrollHeight;
+
         const listenText = document.getElementById('listening-text');
         if (listenText) listenText.textContent = `${escapeHtml(data.userName)} is speaking`;
     }
@@ -877,18 +864,11 @@
         body.appendChild(div);
         body.scrollTop = body.scrollHeight;
     }
-
-    // ── LEAVE / CANCEL ──
+    // ── LEAVE ──
     function leaveMeeting() {
         if (!confirm('Are you sure you want to leave?')) return;
         cleanup();
         window.location.href = LEAVE_URL;
-    }
-
-    function cancelMeeting() {
-        if (!confirm('Cancel this meeting? All participants will be disconnected.')) return;
-        cleanup();
-        document.getElementById('cancel-form').submit();
     }
 
     function cleanup() {
@@ -920,13 +900,18 @@
         const toast = document.createElement('div');
         Object.assign(toast.style, {
             background: '#1e293b', color: 'white', padding: '10px 20px',
-            borderRadius: '8px', fontSize: '14px', opacity: '1',
+            borderRadius: '8px', fontSize: '14px', fontWeight: '500',
+            minWidth: '200px', textAlign: 'center',
             boxShadow: '0 4px 12px rgba(0,0,0,.3)',
-            borderLeft: '3px solid #f59e0b', transition: 'opacity .3s'
+            borderLeft: '3px solid #f59e0b',
+            opacity: '1', transition: 'opacity .3s'
         });
         toast.textContent = message;
         container.appendChild(toast);
-        setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3000);
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
     }
 
 </script>
