@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Console\Commands\Console\Commands;
+namespace App\Console\Commands;
 
 use App\Models\Meeting;
 use Illuminate\Console\Command;

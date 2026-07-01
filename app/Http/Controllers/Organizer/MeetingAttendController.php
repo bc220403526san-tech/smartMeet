@@ -16,12 +16,41 @@ class MeetingAttendController extends Controller
         $user = auth()->user();
 
         if ($user->id !== $meeting->organizer_id) {
-            abort(403, 'Access denied.');
+            abort(403);
+        }
+
+        // actual_start null ho toh meeting date+time se set karo
+        if (!$meeting->actual_start) {
+            $start = \Carbon\Carbon::parse(
+                $meeting->date . ' ' . $meeting->time,
+                $meeting->timezone ?? 'Asia/Karachi'
+            )->utc();
+            $meeting->update(['actual_start' => $start]);
         }
 
         $meeting->load(['participants.user', 'organizer']);
 
-        return view('organizer.meetings.attend', compact('meeting'));
+        $allUserIds = $meeting->participants->pluck('user_id')
+            ->push($meeting->organizer_id)
+            ->unique()
+            ->values();
+
+        $alreadyJoined = $meeting->participants
+            ->filter(fn ($p) => $p->joined_at !== null)
+            ->map(function ($p) {
+                $name = $p->user->name;
+
+                return [
+                    'userId'   => (string) $p->user->id,
+                    'name'     => $name,
+                    'initials' => strtoupper(
+                        substr($name, 0, 1) . substr(strrchr($name, ' ') ?: ' ', 1, 1)
+                    ),
+                ];
+            })
+            ->values();
+
+        return view('organizer.meetings.attend', compact('meeting', 'allUserIds', 'alreadyJoined'));
     }
 
     // ── SIGNAL ──
@@ -29,26 +58,27 @@ class MeetingAttendController extends Controller
     {
         $request->validate([
             'to_user_id' => 'nullable',
-            'type' => 'required|in:offer,answer,ice-candidate,chat,mute,unmute,mic-status',
+            'type'       => 'required|in:offer,answer,ice-candidate,chat,mute,unmute,mic-status,transcript,meeting-cancelled,user-left',
             'data'       => 'required|array',
         ]);
 
         $fromUserId = (string) auth()->id();
 
-        // ✅ Chat — sab ko bhejo, toOthers() NAHI
-        if ($request->type === 'chat') {
+        $broadcastToAll = ['chat', 'transcript', 'mic-status', 'user-left'];
+
+        if (in_array($request->type, $broadcastToAll)) {
             broadcast(new MeetingSignal(
                 meetingId:  (string) $meeting->id,
                 fromUserId: $fromUserId,
                 toUserId:   'all',
-                type:       'chat',
+                type:       $request->type,
                 data:       $request->data
-            )); // ← toOthers() nahi — sab ko milega, JS mein apna skip hoga
+            ));
 
-            return response()->json(['status' => 'chat sent']);
+            return response()->json(['status' => 'broadcast sent']);
         }
 
-        // ✅ Baaki sab — specific user ko, toOthers()
+        // WebRTC + mute/unmute — specific user ko
         broadcast(new MeetingSignal(
             meetingId:  (string) $meeting->id,
             fromUserId: $fromUserId,
@@ -76,9 +106,6 @@ class MeetingAttendController extends Controller
             'spoken_at'  => now(),
         ]);
 
-        // ✅ TranscriptUpdated hata diya — MeetingSignal use kar rahe hain
-        // ✅ type: 'transcript' — handleSignal() mein handle hoga
-        // ✅ toOthers() — sender ko wapas nahi milega, locally show ho chuka hai
         broadcast(new MeetingSignal(
             meetingId:  (string) $meeting->id,
             fromUserId: (string) $user->id,
@@ -97,6 +124,37 @@ class MeetingAttendController extends Controller
         ))->toOthers();
 
         return response()->json(['status' => 'saved']);
+    }
+
+    // ── MARK LEFT (page close/back/refresh — organizer chala gaya, poori meeting end karo) ──
+    public function markLeft(Meeting $meeting)
+    {
+        if ($meeting->organizer_id !== auth()->id()) {
+            abort(403);
+        }
+
+        // Sirf abhi tak active/upcoming/live meeting ko end karo
+        if (in_array($meeting->status, ['active', 'live', 'upcoming'])) {
+            $meeting->update(['status' => 'completed']);
+        }
+
+        // Sab participants ka joined_at reset karo, taake dobara koi tile na dikhe
+        $meeting->participants()->update([
+            'joined_at' => null,
+            'left_at'   => now(),
+        ]);
+
+        broadcast(new MeetingSignal(
+            meetingId:  (string) $meeting->id,
+            fromUserId: (string) auth()->id(),
+            toUserId:   'all',
+            type:       'meeting-cancelled',
+            data:       [
+                'message' => 'Meeting has ended — the organizer left the meeting.',
+            ]
+        ))->toOthers();
+
+        return response()->json(['status' => 'meeting ended']);
     }
 
     // ── LEAVE ──

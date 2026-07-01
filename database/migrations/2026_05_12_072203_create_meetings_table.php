@@ -15,18 +15,21 @@ return new class extends Migration
             $table->id();
             $table->timestamps();
             $table->string('title');
-            $table->text('agenda')->nullable()->change();
+            $table->text('agenda')->nullable();
             $table->text('description')->nullable();
             $table->date('date');
             $table->time('time');
             $table->string('timezone')->default('Asia/Karachi');
             $table->integer('duration')->default(60);
+            $table->timestamp('starts_at')->nullable();
+            $table->timestamp('actual_start')->nullable();
             $table->enum('status', [
             'upcoming',
             'active',
             'completed',
             'cancelled',
-            'flagged'
+            'flagged',
+            'live',
             ])->default('upcoming');
              $table->foreignId('organizer_id')
              ->constrained('users')

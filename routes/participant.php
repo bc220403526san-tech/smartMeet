@@ -38,7 +38,8 @@ Route::middleware(['auth', 'role:participant'])
             Route::get('/{meeting}/attend', [MeetingAttendController::class, 'attend'])->name('attend');
             Route::post('/{meeting}/signal', [MeetingAttendController::class, 'signal'])->name('signal');
             Route::post('/{meeting}/transcript', [MeetingAttendController::class, 'saveTranscript'])->name('transcript');
-
+            Route::post('meetings/{meeting}/mark-left', [\App\Http\Controllers\Participant\MeetingAttendController::class, 'markLeft'])
+                ->name('markLeft');
         });
 
     });

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\MeetingController;
+use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -15,7 +16,8 @@ Route::middleware(['auth', 'role:admin'])
     ->name('admin.')
     ->group(function () {
 
-        Route::view('/dashboard', 'admin.dashboard')->name('dashboard');
+        Route::get('/dashboard', [DashboardController::class, 'index'])
+            ->name('dashboard');
         Route::view('/reports', 'admin.reports.index')->name('reports');
         Route::view('/settings', 'admin.settings.index')->name('settings');
         Route::view('/profile', 'admin.profile.index')->name('profile');

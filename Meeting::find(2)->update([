@@ -1,0 +1,16 @@
+[90m= [39m[34;4mApp\Models\Meeting[39;24m {#8164
+    [34mid[39m: [35m2[39m,
+    [34mcreated_at[39m: [32m"[39m[32m2026-06-29 04:02:56[39m[32m"[39m,
+    [34mupdated_at[39m: [32m"[39m[32m2026-06-29 05:03:01[39m[32m"[39m,
+    [34mtitle[39m: [32m"[39m[32mWeekly Project Progress Meeting[39m[32m"[39m,
+    [34magenda[39m: [32m"[39m\"[32m[{[39m\\\"[32mtitle[39m\\\"[32m:[39m\\\"[32mWelcome & opening remarks,Review of previous quarter goals[39m\\\"[32m,[39m\\\"[32mdescription[39m\\\"[32m:[39m\\\"[32mThis meeting is organized to review the progress of the SmartMeet project, discuss completed tasks, identify current challenges, and plan the activities for the upcoming week.[39m\\\"[32m}][39m\"[32m"[39m,
+    [34mdescription[39m: [32m"[39m[32mThis meeting is organized to review the progress of the SmartMeet project, discuss completed tasks, identify current challenges, and plan the activities for the upcoming week.[39m[32m"[39m,
+    [34mdate[39m: [32m"[39m[32m2026-06-29[39m[32m"[39m,
+    [34mtime[39m: [32m"[39m[32m09:02:00[39m[32m"[39m,
+    [34mtimezone[39m: [32m"[39m[32mAsia/Karachi[39m[32m"[39m,
+    [34mduration[39m: [35m60[39m,
+    [34mstarts_at[39m: [36mnull[39m,
+    [34mstatus[39m: [32m"[39m[32mcompleted[39m[32m"[39m,
+    [34morganizer_id[39m: [35m11[39m,
+    [34mactual_start[39m: [36mnull[39m,
+  }

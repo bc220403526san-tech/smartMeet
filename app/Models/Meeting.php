@@ -18,8 +18,13 @@ class Meeting extends Model
         'duration',
         'timezone',
         'status',
-        'organizer_id'
+        'starts_at',
+        'organizer_id',
+        'actual_start',
     ];
+
+
+    // app/Models/Meeting.php
 
     public function organizer()
     {
@@ -32,6 +37,7 @@ class Meeting extends Model
     }
 
     protected $casts = [
-        'agenda' => 'array',
+        'agenda'       => 'array',
+        'actual_start' => 'datetime',
     ];
 }
