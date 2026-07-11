@@ -1,23 +1,44 @@
 import { defineConfig } from 'vite';
+
 import laravel from 'laravel-vite-plugin';
+
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
-    plugins: [
-        laravel({
-            input:
-                [
-                 'resources/css/meeting-room.css',
-                'resources/css/app.css',
-                'resources/js/app.js',
-                ],
-            refresh: true,
-        }),
-        tailwindcss(),
-    ],
     server: {
-        watch: {
-            ignored: ['**/storage/framework/views/**'],
-        },
+      host: '0.0.0.0',
+      port: 5173,
+        cors: true,
+        hmr: {
+          // host: '192.168.50.202',
+          //   host: '192.168.0.103',
+            host: '10.15.175.20',
+        }
     },
+
+    plugins: [
+
+        laravel({
+
+            input: [
+
+                'resources/css/meeting-room.css',
+
+                'resources/css/app.css',
+
+                'resources/js/app.js',
+
+            ],
+
+            refresh: true,
+
+        }),
+
+        tailwindcss(),
+
+    ],
+
+
+
 });
+

@@ -23,9 +23,9 @@ Route::middleware(['auth', 'role:organizer'])
 
         Route::prefix('participants')->name('participants.')->group(function () {
             Route::view('/', 'organizer.participants.index')->name('index');
-            Route::view('/create', 'organizer.participants.create')->name('create');
+//            Route::view('/create', 'organizer.participants.create')->name('create');
             Route::view('/{id}', 'organizer.participants.show')->name('show');
-            Route::view('/{id}/edit', 'organizer.participants.edit')->name('edit');
+//            Route::view('/{id}/edit', 'organizer.participants.edit')->name('edit');
         });
 
         /*
@@ -37,10 +37,14 @@ Route::middleware(['auth', 'role:organizer'])
             Route::get('/', [MeetingController::class, 'index'])->name('index');
             Route::get('/create', [MeetingController::class, 'create'])->name('create');
             Route::post('/', [MeetingController::class, 'store'])->name('store');
+            Route::get('/status-check', [\App\Http\Controllers\Organizer\MeetingController::class, 'statusCheck'])
+                ->name('status-check');
             Route::get('/{meeting}', [MeetingController::class, 'show'])->name('show');
             Route::get('/{meeting}/edit', [MeetingController::class, 'edit'])->name('edit');
             Route::put('/{meeting}', [MeetingController::class, 'update'])->name('update');
             Route::patch('/{meeting}/cancel', [MeetingController::class, 'cancel'])->name('cancel');
+            Route::post('/{meeting}/send-invite', [MeetingController::class, 'sendInvite'])->name('sendInvite');
+
 
             // Live session
             Route::get('/{meeting}/attend', [MeetingAttendController::class, 'attend'])->name('attend');

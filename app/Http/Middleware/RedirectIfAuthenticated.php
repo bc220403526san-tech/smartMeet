@@ -1,10 +1,9 @@
 <?php
-
 namespace App\Http\Middleware;
-
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Route;
 use Symfony\Component\HttpFoundation\Response;
 
 class RedirectIfAuthenticated
@@ -15,7 +14,19 @@ class RedirectIfAuthenticated
 
         foreach ($guards as $guard) {
             if (Auth::guard($guard)->check()) {
-                return redirect()->route(Auth::user()->role . '.dashboard');
+                $role = Auth::user()->role;
+
+                if (in_array($role, ['admin', 'organizer', 'participant']) && Route::has($role . '.dashboard')) {
+                    return redirect()->route($role . '.dashboard');
+                }
+
+                // Invalid/missing role — loop banne se pehle hi logout kar dein
+                Auth::guard($guard)->logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+
+                return redirect()->route('login')
+                    ->with('error', 'Your account has an invalid role. Please contact support.');
             }
         }
 

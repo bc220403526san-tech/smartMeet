@@ -17,7 +17,7 @@
     $c = $colors[$color] ?? $colors['blue'];
 @endphp
 
-<div class="{{ $c[0] }} p-4 rounded-xl border-l-4 {{ $c[1] }} shadow-lg hover:shadow-xl transition duration-300">
+<div class="{{ $c[0] }} p-4 rounded-xl border-l-4 {{ $c[1] }} shadow-md hover:shadow-2xl transition duration-300">
 
     {{-- ICON --}}
     <div class="w-10 h-10 flex items-center justify-center {{ $c[3] }} rounded-md mb-3 {{ $c[2] }}">

@@ -2,7 +2,9 @@
 
 use App\Http\Controllers\Admin\MeetingController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Admin\SettingsController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -18,18 +20,46 @@ Route::middleware(['auth', 'role:admin'])
 
         Route::get('/dashboard', [DashboardController::class, 'index'])
             ->name('dashboard');
-        Route::view('/reports', 'admin.reports.index')->name('reports');
-        Route::view('/settings', 'admin.settings.index')->name('settings');
-        Route::view('/profile', 'admin.profile.index')->name('profile');
+        Route::delete('/activities/{key}', [DashboardController::class, 'removeActivity'])
+            ->name('activities.remove');
+        Route::get('activities/fetch', [DashboardController::class, 'fetchActivities'])
+            ->name('activities.fetch');
+        /* Reports */
+        Route::prefix('reports')->name('reports.')->group(function () {
+            Route::get('/', [ReportController::class, 'index'])->name('index');
+            Route::get('/export', [ReportController::class, 'export'])->name('export');
+        });
+
+        /*
+        | Settings — profile, avatar, password, notifications, deactivation
+        */
+        Route::prefix('settings')->name('settings.')->group(function () {
+            Route::get('/', [SettingsController::class, 'index'])->name('index');
+            Route::patch('/profile', [SettingsController::class, 'updateProfile'])->name('profile.update');
+            Route::post('/avatar', [SettingsController::class, 'updateAvatar'])->name('avatar.update');
+            Route::put('/password', [SettingsController::class, 'updatePassword'])->name('password.update');
+            Route::patch('/notifications', [SettingsController::class, 'updateNotifications'])->name('notifications.update');
+            Route::delete('/deactivate', [SettingsController::class, 'deactivate'])->name('deactivate');
+            Route::post('/flash', [SettingsController::class, 'storeFlash'])->name('flash');   // <-- yeh missing tha
+        });
+
+        Route::prefix('role-requests')->name('role-requests.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Admin\RoleRequestController::class, 'index'])->name('index');
+            Route::patch('/{roleRequest}/approve', [\App\Http\Controllers\Admin\RoleRequestController::class, 'approve'])->name('approve');
+            Route::patch('/{roleRequest}/reject', [\App\Http\Controllers\Admin\RoleRequestController::class, 'reject'])->name('reject');
+            Route::delete('/{roleRequest}', [\App\Http\Controllers\Admin\RoleRequestController::class, 'destroy'])->name('destroy');
+        });
 
         /*
         | Meetings — read + moderate only (no create/edit)
         */
         Route::prefix('meetings')->name('meetings.')->group(function () {
-            Route::get('/', [MeetingController::class, 'index'])->name('index');
-            Route::get('/{meeting}', [MeetingController::class, 'show'])->name('show');
+            Route::get('/',           [MeetingController::class, 'index'])->name('index');
+            Route::get('/{meeting}',  [MeetingController::class, 'show'])->name('show');
+            Route::get('/{meeting}/edit', [MeetingController::class, 'edit'])->name('edit');
+            Route::delete('/{meeting}', [MeetingController::class, 'destroy'])->name('destroy');
             Route::patch('/{meeting}/cancel', [MeetingController::class, 'cancel'])->name('cancel');
-            Route::patch('/{meeting}/flag', [MeetingController::class, 'flag'])->name('flag');
+            Route::patch('/{meeting}/flag',   [MeetingController::class, 'flag'])->name('flag');
         });
 
         /*
@@ -40,6 +70,9 @@ Route::middleware(['auth', 'role:admin'])
             Route::get('/create', [UserController::class, 'create'])->name('create');
             Route::post('/', [UserController::class, 'store'])->name('store');
             Route::get('/{user}', [UserController::class, 'show'])->name('show');
+            // routes/web.php
+            Route::patch('/{user}/change-role', [UserController::class, 'changeRole'])
+                ->name('change-role');
             Route::get('/{user}/edit', [UserController::class, 'edit'])->name('edit');
             Route::put('/{user}', [UserController::class, 'update'])->name('update');
             Route::delete('/{user}', [UserController::class, 'destroy'])->name('destroy');

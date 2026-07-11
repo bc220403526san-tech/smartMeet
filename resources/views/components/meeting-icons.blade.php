@@ -15,6 +15,39 @@
         </svg>
     </a>
 
+    <!-- ====== SEND EMAIL — SHARED functionality, same as show page ====== -->
+    <button onclick="event.stopPropagation(); openEmailModal(
+                {{ $meeting->id }},
+                '{{ addslashes($meeting->title) }}',
+                '{{ addslashes($meeting->participants->pluck('user.email')->filter()->implode(', ')) }}'
+             )"
+            class="p-2 rounded-lg bg-gray-100 hover:bg-purple-100 transition group shadow-sm hover:shadow"
+            title="Send Email to Participants">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+             stroke-width="1.5" stroke="currentColor"
+             class="w-4 h-4 text-gray-600 group-hover:text-purple-600 transition">
+            <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"/>
+        </svg>
+    </button>
+
+    <!-- INVITE LINK -->
+    <div class="relative inline-block">
+        <button onclick="event.stopPropagation(); copyLinkFromTable('{{ $meeting->unique_code }}', this)"
+                class="p-2 rounded-lg bg-gray-100 hover:bg-indigo-100 transition group shadow-sm hover:shadow"
+                title="Copy Invite Link">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                 stroke-width="1.5" stroke="currentColor"
+                 class="w-4 h-4 text-gray-600 group-hover:text-indigo-600 transition">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                      d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244"/>
+            </svg>
+        </button>
+        <span class="copy-toast absolute -top-9 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-xs px-3 py-1.5 rounded-lg opacity-0 pointer-events-none transition-opacity duration-300 whitespace-nowrap z-50">
+            Link Copied!
+        </span>
+    </div>
+
     <!-- EDIT -->
     @if($meeting->status === 'upcoming')
         <a href="{{ route('organizer.meetings.edit', $meeting) }}"
@@ -38,10 +71,9 @@
         </span>
     @endif
 
-    <!-- CANCEL — sirf upcoming ya active cancel ho sakti hai -->
+    <!-- CANCEL -->
     @if(in_array($meeting->status, ['upcoming', 'active']))
-        <form
-{{--            action="{{ route('organizer.meetings.cancel', $meeting) }}"--}}
+        <form action="{{ route('organizer.meetings.cancel', $meeting) }}"
               method="POST"
               onsubmit="return confirm('Are you sure you want to cancel this meeting?')">
             @csrf
@@ -69,3 +101,23 @@
     @endif
 
 </div>
+
+<script>
+    // ====== COPY LINK FUNCTION ====== (page-agnostic, stays here — sirf link copy karta hai)
+    function copyLinkFromTable(code, btn) {
+        const link = `{{ url('/meetings/join') }}/${code}`;
+
+        navigator.clipboard.writeText(link).then(() => {
+            const toast = btn.parentElement.querySelector('.copy-toast');
+            toast.classList.remove('opacity-0');
+            toast.classList.add('opacity-100');
+
+            setTimeout(() => {
+                toast.classList.remove('opacity-100');
+                toast.classList.add('opacity-0');
+            }, 1500);
+        }).catch(() => {
+            alert('Failed to copy link. Please copy manually: ' + link);
+        });
+    }
+</script>

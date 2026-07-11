@@ -39,7 +39,29 @@ class AuthController extends Controller
         // SUCCESS MESSAGE
         session()->flash('success', 'Registration successful! Welcome to your dashboard');
 
-        // Redirect based on role
+        // 👇 NAYA CODE — Pending meeting join check
+        if (session()->has('pending_meeting_code')) {
+            $code = session()->pull('pending_meeting_code');
+            $meeting = \App\Models\Meeting::where('unique_code', $code)->first();
+
+            if ($meeting && $meeting->isJoinable()) {
+                $meeting->participants()->firstOrCreate([
+                    'user_id' => $user->id,
+                ]);
+
+                // Meeting abhi active nahi — index page pe bhejo
+                if ($meeting->status !== 'active') {
+                    return redirect()->route('participant.meetings.index')
+                        ->with('info', 'You have been added to "' . $meeting->title . '". It will start soon — you can join from here once it begins.');
+                }
+
+                // Meeting live hai — seedha room mein
+                return redirect()->route('participant.meetings.attend', $meeting->id)
+                    ->with('success', 'You have joined the meeting: ' . $meeting->title);
+            }
+        }
+
+        // Redirect based on role (jaisa pehle tha)
         if ($user->role == 'admin') {
             return redirect('/admin/dashboard');
         }
@@ -82,6 +104,28 @@ class AuthController extends Controller
             session()->flash('success', 'Login successful! Welcome back');
 
             $user = Auth::user();
+
+            // 👇 NAYA CODE — Pending meeting join check
+            if (session()->has('pending_meeting_code')) {
+                $code = session()->pull('pending_meeting_code');
+                $meeting = \App\Models\Meeting::where('unique_code', $code)->first();
+
+                if ($meeting && $meeting->isJoinable()) {
+                    $meeting->participants()->firstOrCreate([
+                        'user_id' => $user->id,
+                    ]);
+
+                    // Meeting abhi active nahi — index page pe bhejo
+                    if ($meeting->status !== 'active') {
+                        return redirect()->route('participant.meetings.index')
+                            ->with('info', 'You have been added to "' . $meeting->title . '". It will start soon — you can join from here once it begins.');
+                    }
+
+                    // Meeting live hai — seedha room mein
+                    return redirect()->route('participant.meetings.attend', $meeting->id)
+                        ->with('success', 'You have joined the meeting: ' . $meeting->title);
+                }
+            }
 
             if ($user->role == 'admin') {
                 return redirect('/admin/dashboard');

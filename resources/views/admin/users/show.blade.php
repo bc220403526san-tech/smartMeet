@@ -19,7 +19,7 @@
                 <div class="flex gap-3">
                     {{-- TOGGLE STATUS --}}
                     @if(auth()->id() !== $user->id)
-                        <form action="{{ route('admin.users.toggleStatus', $user) }}" method="POST">
+                        <form action="{{ route('admin.users.toggle-status', $user) }}" method="POST">
                             @csrf
                             @method('PATCH')
                             <button type="submit"

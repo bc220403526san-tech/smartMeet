@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Participant;
 
 use App\Events\MeetingSignal;
+use App\Events\TranscriptUpdated;
 use App\Http\Controllers\Controller;
 use App\Models\Meeting;
 use App\Models\MeetingTranscript;
@@ -10,18 +11,17 @@ use Illuminate\Http\Request;
 
 class MeetingAttendController extends Controller
 {
-    // ── ATTEND ──
     public function attend(Meeting $meeting)
     {
         $user = auth()->user();
 
-        $meeting->participants()
-            ->where('user_id', $user->id)
-            ->update(['joined_at' => now()]);
+        // Update joined_at
+        $meeting->participants()->where('user_id', $user->id)->update([
+            'joined_at' => now(),
+            'left_at' => null
+        ]);
 
-        $meeting->load(['participants.user', 'organizer']);
-
-        // Organizer ko batao koi join hua
+        // Broadcast join event to ALL
         broadcast(new MeetingSignal(
             meetingId:  (string) $meeting->id,
             fromUserId: (string) $user->id,
@@ -30,12 +30,11 @@ class MeetingAttendController extends Controller
             data:       [
                 'userId'   => (string) $user->id,
                 'name'     => $user->name,
-                'initials' => strtoupper(
-                    substr($user->name, 0, 1) .
-                    substr(strrchr($user->name, ' ') ?: ' ', 1, 1)
-                ),
+                'initials' => strtoupper(substr($user->name, 0, 1) . substr(strrchr($user->name, ' ') ?: ' ', 1, 1)),
             ]
-        ))->toOthers();
+        ));
+
+        $meeting->load(['participants.user', 'organizer']);
 
         $allUserIds = $meeting->participants->pluck('user_id')
             ->push($meeting->organizer_id)
@@ -46,7 +45,6 @@ class MeetingAttendController extends Controller
             ->filter(fn ($p) => $p->joined_at !== null && $p->user_id !== $user->id)
             ->map(function ($p) {
                 $name = $p->user->name;
-
                 return [
                     'userId'   => (string) $p->user->id,
                     'name'     => $name,
@@ -57,21 +55,43 @@ class MeetingAttendController extends Controller
             })
             ->values();
 
-        return view('participant.meetings.attend', compact('meeting', 'allUserIds', 'alreadyJoined'));
+        // FIX: full roster (minus self) with real hasJoined flags, mirroring the
+        // organizer controller, so the People tab always shows everyone.
+        $allParticipants = $meeting->participants
+            ->filter(fn ($p) => $p->user_id !== $user->id)
+            ->map(function ($p) {
+                $name = $p->user->name;
+                return [
+                    'userId'    => (string) $p->user->id,
+                    'name'      => $name,
+                    'initials'  => strtoupper(
+                        substr($name, 0, 1) . substr(strrchr($name, ' ') ?: ' ', 1, 1)
+                    ),
+                    'hasJoined' => $p->joined_at !== null,
+                ];
+            })
+            ->values();
+
+        // FIX: the organizer was previously always rendered as "online" on the
+        // participant page regardless of whether they'd actually started the
+        // meeting. actual_start is only set once the organizer opens the room.
+        $organizerJoined = $meeting->actual_start !== null;
+
+        return view('participant.meetings.attend', compact('meeting', 'allUserIds', 'alreadyJoined', 'allParticipants', 'organizerJoined'));
     }
 
-    // ── SIGNAL ──
     public function signal(Request $request, Meeting $meeting)
     {
         $request->validate([
             'to_user_id' => 'nullable',
-            'type' => 'required|in:offer,answer,ice-candidate,chat,mute,unmute,mic-status,transcript,user-joined,meeting-cancelled,user-left',
-            'data'       => 'required|array',
+            'type' => 'required|in:offer,answer,ice-candidate,chat,mute,unmute,mic-status,transcript,user-joined,user-left,meeting-cancelled,meeting-ended',
+            'data' => 'required|array',
         ]);
 
         $fromUserId = (string) auth()->id();
 
-        $broadcastToAll = ['chat', 'transcript', 'mic-status', 'user-left'];
+        // These types ALWAYS broadcast to ALL users
+        $broadcastToAll = ['chat', 'mic-status', 'user-left', 'user-joined', 'meeting-cancelled', 'meeting-ended'];
 
         if (in_array($request->type, $broadcastToAll)) {
             broadcast(new MeetingSignal(
@@ -85,19 +105,18 @@ class MeetingAttendController extends Controller
             return response()->json(['status' => 'broadcast sent']);
         }
 
-        // WebRTC + mute/unmute — specific user ko
+        // WebRTC specific signals
         broadcast(new MeetingSignal(
             meetingId:  (string) $meeting->id,
             fromUserId: $fromUserId,
             toUserId:   (string) $request->to_user_id,
             type:       $request->type,
             data:       $request->data
-        ))->toOthers();
+        ));
 
         return response()->json(['status' => 'signal sent']);
     }
 
-    // ── TRANSCRIPT SAVE ──
     public function saveTranscript(Request $request, Meeting $meeting)
     {
         $request->validate([
@@ -113,27 +132,21 @@ class MeetingAttendController extends Controller
             'spoken_at'  => now(),
         ]);
 
-        broadcast(new MeetingSignal(
-            meetingId:  (string) $meeting->id,
-            fromUserId: (string) $user->id,
-            toUserId:   'all',
-            type:       'transcript',
-            data:       [
-                'userId'       => (string) $user->id,
-                'userName'     => $user->name,
-                'userInitials' => strtoupper(
-                    substr($user->name, 0, 1) .
-                    substr(strrchr($user->name, ' ') ?: ' ', 1, 1)
-                ),
-                'text'         => $request->text,
-                'spokenAt'     => now()->format('h:i A'),
-            ]
-        ))->toOthers();
+        broadcast(new TranscriptUpdated(
+            meetingId:    (string) $meeting->id,
+            userId:       (string) $user->id,
+            userName:     $user->name,
+            userInitials: strtoupper(
+                substr($user->name, 0, 1) .
+                substr(strrchr($user->name, ' ') ?: ' ', 1, 1)
+            ),
+            text:         $request->text,
+            spokenAt:     now()->format('h:i A')
+        ));
 
         return response()->json(['status' => 'saved']);
     }
 
-    // ── MARK LEFT (page close/back/refresh — sirf ye participant nikalta hai) ──
     public function markLeft(Meeting $meeting)
     {
         $user = auth()->user();
@@ -154,12 +167,11 @@ class MeetingAttendController extends Controller
                 'userId' => (string) $user->id,
                 'name'   => $user->name,
             ]
-        ))->toOthers();
+        ));
 
         return response()->json(['status' => 'left']);
     }
 
-    // ── LEAVE ──
     public function leave(Meeting $meeting)
     {
         $isParticipant = $meeting->participants()

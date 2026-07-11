@@ -15,7 +15,6 @@ class SocialController extends Controller
     }
 
     public function callback($provider)
-
     {
         try {
             $socialUser = Socialite::driver($provider)->user();
@@ -36,31 +35,32 @@ class SocialController extends Controller
             }
         }
 
-        // Find or Create User
-        $user = User::updateOrCreate(
-            [
-                'provider'    => $provider,
-                'provider_id' => $socialUser->getId(),
-            ],
-            [
-                'name'              => $socialUser->getName(),
-                'email'             => $email,
-                'image'            => $socialUser->getAvatar(),
-                'provider'          => $provider,
-                'provider_id'       => $socialUser->getId(),
-                'email_verified_at' => now(),
-            ]
-        );
+        // Find or create — pehle dhoondein, na milay to naya banayein
+        $user = User::firstOrNew([
+            'provider'    => $provider,
+            'provider_id' => $socialUser->getId(),
+        ]);
 
-        // Inactive user block karo
+        $user->name              = $socialUser->getName();
+        $user->email             = $email;
+        $user->image             = $socialUser->getAvatar();
+        $user->email_verified_at = now();
+
+        // 👇 Sirf NAYE user ke liye role/is_active set karein — existing user ka role kabhi overwrite na ho
+        if (!$user->exists) {
+            $user->role      = 'participant'; // default role naye social signups ke liye
+            $user->is_active = 1;
+        }
+
+        $user->save();
+
         if (!$user->is_active) {
             return redirect('/login')->with('error', 'Your account has been deactivated.');
         }
 
-        // Login
         Auth::login($user);
+        request()->session()->regenerate();
 
-        // Role based redirect
         if ($user->role == 'admin') return redirect('/admin/dashboard');
         if ($user->role == 'organizer') return redirect('/organizer/dashboard');
         return redirect('/participant/dashboard');

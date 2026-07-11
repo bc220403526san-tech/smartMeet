@@ -83,17 +83,17 @@
     <!-- BOTTOM -->
     <div class="p-5 border-t border-gray-200 space-y-3">
 
-        <a href="#"
-           class="w-full flex items-center justify-center gap-2 text-sm font-medium bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 transition">
+{{--        <a href="#"--}}
+{{--           class="w-full flex items-center justify-center gap-2 text-sm font-medium bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 transition">--}}
 
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                 stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                <path stroke-linecap="round" stroke-linejoin="round"
-                      d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z"/>
-            </svg>
+{{--            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"--}}
+{{--                 stroke-width="1.5" stroke="currentColor" class="w-4 h-4">--}}
+{{--                <path stroke-linecap="round" stroke-linejoin="round"--}}
+{{--                      d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z"/>--}}
+{{--            </svg>--}}
 
-            Start Meeting
-        </a>
+{{--            Start Meeting--}}
+{{--        </a>--}}
 
         <form method="POST" action="{{ route('logout') }}">
             @csrf

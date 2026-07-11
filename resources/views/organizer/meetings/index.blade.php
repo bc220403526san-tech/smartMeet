@@ -1,376 +1,300 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" href="{{ asset('images/s-logo.png') }}">
-    <title>{{ env('APP_NAME') }}</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css">
-    @vite('resources/css/app.css')
-</head>
+<x-layouts.app>
 
-<body class="bg-[#f4f5f7]">
+    <x-slot name="header">
+        <x-header.search-bar placeholder="Search meetings..." />
+    </x-slot>
 
-<input type="checkbox" id="sidebar-toggle">
+    <x-success />
+    <x-error />
 
-<div class="layout-wrapper flex h-screen overflow-hidden">
+    <div class="p-4 bg-gray-50 rounded-2xl m-2 mt-0 space-y-4 overflow-y-auto min-h-screen">
 
-    <label for="sidebar-toggle" class="sidebar-overlay"></label>
-    <x-sidebar.organizer-menu />
-
-    <div class="flex-1 flex flex-col min-w-0 m-3 ml-0">
-
-        <x-header.search-bar placeholder="Search Meetings..." />
-
-        <div class="p-3 sm:p-5 bg-gray-50 rounded-lg mt-3 overflow-y-auto flex-1">
-
-            <x-success />
-            <x-error />
-
-            {{-- ================================================================
-                 TITLE + STATS
-            ================================================================ --}}
-            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-5">
-
-                <div>
-                    <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 tracking-tight">My Meetings</h1>
-                    <p class="text-gray-400 mt-1 text-sm">Review and manage your scheduled sessions.</p>
-                </div>
-
-                {{-- STATS CARDS --}}
-                <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
-
-                    <div class="bg-blue-50 border border-blue-100 rounded-2xl px-4 py-3 shadow-sm">
-                        <p class="text-xs text-gray-400 mb-1">Total</p>
-                        <h3 class="text-xl font-bold text-blue-600">{{ $totalMeetings }}</h3>
-                    </div>
-
-                    <div class="bg-green-50 border border-green-100 rounded-2xl px-4 py-3 shadow-sm">
-                        <p class="text-xs text-gray-400 mb-1">Active</p>
-                        <h3 class="text-xl font-bold text-green-600">{{ $activeMeetings }}</h3>
-                    </div>
-
-                    <div class="bg-yellow-50 border border-yellow-100 rounded-2xl px-4 py-3 shadow-sm">
-                        <p class="text-xs text-gray-400 mb-1">Upcoming</p>
-                        <h3 class="text-xl font-bold text-yellow-500">{{ $upcomingMeetings }}</h3>
-                    </div>
-
-                    <div class="bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 shadow-sm">
-                        <p class="text-xs text-gray-400 mb-1">Completed</p>
-                        <h3 class="text-xl font-bold text-gray-500">{{ $completedMeetings }}</h3>
-                    </div>
-
-                    <div class="bg-red-50 border border-red-100 rounded-2xl px-4 py-3 shadow-sm">
-                        <p class="text-xs text-gray-400 mb-1">Cancelled</p>
-                        <h3 class="text-xl font-bold text-red-600">{{ $cancelledMeetings }}</h3>
-                    </div>
-
-                </div>
-
+        <!-- TOP HEADER -->
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+                <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 tracking-tight">My Meetings</h1>
+                <p class="text-gray-400 mt-1 text-sm sm:text-base">Review and manage your scheduled sessions.</p>
             </div>
 
-            {{-- ================================================================
-                 FILTER + NEW MEETING
-            ================================================================ --}}
-            <form method="GET" action="{{ route('organizer.meetings.index') }}"
-                  class="flex flex-wrap gap-2 justify-end sm:gap-3 mb-4">
-
-                <div class="relative">
-                    <select name="status" onchange="this.form.submit()"
-                            class="appearance-none pl-4 pr-10 py-2 border border-gray-200 rounded-lg
-                                   text-sm text-gray-600 bg-white hover:bg-gray-50
-                                   focus:outline-none focus:ring-2 focus:ring-blue-100 transition cursor-pointer">
-                        <option value="">All Meetings</option>
-                        <option value="active"    {{ request('status') == 'active'    ? 'selected' : '' }}>Active</option>
-                        <option value="upcoming"  {{ request('status') == 'upcoming'  ? 'selected' : '' }}>Upcoming</option>
-                        <option value="completed" {{ request('status') == 'completed' ? 'selected' : '' }}>Completed</option>
-                        <option value="cancelled" {{ request('status') == 'cancelled' ? 'selected' : '' }}>Cancelled</option>
-                    </select>
-                    <div class="absolute inset-y-0 right-3 flex items-center pointer-events-none">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                             stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-400">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/>
-                        </svg>
-                    </div>
+            <!-- STATS CARDS -->
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <div class="bg-white border border-blue-100 rounded-2xl px-4 py-3 shadow-sm">
+                    <p class="text-xs text-gray-400 mb-1">Total</p>
+                    <h3 id="stat-total" class="text-xl font-bold text-blue-600">{{ $totalMeetings }}</h3>
                 </div>
-
-                <a href="{{ route('organizer.meetings.create') }}"
-                   class="px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg text-sm
-                          hover:bg-blue-700 transition whitespace-nowrap">
-                    + New Meeting
-                </a>
-
-            </form>
-
-            {{-- ================================================================
-                 TABLE WRAPPER
-            ================================================================ --}}
-            <div class="bg-white border border-blue-500 border-l-6 border-r-6 rounded-md overflow-hidden
-                        shadow-sm hover:shadow-lg transition-all duration-300 ease-in-out p-4 mt-2">
-
-                @if($meetings->isEmpty())
-
-                    <div class="text-center py-16 text-gray-400">
-                        <i class="fa fa-calendar-xmark text-4xl mb-3"></i>
-                        <p class="text-sm">No meetings found.</p>
-                        <a href="{{ route('organizer.meetings.create') }}"
-                           class="mt-3 inline-block text-blue-600 text-sm hover:underline">
-                            + Create your first meeting
-                        </a>
-                    </div>
-
-                @else
-
-                    {{-- ============================================================
-                         DESKTOP TABLE  (lg and above)
-                    ============================================================ --}}
-                    <div class="hidden lg:block">
-
-                        {{-- Header --}}
-                        <div class="grid grid-cols-6 text-xs text-blue-600 font-semibold mt-6 mb-6 mx-4
-                                    border border-gray-200 p-4 bg-blue-50 rounded-sm
-                                    shadow-[inset_0_4px_10px_rgba(0,0,0,0.2)]">
-                            <div>MEETING TITLE</div>
-                            <div>DATE & TIME</div>
-                            <div>PARTICIPANTS</div>
-                            <div>STATUS</div>
-                            <div>ATTEND</div>
-                            <div>ACTIONS</div>
-                        </div>
-
-                        {{-- Rows --}}
-                        @foreach($meetings as $meeting)
-                            <div class="grid grid-cols-6 px-6 py-4 items-center border-t hover:bg-gray-50 transition">
-
-                                {{-- Title --}}
-                                <div>
-                                    <h3 class="font-semibold text-gray-800 text-sm">{{ $meeting->title }}</h3>
-                                    <p class="text-xs text-gray-400">IM # M-{{ $meeting->id }}</p>
-                                </div>
-
-                                {{-- Date & Time --}}
-                                <div class="text-sm text-gray-600">
-                                    {{ \Carbon\Carbon::parse($meeting->date)->format('M d, Y') }}
-                                    <p class="text-xs text-gray-400">
-                                        {{ \Carbon\Carbon::parse($meeting->time)->format('h:i A') }}
-                                    </p>
-                                </div>
-
-                                {{-- Participants --}}
-                                <div class="text-sm text-gray-600">
-                                    {{ $meeting->participants->count() }} Participants
-                                </div>
-
-                                {{-- Status Badge --}}
-                                <div>
-                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-full font-medium
-                                        {{ $meeting->status === 'upcoming'  ? 'bg-blue-100 text-blue-700'     : '' }}
-                                        {{ $meeting->status === 'active'    ? 'bg-green-100 text-green-700'   : '' }}
-                                        {{ $meeting->status === 'completed' ? 'bg-gray-100 text-gray-600'     : '' }}
-                                        {{ $meeting->status === 'cancelled' ? 'bg-red-100 text-red-600'       : '' }}
-                                        {{ $meeting->status === 'flagged'   ? 'bg-yellow-100 text-yellow-700' : '' }}">
-
-                                        {{-- Dot --}}
-                                        <span class="w-1.5 h-1.5 rounded-full
-                                            {{ $meeting->status === 'upcoming'  ? 'bg-blue-500'   : '' }}
-                                            {{ $meeting->status === 'active'    ? 'bg-green-500'  : '' }}
-                                            {{ $meeting->status === 'completed' ? 'bg-gray-400'   : '' }}
-                                            {{ $meeting->status === 'cancelled' ? 'bg-red-500'    : '' }}
-                                            {{ $meeting->status === 'flagged'   ? 'bg-yellow-500' : '' }}">
-                                        </span>
-
-                                        {{ ucfirst($meeting->status) }}
-                                    </span>
-                                </div>
-
-                                {{-- ── ATTEND COLUMN ── --}}
-                                <div>
-                                    @if($meeting->status === 'active')
-
-                                        {{-- Active → green clickable button --}}
-                                        <a href="{{ route('organizer.meetings.attend', $meeting->id) }}"
-                                           class="inline-flex items-center gap-1.5 px-3 py-1.5
-                                                  bg-green-600 hover:bg-green-700 active:scale-95
-                                                  text-white text-xs font-semibold rounded-lg
-                                                  transition-all duration-150 shadow-sm">
-                                            <i class="fa fa-video text-[11px]"></i>
-                                            Attend
-                                        </a>
-
-                                    @elseif($meeting->status === 'upcoming')
-
-                                        {{-- Upcoming → disabled with clock --}}
-                                        <span title="Meeting hasn't started yet"
-                                              class="inline-flex items-center gap-1.5 px-3 py-1.5
-                                                     bg-gray-100 text-gray-400 border border-gray-200
-                                                     text-xs font-medium rounded-lg cursor-not-allowed
-                                                     select-none">
-                                            <i class="fa fa-clock text-[11px]"></i>
-                                            Upcoming
-                                        </span>
-
-                                    @elseif($meeting->status === 'completed')
-
-                                        {{-- Completed → disabled with check --}}
-                                        <span title="This meeting has ended"
-                                              class="inline-flex items-center gap-1.5 px-3 py-1.5
-                                                     bg-gray-100 text-gray-400 border border-gray-200
-                                                     text-xs font-medium rounded-lg cursor-not-allowed
-                                                     select-none">
-                                            <i class="fa fa-circle-check text-[11px]"></i>
-                                            Ended
-                                        </span>
-
-                                    @elseif($meeting->status === 'cancelled')
-
-                                        {{-- Cancelled → disabled red-tinted --}}
-                                        <span title="This meeting was cancelled"
-                                              class="inline-flex items-center gap-1.5 px-3 py-1.5
-                                                     bg-red-50 text-red-300 border border-red-100
-                                                     text-xs font-medium rounded-lg cursor-not-allowed
-                                                     select-none">
-                                            <i class="fa fa-xmark text-[11px]"></i>
-                                            Cancelled
-                                        </span>
-
-                                    @else
-
-                                        {{-- Flagged or any other status --}}
-                                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5
-                                                     bg-yellow-50 text-yellow-400 border border-yellow-100
-                                                     text-xs font-medium rounded-lg cursor-not-allowed
-                                                     select-none">
-                                            <i class="fa fa-flag text-[11px]"></i>
-                                            {{ ucfirst($meeting->status) }}
-                                        </span>
-
-                                    @endif
-                                </div>
-
-                                {{-- Actions --}}
-                                <div class="flex gap-3">
-                                    <x-meeting-icons :meeting="$meeting" />
-                                </div>
-
-                            </div>
-                        @endforeach
-
-                    </div>
-
-                    {{-- ============================================================
-                         MOBILE CARDS  (below lg)
-                    ============================================================ --}}
-                    <div class="lg:hidden divide-y divide-gray-100">
-
-                        @foreach($meetings as $meeting)
-                            <div class="p-4 hover:bg-gray-50 transition">
-
-                                {{-- Top row: title + status badge --}}
-                                <div class="flex justify-between items-start gap-2 mb-2">
-                                    <div>
-                                        <h3 class="font-semibold text-gray-800 text-sm">{{ $meeting->title }}</h3>
-                                        <p class="text-xs text-gray-400 mt-0.5">
-                                            IM # M-{{ $meeting->id }} &nbsp;·&nbsp;
-                                            {{ \Carbon\Carbon::parse($meeting->date)->format('M d, Y') }},
-                                            {{ \Carbon\Carbon::parse($meeting->time)->format('h:i A') }}
-                                        </p>
-                                    </div>
-
-                                    <span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full shrink-0 font-medium
-                                        {{ $meeting->status === 'upcoming'  ? 'bg-blue-100 text-blue-700'     : '' }}
-                                        {{ $meeting->status === 'active'    ? 'bg-green-100 text-green-700'   : '' }}
-                                        {{ $meeting->status === 'completed' ? 'bg-gray-100 text-gray-600'     : '' }}
-                                        {{ $meeting->status === 'cancelled' ? 'bg-red-100 text-red-600'       : '' }}
-                                        {{ $meeting->status === 'flagged'   ? 'bg-yellow-100 text-yellow-700' : '' }}">
-
-                                        <span class="w-1.5 h-1.5 rounded-full
-                                            {{ $meeting->status === 'upcoming'  ? 'bg-blue-500'   : '' }}
-                                            {{ $meeting->status === 'active'    ? 'bg-green-500'  : '' }}
-                                            {{ $meeting->status === 'completed' ? 'bg-gray-400'   : '' }}
-                                            {{ $meeting->status === 'cancelled' ? 'bg-red-500'    : '' }}
-                                            {{ $meeting->status === 'flagged'   ? 'bg-yellow-500' : '' }}">
-                                        </span>
-
-                                        {{ ucfirst($meeting->status) }}
-                                    </span>
-                                </div>
-
-                                {{-- Bottom row: participants + attend + actions --}}
-                                <div class="flex justify-between items-center mt-3">
-
-                                    <span class="text-xs text-gray-500">
-                                        <i class="fa fa-users mr-1 text-gray-400"></i>
-                                        {{ $meeting->participants->count() }} Participants
-                                    </span>
-
-                                    <div class="flex items-center gap-2">
-
-                                        {{-- ── ATTEND BUTTON (mobile) ── --}}
-                                        @if($meeting->status === 'active')
-                                            <a href="{{ route('organizer.meetings.attend', $meeting->id) }}"
-                                               class="inline-flex items-center gap-1 px-2.5 py-1.5
-                                                      bg-green-600 hover:bg-green-700 active:scale-95
-                                                      text-white text-xs font-semibold rounded-lg
-                                                      transition-all duration-150">
-                                                <i class="fa fa-video text-[10px]"></i>
-                                                Attend
-                                            </a>
-
-                                        @elseif($meeting->status === 'upcoming')
-                                            <span class="inline-flex items-center gap-1 px-2.5 py-1.5
-                                                         bg-gray-100 text-gray-400 border border-gray-200
-                                                         text-xs rounded-lg cursor-not-allowed select-none">
-                                                <i class="fa fa-clock text-[10px]"></i>
-                                                Upcoming
-                                            </span>
-
-                                        @elseif($meeting->status === 'completed')
-                                            <span class="inline-flex items-center gap-1 px-2.5 py-1.5
-                                                         bg-gray-100 text-gray-400 border border-gray-200
-                                                         text-xs rounded-lg cursor-not-allowed select-none">
-                                                <i class="fa fa-circle-check text-[10px]"></i>
-                                                Ended
-                                            </span>
-
-                                        @elseif($meeting->status === 'cancelled')
-                                            <span class="inline-flex items-center gap-1 px-2.5 py-1.5
-                                                         bg-red-50 text-red-300 border border-red-100
-                                                         text-xs rounded-lg cursor-not-allowed select-none">
-                                                <i class="fa fa-xmark text-[10px]"></i>
-                                                Cancelled
-                                            </span>
-                                        @endif
-
-                                        {{-- Existing action icons --}}
-                                        <div class="flex gap-2">
-                                            <x-meeting-icons :meeting="$meeting" />
-                                        </div>
-
-                                    </div>
-                                </div>
-                            </div>
-                        @endforeach
-
-                    </div>
-
-                @endif
-
-                {{-- ================================================================
-                     PAGINATION
-                ================================================================ --}}
-                <div class="flex flex-col sm:flex-row justify-between items-center gap-3
-                            px-4 sm:px-6 py-4 text-sm text-gray-500 border-t mt-2">
-                    <p class="text-xs sm:text-sm">
-                        Showing {{ $meetings->firstItem() ?? 0 }}–{{ $meetings->lastItem() ?? 0 }}
-                        of {{ $meetings->total() }} meetings
-                    </p>
-                    {{ $meetings->links() }}
+                <div class="bg-white border border-green-100 rounded-2xl px-4 py-3 shadow-sm">
+                    <p class="text-xs text-gray-400 mb-1">Active</p>
+                    <h3 id="stat-active" class="text-xl font-bold text-green-600">{{ $activeMeetings }}</h3>
                 </div>
-
+                <div class="bg-white border border-yellow-100 rounded-2xl px-4 py-3 shadow-sm">
+                    <p class="text-xs text-gray-400 mb-1">Upcoming</p>
+                    <h3 id="stat-upcoming" class="text-xl font-bold text-yellow-500">{{ $upcomingMeetings }}</h3>
+                </div>
+                <div class="bg-white border border-gray-100 rounded-2xl px-4 py-3 shadow-sm">
+                    <p class="text-xs text-gray-400 mb-1">Completed</p>
+                    <h3 id="stat-completed" class="text-xl font-bold text-gray-500">{{ $completedMeetings }}</h3>
+                </div>
+                <div class="bg-white border border-red-100 rounded-2xl px-4 py-3 shadow-sm">
+                    <p class="text-xs text-gray-400 mb-1">Cancelled</p>
+                    <h3 id="stat-cancelled" class="text-xl font-bold text-red-600">{{ $cancelledMeetings }}</h3>
+                </div>
             </div>
         </div>
-    </div>
-</div>
 
-</body>
-</html>
+        <!-- FILTERS -->
+        <div class="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
+            <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+                <div class="flex gap-2 items-center flex-wrap">
+
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-400" fill="none"
+                         viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                              d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75"/>
+                    </svg>
+
+                    @php
+                        $statuses = [
+                            ''           => ['label' => 'All',         'active' => 'bg-blue-600 text-white',   'inactive' => 'border border-gray-200 text-gray-500 hover:bg-blue-50 hover:text-blue-600'],
+                            'upcoming'   => ['label' => 'Upcoming',    'active' => 'bg-blue-600 text-white',   'inactive' => 'border border-gray-200 text-gray-500 hover:bg-blue-50 hover:text-blue-600'],
+                            'active'     => ['label' => 'Active',      'active' => 'bg-green-600 text-white',  'inactive' => 'border border-gray-200 text-gray-500 hover:bg-green-50 hover:text-green-600'],
+                            'completed'  => ['label' => 'Completed',   'active' => 'bg-gray-600 text-white',   'inactive' => 'border border-gray-200 text-gray-500 hover:bg-gray-100'],
+                            'cancelled'  => ['label' => 'Cancelled',   'active' => 'bg-red-600 text-white',    'inactive' => 'border border-gray-200 text-gray-500 hover:bg-red-50 hover:text-red-600'],
+                        ];
+                    @endphp
+
+                    @foreach($statuses as $value => $config)
+                        <a href="{{ route('organizer.meetings.index', ['status' => $value]) }}"
+                           class="text-xs px-4 py-2 rounded-xl transition
+                                  {{ request('status') == $value ? $config['active'] : $config['inactive'] }}">
+                            {{ $config['label'] }}
+                        </a>
+                    @endforeach
+
+                    <a href="{{ route('organizer.meetings.create') }}"
+                       class="text-xs px-4 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition shadow-sm">
+                        + New Meeting
+                    </a>
+
+                </div>
+
+                <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2 w-fit">
+                    <div class="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></div>
+                    <p class="text-xs text-gray-500">
+                        Showing {{ $meetings->firstItem() }}–{{ $meetings->lastItem() }}
+                        of {{ $meetings->total() }} meetings
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- TABLE -->
+        <div id="pagetop" class="bg-white border border-gray-200 rounded-3xl shadow-sm overflow-hidden">
+
+            <div class="px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                    <div>
+                        <h2 class="font-semibold text-gray-800 text-lg">Meetings Overview</h2>
+                        <p class="text-xs text-gray-400 mt-0.5">Track all your meetings and activities.</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button class="px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-medium shadow hover:bg-blue-700 transition">
+                            Export Data
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm min-w-[1050px]">
+                    <thead>
+                    <tr class="bg-gray-50 border-b border-gray-100">
+                        <th class="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">Meeting</th>
+                        <th class="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">Date & Time</th>
+                        <th class="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">Participants</th>
+                        <th class="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">Status</th>
+                        <th class="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">Attend</th>
+                        <th class="px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+
+                    @forelse($meetings as $meeting)
+
+                        @php
+                            $statusConfig = [
+                                'upcoming'   => ['bg' => 'bg-blue-50 text-blue-700 border-blue-100',   'dot' => 'bg-blue-500',                      'label' => 'Upcoming'],
+                                'active'     => ['bg' => 'bg-green-50 text-green-700 border-green-100', 'dot' => 'bg-green-500 animate-pulse',        'label' => 'Active'],
+                                'completed'  => ['bg' => 'bg-gray-100 text-gray-600 border-gray-200',   'dot' => 'bg-gray-400',                      'label' => 'Completed'],
+                                'cancelled'  => ['bg' => 'bg-red-50 text-red-600 border-red-100',       'dot' => 'bg-red-400',                       'label' => 'Cancelled'],
+                                'flagged'    => ['bg' => 'bg-orange-50 text-orange-600 border-orange-100', 'dot' => 'bg-orange-400',                 'label' => 'Flagged'],
+                            ];
+                            $s = $statusConfig[$meeting->status] ?? ['bg' => 'bg-gray-100 text-gray-500 border-gray-200', 'dot' => 'bg-gray-400', 'label' => ucfirst($meeting->status)];
+                        @endphp
+
+                        <tr class="hover:bg-blue-50/30 transition duration-200">
+
+                            <!-- MEETING -->
+                            <td class="px-5 py-4">
+                                <p class="font-semibold text-gray-800">{{ $meeting->title }}</p>
+                                <p class="text-xs text-gray-400 mt-1">
+                                    IM # M-{{ $meeting->id }}
+                                </p>
+                            </td>
+
+                            <!-- DATE & TIME -->
+                            <td class="px-5 py-4">
+                                <p class="font-medium text-gray-700">
+                                    {{ \Carbon\Carbon::parse($meeting->date)->format('M d, Y') }}
+                                </p>
+                                <p class="text-xs text-gray-400 mt-1">
+                                    {{ \Carbon\Carbon::parse($meeting->time)->format('h:i A') }}
+                                </p>
+                            </td>
+
+                            <!-- PARTICIPANTS -->
+                            <td class="px-5 py-4">
+                                <div class="inline-flex items-center bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-xl">
+                                    <span class="font-medium text-gray-700">
+                                        {{ $meeting->participants->count() }} Participants
+                                    </span>
+                                </div>
+                            </td>
+
+                            <!-- STATUS -->
+                            <td class="px-5 py-4" id="status-badge-{{ $meeting->id }}">
+                                <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border {{ $s['bg'] }}">
+                                    <span class="w-2 h-2 rounded-full {{ $s['dot'] }}"></span>
+                                    {{ $s['label'] }}
+                                </span>
+                            </td>
+
+                            <!-- ATTEND -->
+                            <td class="px-5 py-4" id="attend-col-{{ $meeting->id }}">
+                                <x-meeting-attend-button :meeting="$meeting" />
+                            </td>
+
+                            <!-- ACTIONS -->
+                            <td class="px-5 py-4">
+                                <x-meeting-icons :meeting="$meeting" />
+                            </td>
+
+                        </tr>
+
+                    @empty
+                        <tr>
+                            <td colspan="6" class="px-5 py-12 text-center text-gray-400 text-sm">
+                                <i class="fa fa-calendar-xmark text-4xl mb-3 block"></i>
+                                No meetings found.
+                                <div class="mt-3">
+                                    <a href="{{ route('organizer.meetings.create') }}"
+                                       class="inline-block text-blue-600 text-sm hover:underline">
+                                        + Create your first meeting
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    @endforelse
+
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- PAGINATION -->
+            @if($meetings->hasPages())
+                <div class="px-5 py-4 border-t border-gray-100">
+                    {{ $meetings->links() }}
+                </div>
+            @endif
+
+        </div>
+
+    </div>
+
+    {{-- EMAIL MODAL --}}
+    <x-email-invite-modal />
+
+</x-layouts.app>
+
+{{-- ================================================================
+     LIVE STATUS POLLING (no page refresh needed)
+================================================================ --}}
+<script>
+    (function () {
+        const rows = Array.from(document.querySelectorAll('[data-meeting-id]'));
+        if (rows.length === 0) return;
+
+        const meetingIds = [...new Set(rows.map(el => el.dataset.meetingId))];
+
+        const badgeMap = {
+            upcoming:  { bg: 'bg-blue-50 text-blue-700 border-blue-100', dot: 'bg-blue-500', label: 'Upcoming' },
+            active:    { bg: 'bg-green-50 text-green-700 border-green-100', dot: 'bg-green-500 animate-pulse', label: 'Active' },
+            completed: { bg: 'bg-gray-100 text-gray-600 border-gray-200', dot: 'bg-gray-400', label: 'Completed' },
+            cancelled: { bg: 'bg-red-50 text-red-600 border-red-100', dot: 'bg-red-400', label: 'Cancelled' },
+            flagged:   { bg: 'bg-orange-50 text-orange-600 border-orange-100', dot: 'bg-orange-400', label: 'Flagged' },
+        };
+
+        function attendHtml(status, id) {
+            if (status === 'active') {
+                return `<a href="/organizer/meetings/${id}/attend" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 active:scale-95 text-white text-xs font-semibold rounded-lg transition-all duration-150 shadow-sm"><i class="fa fa-video text-[11px]"></i> Attend</a>`;
+            }
+            if (status === 'upcoming') {
+                return `<span title="Meeting hasn't started yet" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-400 border border-gray-200 text-xs font-medium rounded-lg cursor-not-allowed select-none"><i class="fa fa-clock text-[11px]"></i> Upcoming</span>`;
+            }
+            if (status === 'completed') {
+                return `<span title="This meeting has ended" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-400 border border-gray-200 text-xs font-medium rounded-lg cursor-not-allowed select-none"><i class="fa fa-circle-check text-[11px]"></i> Ended</span>`;
+            }
+            if (status === 'cancelled') {
+                return `<span title="This meeting was cancelled" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-300 border border-red-100 text-xs font-medium rounded-lg cursor-not-allowed select-none"><i class="fa fa-xmark text-[11px]"></i> Cancelled</span>`;
+            }
+            return '';
+        }
+
+        function badgeHtml(status) {
+            const b = badgeMap[status] || { bg: 'bg-gray-100 text-gray-500 border-gray-200', dot: 'bg-gray-400', label: ucfirst(status) };
+            const label = status.charAt(0).toUpperCase() + status.slice(1);
+            return `<span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border ${b.bg}">
+                <span class="w-2 h-2 rounded-full ${b.dot}"></span>
+                ${b.label}
+            </span>`;
+        }
+
+        function updateRow(id, status) {
+            const badge = document.getElementById('status-badge-' + id);
+            if (badge) badge.innerHTML = badgeHtml(status);
+
+            const attend = document.getElementById('attend-col-' + id);
+            if (attend) attend.innerHTML = attendHtml(status, id);
+        }
+
+        async function poll() {
+            try {
+                const url = `{{ route('organizer.meetings.status-check') }}?ids=${meetingIds.join(',')}`;
+                const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                if (!res.ok) return;
+                const data = await res.json();
+
+                const s = data.stats || {};
+                const setStat = (id, val) => {
+                    const el = document.getElementById(id);
+                    if (el && val !== undefined) el.textContent = val;
+                };
+                setStat('stat-total', s.total);
+                setStat('stat-active', s.active);
+                setStat('stat-upcoming', s.upcoming);
+                setStat('stat-completed', s.completed);
+                setStat('stat-cancelled', s.cancelled);
+
+                Object.entries(data.meetings || {}).forEach(([id, status]) => {
+                    const row = document.querySelector(`[data-meeting-id="${id}"]`);
+                    if (!row || row.dataset.currentStatus === status) return;
+                    row.dataset.currentStatus = status;
+                    updateRow(id, status);
+                });
+            } catch (e) {
+                console.error('Meeting status poll failed:', e);
+            }
+        }
+
+        setInterval(poll, 5000);
+    })();
+</script>

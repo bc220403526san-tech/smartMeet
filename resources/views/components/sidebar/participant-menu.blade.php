@@ -1,9 +1,15 @@
-<aside class="sidebar w-64 bg-white shadow-lg p-5 flex flex-col justify-between rounded-xl m-3">
+<aside class="w-64 bg-white shadow-lg flex flex-col h-[calc(100vh-1rem)] m-2 rounded-2xl border border-gray-100">
 
-    <div>
-        <x-logo />
+    <!-- TOP -->
+    <div class="p-5 flex-1 overflow-y-auto">
 
-        <ul class="space-y-1 text-sm mt-2">
+        {{-- Logo --}}
+        <div class="mb-6">
+            <x-logo />
+        </div>
+
+        {{-- Navigation Menu --}}
+        <ul class="space-y-1">
 
             {{-- Dashboard --}}
             <x-sidebar.sidebar-link
@@ -53,7 +59,6 @@
                 label="Settings"
                 :active="request()->routeIs('participant.settings.index')">
                 <x-slot name="icon">
-                    {{-- ✅ FIX: <svg> opening tag tha hi nahi pehle --}}
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                          stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
                         <path stroke-linecap="round" stroke-linejoin="round"
@@ -68,8 +73,8 @@
     </div>
 
     {{-- BOTTOM --}}
-    {{-- BOTTOM --}}
-    <div class="border-t border-gray-100 pt-4 mt-4">
+    <div class="p-5 border-t border-gray-100">
+
         <form method="POST" action="{{ route('logout') }}">
             @csrf
             <button type="submit"
@@ -87,13 +92,14 @@
 
                 {{-- Gray dot animation on hover --}}
                 <span class="ml-auto flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                <span class="w-1 h-1 rounded-full bg-red-400 animate-bounce" style="animation-delay: 0ms"></span>
-                <span class="w-1 h-1 rounded-full bg-red-400 animate-bounce" style="animation-delay: 150ms"></span>
-                <span class="w-1 h-1 rounded-full bg-red-400 animate-bounce" style="animation-delay: 300ms"></span>
-            </span>
+                    <span class="w-1 h-1 rounded-full bg-red-400 animate-bounce" style="animation-delay: 0ms"></span>
+                    <span class="w-1 h-1 rounded-full bg-red-400 animate-bounce" style="animation-delay: 150ms"></span>
+                    <span class="w-1 h-1 rounded-full bg-red-400 animate-bounce" style="animation-delay: 300ms"></span>
+                </span>
 
             </button>
         </form>
+
     </div>
 
 </aside>

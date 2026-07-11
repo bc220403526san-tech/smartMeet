@@ -25,7 +25,7 @@
         {{-- Cards --}}
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
 
-            <x-card title="TOTAL MEETINGS" value="{{ number_format($totalMeetings) }}" color="blue" icon="fa-calendar">
+            <x-card title="TOTAL MEETINGS" value="{{ number_format($totalMeetings) }}" color="blue" icon="fa-calendar" >
                 {{ $growthPercent >= 0 ? '↑' : '↓' }} {{ abs($growthPercent) }}% from last month
             </x-card>
 
@@ -48,7 +48,7 @@
         </div>
 
         {{-- Activity --}}
-        <x-activity :activities="$activities" />
+        <x-activity :activities="$activities" :limit="5" />
 
     </div>
 

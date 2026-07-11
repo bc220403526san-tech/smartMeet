@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Models\Notification;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\User;
@@ -145,14 +146,51 @@ class UserController extends Controller
             ->with('success', 'User removed successfully!');
     }
 
-    // UserController mein
     public function toggleStatus(User $user)
     {
         if ($user->id === auth()->id()) {
             return back()->with('error', 'You cannot deactivate your own account!');
         }
 
-        $user->update(['is_active' => !$user->is_active]);
+        $newStatus = !$user->is_active;
+        $user->update(['is_active' => $newStatus]);
+
+        Notification::create([
+            'user_id' => $user->id,
+            'title'   => $newStatus ? 'Account Activated' : 'Account Deactivated',
+            'message' => $newStatus
+                ? 'Your account has been activated by an administrator. You now have full access again.'
+                : 'Your account has been deactivated by an administrator.',
+            'link'    => null,
+        ]);
+
         return back()->with('success', 'User status updated.');
+    }
+    /**
+     * Change a user's role and notify them.
+     */
+    public function changeRole(Request $request, User $user)
+    {
+        $request->validate([
+            'role' => 'required|in:admin,organizer,participant',
+        ]);
+
+        $oldRole = $user->role;
+        $newRole = $request->role;
+
+        if ($oldRole === $newRole) {
+            return back()->with('success', 'No change — user already has this role.');
+        }
+
+        $user->update(['role' => $newRole]);
+
+        Notification::create([
+            'user_id' => $user->id,
+            'title'   => 'Your Role Has Been Updated',
+            'message' => 'Your role has been changed from ' . ucfirst($oldRole) . ' to ' . ucfirst($newRole) . '.',
+            'link'    => null,
+        ]);
+
+        return back()->with('success', "User role changed to " . ucfirst($newRole) . " successfully!");
     }
 }

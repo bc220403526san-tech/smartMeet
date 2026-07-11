@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Organizer;
 
 use App\Events\MeetingSignal;
+use App\Events\TranscriptUpdated;
 use App\Http\Controllers\Controller;
 use App\Models\Meeting;
 use App\Models\MeetingTranscript;
@@ -39,7 +40,6 @@ class MeetingAttendController extends Controller
             ->filter(fn ($p) => $p->joined_at !== null)
             ->map(function ($p) {
                 $name = $p->user->name;
-
                 return [
                     'userId'   => (string) $p->user->id,
                     'name'     => $name,
@@ -50,7 +50,22 @@ class MeetingAttendController extends Controller
             })
             ->values();
 
-        return view('organizer.meetings.attend', compact('meeting', 'allUserIds', 'alreadyJoined'));
+        // FIX: full participant roster with real hasJoined flags, so the frontend
+        // can show every invited participant in the People tab (joined AND not
+        // joined) instead of marking everyone as "Joined" the moment the page loads.
+        $allParticipants = $meeting->participants->map(function ($p) {
+            $name = $p->user->name;
+            return [
+                'userId'    => (string) $p->user->id,
+                'name'      => $name,
+                'initials'  => strtoupper(
+                    substr($name, 0, 1) . substr(strrchr($name, ' ') ?: ' ', 1, 1)
+                ),
+                'hasJoined' => $p->joined_at !== null,
+            ];
+        })->values();
+
+        return view('organizer.meetings.attend', compact('meeting', 'allUserIds', 'alreadyJoined', 'allParticipants'));
     }
 
     // ── SIGNAL ──
@@ -58,13 +73,13 @@ class MeetingAttendController extends Controller
     {
         $request->validate([
             'to_user_id' => 'nullable',
-            'type'       => 'required|in:offer,answer,ice-candidate,chat,mute,unmute,mic-status,transcript,meeting-cancelled,user-left',
-            'data'       => 'required|array',
+            'type' => 'required|in:offer,answer,ice-candidate,chat,mute,unmute,mic-status,transcript,user-joined,user-left,meeting-cancelled,meeting-ended',
+            'data' => 'required|array',
         ]);
 
         $fromUserId = (string) auth()->id();
 
-        $broadcastToAll = ['chat', 'transcript', 'mic-status', 'user-left'];
+        $broadcastToAll = ['chat', 'mic-status', 'user-joined', 'user-left', 'meeting-cancelled', 'meeting-ended'];
 
         if (in_array($request->type, $broadcastToAll)) {
             broadcast(new MeetingSignal(
@@ -78,7 +93,7 @@ class MeetingAttendController extends Controller
             return response()->json(['status' => 'broadcast sent']);
         }
 
-        // WebRTC + mute/unmute — specific user ko
+        // WebRTC (offer/answer/ice-candidate) + mute/unmute — specific user ko
         broadcast(new MeetingSignal(
             meetingId:  (string) $meeting->id,
             fromUserId: $fromUserId,
@@ -106,61 +121,43 @@ class MeetingAttendController extends Controller
             'spoken_at'  => now(),
         ]);
 
-        broadcast(new MeetingSignal(
-            meetingId:  (string) $meeting->id,
-            fromUserId: (string) $user->id,
-            toUserId:   'all',
-            type:       'transcript',
-            data:       [
-                'userId'       => (string) $user->id,
-                'userName'     => $user->name,
-                'userInitials' => strtoupper(
-                    substr($user->name, 0, 1) .
-                    substr(strrchr($user->name, ' ') ?: ' ', 1, 1)
-                ),
-                'text'         => $request->text,
-                'spokenAt'     => now()->format('h:i A'),
-            ]
-        ))->toOthers();
+        // FIX: this used to broadcast a MeetingSignal (type 'transcript'), which
+        // goes out on the '.signal' channel event. But handleSignal() on the
+        // frontend has no case for 'transcript' — only handleTranscript() (bound
+        // to the '.transcript' channel event) does. That mismatch meant nobody
+        // ever saw the organizer's own live transcript. Broadcasting the same
+        // TranscriptUpdated event the participant controller uses fixes this.
+        broadcast(new TranscriptUpdated(
+            meetingId:    (string) $meeting->id,
+            userId:       (string) $user->id,
+            userName:     $user->name,
+            userInitials: strtoupper(
+                substr($user->name, 0, 1) .
+                substr(strrchr($user->name, ' ') ?: ' ', 1, 1)
+            ),
+            text:         $request->text,
+            spokenAt:     now()->format('h:i A')
+        ));
 
         return response()->json(['status' => 'saved']);
     }
 
-    // ── MARK LEFT (page close/back/refresh — organizer chala gaya, poori meeting end karo) ──
+    // ── MARK LEFT ──
     public function markLeft(Meeting $meeting)
     {
-        if ($meeting->organizer_id !== auth()->id()) {
-            abort(403);
-        }
-
-        // Sirf abhi tak active/upcoming/live meeting ko end karo
-        if (in_array($meeting->status, ['active', 'live', 'upcoming'])) {
-            $meeting->update(['status' => 'completed']);
-        }
-
-        // Sab participants ka joined_at reset karo, taake dobara koi tile na dikhe
-        $meeting->participants()->update([
-            'joined_at' => null,
-            'left_at'   => now(),
-        ]);
+        $user = auth()->user();
 
         broadcast(new MeetingSignal(
             meetingId:  (string) $meeting->id,
-            fromUserId: (string) auth()->id(),
+            fromUserId: (string) $user->id,
             toUserId:   'all',
-            type:       'meeting-cancelled',
+            type:       'user-left',
             data:       [
-                'message' => 'Meeting has ended — the organizer left the meeting.',
+                'userId' => (string) $user->id,
+                'name'   => $user->name,
             ]
         ))->toOthers();
 
-        return response()->json(['status' => 'meeting ended']);
-    }
-
-    // ── LEAVE ──
-    public function leave(Meeting $meeting)
-    {
-        return redirect()->route('organizer.meetings.index')
-            ->with('success', 'You left the meeting.');
+        return response()->json(['status' => 'left']);
     }
 }

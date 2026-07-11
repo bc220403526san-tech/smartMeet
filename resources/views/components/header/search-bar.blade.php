@@ -38,7 +38,7 @@
     {{-- RIGHT: Icons + Action Button + Profile --}}
     <div class="flex items-center gap-2 sm:gap-3 shrink-0">
 
-        <x-header.icons />
+        <x-notification-bell />
 
         @if($actionButton && $actionRoute)
             {{-- Desktop --}}

@@ -23,7 +23,13 @@ Route::middleware(['auth', 'role:participant'])
         */
         Route::prefix('settings')->name('settings.')->group(function () {
             Route::get('/', [SettingsController::class, 'index'])->name('index');
-            Route::put('/', [SettingsController::class, 'update'])->name('update');
+            Route::patch('/profile', [SettingsController::class, 'updateProfile'])->name('profile.update');
+            Route::post('/avatar', [SettingsController::class, 'updateAvatar'])->name('avatar.update');
+            Route::put('/password', [SettingsController::class, 'updatePassword'])->name('password.update');
+            Route::patch('/notifications', [SettingsController::class, 'updateNotifications'])->name('notifications.update');
+            Route::delete('/deactivate', [SettingsController::class, 'deactivate'])->name('deactivate');
+            Route::post('/flash', [SettingsController::class, 'storeFlash'])->name('flash');
+            Route::post('/role-request', [SettingsController::class, 'roleRequest'])->name('role-request');
         });
 
         /*
@@ -33,6 +39,9 @@ Route::middleware(['auth', 'role:participant'])
 
             Route::get('/', [MeetingController::class, 'index'])->name('index');
             Route::get('/today', [MeetingController::class, 'today'])->name('today');
+            Route::get('/{meeting}', [MeetingController::class, 'show'])->name('show');
+            Route::get('/status-check', [\App\Http\Controllers\Participant\MeetingController::class, 'statusCheck'])
+                ->name('status-check');
 
             // Live session
             Route::get('/{meeting}/attend', [MeetingAttendController::class, 'attend'])->name('attend');

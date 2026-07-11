@@ -137,14 +137,42 @@ class MeetingController extends Controller
         $isParticipant = $meeting->participants()
             ->where('user_id', auth()->id())
             ->exists();
-
         if (!$isParticipant) {
             abort(403, 'You are not invited to this meeting.');
         }
 
+        // 👇 Agar koi seedha ye URL kholay jab meeting active na ho — room mein na jaane dein
+        if ($meeting->status !== 'active') {
+            return redirect()->route('participant.meetings.index')
+                ->with('info', "This meeting hasn't started yet. You'll be able to join once the organizer starts it.");
+        }
+
         $isOrganizer = false;
         $meeting->load(['participants.user', 'organizer']);
-
         return view('participant.meetings.attend', compact('meeting', 'isOrganizer'));
+    }
+
+// ── STATUS CHECK (polling for index page) ──
+    public function statusCheck(Request $request)
+    {
+        $userId = auth()->id();
+        $ids = array_filter(explode(',', (string) $request->query('ids', '')));
+
+        $meetings = Meeting::whereIn('id', $ids)
+            ->whereHas('participants', function ($q) use ($userId) {
+                $q->where('user_id', $userId);
+            })
+            ->get(['id', 'status']);
+
+        return response()->json([
+            'meetings' => $meetings->keyBy('id')->map->status,
+            'stats' => [
+                'upcomingToday' => Meeting::whereHas('participants', fn($q) => $q->where('user_id', $userId))
+                    ->where('date', today())->where('status', 'upcoming')->count(),
+                'total'     => Meeting::whereHas('participants', fn($q) => $q->where('user_id', $userId))->count(),
+                'completed' => Meeting::whereHas('participants', fn($q) => $q->where('user_id', $userId))
+                    ->where('status', 'completed')->count(),
+            ],
+        ]);
     }
 }

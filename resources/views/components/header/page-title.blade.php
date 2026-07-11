@@ -23,7 +23,7 @@
 
     {{-- RIGHT: Icons + Profile --}}
     <div class="flex items-center gap-2 sm:gap-3 shrink-0">
-        <x-header.icons />
+        <x-notification-bell />
         <x-header.profile />
     </div>
 

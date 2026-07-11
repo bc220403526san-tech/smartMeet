@@ -1,0 +1,13 @@
+[90m= [39m[34;4mIlluminate\Support\Collection[39;24m {#7518
+    [34mall[39m: [
+      {#7522
+        +"[1mrole[22m": [32m"[39m[32madmin[39m[32m"[39m,
+      },
+      {#7521
+        +"[1mrole[22m": [32m"[39m[32mparticipant[39m[32m"[39m,
+      },
+      {#7523
+        +"[1mrole[22m": [32m"[39m[32morganizer[39m[32m"[39m,
+      },
+    ],
+  }

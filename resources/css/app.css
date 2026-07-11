@@ -77,3 +77,19 @@
 input:checked ~ div .absolute {
     transform: translateX(19px);
 }
+
+
+nav[role="navigation"] span[aria-current="page"] span {
+    background-color: #2563eb !important;
+    border-color: #2563eb !important;
+    color: white !important;
+    border-radius: 0.5rem;
+}
+
+nav[role="navigation"] a {
+    color: #2563eb !important;
+}
+
+nav[role="navigation"] a:hover {
+    background-color: #eff6ff !important;
+}

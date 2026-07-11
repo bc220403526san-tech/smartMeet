@@ -1,143 +1,116 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" href="{{ asset('images/s-logo.png') }}">
-    <title>{{ env('APP_NAME') }}</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <script src="https://cdn.tailwindcss.com"></script>
-    @vite('resources/css/app.css')
-</head>
+<x-layouts.app>
 
-<body class="bg-[#f4f5f7]">
-
-<input type="checkbox" id="sidebar-toggle">
-
-<div class="layout-wrapper flex h-screen overflow-hidden">
-
-    <!-- Overlay (closes sidebar on mobile) -->
-    <label for="sidebar-toggle" class="sidebar-overlay"></label>
-
-    <!-- SIDEBAR -->
-    <x-sidebar.organizer-menu />
-
-    <!-- ══════════════════════════ MAIN ══════════════════════════ -->
-    <div class="flex-1 flex flex-col min-w-0 m-3 ml-0 lg:ml-0">
-
+    <x-slot name="header">
         <!-- HEADER -->
         <x-header.page-title
             title="Organizer Dashboard"
         />
+    </x-slot>
 
-        <!-- Content -->
-        <div class="p-4 sm:p-6 bg-gray-50 rounded-xl mt-3 overflow-y-auto flex-1">
+    <div class="p-4 bg-gray-50 rounded-2xl m-2 mt-0 space-y-4 overflow-y-auto min-h-screen">
 
-            <!-- Page Header -->
-            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-7">
-                <div>
-                    <div class="flex items-center gap-1.5 text-xs text-slate-400 mb-1.5 flex-wrap">
-                        <a href="#" class="text-blue-500 font-medium hover:underline">Participants</a>
-                        <span>›</span>
-                        <span class="text-blue-500">Sarah Chen</span>
-                    </div>
-                    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Participant Details</h1>
+        <!-- Page Header -->
+        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div>
+                <div class="flex items-center gap-1.5 text-xs text-slate-400 mb-1.5 flex-wrap">
+                    <a href="#" class="text-blue-500 font-medium hover:underline">Participants</a>
+                    <span>›</span>
+                    <span class="text-blue-500">Sarah Chen</span>
                 </div>
-                <div class="flex items-center gap-3 sm:mt-1 flex-shrink-0">
-                    <button class="flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 border border-slate-200 rounded-xl bg-white text-slate-500 text-sm font-semibold hover:bg-slate-50 hover:border-slate-300 transition whitespace-nowrap">
-                        ← Back
-                    </button>
-                    <button class="flex items-center gap-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition whitespace-nowrap">
-                        Edit Participant
-                    </button>
-                </div>
+                <h1 class="text-lg sm:text-2xl font-bold text-slate-900 tracking-tight">Participant Details</h1>
             </div>
+            <div class="flex items-center gap-3 sm:mt-1 flex-shrink-0">
+                <button class="flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 border border-slate-200 rounded-xl bg-white text-slate-500 text-sm font-semibold hover:bg-slate-50 hover:border-slate-300 transition whitespace-nowrap">
+                    ← Back
+                </button>
+            </div>
+        </div>
 
-            <!-- Cards: stack on mobile, side-by-side on lg+ -->
-            <div class="grid grid-cols-1 lg:grid-cols-[1fr_1.3fr] gap-6 max-w-6xl mx-auto items-start">
+        <!-- Centered Card -->
+        <div class="flex justify-center items-start">
+            <div class="w-full max-w-md">
+                <!-- Profile Card - Small & Cute -->
+                <div class="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300 ease-in-out relative overflow-hidden">
 
-                <!-- Profile Card -->
-                <div class="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-l-4 border-blue-500 hover:shadow-lg transition-all duration-300 ease-in-out">
-                    <div class="flex justify-center mb-5 relative">
-                        <div class="w-20 h-20 rounded-full border-2 border-indigo-200 overflow-hidden bg-indigo-100 flex items-center justify-center text-indigo-400 text-3xl font-bold">
-                            SC
+                    <!-- Decorative gradient background -->
+                    <div class="absolute top-0 right-0 w-40 h-40 bg-gradient-to-bl from-blue-50/60 to-indigo-50/30 rounded-full blur-2xl -mr-16 -mt-16"></div>
+                    <div class="absolute bottom-0 left-0 w-40 h-40 bg-gradient-to-tr from-purple-50/40 to-pink-50/20 rounded-full blur-2xl -ml-16 -mb-16"></div>
+
+                    <div class="relative z-10">
+                        <!-- Avatar -->
+                        <div class="flex justify-center mb-4 relative">
+                            <div class="relative">
+                                <div class="w-20 h-20 rounded-full border-3 border-white shadow-md overflow-hidden bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-2xl font-bold">
+                                    SC
+                                </div>
+                                <span class="w-3.5 h-3.5 bg-green-400 border-2 border-white rounded-full absolute bottom-0 right-0 shadow-sm"></span>
+                            </div>
                         </div>
-                        <span class="w-3.5 h-3.5 bg-green-400 border-2 border-white rounded-full absolute bottom-0 right-[calc(50%-42px)]"></span>
-                    </div>
-                    <div class="text-center text-lg font-bold text-slate-900 mb-1">Sarah Chen</div>
-                    <div class="text-center text-sm text-slate-400 mb-4">sarah.chen@techflow.io</div>
-                    <div class="flex justify-center gap-2 mb-6 flex-wrap">
-                        <span class="px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide bg-blue-50 text-blue-500 border border-blue-200">Participant</span>
-                        <span class="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide bg-green-50 text-green-600 border border-green-200">
-                            <span class="w-1.5 h-1.5 rounded-full bg-green-400 inline-block"></span>
-                            Active
-                        </span>
-                    </div>
-                    <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5">
-                        <div>
-                            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Join Date</div>
-                            <div class="text-sm font-semibold text-slate-900">Oct 10, 2023</div>
+
+                        <!-- Name -->
+                        <div class="text-center mb-1">
+                            <h2 class="text-xl font-bold text-slate-900">Sarah Chen</h2>
                         </div>
-                        <div class="w-9 h-9 bg-white border border-slate-200 rounded-lg flex items-center justify-center text-slate-400">
-                            <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+
+                        <!-- Email with icon -->
+                        <div class="flex items-center justify-center gap-2 mb-4">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-slate-400">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
                             </svg>
+                            <span class="text-sm text-slate-500">sarah.chen@techflow.io</span>
+                        </div>
+
+                        <!-- Badges -->
+                        <div class="flex justify-center gap-2 mb-5 flex-wrap">
+                            <span class="px-3 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-blue-50 text-blue-600 border border-blue-200">
+                                <i class="fas fa-user mr-1"></i> Participant
+                            </span>
+                            <span class="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-emerald-50 text-emerald-600 border border-emerald-200">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block animate-pulse"></span>
+                                Active
+                            </span>
+                        </div>
+
+                        <!-- Divider -->
+                        <div class="border-t border-gray-100 my-4"></div>
+
+                        <!-- Stats Grid - Smaller -->
+                        <div class="grid grid-cols-3 gap-2 mb-4">
+                            <div class="text-center bg-gradient-to-br from-blue-50 to-blue-100/40 rounded-lg py-2 px-1 border border-blue-100">
+                                <p class="text-lg font-bold text-blue-600">24</p>
+                                <p class="text-[8px] font-medium text-slate-500 uppercase tracking-wider">Meetings</p>
+                            </div>
+                            <div class="text-center bg-gradient-to-br from-emerald-50 to-emerald-100/40 rounded-lg py-2 px-1 border border-emerald-100">
+                                <p class="text-lg font-bold text-emerald-600">18</p>
+                                <p class="text-[8px] font-medium text-slate-500 uppercase tracking-wider">Attended</p>
+                            </div>
+                            <div class="text-center bg-gradient-to-br from-purple-50 to-purple-100/40 rounded-lg py-2 px-1 border border-purple-100">
+                                <p class="text-lg font-bold text-purple-600">92%</p>
+                                <p class="text-[8px] font-medium text-slate-500 uppercase tracking-wider">Attendance</p>
+                            </div>
+                        </div>
+
+                        <!-- Join Date - Smaller -->
+                        <div class="flex items-center justify-between bg-gradient-to-r from-slate-50 to-gray-50 border border-slate-200 rounded-lg px-4 py-2.5">
+                            <div>
+                                <div class="text-[8px] font-bold text-slate-400 uppercase tracking-widest">
+                                    <i class="fas fa-calendar-alt mr-1"></i> Joined
+                                </div>
+                                <div class="text-xs font-semibold text-slate-900">Oct 10, 2023</div>
+                            </div>
+                            <div class="w-8 h-8 bg-white border border-slate-200 rounded-lg flex items-center justify-center text-slate-400 shadow-sm">
+                                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="4" width="18" height="18" rx="2"/>
+                                    <line x1="16" y1="2" x2="16" y2="6"/>
+                                    <line x1="8" y1="2" x2="8" y2="6"/>
+                                    <line x1="3" y1="10" x2="21" y2="10"/>
+                                </svg>
+                            </div>
                         </div>
                     </div>
                 </div>
-
-                <!-- Recent Activity Card -->
-                <div class="bg-white rounded-2xl p-6 sm:p-7 shadow-sm border border-l-4 border-blue-500 hover:shadow-lg transition-all duration-300 ease-in-out">
-                    <div class="text-base font-bold text-slate-900 mb-6">Recent Activity</div>
-                    <div class="flex flex-col gap-4 sm:gap-5">
-
-                        <div class="flex items-center gap-3 sm:gap-4">
-                            <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
-                                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#3b82f6" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-                            </div>
-                            <div class="min-w-0">
-                                <div class="text-sm font-semibold text-slate-800 truncate">Q4 Product Roadmap Sync</div>
-                                <div class="text-xs text-slate-400 mt-0.5">Oct 24, 2023 · 45 minutes</div>
-                            </div>
-                        </div>
-
-                        <div class="flex items-center gap-3 sm:gap-4">
-                            <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-violet-50 flex items-center justify-center flex-shrink-0">
-                                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#8b5cf6" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                            </div>
-                            <div class="min-w-0">
-                                <div class="text-sm font-semibold text-slate-800 truncate">Design Systems Deep Dive</div>
-                                <div class="text-xs text-slate-400 mt-0.5">Oct 22, 2023 · 1 hour 15 mins</div>
-                            </div>
-                        </div>
-
-                        <div class="flex items-center gap-3 sm:gap-4">
-                            <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
-                                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#f59e0b" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                            </div>
-                            <div class="min-w-0">
-                                <div class="text-sm font-semibold text-slate-800 truncate">Agile Sprint Planning</div>
-                                <div class="text-xs text-slate-400 mt-0.5">Oct 20, 2023 · 30 minutes</div>
-                            </div>
-                        </div>
-
-                        <div class="flex items-center gap-3 sm:gap-4 mb-1">
-                            <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-rose-50 flex items-center justify-center flex-shrink-0">
-                                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#f43f5e" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                            </div>
-                            <div class="min-w-0">
-                                <div class="text-sm font-semibold text-slate-800 truncate">UX Review & Feedback Session</div>
-                                <div class="text-xs text-slate-400 mt-0.5">Oct 18, 2023 · 50 minutes</div>
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
-
             </div>
         </div>
     </div>
-</div>
 
-</body>
-</html>
+</x-layouts.app>
