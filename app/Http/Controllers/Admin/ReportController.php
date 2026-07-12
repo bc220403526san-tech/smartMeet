@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
@@ -12,17 +11,15 @@ class ReportController extends Controller
 {
     public function index(Request $request)
     {
-        // ── Filters ──
-        $dateFrom = $request->input('date_from');
-        $dateTo   = $request->input('date_to');
-        $status   = $request->input('status');
-        $search   = $request->input('search');
+        // ── Filters (date range removed — status + search + flagged remain) ──
+        $status  = $request->input('status');
+        $search  = $request->input('search');
+        $flagged = $request->boolean('flagged');
 
         // ── Base query with filters applied ──
         $meetingsQuery = Meeting::with(['organizer', 'participants'])
-            ->when($dateFrom, fn($q) => $q->whereDate('date', '>=', $dateFrom))
-            ->when($dateTo, fn($q) => $q->whereDate('date', '<=', $dateTo))
             ->when($status && $status !== 'All Status', fn($q) => $q->where('status', strtolower($status)))
+            ->when($flagged, fn($q) => $q->where('is_flagged', true))
             ->when($search, function ($q) use ($search) {
                 $q->where('title', 'like', "%{$search}%")
                     ->orWhereHas('organizer', fn($q2) => $q2->where('name', 'like', "%{$search}%"));
@@ -39,13 +36,11 @@ class ReportController extends Controller
             'completed'        => Meeting::where('status', 'completed')->count(),
             'cancelled'        => Meeting::where('status', 'cancelled')->count(),
             'upcoming'         => Meeting::where('status', 'upcoming')->count(),
-
             'total_users'      => User::count(),
             'active_users'     => User::where('is_active', 1)->count(),
             'inactive_users'   => User::where('is_active', 0)->count(),
             'organizers'       => User::where('role', 'organizer')->count(),
             'participants'     => User::where('role', 'participant')->count(),
-
             'created_today'    => Meeting::whereDate('created_at', $today)->count(),
             'completed_today'  => Meeting::where('status', 'completed')->whereDate('updated_at', $today)->count(),
         ];
@@ -54,7 +49,6 @@ class ReportController extends Controller
         $change = function ($model, array $conditions = []) use ($weekAgo, $twoWeeksAgo, $today) {
             $thisWeek = $model::where($conditions)->whereBetween('created_at', [$weekAgo, $today])->count();
             $lastWeek = $model::where($conditions)->whereBetween('created_at', [$twoWeeksAgo, $weekAgo])->count();
-
             if ($lastWeek == 0) return $thisWeek > 0 ? '+100%' : '0%';
             $percent = round((($thisWeek - $lastWeek) / $lastWeek) * 100);
             return ($percent >= 0 ? '+' : '') . $percent . '%';
@@ -80,8 +74,31 @@ class ReportController extends Controller
 
     public function export(Request $request)
     {
-        // TODO: implement CSV / Excel / PDF export
-        // Example with Laravel Excel:
-        // return Excel::download(new MeetingsExport($request->all()), 'meetings-report.xlsx');
+        $status  = $request->input('status');
+        $search  = $request->input('search');
+        $flagged = $request->boolean('flagged');
+
+        $meetings = Meeting::with(['organizer', 'participants'])
+            ->when($status && $status !== 'All Status', fn($q) => $q->where('status', strtolower($status)))
+            ->when($flagged, fn($q) => $q->where('is_flagged', true))
+            ->when($search, function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                    ->orWhereHas('organizer', fn($q2) => $q2->where('name', 'like', "%{$search}%"));
+            })
+            ->latest('date')
+            ->get();
+
+        $filename = 'meetings-report-' . now()->format('Y-m-d_H-i-s') . '.pdf';
+
+        // Requires: composer require barryvdh/laravel-dompdf
+        if (! class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
+            abort(500, 'barryvdh/laravel-dompdf is not installed. Run: composer require barryvdh/laravel-dompdf');
+        }
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('admin.reports.export-pdf', [
+            'meetings' => $meetings,
+        ])->setPaper('a4', 'landscape');
+
+        return $pdf->download($filename);
     }
 }

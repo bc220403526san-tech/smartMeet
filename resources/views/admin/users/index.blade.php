@@ -1,11 +1,9 @@
 <x-layouts.app>
-
     <x-slot name="header">
         <x-header.search-bar placeholder="Search for users, roles, or status..." />
     </x-slot>
 
     <div class="p-4 bg-gray-50 rounded-2xl m-2 mt-0 space-y-4 overflow-y-auto min-h-screen">
-
         <x-success />
         <x-error />
 
@@ -24,7 +22,6 @@
 
         <!-- USER DIRECTORY -->
         <div id="pagetop" class="bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden">
-
             <!-- DIRECTORY HEADER -->
             <div class="px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
@@ -41,6 +38,11 @@
                                       d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75"/>
                             </svg>
                             <form method="GET" action="{{ route('admin.users.index') }}" class="flex items-center gap-2">
+                                {{-- preserve search + baaki params jab role select ho --}}
+                                @foreach(request()->except(['role', 'page']) as $key => $value)
+                                    <input type="hidden" name="{{ $key }}" value="{{ $value }}">
+                                @endforeach
+
                                 <select name="role" onchange="this.form.submit()"
                                         class="text-sm text-gray-600 bg-transparent outline-none cursor-pointer">
                                     <option value="">All Roles</option>
@@ -67,28 +69,29 @@
             <!-- ROWS -->
             <div class="divide-y divide-gray-100">
                 @forelse($users as $user)
+                    @php
+                        $avatar = $user->image
+                            ? asset('storage/' . $user->image)
+                            : ($user->image_url ?? asset('images/default-avatar.png'));
+                    @endphp
 
                     {{-- DESKTOP ROW --}}
                     <div class="hidden md:grid md:grid-cols-5 items-center px-5 py-4 hover:bg-blue-50/30 transition duration-200">
-
                         <div class="flex items-center gap-3">
-                            <img src="{{ $user->image ? asset('storage/' . $user->image) : $user->image_url }}"
+                            <img src="{{ $avatar }}"
                                  class="w-10 h-10 rounded-full object-cover ring-2 ring-gray-100 shrink-0">
                             <div>
                                 <span class="text-sm font-semibold text-gray-800">{{ $user->name }}</span>
                                 <p class="text-xs text-gray-400">ID: #U-{{ str_pad($user->id, 4, '0', STR_PAD_LEFT) }}</p>
                             </div>
                         </div>
-
                         <p class="text-sm text-gray-600 truncate pr-4">{{ $user->email }}</p>
-
                         <span class="px-3 py-1.5 rounded-full text-xs font-semibold w-fit
                             {{ $user->role == 'admin'       ? 'bg-blue-100 text-blue-700 border border-blue-200'   : '' }}
                             {{ $user->role == 'organizer'   ? 'bg-gray-100 text-gray-700 border border-gray-200'   : '' }}
                             {{ $user->role == 'participant' ? 'bg-green-100 text-green-700 border border-green-200' : '' }}">
                             {{ ucfirst($user->role) }}
                         </span>
-
                         <div class="flex items-center gap-2">
                             <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border
                                 {{ $user->is_active ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-600 border-red-200' }}">
@@ -96,26 +99,22 @@
                                 {{ $user->is_active ? 'Active' : 'Inactive' }}
                             </span>
                         </div>
-
                         <div class="flex gap-2 text-gray-500">
                             <x-icons :user="$user" />
                         </div>
-
                     </div>
 
                     {{-- MOBILE ROW --}}
                     <div class="md:hidden px-4 py-3 hover:bg-blue-50/30 transition duration-200">
-
                         <div class="flex justify-between items-start mb-2">
                             <div class="flex items-center gap-2">
-                                <img src="{{ $user->image ? asset('storage/' . $user->image) : $user->image_url }}"
+                                <img src="{{ $avatar }}"
                                      class="w-10 h-10 rounded-full object-cover ring-2 ring-gray-100 shrink-0">
                                 <div>
                                     <p class="text-sm font-semibold text-gray-800">{{ $user->name }}</p>
                                     <p class="text-xs text-gray-400 truncate max-w-[180px]">{{ $user->email }}</p>
                                 </div>
                             </div>
-
                             <span class="px-2.5 py-1 rounded-full text-xs font-medium shrink-0
                                 {{ $user->role == 'admin'       ? 'bg-blue-100 text-blue-700 border border-blue-200'   : '' }}
                                 {{ $user->role == 'organizer'   ? 'bg-gray-100 text-gray-700 border border-gray-200'   : '' }}
@@ -123,7 +122,6 @@
                                 {{ ucfirst($user->role) }}
                             </span>
                         </div>
-
                         <div class="flex justify-between items-center">
                             <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border
                                 {{ $user->is_active ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-600 border-red-200' }}">
@@ -134,9 +132,7 @@
                                 <x-icons :user="$user" />
                             </div>
                         </div>
-
                     </div>
-
                 @empty
                     <div class="text-center py-16 text-gray-400 text-sm">
                         <i class="fa-solid fa-user-slash text-4xl mb-3 block text-gray-300"></i>
@@ -149,9 +145,7 @@
             <div class="px-5 py-4 border-t border-gray-100 bg-gray-50/50">
                 {{ $users->links() }}
             </div>
-
         </div>
-
     </div>
 
     {{-- ═══════════════════════════════════════════
@@ -162,13 +156,10 @@
         document.addEventListener('DOMContentLoaded', function () {
             const params = new URLSearchParams(window.location.search);
             const target = document.getElementById('pagetop');
-
-            const isFilteredNav = ['page', 'role'].some(key => params.has(key));
-
+            const isFilteredNav = ['page', 'role', 'search'].some(key => params.has(key));
             if (target && isFilteredNav) {
                 target.scrollIntoView({ behavior: 'instant', block: 'start' });
             }
         });
     </script>
-
 </x-layouts.app>

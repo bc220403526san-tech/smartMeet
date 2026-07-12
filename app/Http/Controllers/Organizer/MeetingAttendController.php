@@ -1,25 +1,20 @@
 <?php
-
 namespace App\Http\Controllers\Organizer;
-
 use App\Events\MeetingSignal;
 use App\Events\TranscriptUpdated;
 use App\Http\Controllers\Controller;
 use App\Models\Meeting;
 use App\Models\MeetingTranscript;
 use Illuminate\Http\Request;
-
 class MeetingAttendController extends Controller
 {
     // ── ATTEND ──
     public function attend(Meeting $meeting)
     {
         $user = auth()->user();
-
         if ($user->id !== $meeting->organizer_id) {
             abort(403);
         }
-
         // actual_start null ho toh meeting date+time se set karo
         if (!$meeting->actual_start) {
             $start = \Carbon\Carbon::parse(
@@ -28,14 +23,11 @@ class MeetingAttendController extends Controller
             )->utc();
             $meeting->update(['actual_start' => $start]);
         }
-
         $meeting->load(['participants.user', 'organizer']);
-
         $allUserIds = $meeting->participants->pluck('user_id')
             ->push($meeting->organizer_id)
             ->unique()
             ->values();
-
         $alreadyJoined = $meeting->participants
             ->filter(fn ($p) => $p->joined_at !== null)
             ->map(function ($p) {
@@ -49,7 +41,6 @@ class MeetingAttendController extends Controller
                 ];
             })
             ->values();
-
         // FIX: full participant roster with real hasJoined flags, so the frontend
         // can show every invited participant in the People tab (joined AND not
         // joined) instead of marking everyone as "Joined" the moment the page loads.
@@ -64,23 +55,22 @@ class MeetingAttendController extends Controller
                 'hasJoined' => $p->joined_at !== null,
             ];
         })->values();
-
         return view('organizer.meetings.attend', compact('meeting', 'allUserIds', 'alreadyJoined', 'allParticipants'));
     }
-
     // ── SIGNAL ──
     public function signal(Request $request, Meeting $meeting)
     {
         $request->validate([
             'to_user_id' => 'nullable',
-            'type' => 'required|in:offer,answer,ice-candidate,chat,mute,unmute,mic-status,transcript,user-joined,user-left,meeting-cancelled,meeting-ended',
+            // NEW: 'camera-status' added alongside 'mic-status' so the frontend
+            // can broadcast/receive webcam on/off state the same way it already
+            // does for the microphone.
+            'type' => 'required|in:offer,answer,ice-candidate,chat,mute,unmute,mic-status,camera-status,transcript,user-joined,user-left,meeting-cancelled,meeting-ended',
             'data' => 'required|array',
         ]);
-
         $fromUserId = (string) auth()->id();
-
-        $broadcastToAll = ['chat', 'mic-status', 'user-joined', 'user-left', 'meeting-cancelled', 'meeting-ended'];
-
+        // NEW: 'camera-status' broadcasts to everyone, same as 'mic-status'.
+        $broadcastToAll = ['chat', 'mic-status', 'camera-status', 'user-joined', 'user-left', 'meeting-cancelled', 'meeting-ended'];
         if (in_array($request->type, $broadcastToAll)) {
             broadcast(new MeetingSignal(
                 meetingId:  (string) $meeting->id,
@@ -89,10 +79,8 @@ class MeetingAttendController extends Controller
                 type:       $request->type,
                 data:       $request->data
             ));
-
             return response()->json(['status' => 'broadcast sent']);
         }
-
         // WebRTC (offer/answer/ice-candidate) + mute/unmute — specific user ko
         broadcast(new MeetingSignal(
             meetingId:  (string) $meeting->id,
@@ -101,26 +89,21 @@ class MeetingAttendController extends Controller
             type:       $request->type,
             data:       $request->data
         ))->toOthers();
-
         return response()->json(['status' => 'signal sent']);
     }
-
     // ── TRANSCRIPT SAVE ──
     public function saveTranscript(Request $request, Meeting $meeting)
     {
         $request->validate([
             'text' => 'required|string|max:5000',
         ]);
-
         $user = auth()->user();
-
         MeetingTranscript::create([
             'meeting_id' => $meeting->id,
             'user_id'    => $user->id,
             'text'       => $request->text,
             'spoken_at'  => now(),
         ]);
-
         // FIX: this used to broadcast a MeetingSignal (type 'transcript'), which
         // goes out on the '.signal' channel event. But handleSignal() on the
         // frontend has no case for 'transcript' — only handleTranscript() (bound
@@ -138,15 +121,12 @@ class MeetingAttendController extends Controller
             text:         $request->text,
             spokenAt:     now()->format('h:i A')
         ));
-
         return response()->json(['status' => 'saved']);
     }
-
     // ── MARK LEFT ──
     public function markLeft(Meeting $meeting)
     {
         $user = auth()->user();
-
         broadcast(new MeetingSignal(
             meetingId:  (string) $meeting->id,
             fromUserId: (string) $user->id,
@@ -157,7 +137,6 @@ class MeetingAttendController extends Controller
                 'name'   => $user->name,
             ]
         ))->toOthers();
-
         return response()->json(['status' => 'left']);
     }
 }

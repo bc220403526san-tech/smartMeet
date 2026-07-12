@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers\Admin;
 
 use App\Models\Notification;
@@ -9,20 +8,34 @@ use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 
-
 class UserController extends Controller
 {
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $users        = User::latest()->paginate(6);
-        $totalUsers   = User::count();
-        $activeUsers  = User::where('is_active', 1)->count();
-        $inactiveUsers = User::where('is_active', 0)->count();
-        return view('admin.users.index', compact('users', 'totalUsers', 'activeUsers', 'inactiveUsers'));
+        $query = User::query();
 
+        if ($request->filled('role')) {
+            $query->where('role', $request->role);
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('role', 'like', "%{$search}%");
+            });
+        }
+
+        $users         = $query->latest()->paginate(6)->withQueryString();
+        $totalUsers    = User::count();
+        $activeUsers   = User::where('is_active', 1)->count();
+        $inactiveUsers = User::where('is_active', 0)->count();
+
+        return view('admin.users.index', compact('users', 'totalUsers', 'activeUsers', 'inactiveUsers'));
     }
 
     /**
@@ -43,7 +56,7 @@ class UserController extends Controller
             'email'    => 'required|email|unique:users',
             'password' => 'required|min:6',
             'role'     => 'required|in:admin,organizer,participant',
-            'image' => 'nullable|mimes:jpg,jpeg,png,webp,avif|max:2048',
+            'image'    => 'nullable|mimes:jpg,jpeg,png,webp,avif|max:2048',
         ]);
 
         $imagePath = null;
@@ -166,11 +179,18 @@ class UserController extends Controller
 
         return back()->with('success', 'User status updated.');
     }
+
     /**
      * Change a user's role and notify them.
+     * Admin cannot change their own role.
      */
     public function changeRole(Request $request, User $user)
     {
+        // Admin apna khud ka role change nahi kar sakta
+        if ($user->id === auth()->id()) {
+            return back()->with('error', 'You cannot change your own role!');
+        }
+
         $request->validate([
             'role' => 'required|in:admin,organizer,participant',
         ]);

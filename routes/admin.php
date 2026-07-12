@@ -27,7 +27,8 @@ Route::middleware(['auth', 'role:admin'])
         /* Reports */
         Route::prefix('reports')->name('reports.')->group(function () {
             Route::get('/', [ReportController::class, 'index'])->name('index');
-            Route::get('/export', [ReportController::class, 'export'])->name('export');
+            Route::get('/export', [App\Http\Controllers\Admin\ReportController::class, 'export'])
+                ->name('export');
         });
 
         /*

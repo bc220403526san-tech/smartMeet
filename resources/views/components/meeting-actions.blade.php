@@ -16,9 +16,45 @@
         </svg>
     </a>
 
+    <!-- FLAG / UNFLAG — sirf jab meeting "upcoming" ho, ya already flagged ho (unflag ke liye) -->
+    @if($meeting->status === 'upcoming' || $meeting->status === 'flagged')
+        <form action="{{ route('admin.meetings.flag', $meeting) }}" method="POST" class="inline">
+            @csrf
+            @method('PATCH')
+            <button type="submit"
+                    title="{{ $meeting->status === 'flagged' ? 'Remove Flag' : 'Flag for Review' }}"
+                    class="p-2 rounded-lg bg-gray-100 hover:bg-orange-100 transition group shadow-sm hover:shadow">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="{{ $meeting->status === 'flagged' ? 'currentColor' : 'none' }}"
+                     viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
+                     class="w-4 h-4 {{ $meeting->status === 'flagged' ? 'text-orange-500' : 'text-gray-600 group-hover:text-orange-500' }} transition">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M3 3v1.5M3 21V5.25m0 0A2.25 2.25 0 0 1 5.25 3h13.5A2.25 2.25 0 0 1 21 5.25v6.5a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 0 3 16.25"/>
+                </svg>
+            </button>
+        </form>
+    @endif
+
+    <!-- CANCEL MEETING — sirf tab jab abhi cancel/complete nahi hui -->
+    @if(!in_array($meeting->status, ['cancelled', 'completed']))
+        <form action="{{ route('admin.meetings.cancel', $meeting) }}" method="POST"
+              onsubmit="return confirm('Cancel this meeting? All participants will be notified.')" class="inline">
+            @csrf
+            @method('PATCH')
+            <button type="submit" title="Cancel Meeting"
+                    class="p-2 rounded-lg bg-gray-100 hover:bg-red-100 transition group shadow-sm hover:shadow">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                     stroke-width="1.5" stroke="currentColor"
+                     class="w-4 h-4 text-gray-600 group-hover:text-red-600 transition">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M9.75 9.75l4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+                </svg>
+            </button>
+        </form>
+    @endif
+
     <!-- DELETE -->
     <form action="{{ route('admin.meetings.destroy', $meeting) }}" method="POST"
-          onsubmit="return confirm('Delete this meeting?')">
+          onsubmit="return confirm('Delete this meeting?')" class="inline">
         @csrf
         @method('DELETE')
         <button type="submit" title="Delete"

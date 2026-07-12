@@ -1,4 +1,5 @@
 @props(['user'])
+
 <div class="flex gap-2 flex-wrap items-center">
 
     <!-- VIEW -->
@@ -15,61 +16,69 @@
         </svg>
     </a>
 
-    <!-- ====== CHANGE ROLE DROPDOWN ====== -->
-    <div class="relative dropdown-container">
-        <button onclick="toggleDropdown(this)"
-                class="p-2 rounded-lg bg-gray-100 hover:bg-indigo-100 transition group shadow-sm hover:shadow"
-                title="Change Role">
+    <!-- ====== CHANGE ROLE DROPDOWN — admin apna khud ka role change nahi kar sakta ====== -->
+    @if(auth()->id() !== $user->id)
+        <div class="dropdown-container">
+            <button onclick="toggleDropdown(this)"
+                    class="p-2 rounded-lg bg-gray-100 hover:bg-indigo-100 transition group shadow-sm hover:shadow"
+                    title="Change Role">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                     stroke-width="1.5" stroke="currentColor"
+                     class="w-4 h-4 text-gray-600 group-hover:text-indigo-600 transition">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Zm6-10.125a1.875 1.875 0 1 1-3.75 0 1.875 1.875 0 0 1 3.75 0Zm1.294 6.336a6.721 6.721 0 0 1-3.17.789 6.721 6.721 0 0 1-3.168-.789 3.376 3.376 0 0 1 6.338 0Z"/>
+                </svg>
+            </button>
+
+            <!-- Dropdown Menu (position: fixed via JS — parent overflow-hidden isko clip nahi karega) -->
+            <div class="dropdown-menu hidden fixed w-44 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-[9999]">
+                <form action="{{ route('admin.users.change-role', $user) }}" method="POST">
+                    @csrf
+                    @method('PATCH')
+                    <button type="submit" name="role" value="admin"
+                            class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition flex items-center gap-2 {{ $user->role == 'admin' ? 'bg-blue-50 text-blue-700' : '' }}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/>
+                        </svg>
+                        Admin
+                        @if($user->role == 'admin')
+                            <span class="ml-auto text-blue-500">✓</span>
+                        @endif
+                    </button>
+                    <button type="submit" name="role" value="organizer"
+                            class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-700 transition flex items-center gap-2 {{ $user->role == 'organizer' ? 'bg-gray-100' : '' }}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z"/>
+                        </svg>
+                        Organizer
+                        @if($user->role == 'organizer')
+                            <span class="ml-auto text-blue-500">✓</span>
+                        @endif
+                    </button>
+                    <button type="submit" name="role" value="participant"
+                            class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 transition flex items-center gap-2 {{ $user->role == 'participant' ? 'bg-green-50 text-green-700' : '' }}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/>
+                        </svg>
+                        Participant
+                        @if($user->role == 'participant')
+                            <span class="ml-auto text-blue-500">✓</span>
+                        @endif
+                    </button>
+                </form>
+            </div>
+        </div>
+    @else
+        <span title="You cannot change your own role"
+              class="p-2 rounded-lg bg-gray-50 inline-flex items-center justify-center opacity-40 cursor-not-allowed">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                  stroke-width="1.5" stroke="currentColor"
-                 class="w-4 h-4 text-gray-600 group-hover:text-indigo-600 transition">
+                 class="w-4 h-4 text-gray-400">
                 <path stroke-linecap="round" stroke-linejoin="round"
                       d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Zm6-10.125a1.875 1.875 0 1 1-3.75 0 1.875 1.875 0 0 1 3.75 0Zm1.294 6.336a6.721 6.721 0 0 1-3.17.789 6.721 6.721 0 0 1-3.168-.789 3.376 3.376 0 0 1 6.338 0Z"/>
             </svg>
-        </button>
-
-        <!-- Dropdown Menu -->
-        <div class="dropdown-menu hidden absolute right-0 mt-1 w-44 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50">
-
-            <form action="{{ route('admin.users.change-role', $user) }}" method="POST">
-                @csrf
-                @method('PATCH')
-
-                <button type="submit" name="role" value="admin"
-                        class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition flex items-center gap-2 {{ $user->role == 'admin' ? 'bg-blue-50 text-blue-700' : '' }}">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/>
-                    </svg>
-                    Admin
-                    @if($user->role == 'admin')
-                        <span class="ml-auto text-blue-500">✓</span>
-                    @endif
-                </button>
-
-                <button type="submit" name="role" value="organizer"
-                        class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-700 transition flex items-center gap-2 {{ $user->role == 'organizer' ? 'bg-gray-100' : '' }}">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z"/>
-                    </svg>
-                    Organizer
-                    @if($user->role == 'organizer')
-                        <span class="ml-auto text-blue-500">✓</span>
-                    @endif
-                </button>
-
-                <button type="submit" name="role" value="participant"
-                        class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 transition flex items-center gap-2 {{ $user->role == 'participant' ? 'bg-green-50 text-green-700' : '' }}">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/>
-                    </svg>
-                    Participant
-                    @if($user->role == 'participant')
-                        <span class="ml-auto text-blue-500">✓</span>
-                    @endif
-                </button>
-            </form>
-        </div>
-    </div>
+        </span>
+    @endif
 
     {{-- ACTIVATE / DEACTIVATE TOGGLE --}}
     @if(auth()->id() !== $user->id)
@@ -120,33 +129,72 @@
             </svg>
         </button>
     </form>
-
 </div>
 
-<!-- ====== JAVASCRIPT FOR DROPDOWN ====== -->
+<!-- ====== JAVASCRIPT FOR DROPDOWN (fixed positioning, escapes overflow-hidden) ====== -->
 <script>
     function toggleDropdown(button) {
         var dropdown = button.parentElement.querySelector('.dropdown-menu');
         var allDropdowns = document.querySelectorAll('.dropdown-menu');
 
         // Close all other dropdowns
-        allDropdowns.forEach(function(menu) {
+        allDropdowns.forEach(function (menu) {
             if (menu !== dropdown) {
                 menu.classList.add('hidden');
             }
         });
 
-        // Toggle current dropdown
+        var willOpen = dropdown.classList.contains('hidden');
         dropdown.classList.toggle('hidden');
+
+        if (willOpen) {
+            positionDropdown(button, dropdown);
+        }
+    }
+
+    function positionDropdown(button, dropdown) {
+        var rect = button.getBoundingClientRect();
+        var menuWidth = 176; // w-44 = 11rem = 176px
+        var menuHeight = dropdown.offsetHeight || 150;
+
+        var top = rect.bottom + 6;
+        var left = rect.right - menuWidth;
+
+        // Agar neeche jagah kam ho, to upar khol do
+        if (top + menuHeight > window.innerHeight - 10) {
+            top = rect.top - menuHeight - 6;
+        }
+
+        // Agar left screen se bahar jaye to adjust karo
+        if (left < 8) left = 8;
+        if (left + menuWidth > window.innerWidth - 8) {
+            left = window.innerWidth - menuWidth - 8;
+        }
+
+        dropdown.style.top = top + 'px';
+        dropdown.style.left = left + 'px';
     }
 
     // Close dropdown when clicking outside
-    document.addEventListener('click', function(event) {
+    document.addEventListener('click', function (event) {
         var isDropdownButton = event.target.closest('[onclick="toggleDropdown(this)"]');
         if (!isDropdownButton) {
-            document.querySelectorAll('.dropdown-menu').forEach(function(menu) {
+            document.querySelectorAll('.dropdown-menu').forEach(function (menu) {
                 menu.classList.add('hidden');
             });
         }
+    });
+
+    // Scroll ya resize ho to dropdown band kar do (position stale na ho)
+    window.addEventListener('scroll', function () {
+        document.querySelectorAll('.dropdown-menu').forEach(function (menu) {
+            menu.classList.add('hidden');
+        });
+    }, true);
+
+    window.addEventListener('resize', function () {
+        document.querySelectorAll('.dropdown-menu').forEach(function (menu) {
+            menu.classList.add('hidden');
+        });
     });
 </script>

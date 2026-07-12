@@ -85,9 +85,6 @@
                         <h2 class="font-semibold text-gray-800 text-lg">Meetings Overview</h2>
                         <p class="text-xs text-gray-400 mt-0.5">Track all meetings and moderation activities.</p>
                     </div>
-                    <button class="px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-medium shadow hover:bg-blue-700 transition">
-                        Export Data
-                    </button>
                 </div>
             </div>
 

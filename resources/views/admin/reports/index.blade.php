@@ -1,5 +1,7 @@
 <x-layouts.app>
     <x-slot name="header">
+        {{-- This component already submits (live, debounced) to url()->current(),
+             so on this page it naturally searches meetings/reports. No extra props needed. --}}
         <x-header.search-bar placeholder="Search reports, meetings, users..." />
     </x-slot>
     {{-- ═══════════════════════════════════════════
@@ -14,33 +16,12 @@
                 <h1 class="text-xl sm:text-2xl font-bold text-gray-800">Reports & Analytics</h1>
                 <p class="text-xs sm:text-sm text-gray-400 mt-0.5">Platform-wide insights, metrics, and export tools.</p>
             </div>
-            {{-- Export Dropdown --}}
-            <div x-data="{ open: false }" class="relative self-start sm:self-auto">
-                <button @click="open = !open"
-                        class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2.5 rounded-xl transition shadow-sm whitespace-nowrap">
-                    <i class="fa-solid fa-download text-xs"></i>
-                    Export Report
-                    <i class="fa-solid fa-chevron-down text-xs"></i>
-                </button>
-                <div x-show="open"
-                     @click.outside="open = false"
-                     x-transition
-                     class="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden z-20"
-                     style="display: none;">
-                    <a href="{{ route('admin.reports.export', array_merge(request()->query(), ['type' => 'csv'])) }}"
-                       class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition">
-                        <i class="fa-solid fa-file-csv text-green-500 text-xs"></i> Export as CSV
-                    </a>
-                    <a href="{{ route('admin.reports.export', array_merge(request()->query(), ['type' => 'xlsx'])) }}"
-                       class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition border-t border-gray-100">
-                        <i class="fa-solid fa-file-excel text-emerald-600 text-xs"></i> Export as Excel
-                    </a>
-                    <a href="{{ route('admin.reports.export', array_merge(request()->query(), ['type' => 'pdf'])) }}"
-                       class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition border-t border-gray-100">
-                        <i class="fa-solid fa-file-pdf text-red-500 text-xs"></i> Export as PDF
-                    </a>
-                </div>
-            </div>
+            {{-- Export (PDF only, simple direct download link) --}}
+            <a href="{{ route('admin.reports.export', request()->query()) }}"
+               class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2.5 rounded-xl transition shadow-sm whitespace-nowrap self-start sm:self-auto">
+                <i class="fa-solid fa-file-pdf text-xs"></i>
+                Export as PDF
+            </a>
         </div>
         {{-- ═══════════════════════════════════════════
              STATS CARDS (dynamic from controller)
@@ -95,64 +76,36 @@
             @endforeach
         </div>
         {{-- ═══════════════════════════════════════════
-             FILTERS (GET form -> controller filters)
+             STATUS FILTER (pill buttons, no dropdown, no date range)
         ════════════════════════════════════════════ --}}
         <div class="bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm">
-            <form method="GET" action="{{ route('admin.reports.index') }}" class="flex flex-wrap items-end gap-3">
-                <div class="flex items-center gap-1.5 text-sm font-semibold text-gray-600 shrink-0 pb-1">
-                    <i class="fa-solid fa-sliders text-blue-500 text-xs"></i> Filters
+            <div class="flex flex-wrap items-center gap-2">
+                <div class="flex items-center gap-1.5 text-sm font-semibold text-gray-600 shrink-0 pr-1">
+                    <i class="fa-solid fa-sliders text-blue-500 text-xs"></i> Status
                 </div>
-                <div class="flex flex-col gap-1 flex-1 min-w-[130px]">
-                    <label class="text-xs text-gray-400">Date From</label>
-                    <input type="date" name="date_from" value="{{ request('date_from') }}"
-                           class="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 w-full">
-                </div>
-                <div class="flex flex-col gap-1 flex-1 min-w-[130px]">
-                    <label class="text-xs text-gray-400">Date To</label>
-                    <input type="date" name="date_to" value="{{ request('date_to') }}"
-                           class="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 w-full">
-                </div>
-                <div class="flex flex-col gap-1 flex-1 min-w-[120px]">
-                    <label class="text-xs text-gray-400">Status</label>
-                    <select name="status" class="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 w-full">
-                        @foreach(['All Status', 'Active', 'Upcoming', 'Completed', 'Cancelled'] as $opt)
-                            <option value="{{ $opt }}" {{ request('status', 'All Status') == $opt ? 'selected' : '' }}>
-                                {{ $opt }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="flex items-end gap-2 shrink-0">
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-4 py-1.5 rounded-lg transition shadow-sm">
-                        Apply
-                    </button>
-                    @if(request()->hasAny(['date_from', 'date_to', 'status', 'search']))
-                        <a href="{{ route('admin.reports.index') }}" class="text-xs text-gray-400 hover:text-gray-600 px-2 py-1.5">
-                            Reset
-                        </a>
-                    @endif
-                </div>
-            </form>
+                @foreach(['All Status', 'Active', 'Upcoming', 'Completed', 'Cancelled'] as $opt)
+                    @php
+                        $isActive = request('status', 'All Status') == $opt;
+                        $target = array_merge(request()->except(['page']), ['status' => $opt]);
+                    @endphp
+                    <a href="{{ route('admin.reports.index', $target) }}"
+                       class="filter-link px-3 py-1.5 rounded-full text-xs font-semibold border transition
+                           {{ $isActive
+                               ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                               : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300' }}">
+                        {{ $opt }}
+                    </a>
+                @endforeach
+            </div>
         </div>
         {{-- ═══════════════════════════════════════════
              MEETINGS TABLE
         ════════════════════════════════════════════ --}}
         <div id="reports-table" class="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-            <div class="px-4 sm:px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                    <h2 class="font-semibold text-gray-800">Meetings Report</h2>
-                    <p class="text-xs text-gray-400 mt-0.5">All meetings with full details</p>
-                </div>
-                <form method="GET" action="{{ route('admin.reports.index') }}" class="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2 w-full sm:w-auto">
-                    @foreach(request()->except(['search', 'page']) as $key => $value)
-                        <input type="hidden" name="{{ $key }}" value="{{ $value }}">
-                    @endforeach
-                    <i class="fa-solid fa-magnifying-glass text-gray-400 text-xs"></i>
-                    <input type="text" name="search" value="{{ request('search') }}"
-                           placeholder="Search meetings..." class="text-xs outline-none flex-1 sm:w-48">
-                </form>
+            <div class="px-4 sm:px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
+                <h2 class="font-semibold text-gray-800">Meetings Report</h2>
+                <p class="text-xs text-gray-400 mt-0.5">All meetings with full details</p>
             </div>
-
             @php
                 $statusColors = [
                     'completed' => 'bg-indigo-50 text-indigo-600 border-indigo-100',
@@ -167,7 +120,6 @@
                     'upcoming'  => 'bg-yellow-400',
                 ];
             @endphp
-
             {{-- Desktop Table --}}
             <div class="hidden md:block overflow-x-auto">
                 <table class="w-full text-sm">
@@ -227,7 +179,6 @@
                             </td>
                             <td class="px-5 py-4">
                                 <div class="flex items-center gap-1.5 text-gray-400">
-
                                     {{-- VIEW (eye icon) --}}
                                     <a href="{{ route('admin.meetings.show', $meeting->id) }}"
                                        class="p-1.5 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition" title="View details">
@@ -236,7 +187,6 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                         </svg>
                                     </a>
-
                                     {{-- CANCEL (only if upcoming/active) --}}
                                     @if(in_array($meeting->status, ['upcoming', 'active']))
                                         <form action="{{ route('admin.meetings.cancel', $meeting->id) }}" method="POST" onsubmit="return confirm('Cancel this meeting?')">
@@ -248,25 +198,26 @@
                                             </button>
                                         </form>
                                     @endif
-
-                                    {{-- FLAG (dynamic: filled+red if flagged, outline+gray if not) --}}
-                                    <form action="{{ route('admin.meetings.flag', $meeting->id) }}" method="POST"
-                                          onsubmit="return confirm('{{ $meeting->is_flagged ? 'Remove flag from this meeting?' : 'Flag this meeting for review?' }}')">
-                                        @csrf
-                                        <button type="submit"
-                                                class="p-1.5 rounded-lg transition {{ $meeting->is_flagged ? 'text-red-500 hover:bg-red-50' : 'hover:bg-orange-50 hover:text-orange-500' }}"
-                                                title="{{ $meeting->is_flagged ? 'Remove flag' : 'Flag for review' }}">
-                                            @if($meeting->is_flagged)
-                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4">
-                                                    <path d="M3 2.25a.75.75 0 0 1 .75.75v.54l1.838-.46a9.75 9.75 0 0 1 6.725.738l.108.054a8.25 8.25 0 0 0 5.58.652l3.109-.732a.75.75 0 0 1 .917.81 47.784 47.784 0 0 0 .005 10.337.75.75 0 0 1-.574.812l-3.114.733a9.75 9.75 0 0 1-6.594-.77l-.108-.054a8.25 8.25 0 0 0-5.69-.625l-2.202.55V21a.75.75 0 0 1-1.5 0V3A.75.75 0 0 1 3 2.25Z" />
-                                                </svg>
-                                            @else
-                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 3v1.5M3 21V6.75m0 0A2.25 2.25 0 0 1 5.25 4.5h6.879a1.5 1.5 0 0 1 1.06.44l1.622 1.62a1.5 1.5 0 0 0 1.06.44h4.129a2.25 2.25 0 0 1 2.25 2.25v6.5a2.25 2.25 0 0 1-2.25 2.25H16.5a1.5 1.5 0 0 0-1.06.44l-1.63 1.63a1.5 1.5 0 0 1-1.062.44H5.25a2.25 2.25 0 0 1-2.25-2.25V6.75Z" />
-                                                </svg>
-                                            @endif
-                                        </button>
-                                    </form>
+                                    {{-- FLAG (only available for upcoming meetings) --}}
+                                    @if($meeting->status === 'upcoming')
+                                        <form action="{{ route('admin.meetings.flag', $meeting->id) }}" method="POST"
+                                              onsubmit="return confirm('{{ $meeting->is_flagged ? 'Remove flag from this meeting?' : 'Flag this meeting for review?' }}')">
+                                            @csrf
+                                            <button type="submit"
+                                                    class="p-1.5 rounded-lg transition {{ $meeting->is_flagged ? 'text-red-500 hover:bg-red-50' : 'hover:bg-orange-50 hover:text-orange-500' }}"
+                                                    title="{{ $meeting->is_flagged ? 'Remove flag' : 'Flag for review' }}">
+                                                @if($meeting->is_flagged)
+                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4">
+                                                        <path d="M3 2.25a.75.75 0 0 1 .75.75v.54l1.838-.46a9.75 9.75 0 0 1 6.725.738l.108.054a8.25 8.25 0 0 0 5.58.652l3.109-.732a.75.75 0 0 1 .917.81 47.784 47.784 0 0 0 .005 10.337.75.75 0 0 1-.574.812l-3.114.733a9.75 9.75 0 0 1-6.594-.77l-.108-.054a8.25 8.25 0 0 0-5.69-.625l-2.202.55V21a.75.75 0 0 1-1.5 0V3A.75.75 0 0 1 3 2.25Z" />
+                                                    </svg>
+                                                @else
+                                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 3v1.5M3 21V6.75m0 0A2.25 2.25 0 0 1 5.25 4.5h6.879a1.5 1.5 0 0 1 1.06.44l1.622 1.62a1.5 1.5 0 0 0 1.06.44h4.129a2.25 2.25 0 0 1 2.25 2.25v6.5a2.25 2.25 0 0 1-2.25 2.25H16.5a1.5 1.5 0 0 0-1.06.44l-1.63 1.63a1.5 1.5 0 0 1-1.062.44H5.25a2.25 2.25 0 0 1-2.25-2.25V6.75Z" />
+                                                    </svg>
+                                                @endif
+                                            </button>
+                                        </form>
+                                    @endif
                                 </div>
                             </td>
                         </tr>
@@ -283,7 +234,6 @@
                     </tbody>
                 </table>
             </div>
-
             {{-- Mobile Cards --}}
             <div class="md:hidden divide-y divide-gray-100">
                 @forelse($meetings as $meeting)
@@ -348,22 +298,24 @@
                                     </button>
                                 </form>
                             @endif
-                            <form action="{{ route('admin.meetings.flag', $meeting->id) }}" method="POST"
-                                  onsubmit="return confirm('{{ $meeting->is_flagged ? 'Remove flag from this meeting?' : 'Flag this meeting for review?' }}')">
-                                @csrf
-                                <button type="submit" class="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-gray-50 rounded-lg transition border border-gray-100 {{ $meeting->is_flagged ? 'text-red-500 hover:bg-red-50' : 'hover:bg-orange-50 hover:text-orange-500' }}">
-                                    @if($meeting->is_flagged)
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-3.5 h-3.5">
-                                            <path d="M3 2.25a.75.75 0 0 1 .75.75v.54l1.838-.46a9.75 9.75 0 0 1 6.725.738l.108.054a8.25 8.25 0 0 0 5.58.652l3.109-.732a.75.75 0 0 1 .917.81 47.784 47.784 0 0 0 .005 10.337.75.75 0 0 1-.574.812l-3.114.733a9.75 9.75 0 0 1-6.594-.77l-.108-.054a8.25 8.25 0 0 0-5.69-.625l-2.202.55V21a.75.75 0 0 1-1.5 0V3A.75.75 0 0 1 3 2.25Z" />
-                                        </svg>
-                                    @else
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 3v1.5M3 21V6.75m0 0A2.25 2.25 0 0 1 5.25 4.5h6.879a1.5 1.5 0 0 1 1.06.44l1.622 1.62a1.5 1.5 0 0 0 1.06.44h4.129a2.25 2.25 0 0 1 2.25 2.25v6.5a2.25 2.25 0 0 1-2.25 2.25H16.5a1.5 1.5 0 0 0-1.06.44l-1.63 1.63a1.5 1.5 0 0 1-1.062.44H5.25a2.25 2.25 0 0 1-2.25-2.25V6.75Z" />
-                                        </svg>
-                                    @endif
-                                    {{ $meeting->is_flagged ? 'Unflag' : 'Flag' }}
-                                </button>
-                            </form>
+                            @if($meeting->status === 'upcoming')
+                                <form action="{{ route('admin.meetings.flag', $meeting->id) }}" method="POST"
+                                      onsubmit="return confirm('{{ $meeting->is_flagged ? 'Remove flag from this meeting?' : 'Flag this meeting for review?' }}')">
+                                    @csrf
+                                    <button type="submit" class="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-gray-50 rounded-lg transition border border-gray-100 {{ $meeting->is_flagged ? 'text-red-500 hover:bg-red-50' : 'hover:bg-orange-50 hover:text-orange-500' }}">
+                                        @if($meeting->is_flagged)
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-3.5 h-3.5">
+                                                <path d="M3 2.25a.75.75 0 0 1 .75.75v.54l1.838-.46a9.75 9.75 0 0 1 6.725.738l.108.054a8.25 8.25 0 0 0 5.58.652l3.109-.732a.75.75 0 0 1 .917.81 47.784 47.784 0 0 0 .005 10.337.75.75 0 0 1-.574.812l-3.114.733a9.75 9.75 0 0 1-6.594-.77l-.108-.054a8.25 8.25 0 0 0-5.69-.625l-2.202.55V21a.75.75 0 0 1-1.5 0V3A.75.75 0 0 1 3 2.25Z" />
+                                            </svg>
+                                        @else
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 3v1.5M3 21V6.75m0 0A2.25 2.25 0 0 1 5.25 4.5h6.879a1.5 1.5 0 0 1 1.06.44l1.622 1.62a1.5 1.5 0 0 0 1.06.44h4.129a2.25 2.25 0 0 1 2.25 2.25v6.5a2.25 2.25 0 0 1-2.25 2.25H16.5a1.5 1.5 0 0 0-1.06.44l-1.63 1.63a1.5 1.5 0 0 1-1.062.44H5.25a2.25 2.25 0 0 1-2.25-2.25V6.75Z" />
+                                            </svg>
+                                        @endif
+                                        {{ $meeting->is_flagged ? 'Unflag' : 'Flag' }}
+                                    </button>
+                                </form>
+                            @endif
                         </div>
                     </div>
                 @empty
@@ -372,32 +324,46 @@
                     </div>
                 @endforelse
             </div>
-
             {{-- Pagination --}}
-            <div class="px-4 sm:px-5 py-4 border-t border-gray-100">
+            <div id="pagination-wrapper" class="px-4 sm:px-5 py-4 border-t border-gray-100">
                 {{ $meetings->links() }}
             </div>
         </div>
     </div>
-
-    {{-- SCROLL FIX --}}
+    {{-- SCROLL FIX ──
+         • Searching (header search bar) → page scrolls to the very top.
+         • Paginating (next/prev/page number) → page scrolls down to the meetings table.
+    --}}
     <script>
         (function () {
-            const STORAGE_KEY = 'reportsScrollY';
+            const STORAGE_KEY = 'reportsScrollTarget';
+
+            // Pagination links live inside #pagination-wrapper
             document.addEventListener('click', function (e) {
-                const link = e.target.closest('[data-pagination] a');
-                if (link) sessionStorage.setItem(STORAGE_KEY, window.scrollY);
+                const link = e.target.closest('#pagination-wrapper a');
+                if (link) sessionStorage.setItem(STORAGE_KEY, 'table');
             });
+
+            // Status filter pills -> scroll down to the table so results are visible
+            document.addEventListener('click', function (e) {
+                const link = e.target.closest('a.filter-link');
+                if (link) sessionStorage.setItem(STORAGE_KEY, 'table');
+            });
+
+            // Header live-search form (id="live-search-form") submits via JS on typing
             document.addEventListener('submit', function (e) {
-                if (e.target.matches('form[method="GET"], form[method="get"]')) {
-                    sessionStorage.setItem(STORAGE_KEY, window.scrollY);
+                if (e.target.id === 'live-search-form') {
+                    sessionStorage.setItem(STORAGE_KEY, 'table');
                 }
             });
+
             document.addEventListener('DOMContentLoaded', function () {
-                const saved = sessionStorage.getItem(STORAGE_KEY);
-                if (saved !== null) {
-                    window.scrollTo(0, parseInt(saved, 10));
-                    sessionStorage.removeItem(STORAGE_KEY);
+                const target = sessionStorage.getItem(STORAGE_KEY);
+                sessionStorage.removeItem(STORAGE_KEY);
+
+                if (target === 'table') {
+                    const table = document.getElementById('reports-table');
+                    if (table) table.scrollIntoView({ behavior: 'auto', block: 'start' });
                 }
             });
         })();
