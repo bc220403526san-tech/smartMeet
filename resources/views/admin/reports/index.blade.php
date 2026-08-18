@@ -4,28 +4,25 @@
              so on this page it naturally searches meetings/reports. No extra props needed. --}}
         <x-header.search-bar placeholder="Search reports, meetings, users..." />
     </x-slot>
-    {{-- ═══════════════════════════════════════════
-         PAGE CONTENT
-    ════════════════════════════════════════════ --}}
-    <div class="p-3 sm:p-4 space-y-4 p-4 bg-gray-50 rounded-2xl m-2 mt-0 space-y-4 overflow-y-auto">
-        {{-- ═══════════════════════════════════════════
-             PAGE TITLE
-        ════════════════════════════════════════════ --}}
+
+    {{-- PAGE CONTENT --}}
+    <div class="p-3 sm:p-4 space-y-4 bg-gray-50 rounded-2xl m-2 mt-0 overflow-y-auto">
+
+        {{-- PAGE TITLE --}}
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-                <h1 class="text-xl sm:text-2xl font-bold text-gray-800">Reports & Analytics</h1>
+            <div class="min-w-0">
+                <h1 class="text-lg sm:text-xl md:text-2xl font-bold text-gray-800 truncate">Reports & Analytics</h1>
                 <p class="text-xs sm:text-sm text-gray-400 mt-0.5">Platform-wide insights, metrics, and export tools.</p>
             </div>
             {{-- Export (PDF only, simple direct download link) --}}
             <a href="{{ route('admin.reports.export', request()->query()) }}"
-               class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2.5 rounded-xl transition shadow-sm whitespace-nowrap self-start sm:self-auto">
+               class="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2.5 rounded-xl transition shadow-sm whitespace-nowrap w-full sm:w-auto self-stretch sm:self-auto">
                 <i class="fa-solid fa-file-pdf text-xs"></i>
                 Export as PDF
             </a>
         </div>
-        {{-- ═══════════════════════════════════════════
-             STATS CARDS (dynamic from controller)
-        ════════════════════════════════════════════ --}}
+
+        {{-- STATS CARDS (dynamic from controller) --}}
         @php
             $statCards = [
                 ['label' => 'Total Meetings',   'value' => number_format($stats['total_meetings']),   'change' => $changes['total_meetings']  ?? null, 'icon' => 'fa-calendar',       'color' => 'blue'],
@@ -58,28 +55,27 @@
                     $c  = $colorMap[$stat['color']];
                     $up = $stat['change'] ? !str_starts_with($stat['change'], '-') : true;
                 @endphp
-                <div class="bg-white border border-gray-200 rounded-2xl p-3 sm:p-4 shadow-sm hover:shadow-md transition group">
-                    <div class="flex items-center justify-between mb-2 sm:mb-3">
-                        <div class="{{ $c['bg'] }} p-1.5 sm:p-2 rounded-xl">
+                <div class="bg-white border border-gray-200 rounded-2xl p-3 sm:p-4 shadow-sm hover:shadow-md transition group min-w-0">
+                    <div class="flex items-center justify-between mb-2 sm:mb-3 gap-1">
+                        <div class="{{ $c['bg'] }} p-1.5 sm:p-2 rounded-xl shrink-0">
                             <i class="fa-solid {{ $stat['icon'] }} {{ $c['icon'] }} text-xs sm:text-sm"></i>
                         </div>
                         @if($stat['change'])
-                            <span class="text-xs font-medium px-1.5 sm:px-2 py-0.5 rounded-full
+                            <span class="text-[10px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 rounded-full whitespace-nowrap
                                 {{ $up ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-500' }}">
                                 {{ $stat['change'] }}
                             </span>
                         @endif
                     </div>
-                    <p class="text-lg sm:text-2xl font-bold text-gray-800">{{ $stat['value'] }}</p>
-                    <p class="text-xs text-gray-400 mt-1 leading-tight">{{ $stat['label'] }}</p>
+                    <p class="text-base sm:text-lg md:text-2xl font-bold text-gray-800 truncate">{{ $stat['value'] }}</p>
+                    <p class="text-[11px] sm:text-xs text-gray-400 mt-1 leading-tight">{{ $stat['label'] }}</p>
                 </div>
             @endforeach
         </div>
-        {{-- ═══════════════════════════════════════════
-             STATUS FILTER (pill buttons, no dropdown, no date range)
-        ════════════════════════════════════════════ --}}
-        <div class="bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm">
-            <div class="flex flex-wrap items-center gap-2">
+
+        {{-- STATUS FILTER (pill buttons, horizontal scroll on small screens) --}}
+        <div class="bg-white border border-gray-200 rounded-2xl px-3 sm:px-4 py-3 shadow-sm">
+            <div class="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 sm:pb-0 sm:flex-wrap">
                 <div class="flex items-center gap-1.5 text-sm font-semibold text-gray-600 shrink-0 pr-1">
                     <i class="fa-solid fa-sliders text-blue-500 text-xs"></i> Status
                 </div>
@@ -89,7 +85,7 @@
                         $target = array_merge(request()->except(['page']), ['status' => $opt]);
                     @endphp
                     <a href="{{ route('admin.reports.index', $target) }}"
-                       class="filter-link px-3 py-1.5 rounded-full text-xs font-semibold border transition
+                       class="filter-link shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold border transition whitespace-nowrap
                            {{ $isActive
                                ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
                                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300' }}">
@@ -98,12 +94,11 @@
                 @endforeach
             </div>
         </div>
-        {{-- ═══════════════════════════════════════════
-             MEETINGS TABLE
-        ════════════════════════════════════════════ --}}
+
+        {{-- MEETINGS TABLE --}}
         <div id="reports-table" class="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
             <div class="px-4 sm:px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
-                <h2 class="font-semibold text-gray-800">Meetings Report</h2>
+                <h2 class="font-semibold text-gray-800 text-sm sm:text-base">Meetings Report</h2>
                 <p class="text-xs text-gray-400 mt-0.5">All meetings with full details</p>
             </div>
             @php
@@ -120,9 +115,10 @@
                     'upcoming'  => 'bg-yellow-400',
                 ];
             @endphp
-            {{-- Desktop Table --}}
+
+            {{-- Desktop / Tablet Table (scrolls horizontally instead of breaking layout) --}}
             <div class="hidden md:block overflow-x-auto">
-                <table class="w-full text-sm">
+                <table class="w-full text-sm min-w-[720px]">
                     <thead>
                     <tr class="bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                         <th class="px-5 py-3 text-left">Meeting</th>
@@ -136,11 +132,11 @@
                     <tbody class="divide-y divide-gray-100">
                     @forelse($meetings as $meeting)
                         <tr class="hover:bg-blue-50/30 transition duration-150">
-                            <td class="px-5 py-4">
-                                <div class="flex items-center gap-2">
-                                    <p class="font-semibold text-gray-800">{{ $meeting->title }}</p>
+                            <td class="px-5 py-4 max-w-[220px]">
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <p class="font-semibold text-gray-800 truncate">{{ $meeting->title }}</p>
                                     @if($meeting->is_flagged)
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-3.5 h-3.5 text-red-500" title="Flagged">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-3.5 h-3.5 text-red-500 shrink-0" title="Flagged">
                                             <path d="M3 2.25a.75.75 0 0 1 .75.75v.54l1.838-.46a9.75 9.75 0 0 1 6.725.738l.108.054a8.25 8.25 0 0 0 5.58.652l3.109-.732a.75.75 0 0 1 .917.81 47.784 47.784 0 0 0 .005 10.337.75.75 0 0 1-.574.812l-3.114.733a9.75 9.75 0 0 1-6.594-.77l-.108-.054a8.25 8.25 0 0 0-5.69-.625l-2.202.55V21a.75.75 0 0 1-1.5 0V3A.75.75 0 0 1 3 2.25Z" />
                                         </svg>
                                     @endif
@@ -148,7 +144,7 @@
                                 <p class="text-xs text-gray-400 mt-0.5">{{ $meeting->duration }} min duration</p>
                             </td>
                             <td class="px-5 py-4">
-                                <div class="flex items-center gap-2">
+                                <div class="flex items-center gap-2 min-w-0">
                                     <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 text-xs font-bold flex items-center justify-center shrink-0 overflow-hidden">
                                         @if($meeting->organizer)
                                             <img src="{{ $meeting->organizer->image_url }}" alt="{{ $meeting->organizer->name }}" class="w-full h-full object-cover">
@@ -156,24 +152,24 @@
                                             NA
                                         @endif
                                     </div>
-                                    <span class="text-sm text-gray-700">{{ $meeting->organizer->name ?? 'Unassigned' }}</span>
+                                    <span class="text-sm text-gray-700 truncate">{{ $meeting->organizer->name ?? 'Unassigned' }}</span>
                                 </div>
                             </td>
-                            <td class="px-5 py-4">
+                            <td class="px-5 py-4 whitespace-nowrap">
                                 <p class="text-sm text-gray-700">{{ \Carbon\Carbon::parse($meeting->date)->format('M d, Y') }}</p>
                                 <p class="text-xs text-gray-400">{{ \Carbon\Carbon::parse($meeting->time)->format('h:i A') }}</p>
                             </td>
                             <td class="px-5 py-4">
-                                <span class="inline-flex items-center gap-1.5 bg-gray-100 text-gray-700 px-3 py-1 rounded-xl text-xs font-medium">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-3 h-3">
+                                <span class="inline-flex items-center gap-1.5 bg-gray-100 text-gray-700 px-3 py-1 rounded-xl text-xs font-medium whitespace-nowrap">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-3 h-3 shrink-0">
                                         <path fill-rule="evenodd" d="M8.25 6.75a3.75 3.75 0 1 1 7.5 0 3.75 3.75 0 0 1-7.5 0ZM15.75 9.75a3 3 0 1 1 6 0 3 3 0 0 1-6 0ZM2.25 9.75a3 3 0 1 1 6 0 3 3 0 0 1-6 0ZM6.31 15.117A6.745 6.745 0 0 1 12 12a6.745 6.745 0 0 1 6.709 7.498.75.75 0 0 1-.372.568A12.696 12.696 0 0 1 12 21.75c-2.305 0-4.47-.612-6.337-1.684a.75.75 0 0 1-.372-.568 6.787 6.787 0 0 1 1.019-4.38Z" clip-rule="evenodd" />
                                     </svg>
                                     {{ $meeting->participants->count() }}
                                 </span>
                             </td>
                             <td class="px-5 py-4">
-                                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border {{ $statusColors[$meeting->status] ?? 'bg-gray-50 text-gray-600 border-gray-100' }}">
-                                    <span class="w-1.5 h-1.5 rounded-full {{ $dotColors[$meeting->status] ?? 'bg-gray-400' }}"></span>
+                                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border whitespace-nowrap {{ $statusColors[$meeting->status] ?? 'bg-gray-50 text-gray-600 border-gray-100' }}">
+                                    <span class="w-1.5 h-1.5 rounded-full shrink-0 {{ $dotColors[$meeting->status] ?? 'bg-gray-400' }}"></span>
                                     {{ ucfirst($meeting->status) }}
                                 </span>
                             </td>
@@ -234,29 +230,30 @@
                     </tbody>
                 </table>
             </div>
+
             {{-- Mobile Cards --}}
             <div class="md:hidden divide-y divide-gray-100">
                 @forelse($meetings as $meeting)
-                    <div class="p-4 hover:bg-blue-50/20 transition">
+                    <div class="p-3 sm:p-4 hover:bg-blue-50/20 transition">
                         <div class="flex items-start justify-between gap-2 mb-3">
-                            <div>
-                                <div class="flex items-center gap-2">
-                                    <p class="font-semibold text-gray-800 text-sm">{{ $meeting->title }}</p>
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <p class="font-semibold text-gray-800 text-sm truncate">{{ $meeting->title }}</p>
                                     @if($meeting->is_flagged)
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-3 h-3 text-red-500">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-3 h-3 text-red-500 shrink-0">
                                             <path d="M3 2.25a.75.75 0 0 1 .75.75v.54l1.838-.46a9.75 9.75 0 0 1 6.725.738l.108.054a8.25 8.25 0 0 0 5.58.652l3.109-.732a.75.75 0 0 1 .917.81 47.784 47.784 0 0 0 .005 10.337.75.75 0 0 1-.574.812l-3.114.733a9.75 9.75 0 0 1-6.594-.77l-.108-.054a8.25 8.25 0 0 0-5.69-.625l-2.202.55V21a.75.75 0 0 1-1.5 0V3A.75.75 0 0 1 3 2.25Z" />
                                         </svg>
                                     @endif
                                 </div>
                                 <p class="text-xs text-gray-400 mt-0.5">{{ $meeting->duration }} min duration</p>
                             </div>
-                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border shrink-0 {{ $statusColors[$meeting->status] ?? 'bg-gray-50 text-gray-600 border-gray-100' }}">
-                                <span class="w-1.5 h-1.5 rounded-full {{ $dotColors[$meeting->status] ?? 'bg-gray-400' }}"></span>
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border shrink-0 whitespace-nowrap {{ $statusColors[$meeting->status] ?? 'bg-gray-50 text-gray-600 border-gray-100' }}">
+                                <span class="w-1.5 h-1.5 rounded-full shrink-0 {{ $dotColors[$meeting->status] ?? 'bg-gray-400' }}"></span>
                                 {{ ucfirst($meeting->status) }}
                             </span>
                         </div>
-                        <div class="flex flex-wrap items-center gap-3 text-xs text-gray-500 mb-3">
-                            <div class="flex items-center gap-1.5">
+                        <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-gray-500 mb-3">
+                            <div class="flex items-center gap-1.5 min-w-0">
                                 <div class="w-6 h-6 rounded-full bg-blue-100 text-blue-600 text-[10px] font-bold flex items-center justify-center shrink-0 overflow-hidden">
                                     @if($meeting->organizer)
                                         <img src="{{ $meeting->organizer->image_url }}" alt="{{ $meeting->organizer->name }}" class="w-full h-full object-cover">
@@ -264,22 +261,22 @@
                                         NA
                                     @endif
                                 </div>
-                                <span>{{ $meeting->organizer->name ?? 'Unassigned' }}</span>
+                                <span class="truncate">{{ $meeting->organizer->name ?? 'Unassigned' }}</span>
                             </div>
                             <div class="flex items-center gap-1">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5 text-gray-300">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5 text-gray-300 shrink-0">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75"/>
                                 </svg>
-                                <span>{{ \Carbon\Carbon::parse($meeting->date)->format('M d, Y') }}, {{ \Carbon\Carbon::parse($meeting->time)->format('h:i A') }}</span>
+                                <span class="whitespace-nowrap">{{ \Carbon\Carbon::parse($meeting->date)->format('M d, Y') }}, {{ \Carbon\Carbon::parse($meeting->time)->format('h:i A') }}</span>
                             </div>
                             <div class="flex items-center gap-1">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-3.5 h-3.5 text-gray-300">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-3.5 h-3.5 text-gray-300 shrink-0">
                                     <path fill-rule="evenodd" d="M7.5 6a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3.751 20.105a8.25 8.25 0 0 1 16.498 0 .75.75 0 0 1-.437.695A18.683 18.683 0 0 1 12 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 0 1-.437-.695Z" clip-rule="evenodd" />
                                 </svg>
-                                <span>{{ $meeting->participants->count() }} participants</span>
+                                <span class="whitespace-nowrap">{{ $meeting->participants->count() }} participants</span>
                             </div>
                         </div>
-                        <div class="flex items-center gap-2 text-gray-400">
+                        <div class="flex flex-wrap items-center gap-2 text-gray-400">
                             <a href="{{ route('admin.meetings.show', $meeting->id) }}" class="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-gray-50 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition border border-gray-100">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
@@ -324,43 +321,45 @@
                     </div>
                 @endforelse
             </div>
+
             {{-- Pagination --}}
-            <div id="pagination-wrapper" class="px-4 sm:px-5 py-4 border-t border-gray-100">
-                {{ $meetings->links() }}
+            <div id="pagination-wrapper" class="px-3 sm:px-5 py-4 border-t border-gray-100 overflow-x-auto">
+                <div class="flex justify-center min-w-max">
+                    {{ $meetings->links() }}
+                </div>
             </div>
         </div>
     </div>
-    {{-- SCROLL FIX ──
-         • Searching (header search bar) → page scrolls to the very top.
-         • Paginating (next/prev/page number) → page scrolls down to the meetings table.
+
+    {{-- Hide scrollbar for the status-filter horizontal scroll on small screens --}}
+    <style>
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+
+    {{-- SCROLL FIX --
+         - Searching (header search bar) -> page scrolls to the very top.
+         - Paginating (next/prev/page number) -> page scrolls down to the meetings table.
     --}}
     <script>
         (function () {
             const STORAGE_KEY = 'reportsScrollTarget';
-
-            // Pagination links live inside #pagination-wrapper
             document.addEventListener('click', function (e) {
                 const link = e.target.closest('#pagination-wrapper a');
                 if (link) sessionStorage.setItem(STORAGE_KEY, 'table');
             });
-
-            // Status filter pills -> scroll down to the table so results are visible
             document.addEventListener('click', function (e) {
                 const link = e.target.closest('a.filter-link');
                 if (link) sessionStorage.setItem(STORAGE_KEY, 'table');
             });
-
-            // Header live-search form (id="live-search-form") submits via JS on typing
             document.addEventListener('submit', function (e) {
                 if (e.target.id === 'live-search-form') {
                     sessionStorage.setItem(STORAGE_KEY, 'table');
                 }
             });
-
             document.addEventListener('DOMContentLoaded', function () {
                 const target = sessionStorage.getItem(STORAGE_KEY);
                 sessionStorage.removeItem(STORAGE_KEY);
-
                 if (target === 'table') {
                     const table = document.getElementById('reports-table');
                     if (table) table.scrollIntoView({ behavior: 'auto', block: 'start' });

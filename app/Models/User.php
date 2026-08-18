@@ -16,6 +16,7 @@ class User extends Authenticatable
         'email',
         'password',
         'image',
+        'avatar',
         'provider',
         'provider_id',
         'role',
@@ -38,8 +39,7 @@ class User extends Authenticatable
 
     public function getImageUrlAttribute(): string
     {
-        if (!$this->image) {
-
+        if (!$this->avatar) {
             $colors = [
                 '3b82f6',
                 'ef4444',
@@ -50,18 +50,15 @@ class User extends Authenticatable
                 '14b8a6',
                 'f97316',
             ];
-
             $color = $colors[ord($this->name[0]) % count($colors)];
-
             return 'https://ui-avatars.com/api/?name=' . urlencode($this->name) . '&background=' . $color . '&color=fff&size=128';
         }
 
-        if (str_starts_with($this->image, 'http')) {
-            return $this->image; // Google image
+        if (str_starts_with($this->avatar, 'http')) {
+            return $this->avatar; // Google image
         }
 
-        return Storage::url($this->image);
-
+        return Storage::url($this->avatar);
     }
 
     // ========== RELATIONSHIPS ==========

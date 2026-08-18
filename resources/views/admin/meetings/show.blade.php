@@ -156,9 +156,6 @@
                         <h2 class="font-semibold text-gray-800 text-lg">Participants</h2>
                         <p class="text-xs text-gray-400 mt-0.5">{{ $meeting->participants->count() }} people invited</p>
                     </div>
-                    @if($meeting->participants->count() > 4)
-                        <button class="text-blue-600 text-sm font-medium hover:text-blue-700">Manage all</button>
-                    @endif
                 </div>
             </div>
 
@@ -176,6 +173,13 @@
                             'VIEWER'  => 'bg-gray-100 text-gray-500 border-gray-200',
                         ];
                         $roleClass = $roleColors[$pRole] ?? 'bg-gray-100 text-gray-500 border-gray-200';
+
+                        // Attendance history:
+                        // joined_at OR left_at means participant attended at least once.
+                        // This also supports older records where joined_at was cleared on leave.
+                        $joinedAt = $participant->joined_at ?? $participant->pivot?->joined_at;
+                        $leftAt   = $participant->left_at ?? $participant->pivot?->left_at;
+                        $hasAttended = $joinedAt !== null || $leftAt !== null;
                     @endphp
                     <div class="flex items-center justify-between px-5 py-4 hover:bg-blue-50/30 transition duration-200">
                         <div class="flex items-center gap-3 min-w-0">
@@ -193,9 +197,19 @@
                                 </p>
                             </div>
                         </div>
-                        <span class="text-[11px] font-semibold px-2.5 py-1 rounded-full border {{ $roleClass }} shrink-0">
-                            {{ $pRole }}
-                        </span>
+                        <div class="flex items-center gap-2 shrink-0">
+                            @if($hasAttended)
+                                <span class="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-green-100 bg-green-50 text-green-600 uppercase tracking-wide">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                                    Joined
+                                </span>
+                            @else
+                                <span class="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-amber-100 bg-amber-50 text-amber-600 uppercase tracking-wide">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                                    Not Joined
+                                </span>
+                            @endif
+                        </div>
                     </div>
                 @empty
                     <div class="px-5 py-12 text-center text-gray-400 text-sm">

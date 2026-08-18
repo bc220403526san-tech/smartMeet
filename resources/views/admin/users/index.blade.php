@@ -70,9 +70,7 @@
             <div class="divide-y divide-gray-100">
                 @forelse($users as $user)
                     @php
-                        $avatar = $user->image
-                            ? asset('storage/' . $user->image)
-                            : ($user->image_url ?? asset('images/default-avatar.png'));
+                        $avatar = $user->image_url;
                     @endphp
 
                     {{-- DESKTOP ROW --}}

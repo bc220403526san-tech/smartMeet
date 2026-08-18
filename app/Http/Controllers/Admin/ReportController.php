@@ -88,15 +88,47 @@ class ReportController extends Controller
             ->latest('date')
             ->get();
 
+        // ── Full stats, same as the index page cards ──
+        $today = Carbon::today();
+        $stats = [
+            'total_meetings'   => Meeting::count(),
+            'active_now'       => Meeting::where('status', 'active')->count(),
+            'completed'        => Meeting::where('status', 'completed')->count(),
+            'cancelled'        => Meeting::where('status', 'cancelled')->count(),
+            'upcoming'         => Meeting::where('status', 'upcoming')->count(),
+            'total_users'      => User::count(),
+            'active_users'     => User::where('is_active', 1)->count(),
+            'inactive_users'   => User::where('is_active', 0)->count(),
+            'organizers'       => User::where('role', 'organizer')->count(),
+            'participants'     => User::where('role', 'participant')->count(),
+            'created_today'    => Meeting::whereDate('created_at', $today)->count(),
+            'completed_today'  => Meeting::where('status', 'completed')->whereDate('updated_at', $today)->count(),
+        ];
+
+        $filters = [
+            'status'  => $status ?: 'All Status',
+            'search'  => $search ?: null,
+            'flagged' => $flagged,
+        ];
+
+        // ── Logo as base64 so dompdf renders it reliably ──
+        $logoBase64 = null;
+        $logoPath = public_path('images/s-logo.png');
+        if (file_exists($logoPath)) {
+            $logoBase64 = base64_encode(file_get_contents($logoPath));
+        }
+
         $filename = 'meetings-report-' . now()->format('Y-m-d_H-i-s') . '.pdf';
 
-        // Requires: composer require barryvdh/laravel-dompdf
         if (! class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
             abort(500, 'barryvdh/laravel-dompdf is not installed. Run: composer require barryvdh/laravel-dompdf');
         }
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('admin.reports.export-pdf', [
-            'meetings' => $meetings,
+            'meetings'   => $meetings,
+            'stats'      => $stats,
+            'filters'    => $filters,
+            'logoBase64' => $logoBase64,
         ])->setPaper('a4', 'landscape');
 
         return $pdf->download($filename);

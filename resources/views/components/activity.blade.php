@@ -1,42 +1,45 @@
 @props(['activities', 'limit' => 6])
 
-<div class="bg-gray-100 border border-blue-400 p-5 rounded-xl shadow-lg w-full">
+<div class="bg-white border border-blue-100 p-5 rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-200 w-full">
 
     <!-- HEADER -->
     <div class="flex justify-between items-center mb-4">
-        <h2 class="font-semibold">Recent Activity</h2>
+        <div>
+            <h2 class="font-semibold text-gray-900 text-sm">Recent Activity</h2>
+            <p class="text-xs text-gray-400 mt-0.5">Latest actions across your workspace</p>
+        </div>
         <button type="button"
                 id="toggleActivitiesBtn"
                 data-expanded="false"
                 onclick="toggleActivities()"
-                class="text-blue-500 text-sm hover:underline focus:outline-none hidden">
+                class="text-blue-600 text-xs font-semibold hover:underline focus:outline-none hidden">
             View All →
         </button>
     </div>
 
     <!-- LIST -->
-    <div id="activityList" class="space-y-3">
+    <div id="activityList" class="space-y-1.5">
         @forelse($activities as $index => $activity)
             <div id="activity-{{ $activity['key'] }}"
-                 class="activity-item flex items-center gap-3 p-2 hover:bg-white rounded-xl transition
+                 class="activity-item flex items-center gap-3 p-2.5 hover:bg-blue-50/60 rounded-xl transition-colors duration-150
                         {{ $index >= $limit ? 'hidden' : '' }}"
                 {{ $index >= $limit ? 'data-extra=true' : '' }}>
 
-                <div class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
+                <div class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-blue-50">
                     <img src="{{ $activity['image'] }}" alt="{{ $activity['name'] }}"
                          class="w-full h-full object-cover">
                 </div>
 
                 <div class="flex-1 min-w-0">
-                    <p class="font-medium text-sm truncate">{{ $activity['name'] }}</p>
+                    <p class="font-medium text-sm text-gray-800 truncate">{{ $activity['name'] }}</p>
                     <p class="text-sm text-gray-500 truncate">{{ $activity['message'] }}</p>
-                    <p class="text-xs text-gray-400">{{ $activity['time'] }}</p>
+                    <p class="text-xs text-gray-400 mt-0.5">{{ $activity['time'] }}</p>
                 </div>
 
-                <span class="text-[10px] px-2 py-0.5 rounded-full flex-shrink-0
+                <span class="text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0
                     {{ $activity['type'] == 'meeting'
-                        ? 'bg-blue-100 text-blue-600'
-                        : 'bg-green-100 text-green-600' }}">
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-slate-100 text-slate-600' }}">
                     {{ ucfirst($activity['type']) }}
                 </span>
 
@@ -45,8 +48,8 @@
                         onclick="removeActivity(this)"
                         title="Remove"
                         class="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full
-                               text-red-400 bg-white border border-gray-200 shadow-sm
-                               hover:bg-red-50 hover:text-red-600 transition-all duration-200">
+                               text-gray-400 bg-white border border-gray-200 shadow-sm
+                               hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-all duration-200">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                          stroke-width="2" stroke="currentColor" class="w-4 h-4">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
@@ -55,9 +58,12 @@
 
             </div>
         @empty
-            <p id="emptyMsg" class="text-sm text-gray-400 text-center py-4">
-                No recent activity found.
-            </p>
+            <div id="emptyMsg" class="text-center py-10">
+                <div class="w-12 h-12 mx-auto rounded-full bg-blue-50 flex items-center justify-center mb-3">
+                    <i class="fa-solid fa-inbox text-blue-300"></i>
+                </div>
+                <p class="text-sm text-gray-500 font-medium">No recent activity found</p>
+            </div>
         @endforelse
     </div>
 
@@ -117,9 +123,12 @@
 
             if (!activities || activities.length === 0) {
                 list.innerHTML = `
-                <p id="emptyMsg" class="text-sm text-gray-400 text-center py-4">
-                    No recent activity found.
-                </p>`;
+                <div id="emptyMsg" class="text-center py-10">
+                    <div class="w-12 h-12 mx-auto rounded-full bg-blue-50 flex items-center justify-center mb-3">
+                        <i class="fa-solid fa-inbox text-blue-300"></i>
+                    </div>
+                    <p class="text-sm text-gray-500 font-medium">No recent activity found</p>
+                </div>`;
                 checkToggleBtn();
                 return;
             }
@@ -131,23 +140,23 @@
 
                 return `
             <div id="activity-${a.key}"
-                 class="activity-item flex items-center gap-3 p-2 hover:bg-white rounded-xl transition ${hiddenCls}"
+                 class="activity-item flex items-center gap-3 p-2.5 hover:bg-blue-50/60 rounded-xl transition-colors duration-150 ${hiddenCls}"
                  ${extraAttr}>
 
-                <div class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
+                <div class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-blue-50">
                     <img src="${a.image}" alt="${a.name}" class="w-full h-full object-cover">
                 </div>
 
                 <div class="flex-1 min-w-0">
-                    <p class="font-medium text-sm truncate">${a.name}</p>
+                    <p class="font-medium text-sm text-gray-800 truncate">${a.name}</p>
                     <p class="text-sm text-gray-500 truncate">${a.message}</p>
-                    <p class="text-xs text-gray-400">${a.time}</p>
+                    <p class="text-xs text-gray-400 mt-0.5">${a.time}</p>
                 </div>
 
-                <span class="text-[10px] px-2 py-0.5 rounded-full flex-shrink-0 ${
+                <span class="text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${
                     a.type === 'meeting'
-                        ? 'bg-blue-100 text-blue-600'
-                        : 'bg-green-100 text-green-600'
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-slate-100 text-slate-600'
                 }">
                     ${a.type.charAt(0).toUpperCase() + a.type.slice(1)}
                 </span>
@@ -157,8 +166,8 @@
                         onclick="removeActivity(this)"
                         title="Remove"
                         class="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full
-                               text-red-400 bg-white border border-gray-200 shadow-sm
-                               hover:bg-red-50 hover:text-red-600 transition-all duration-200">
+                               text-gray-400 bg-white border border-gray-200 shadow-sm
+                               hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-all duration-200">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                          stroke-width="2" stroke="currentColor" class="w-4 h-4">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>

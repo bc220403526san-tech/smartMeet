@@ -49,7 +49,6 @@ class MeetingController extends Controller
     // ── TODAY ──
     public function today()
     {
-
         $userId = auth()->id();
 
         $todayMeetings = Meeting::with('organizer')
@@ -65,16 +64,14 @@ class MeetingController extends Controller
                 $startTime = Carbon::parse($meeting->date . ' ' . $meeting->time);
                 $endTime   = $startTime->copy()->addMinutes($meeting->duration);
 
-                // ── ACTIVE meeting: remaining time from NOW to end ──
                 if ($meeting->status === 'active') {
                     $remainingMinutes = (int) $now->diffInMinutes($endTime, false);
-
                     if ($remainingMinutes <= 0) {
                         $meeting->time_label = 'Ended';
                         $meeting->time_type  = 'ended';
                     } elseif ($remainingMinutes <= 10) {
                         $meeting->time_label = "{$remainingMinutes}m remaining";
-                        $meeting->time_type  = 'ending_soon'; // red warning
+                        $meeting->time_type  = 'ending_soon';
                     } else {
                         $hrs  = intdiv($remainingMinutes, 60);
                         $mins = $remainingMinutes % 60;
@@ -83,11 +80,8 @@ class MeetingController extends Controller
                             : "{$mins}m remaining";
                         $meeting->time_type  = 'active';
                     }
-
-                    // ── UPCOMING meeting: time until start ──
                 } elseif ($meeting->status === 'upcoming') {
                     $minutesUntilStart = (int) $now->diffInMinutes($startTime, false);
-
                     if ($minutesUntilStart <= 0) {
                         $meeting->time_label = 'Starting now';
                         $meeting->time_type  = 'starting_now';
@@ -100,7 +94,6 @@ class MeetingController extends Controller
                         $meeting->time_label = "Starts in {$hrs}h {$mins}m";
                         $meeting->time_type  = 'upcoming';
                     }
-
                 } else {
                     $meeting->time_label = null;
                     $meeting->time_type  = $meeting->status;
@@ -115,21 +108,25 @@ class MeetingController extends Controller
         return view('participant.meetings.today', compact('todayMeetings'));
     }
 
-    // ── SHOW ──
-//    public function show(Meeting $meeting)
-//    {
-//        $isParticipant = $meeting->participants()
-//            ->where('user_id', auth()->id())
-//            ->exists();
-//
-//        if (!$isParticipant) {
-//            abort(403);
-//        }
-//
-//        $meeting->load(['organizer', 'participants.user']);
-//
-//        return view('participant.meetings.show', compact('meeting'));
-//    }
+    // ── SHOW (ab dynamic — real meeting detail) ──
+    public function show(Meeting $meeting)
+    {
+        $isParticipant = $meeting->participants()
+            ->where('user_id', auth()->id())
+            ->exists();
+
+        if (!$isParticipant) {
+            abort(403, 'You are not invited to this meeting.');
+        }
+
+        // Organizer + participants (with pivot user data) load karo
+        $meeting->load(['organizer', 'participants.user']);
+
+        $startTime = Carbon::parse($meeting->date . ' ' . $meeting->time);
+        $endTime   = $startTime->copy()->addMinutes($meeting->duration);
+
+        return view('participant.meetings.show', compact('meeting', 'startTime', 'endTime'));
+    }
 
     // ── ATTEND ──
     public function attend(Meeting $meeting)
@@ -137,11 +134,11 @@ class MeetingController extends Controller
         $isParticipant = $meeting->participants()
             ->where('user_id', auth()->id())
             ->exists();
+
         if (!$isParticipant) {
             abort(403, 'You are not invited to this meeting.');
         }
 
-        // 👇 Agar koi seedha ye URL kholay jab meeting active na ho — room mein na jaane dein
         if ($meeting->status !== 'active') {
             return redirect()->route('participant.meetings.index')
                 ->with('info', "This meeting hasn't started yet. You'll be able to join once the organizer starts it.");
@@ -149,10 +146,11 @@ class MeetingController extends Controller
 
         $isOrganizer = false;
         $meeting->load(['participants.user', 'organizer']);
+
         return view('participant.meetings.attend', compact('meeting', 'isOrganizer'));
     }
 
-// ── STATUS CHECK (polling for index page) ──
+    // ── STATUS CHECK (polling for index page) ──
     public function statusCheck(Request $request)
     {
         $userId = auth()->id();

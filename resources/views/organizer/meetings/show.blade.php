@@ -213,7 +213,21 @@
                                     Team Members
                                 </p>
                                 <h2 class="text-2xl font-bold text-white leading-tight">Participants</h2>
-                                <p class="text-sm text-blue-100 mt-1">Active meeting members</p>
+                                @php
+                                    $joinedParticipantsCount = $meeting->participants->filter(function ($participant) {
+                                        $joinedAt = $participant->joined_at ?? $participant->pivot?->joined_at;
+                                        $leftAt   = $participant->left_at ?? $participant->pivot?->left_at;
+
+                                        // Attendance history:
+                                        // joined_at OR left_at existing means this participant
+                                        // attended the meeting at least once.
+                                        return $joinedAt !== null || $leftAt !== null;
+                                    })->count();
+                                @endphp
+
+                                <p class="text-sm text-blue-100 mt-1">
+                                    {{ $joinedParticipantsCount }} joined · {{ $meeting->participants->count() }} total
+                                </p>
                             </div>
                             <div class="bg-white/20 backdrop-blur-md border border-white/20
                                         rounded-2xl px-4 py-3 text-center min-w-[80px]">
@@ -262,6 +276,36 @@
                                                 <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-[2px] mt-0.5 truncate">
                                                     {{ ucfirst($participant->user->role) }}
                                                 </p>
+
+                                                @php
+                                                    $joinedAt = $participant->joined_at
+                                                        ?? $participant->pivot?->joined_at;
+
+                                                    $leftAt = $participant->left_at
+                                                        ?? $participant->pivot?->left_at;
+
+
+                                                    $hasAttended = $joinedAt !== null || $leftAt !== null;
+                                                @endphp
+
+                                                <div class="mt-1.5 flex items-center gap-1.5">
+                                                    @if($hasAttended)
+                                                        <span class="relative flex h-2 w-2">
+                                                            <span class="absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-30"></span>
+                                                            <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                                        </span>
+
+                                                        <span class="text-[10px] font-semibold text-green-600 uppercase tracking-wider">
+                                                            Joined
+                                                        </span>
+                                                    @else
+                                                        <span class="inline-flex rounded-full h-2 w-2 bg-amber-400"></span>
+
+                                                        <span class="text-[10px] font-semibold text-amber-600 uppercase tracking-wider">
+                                                            Not Joined
+                                                        </span>
+                                                    @endif
+                                                </div>
                                             </div>
                                         </div>
                                     @endforeach

@@ -1,0 +1,151 @@
+body {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 11px;
+    color: #374151;
+    margin: 0;
+}
+
+/* Header / Branding */
+.report-header {
+    display: table;
+    width: 100%;
+    border-bottom: 2px solid #e0e7ff;
+    padding-bottom: 14px;
+    margin-bottom: 18px;
+}
+.report-header .brand {
+    display: table-cell;
+    vertical-align: middle;
+}
+.brand-logo {
+    height: 38px;
+    max-height: 38px;
+    width: auto;
+    vertical-align: middle;
+}
+.brand-text {
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: 8px;
+}
+.brand-text .name {
+    font-size: 18px;
+    font-weight: bold;
+    color: #1f2937;
+}
+.brand-text .tagline {
+    font-size: 9px;
+    color: #9ca3af;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+.report-header .meta {
+    display: table-cell;
+    vertical-align: middle;
+    text-align: right;
+}
+.report-header .meta .title {
+    font-size: 15px;
+    font-weight: bold;
+    color: #1f2937;
+}
+.report-header .meta .generated {
+    font-size: 9px;
+    color: #9ca3af;
+    margin-top: 2px;
+}
+
+/* Filters applied */
+.filters-bar {
+    font-size: 9px;
+    color: #6b7280;
+    background: #f9fafb;
+    padding: 6px 10px;
+    border-radius: 4px;
+    margin-bottom: 16px;
+}
+.filters-bar span { margin-right: 16px; }
+.filters-bar b { color: #374151; }
+
+/* Section titles */
+h2.section-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #374151;
+    margin: 0 0 8px 0;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+/* Stats summary */
+table.stats-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 6px;
+    margin-bottom: 20px;
+    margin-left: -6px;
+}
+table.stats-table td {
+    width: 16.6%;
+    text-align: center;
+    border: 1px solid #eef2ff;
+    padding: 10px 4px;
+    background: #f8faff;
+}
+table.stats-table .stat-value {
+    font-size: 16px;
+    font-weight: bold;
+    color: #4f6ef7;
+}
+table.stats-table .stat-label {
+    font-size: 8px;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-top: 2px;
+}
+
+/* Meetings table */
+table.meetings-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid #eef0f4;
+}
+table.meetings-table th,
+table.meetings-table td {
+    border: 1px solid #eef0f4;
+    padding: 7px 9px;
+    text-align: left;
+}
+table.meetings-table th {
+    background: #eef2ff;
+    color: #4f5b93;
+    text-transform: uppercase;
+    font-size: 8.5px;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+}
+table.meetings-table tr:nth-child(even) { background: #fbfbfd; }
+table.meetings-table td { color: #4b5563; }
+
+.status-badge {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 10px;
+    font-size: 8.5px;
+    font-weight: 600;
+}
+.status-completed { background: #eef2ff; color: #4f46e5; }
+.status-active    { background: #ecfdf5; color: #059669; }
+.status-cancelled { background: #fef2f2; color: #dc2626; }
+.status-upcoming  { background: #fffbeb; color: #d97706; }
+
+.flag-yes { color: #dc2626; font-weight: 600; }
+.flag-no  { color: #c1c7d0; }
+
+.footer-note {
+    margin-top: 18px;
+    font-size: 8px;
+    color: #c1c7d0;
+    text-align: center;
+}

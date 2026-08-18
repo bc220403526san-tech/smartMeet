@@ -12,6 +12,7 @@ use Illuminate\Validation\Rules\Password;
 
 class SettingsController extends Controller
 {
+    // ── INDEX ──
     public function index()
     {
         $user = Auth::user();
@@ -21,11 +22,12 @@ class SettingsController extends Controller
             : 0;
 
         return view('admin.settings.index', [
-            'user' => $user,
+            'user'          => $user,
             'totalMeetings' => $totalMeetings,
         ]);
     }
 
+    // ── PROFILE ──
     public function updateProfile(Request $request)
     {
         $user = Auth::user();
@@ -37,38 +39,34 @@ class SettingsController extends Controller
             'phone' => ['nullable', 'string', 'max:30'],
         ]);
 
-        // Check if user is trying to change their own role
+        // Admin apna khud ka role change nahi kar sakta
         if ($user->role !== $validated['role']) {
             if ($request->wantsJson()) {
                 return response()->json([
-                    'message' => 'Role cannot be changed. Admins cannot modify their own role.'
+                    'message' => 'Role cannot be changed. Admins cannot modify their own role.',
                 ], 403);
             }
-
             return back()->withErrors(['role' => 'Role cannot be changed. Admins cannot modify their own role.']);
         }
 
-        // forceFill bypasses $fillable so this always persists, even if the
-        // User model hasn't been updated to allow mass assignment of these
-        // columns yet. We validate above, so this is safe.
         $user->forceFill($validated)->save();
 
         if ($request->wantsJson()) {
             return response()->json(['message' => 'Profile updated successfully.']);
         }
-
         return back()->with('success', 'Profile updated successfully.');
     }
 
+    // ── AVATAR ──
     public function updateAvatar(Request $request)
     {
         $request->validate([
-            'avatar' => ['required', 'file', 'max:8192'],
+            'avatar' => ['required', 'file', 'max:8192'], // 8MB
         ]);
 
         $file = $request->file('avatar');
         $mime = $file->getMimeType();
-        $ext = strtolower($file->getClientOriginalExtension());
+        $ext  = strtolower($file->getClientOriginalExtension());
 
         $allowedExt = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'heic', 'heif', 'avif'];
 
@@ -80,31 +78,31 @@ class SettingsController extends Controller
 
         $user = Auth::user();
 
+        // Purani avatar delete karo (agar hai)
         if ($user->avatar) {
             Storage::disk('public')->delete($user->avatar);
         }
 
         $path = $file->store('avatars', 'public');
-
         $user->forceFill(['avatar' => $path])->save();
 
         if ($request->wantsJson()) {
             return response()->json([
                 'message' => 'Profile photo updated.',
-                'url' => Storage::url($path),
+                'url'     => Storage::url($path),
             ]);
         }
-
         return back()->with('success', 'Profile photo updated.');
     }
 
+    // ── PASSWORD ──
     public function updatePassword(Request $request)
     {
         $user = Auth::user();
 
         $request->validate([
             'current_password' => ['required', 'current_password'],
-            'password' => ['required', 'confirmed', Password::min(8)->mixedCase()->numbers()->symbols()],
+            'password'          => ['required', 'confirmed', Password::min(8)->mixedCase()->numbers()->symbols()],
         ]);
 
         $user->forceFill([
@@ -114,18 +112,14 @@ class SettingsController extends Controller
         if ($request->wantsJson()) {
             return response()->json(['message' => 'Password updated successfully.']);
         }
-
         return back()->with('success', 'Password updated successfully.');
     }
 
+    // ── NOTIFICATIONS ──
     public function updateNotifications(Request $request)
     {
         $user = Auth::user();
 
-        // Only touch keys actually present in the request. Previously this
-        // also ran for every key whenever the request was JSON, which force-set
-        // the other two toggles to false any time only one was sent — that
-        // was the bug causing toggles to reset each other.
         $data = [];
         foreach (['email_alerts', 'reminders_enabled', 'system_alerts'] as $key) {
             if ($request->has($key)) {
@@ -144,10 +138,10 @@ class SettingsController extends Controller
         if ($request->wantsJson()) {
             return response()->json(['message' => 'Notification preferences saved.', 'data' => $data]);
         }
-
         return back()->with('success', 'Notification preferences saved.');
     }
 
+    // ── DEACTIVATE ──
     public function deactivate(Request $request)
     {
         $request->validate([
@@ -164,21 +158,15 @@ class SettingsController extends Controller
         return redirect('/login')->with('status', 'Your account has been deactivated.');
     }
 
-    /**
-     * Store a flash message in session for AJAX requests
-     */
+    // ── FLASH (AJAX ke liye session message store karta hai) ──
     public function storeFlash(Request $request)
     {
         $request->validate([
             'message' => ['required', 'string'],
-            'type' => ['required', 'in:success,error'],
+            'type'    => ['required', 'in:success,error'],
         ]);
 
-        if ($request->type === 'error') {
-            session()->flash('error', $request->message);
-        } else {
-            session()->flash('success', $request->message);
-        }
+        session()->flash($request->type, $request->message);
 
         return response()->json(['message' => 'Flash stored.']);
     }

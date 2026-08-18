@@ -49,17 +49,14 @@
             return;
         }
         list.innerHTML = notifications.map(n => {
-            const hasLink = n.link && n.link !== '#';
-            const tag = hasLink ? 'a' : 'div';
-            const hrefAttr = hasLink ? `href="${n.link}"` : '';
-            const cursorClass = hasLink ? 'cursor-pointer' : 'cursor-default';
+            const openUrl = `/notifications/${n.id}/open`;
             return `
-            <${tag} ${hrefAttr} onclick="markNotificationRead(${n.id})"
-               class="block px-4 py-2 hover:bg-gray-50 transition ${cursorClass} ${n.is_read ? '' : 'bg-blue-50/50'}">
-                <p class="text-sm font-medium text-gray-800">${n.title}</p>
-                ${n.message ? `<p class="text-xs text-gray-500 mt-0.5">${n.message}</p>` : ''}
-                <p class="text-[10px] text-gray-400 mt-1">${n.time}</p>
-            </${tag}>`;
+        <a href="${openUrl}"
+           class="block px-4 py-2 hover:bg-gray-50 transition ${n.is_read ? '' : 'bg-blue-50/50'}">
+            <p class="text-sm font-medium text-gray-800">${n.title}</p>
+            ${n.message ? `<p class="text-xs text-gray-500 mt-0.5">${n.message}</p>` : ''}
+            <p class="text-[10px] text-gray-400 mt-1">${n.time}</p>
+        </a>`;
         }).join('');
     }
     function fetchNotifications() {

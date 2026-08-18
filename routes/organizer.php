@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Organizer\MeetingAttendController;
 use App\Http\Controllers\Organizer\MeetingController;
+use App\Http\Controllers\Organizer\ParticipantController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -15,17 +16,42 @@ Route::middleware(['auth', 'role:organizer'])
     ->name('organizer.')
     ->group(function () {
 
-        Route::view('/dashboard', 'organizer.dashboard')->name('dashboard');
+        Route::get('/dashboard', [App\Http\Controllers\Organizer\DashboardController::class, 'index'])
+                ->name('dashboard');
 
         Route::prefix('settings')->name('settings.')->group(function () {
-            Route::view('/', 'organizer.settings.index')->name('index');
+            Route::get('/', [\App\Http\Controllers\Organizer\SettingsController::class, 'index'])
+                ->name('index');
+
+            Route::patch('/profile', [\App\Http\Controllers\Organizer\SettingsController::class, 'updateProfile'])
+                ->name('profile.update');
+
+            Route::post('/avatar', [\App\Http\Controllers\Organizer\SettingsController::class, 'updateAvatar'])
+                ->name('avatar.update');
+
+            Route::put('/password', [\App\Http\Controllers\Organizer\SettingsController::class, 'updatePassword'])
+                ->name('password.update');
+
+            Route::patch('/notifications', [\App\Http\Controllers\Organizer\SettingsController::class, 'updateNotifications'])
+                ->name('notifications.update');
+
+            Route::delete('/deactivate', [\App\Http\Controllers\Organizer\SettingsController::class, 'deactivate'])
+                ->name('deactivate');
+
+            Route::post('/flash', [\App\Http\Controllers\Organizer\SettingsController::class, 'storeFlash'])
+                ->name('flash');
+            Route::post('/role-request', [App\Http\Controllers\Organizer\SettingsController::class, 'roleRequest'])
+                ->name('role-request');
         });
 
         Route::prefix('participants')->name('participants.')->group(function () {
-            Route::view('/', 'organizer.participants.index')->name('index');
-//            Route::view('/create', 'organizer.participants.create')->name('create');
-            Route::view('/{id}', 'organizer.participants.show')->name('show');
-//            Route::view('/{id}/edit', 'organizer.participants.edit')->name('edit');
+
+            Route::get('/', [ParticipantController::class, 'index'])->name('index');
+            Route::get('/{participant}', [ParticipantController::class, 'show'])
+                ->name('show');
+            Route::delete('/{participant}', [ParticipantController::class, 'destroy'])
+                ->name('destroy');
+
         });
 
         /*

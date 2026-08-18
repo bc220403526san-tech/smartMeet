@@ -24,6 +24,8 @@ class Meeting extends Model
         'starts_at',
         'organizer_id',
         'actual_start',
+        'organizer_joined_at',
+        'organizer_left_at',
     ];
 
 

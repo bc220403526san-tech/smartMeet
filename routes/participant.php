@@ -16,7 +16,8 @@ Route::middleware(['auth', 'role:participant'])
     ->name('participant.')
     ->group(function () {
 
-        Route::view('/dashboard', 'participant.dashboard')->name('dashboard');
+        Route::get('/dashboard', [\App\Http\Controllers\Participant\DashboardController::class, 'index'])
+            ->name('dashboard');
 
         /*
         | Settings

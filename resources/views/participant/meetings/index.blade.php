@@ -227,9 +227,7 @@
                                 </span>
                             @endif
                         </div>
-                        <!-- View Details -->
-                        <a
-{{--                            href="{{ route('participant.meetings.show', $meeting) }}"--}}
+                        <a href="{{ route('participant.meetings.show', $meeting) }}"
                            class="w-10 h-10 rounded-xl bg-gray-100 hover:bg-blue-100 text-gray-500 hover:text-blue-600 transition flex items-center justify-center shadow-sm group-hover:shadow">
                             <i class="fa-regular fa-eye text-sm"></i>
                         </a>

@@ -1,16 +1,11 @@
 <x-layouts.app>
-
     <x-slot name="header">
         <x-header.page-title title="Organizer Dashboard" />
     </x-slot>
-
     <x-success />
     <x-error />
-
     <div class="p-4 bg-gray-50 rounded-2xl m-2 mt-0 space-y-4 overflow-y-auto min-h-screen">
-
         <div class="max-w-4xl mx-auto">
-
             <!-- TOP BAR -->
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div class="flex items-center gap-2 text-xs">
@@ -21,17 +16,14 @@
                     <i class="fa-solid fa-angle-right text-[10px] text-gray-300"></i>
                     <span class="font-semibold text-blue-600 uppercase tracking-wider">Edit Meeting</span>
                 </div>
-
                 <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full
                             bg-orange-50 border border-orange-100 text-orange-600 text-xs font-semibold w-fit">
                     <span class="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></span>
                     {{ ucfirst($meeting->status) }} Meeting
                 </div>
             </div>
-
             <!-- MAIN CARD -->
             <div class="bg-white rounded-[28px] border border-gray-200 shadow-sm overflow-hidden">
-
                 <!-- HEADER -->
                 <div class="relative overflow-hidden">
                     <div class="absolute inset-0 bg-gradient-to-r from-blue-600 via-cyan-500 to-sky-500"></div>
@@ -57,14 +49,11 @@
                         </div>
                     </div>
                 </div>
-
                 <!-- FORM -->
                 <form action="{{ route('organizer.meetings.update', $meeting) }}" method="POST">
                     @csrf
                     @method('PUT')
-
                     <div class="p-5 lg:p-6 space-y-6">
-
                         {{-- ERRORS --}}
                         @if($errors->any())
                             <div class="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-2xl">
@@ -75,10 +64,8 @@
                                 </ul>
                             </div>
                         @endif
-
                         <!-- BASIC INFO -->
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-
                             <!-- TITLE -->
                             <div class="lg:col-span-2">
                                 <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">
@@ -90,8 +77,7 @@
                                               text-sm text-gray-800 focus:outline-none focus:ring-4
                                               focus:ring-blue-100 focus:border-blue-400 focus:bg-white transition">
                             </div>
-
-                            <!-- DESCRIPTION -->
+                            <!-- MEETING DESCRIPTION (agenda se alag, meeting ki apni description hai — waisi hi rahegi) -->
                             <div class="lg:col-span-2">
                                 <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">
                                     Description
@@ -102,12 +88,9 @@
                                                  focus:ring-blue-100 focus:border-blue-400 focus:bg-white
                                                  transition resize-none">{{ old('description', $meeting->description) }}</textarea>
                             </div>
-
                         </div>
-
                         <!-- DATE TIME -->
                         <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-
                             <!-- DATE -->
                             <div>
                                 <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">
@@ -122,7 +105,6 @@
                                                   focus:ring-blue-100 focus:border-blue-400 focus:bg-white transition">
                                 </div>
                             </div>
-
                             <!-- TIME -->
                             <div>
                                 <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">
@@ -136,7 +118,6 @@
                                                   focus:ring-blue-100 focus:border-blue-400 focus:bg-white transition">
                                 </div>
                             </div>
-
                             <!-- DURATION -->
                             <div>
                                 <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">
@@ -157,7 +138,6 @@
                                     <i class="fa-regular fa-hourglass-half text-orange-500 absolute right-4 top-1/2 -translate-y-1/2 text-sm"></i>
                                 </div>
                             </div>
-
                             <!-- TIMEZONE -->
                             <div>
                                 <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">
@@ -178,12 +158,9 @@
                                     <i class="fa-solid fa-earth-asia absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
                                 </div>
                             </div>
-
                         </div>
-
                         <!-- PARTICIPANTS -->
                         <div class="bg-gray-50 border border-gray-100 rounded-3xl p-5">
-
                             <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
                                 <div class="flex items-center gap-3">
                                     <div class="w-11 h-11 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center">
@@ -195,12 +172,10 @@
                                     </div>
                                 </div>
                             </div>
-
                             <!-- Selected Participants -->
                             <div id="chips-area"
                                  class="flex items-center gap-2 flex-wrap bg-white border border-gray-200
                                         p-3 rounded-2xl min-h-[50px] mb-3">
-
                                 @foreach($participants as $participant)
                                     @php
                                         $isSelected = in_array($participant->id, $selectedParticipants);
@@ -220,18 +195,14 @@
                                         </span>
                                     @endif
                                 @endforeach
-
                                 <button type="button" id="add-member-btn"
                                         class="text-blue-500 text-xs flex items-center gap-1 hover:text-blue-700 transition">
                                     <i class="fa fa-plus text-xs"></i> Add Member
                                 </button>
-
                             </div>
-
                             <!-- Dropdown -->
                             <div id="participant-dropdown"
                                  class="hidden bg-white border border-gray-200 rounded-2xl shadow-lg z-20 relative">
-
                                 <div class="px-3 py-2 border-b border-gray-100 bg-gray-50
                                             flex justify-between items-center sticky top-0 rounded-t-2xl">
                                     <span class="text-xs font-medium text-gray-500">Select Participants</span>
@@ -240,14 +211,12 @@
                                         <i class="fa fa-times"></i> Close
                                     </button>
                                 </div>
-
                                 <div class="px-3 py-2 border-b border-gray-100">
                                     <input type="text" id="participant-search"
                                            placeholder="Search..."
                                            class="w-full px-3 py-2 bg-gray-100 rounded-xl text-xs
                                                   focus:outline-none focus:ring-2 focus:ring-blue-300">
                                 </div>
-
                                 <div id="participant-list" class="max-h-44 overflow-y-auto">
                                     @foreach($participants as $participant)
                                         <div class="participant-item flex items-center gap-3 px-4 py-2.5
@@ -269,7 +238,6 @@
                                         </div>
                                     @endforeach
                                 </div>
-
                                 <div class="px-4 py-3 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
                                     <button type="button" id="done-btn"
                                             class="w-full text-center px-4 py-2 bg-blue-600 text-white
@@ -277,16 +245,11 @@
                                         Done
                                     </button>
                                 </div>
-
                             </div>
-
                             <div id="hidden-inputs"></div>
-
                         </div>
-
-                        <!-- AGENDA -->
+                        <!-- AGENDA — Sirf Title (description hata di gayi, create page ke hisaab se) -->
                         <div class="bg-gray-50 border border-gray-100 rounded-3xl p-5">
-
                             <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
                                 <div class="flex items-center gap-3">
                                     <div class="w-11 h-11 rounded-2xl bg-purple-100 text-purple-600 flex items-center justify-center">
@@ -303,60 +266,31 @@
                                     + Add Agenda
                                 </button>
                             </div>
-
-                            <div id="agendaWrapper" class="space-y-4">
-
+                            <div id="agendaWrapper" class="space-y-2">
                                 @php
                                     $agendaItems = json_decode($meeting->agenda, true) ?? [];
-                                    if(empty($agendaItems)) $agendaItems = [['title' => '', 'description' => '']];
+                                    if(empty($agendaItems)) $agendaItems = [['title' => '']];
                                 @endphp
-
                                 @foreach($agendaItems as $index => $item)
-                                    <div class="agenda-item bg-white border border-gray-200 rounded-3xl p-5 relative shadow-sm">
-
+                                    <div class="agenda-item flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-200">
+                                        <span class="agenda-number text-gray-400 text-xs font-bold w-5 text-center shrink-0">{{ $index + 1 }}</span>
+                                        <input type="text"
+                                               name="agenda_title[]"
+                                               value="{{ old('agenda_title.'.$index, $item['title'] ?? '') }}"
+                                               placeholder="e.g. Marketing Strategy"
+                                               class="flex-1 px-3 py-2.5 bg-gray-50 rounded-lg text-sm border border-gray-200
+                                                      focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-200">
                                         <button type="button"
                                                 class="removeAgenda {{ count($agendaItems) === 1 ? 'hidden' : '' }}
-                                                       absolute top-2 right-4 w-7 h-7 rounded-xl
-                                                       bg-red-50 hover:bg-red-100 text-red-500 transition">
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5 ml-1">
+                                                       text-gray-400 hover:text-red-500 transition p-1 rounded-lg hover:bg-red-50 shrink-0">
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
                                             </svg>
                                         </button>
-
-                                        <div class="space-y-4">
-                                            <div>
-                                                <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">
-                                                    Agenda Title
-                                                </label>
-                                                <input type="text"
-                                                       name="agenda_title[]"
-                                                       value="{{ old('agenda_title.'.$index, $item['title'] ?? '') }}"
-                                                       placeholder="e.g. Marketing Strategy"
-                                                       class="w-full h-12 px-4 bg-gray-50 border border-gray-200
-                                                              rounded-2xl text-sm focus:outline-none focus:ring-4
-                                                              focus:ring-blue-100 focus:border-blue-400 focus:bg-white transition">
-                                            </div>
-                                            <div>
-                                                <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">
-                                                    Description
-                                                </label>
-                                                <textarea rows="3"
-                                                          name="agenda_description[]"
-                                                          placeholder="Agenda description..."
-                                                          class="w-full px-4 py-3 bg-gray-50 border border-gray-200
-                                                                 rounded-2xl text-sm focus:outline-none focus:ring-4
-                                                                 focus:ring-blue-100 focus:border-blue-400 focus:bg-white
-                                                                 transition resize-none">{{ old('agenda_description.'.$index, $item['description'] ?? '') }}</textarea>
-                                            </div>
-                                        </div>
-
                                     </div>
                                 @endforeach
-
                             </div>
-
                         </div>
-
                         <!-- BUTTONS -->
                         <div class="flex items-center justify-end gap-3 pt-2">
                             <a href="{{ route('organizer.meetings.index') }}"
@@ -373,16 +307,12 @@
                                 Save Changes
                             </button>
                         </div>
-
                     </div>
                 </form>
-
             </div>
         </div>
     </div>
-
 </x-layouts.app>
-
 <script>
     // ── PARTICIPANTS ──
     const addBtn       = document.getElementById('add-member-btn');
@@ -393,30 +323,25 @@
     const chipsArea    = document.getElementById('chips-area');
     const hiddenInputs = document.getElementById('hidden-inputs');
     const items        = document.querySelectorAll('.participant-item');
-
     // Already selected participants
     let selected = {};
     @foreach($selectedParticipants as $id)
         selected['{{ $id }}'] = true;
     @endforeach
-
     addBtn.addEventListener('click', () => dropdown.classList.remove('hidden'));
     closeBtn.addEventListener('click', () => dropdown.classList.add('hidden'));
     doneBtn.addEventListener('click',  () => dropdown.classList.add('hidden'));
-
     searchInput.addEventListener('input', function () {
         const q = this.value.toLowerCase();
         items.forEach(item => {
             item.style.display = item.dataset.name.toLowerCase().includes(q) ? '' : 'none';
         });
     });
-
     items.forEach(item => {
         item.addEventListener('click', () => {
             const id   = item.dataset.id;
             const name = item.dataset.name;
             const check = item.querySelector('.check-icon');
-
             if (selected[id]) {
                 delete selected[id];
                 check.classList.add('hidden');
@@ -428,11 +353,9 @@
             }
         });
     });
-
     function addChip(id, name) {
         // Purana chip remove karo agar already hai
         removeChip(id);
-
         const chip = document.createElement('span');
         chip.id = 'chip-' + id;
         chip.className = 'bg-blue-100 text-blue-600 px-3 py-1 rounded-full text-xs flex items-center gap-2';
@@ -443,14 +366,12 @@
             </button>`;
         chipsArea.insertBefore(chip, addBtn);
     }
-
     function removeChip(id) {
         const chip  = document.getElementById('chip-' + id);
         const input = document.getElementById('input-' + id);
         if (chip)  chip.remove();
         if (input) input.remove();
     }
-
     window.removeParticipant = function(id) {
         delete selected[id];
         removeChip(id);
@@ -460,58 +381,44 @@
             }
         });
     };
-
     // ── AGENDA ──
     const addAgendaBtn  = document.getElementById('addAgendaBtn');
     const agendaWrapper = document.getElementById('agendaWrapper');
-
     addAgendaBtn.addEventListener('click', () => {
+        const count = document.querySelectorAll('.agenda-item').length + 1;
         const div = document.createElement('div');
-        div.className = 'agenda-item bg-white border border-gray-200 rounded-3xl p-5 relative shadow-sm';
+        div.className = 'agenda-item flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-200';
         div.innerHTML = `
-            <button type="button" class="removeAgenda absolute top-4 right-4 w-9 h-9
-                                         rounded-xl bg-red-50 hover:bg-red-100 text-red-500 transition">
-                <i class="fa-solid fa-xmark"></i>
-            </button>
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">
-                        Agenda Title
-                    </label>
-                    <input type="text" name="agenda_title[]" placeholder="e.g. Product Discussion"
-                           class="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm
-                                  focus:outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-400
-                                  focus:bg-white transition">
-                </div>
-                <div>
-                    <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">
-                        Description
-                    </label>
-                    <textarea rows="3" name="agenda_description[]" placeholder="Agenda description..."
-                              class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm
-                                     focus:outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-400
-                                     focus:bg-white transition resize-none"></textarea>
-                </div>
-            </div>`;
+            <span class="agenda-number text-gray-400 text-xs font-bold w-5 text-center shrink-0">${count}</span>
+            <input type="text"
+                   name="agenda_title[]"
+                   placeholder="e.g. Action Items Review"
+                   class="flex-1 px-3 py-2.5 bg-gray-50 rounded-lg text-sm border border-gray-200
+                          focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-200">
+            <button type="button"
+                    class="removeAgenda text-gray-400 hover:text-red-500 transition p-1 rounded-lg hover:bg-red-50 shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+            </button>`;
         agendaWrapper.appendChild(div);
         updateAgendaButtons();
+        updateNumbers();
     });
-
     function updateAgendaButtons() {
         const agendaItems = document.querySelectorAll('.agenda-item');
         agendaItems.forEach(item => {
             const btn = item.querySelector('.removeAgenda');
-            if (agendaItems.length === 1) {
-                btn.classList.add('hidden');
-            } else {
-                btn.classList.remove('hidden');
-            }
+            btn.classList.toggle('hidden', agendaItems.length === 1);
             btn.onclick = () => {
                 item.remove();
                 updateAgendaButtons();
+                updateNumbers();
             };
         });
     }
-
+    function updateNumbers() {
+        document.querySelectorAll('.agenda-number').forEach((el, i) => el.textContent = i + 1);
+    }
     updateAgendaButtons();
 </script>
