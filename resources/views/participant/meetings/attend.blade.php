@@ -923,6 +923,200 @@
             .ctrl-btn { min-width: 42px !important; }
             .ctrl-icon, .btn-end { width: 32px !important; height: 32px !important; min-width: 32px !important; min-height: 32px !important; }
         }
+
+        /* ============================================================
+           SMARTMEET FINAL ROOM LAYOUT OVERRIDE
+           Keeps 1–2 users compact and scales cleanly for larger rooms.
+        ============================================================ */
+        .video-grid {
+            align-content: center !important;
+            justify-content: center !important;
+            grid-auto-rows: minmax(210px, min(42vh, 430px)) !important;
+        }
+        .video-grid:has(> .video-tile:only-child) {
+            grid-template-columns: minmax(280px, min(760px, 82%)) !important;
+        }
+        .video-grid:has(> .video-tile:first-child:nth-last-child(2)) {
+            grid-template-columns: repeat(2, minmax(260px, 520px)) !important;
+        }
+        .video-tile {
+            width: 100%;
+            max-height: 460px;
+            aspect-ratio: 16 / 9;
+            min-height: 0 !important;
+        }
+        .video-placeholder { min-height: 0; }
+        .video-placeholder video { object-fit: cover !important; }
+        .participant-online, .participant-offline {
+            border-radius: 14px !important;
+        }
+        @media (max-width: 760px) {
+            .video-grid,
+            .video-grid:has(> .video-tile:only-child),
+            .video-grid:has(> .video-tile:first-child:nth-last-child(2)) {
+                grid-template-columns: 1fr !important;
+                grid-auto-rows: auto !important;
+                align-content: start !important;
+            }
+            .video-tile {
+                aspect-ratio: 16 / 10;
+                max-height: none;
+            }
+        }
+
+
+        /* ===== SmartMeet final compact professional grid ===== */
+        .video-grid{
+            display:grid !important;
+            grid-template-columns:repeat(auto-fill,minmax(280px,360px)) !important;
+            grid-auto-rows:auto !important;
+            justify-content:start !important;
+            align-content:start !important;
+            align-items:start !important;
+            gap:14px !important;
+            padding:18px !important;
+        }
+        .video-grid .video-tile{
+            width:100% !important;
+            max-width:360px !important;
+            height:auto !important;
+            min-height:0 !important;
+            aspect-ratio:16/10 !important;
+            border-radius:18px !important;
+            overflow:hidden !important;
+            box-shadow:0 10px 30px rgba(15,23,42,.12) !important;
+        }
+        .video-grid .video-placeholder,
+        .video-grid video{
+            width:100% !important;
+            height:100% !important;
+        }
+        .video-grid video{object-fit:cover !important}
+        @media(max-width:700px){
+            .video-grid{
+                grid-template-columns:minmax(0,1fr) !important;
+                padding:12px !important;
+            }
+            .video-grid .video-tile{
+                max-width:100% !important;
+                aspect-ratio:16/10 !important;
+            }
+        }
+        /* People: joined users crisp, invited/not-present users intentionally muted */
+        .participant-online{opacity:1 !important;filter:none !important}
+        .participant-offline{
+            opacity:.56 !important;
+            filter:saturate(.35) !important;
+            background:rgba(148,163,184,.08) !important;
+        }
+
+
+
+        /* ============================================================
+           SMARTMEET FINAL PROFESSIONAL ROOM LAYOUT
+           Larger compact tiles, top-left alignment, no full-width stretching.
+        ============================================================ */
+        .video-area{
+            padding:0 !important;
+        }
+        .video-grid{
+            display:grid !important;
+            grid-template-columns:repeat(auto-fill,minmax(360px,470px)) !important;
+            grid-auto-rows:auto !important;
+            justify-content:start !important;
+            align-content:start !important;
+            align-items:start !important;
+            gap:16px !important;
+            padding:22px !important;
+        }
+        .video-grid .video-tile{
+            width:100% !important;
+            max-width:470px !important;
+            min-width:0 !important;
+            min-height:0 !important;
+            height:auto !important;
+            aspect-ratio:16/10 !important;
+            border-radius:20px !important;
+            overflow:hidden !important;
+            border:1px solid rgba(148,163,184,.20) !important;
+            background:linear-gradient(180deg,rgba(15,23,42,.98),rgba(2,6,23,.98)) !important;
+            box-shadow:0 14px 38px rgba(0,0,0,.22) !important;
+            transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease !important;
+        }
+        .video-grid .video-tile:hover{
+            transform:translateY(-2px);
+            border-color:rgba(59,130,246,.45) !important;
+            box-shadow:0 18px 44px rgba(0,0,0,.30) !important;
+        }
+        .video-grid .video-placeholder{
+            width:100% !important;
+            height:calc(100% - 48px) !important;
+            min-height:0 !important;
+        }
+        .video-grid .video-placeholder video{
+            width:100% !important;
+            height:100% !important;
+            object-fit:cover !important;
+        }
+        .video-grid .tile-info{
+            min-height:48px !important;
+            padding:10px 13px !important;
+            backdrop-filter:blur(10px);
+        }
+        .video-grid .avatar-circle{
+            width:76px !important;
+            height:76px !important;
+            font-size:24px !important;
+            box-shadow:0 10px 30px rgba(0,0,0,.22);
+        }
+        .participant-online{
+            opacity:1 !important;
+            filter:none !important;
+        }
+        .participant-offline{
+            opacity:.46 !important;
+            filter:saturate(.30) blur(.15px) !important;
+        }
+        #side-panel{
+            box-shadow:0 18px 55px rgba(0,0,0,.30) !important;
+        }
+        .controls{
+            box-shadow:0 -8px 30px rgba(0,0,0,.12) !important;
+        }
+        .ctrl-icon{
+            transition:transform .15s ease,background .15s ease !important;
+        }
+        .ctrl-icon:hover{
+            transform:translateY(-2px) !important;
+        }
+        @media(max-width:1050px){
+            .video-grid{
+                grid-template-columns:repeat(auto-fill,minmax(320px,430px)) !important;
+            }
+            .video-grid .video-tile{
+                max-width:430px !important;
+            }
+        }
+        @media(max-width:720px){
+            .video-grid{
+                grid-template-columns:1fr !important;
+                gap:12px !important;
+                padding:12px !important;
+            }
+            .video-grid .video-tile{
+                max-width:100% !important;
+                aspect-ratio:16/10 !important;
+            }
+        }
+
+
+        #listening-indicator{
+            border-radius:12px !important;
+            background:rgba(34,197,94,.10) !important;
+            border:1px solid rgba(34,197,94,.20) !important;
+            margin:8px 10px !important;
+        }
+
     </style>
 
 </head>
@@ -1754,37 +1948,38 @@
         });
 
     }
+    /* ============================================================
+       ICE / STUN / TURN — production configuration
+       Add TURN_HOST, TURN_USERNAME and TURN_CREDENTIAL in .env and
+       config/services.php as shown in the deployment guide.
+    ============================================================ */
+    const TURN_HOST = @json(config('services.turn.host', 'smartmeet.live'));
+    const TURN_USERNAME = @json(config('services.turn.username', 'smartmeet'));
+    const TURN_CREDENTIAL = @json(config('services.turn.credential', ''));
+
+    const iceServers = [
+        { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }
+    ];
+
+    if (TURN_HOST && TURN_USERNAME && TURN_CREDENTIAL) {
+        iceServers.push({
+            urls: [
+                `turn:${TURN_HOST}:3478?transport=udp`,
+                `turn:${TURN_HOST}:3478?transport=tcp`
+            ],
+            username: TURN_USERNAME,
+            credential: TURN_CREDENTIAL
+        });
+    } else {
+        console.warn('TURN is not configured. Cross-network WebRTC may be unreliable.');
+    }
 
     const iceConfig = {
-
-        iceServers: [
-
-            { urls: 'stun:stun.l.google.com:19302' },
-
-            { urls: 'stun:stun1.l.google.com:19302' },
-
-            { urls: 'stun:stun2.l.google.com:19302' },
-
-            { urls: 'stun:stun3.l.google.com:19302' },
-
-            { urls: 'stun:stun4.l.google.com:19302' },
-
-            { urls: 'stun:stun.ekiga.net' },
-
-            { urls: 'stun:stun.ideasip.com' },
-
-            { urls: 'stun:stun.schlund.de' },
-
-        ],
-
+        iceServers,
         iceCandidatePoolSize: 10,
-
         iceTransportPolicy: 'all',
-
         bundlePolicy: 'max-bundle',
-
         rtcpMuxPolicy: 'require'
-
     };
 
     function isPolite(otherUserId) {
@@ -2058,7 +2253,8 @@
             if (changed || forceNegotiation) {
                 queuePeerNegotiation(uid, {
                     reason: 'local-track-change',
-                    delay: 80
+                    force: forceNegotiation,
+                    delay: 35
                 });
             }
         });
@@ -2145,20 +2341,9 @@
                 });
                 isMicOn = false;
 
-                try {
-                    const cameraStream = await navigator.mediaDevices.getUserMedia({
-                        audio: false,
-                        video: { width: { ideal: 960 }, height: { ideal: 540 }, facingMode: 'user' }
-                    });
-                    cameraStream.getVideoTracks().forEach(track => {
-                        track.enabled = false;
-                        localStream.addTrack(track);
-                    });
-                } catch (cameraError) {
-                    console.warn('Camera unavailable; continuing with audio:', cameraError);
-                    const camBtn = document.getElementById('ctrl-camera');
-                    if (camBtn?.parentElement) camBtn.parentElement.style.display = 'none';
-                }
+                // Camera is intentionally NOT requested during room startup.
+                // It is requested only after the user clicks Camera, so a
+                // temporary permission/device error can never remove the button.
 
                 isCameraOn = false;
                 const localVideo = document.getElementById('localVideo');
@@ -2751,13 +2936,13 @@
 
                 stopRecognition();
 
-                showToast('You have been muted by the organizer');
+                showModerationNotice('🎙️ Your microphone was muted by the organizer.');
 
                 broadcastMyMicStatus();
 
             } else if (data.type === 'unmute') {
 
-                showToast('The organizer has unmuted you');
+                showModerationNotice('🎙️ The organizer has allowed your microphone. Tap Mic when you are ready to speak.');
 
             }
 
@@ -2802,7 +2987,19 @@
 
             if (micOff) micOff.style.display = 'none';
 
-            startRecognition();
+            // Rebuild/restart the transcript engine if the browser stopped it.
+            if (!recognition) startTranscript();
+            setTimeout(startRecognition, 50);
+
+            // Ensure every currently joined peer has this audio track now.
+            connectToAll();
+            await syncTracksToEveryPeer(true);
+            [120, 450].forEach(delay => setTimeout(() => {
+                if (isMicOn) {
+                    connectToAll();
+                    syncTracksToEveryPeer(true);
+                }
+            }, delay));
 
         } else {
 
@@ -2818,7 +3015,7 @@
 
         // The audio track remains attached while muted. Enabling it
         // therefore starts audio-only calling immediately on every peer.
-        await syncTracksToEveryPeer(false);
+        await syncTracksToEveryPeer(isMicOn);
         if (isMicOn) {
             Object.keys(peers).forEach(uid => {
                 if (shouldInitiatePeer(uid)) queuePeerNegotiation(uid, { reason: 'microphone-enabled', delay: 10 });
@@ -3110,13 +3307,13 @@
                 return;
             }
             if (e.error !== 'aborted' && e.error !== 'no-speech') console.warn('Speech recognition:', e.error);
-            if (isMicOn && document.visibilityState === 'visible') setTimeout(startRecognition, 180);
+            if (isMicOn && document.visibilityState === 'visible') setTimeout(startRecognition, 100);
         };
 
         recognition.onend = () => {
             recognitionRunning = false;
             if (indicator) indicator.style.display = 'none';
-            if (isMicOn && document.visibilityState === 'visible') setTimeout(startRecognition, 120);
+            if (isMicOn && document.visibilityState === 'visible') setTimeout(startRecognition, 80);
         };
 
     }
@@ -3133,7 +3330,7 @@
         showToast('Transcript language: English');
         if (recognition) { stopRecognition(); recognition = null; }
         startTranscript();
-        if (isMicOn) setTimeout(startRecognition, 120);
+        if (isMicOn) setTimeout(startRecognition, 80);
     }
 
     function stopRecognition() {
@@ -3438,6 +3635,37 @@
 
         }, 3200);
 
+    }
+
+
+
+    /* Final browser audio-unlock safety net.
+       Remote audio is retried after any real user gesture. */
+    function unlockAllRemoteAudio() {
+        document.querySelectorAll('audio[data-peer-id]').forEach(audio => {
+            audio.muted = false;
+            audio.defaultMuted = false;
+            audio.volume = 1;
+            audio.play().catch(() => {});
+        });
+    }
+    ['pointerdown', 'touchstart', 'keydown'].forEach(eventName => {
+        document.addEventListener(eventName, unlockAllRemoteAudio, { passive: true });
+    });
+
+
+
+    /* ===== SmartMeet moderation notice ===== */
+    function showModerationNotice(message) {
+        const old = document.getElementById('smartmeet-moderation-notice');
+        if (old) old.remove();
+        const el = document.createElement('div');
+        el.id = 'smartmeet-moderation-notice';
+        el.style.cssText = 'position:fixed;top:82px;left:50%;transform:translateX(-50%);z-index:99999;background:#0f172a;color:#fff;padding:12px 18px;border-radius:14px;box-shadow:0 14px 40px rgba(15,23,42,.25);font-weight:700;font-size:14px;max-width:min(92vw,520px);text-align:center';
+        el.textContent = message;
+        document.body.appendChild(el);
+        setTimeout(() => { el.style.opacity='0'; el.style.transition='opacity .25s'; }, 3200);
+        setTimeout(() => el.remove(), 3500);
     }
 
 </script>
