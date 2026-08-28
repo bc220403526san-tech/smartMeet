@@ -6129,6 +6129,72 @@
    SDP
 ============================================================ */
 
+
+    async function applyRemoteOfferSafely(userId, description) {
+        const uid = String(userId);
+
+        let pc = createPeerConnection(uid);
+        if (!pc) {
+            throw new Error('Could not create peer connection for ' + uid);
+        }
+
+        try {
+            await pc.setRemoteDescription(description);
+            return pc;
+        } catch (error) {
+            const message = String(error?.message || error || '');
+            const isMLineMismatch =
+                error?.name === 'InvalidAccessError' &&
+                (
+                    message.includes('m-lines') ||
+                    message.includes("doesn't match order") ||
+                    message.includes('different order')
+                );
+
+            if (!isMLineMismatch) {
+                throw error;
+            }
+
+            console.warn(
+                'Repairing stale WebRTC negotiation state for peer',
+                uid
+            );
+
+            // The current PeerConnection has an incompatible historical SDP
+            // layout. Rebuild just this peer; local MediaStream tracks are kept.
+            try {
+                if (peers[uid]) peers[uid].close();
+            } catch (e) {}
+
+            delete peers[uid];
+            delete makingOffer[uid];
+            delete ignoreOffer[uid];
+
+            const queuedCandidates = pendingCandidates[uid] || [];
+            pendingCandidates[uid] = [];
+
+            pc = createPeerConnection(uid);
+
+            if (!pc) {
+                throw error;
+            }
+
+            await pc.setRemoteDescription(description);
+            await syncLocalTracksToPeer(uid);
+
+            // Candidates received before the fresh offer can still be tried.
+            for (const candidate of queuedCandidates) {
+                try {
+                    await pc.addIceCandidate(
+                        new RTCIceCandidate(candidate)
+                    );
+                } catch (e) {}
+            }
+
+            return pc;
+        }
+    }
+
     function decodeSdp(sdp) {
 
         if (!sdp) {
@@ -7094,7 +7160,7 @@
                 'offer'
             ) {
 
-                const pc =
+                let pc =
                     createPeerConnection(
                         from
                     );
@@ -7133,16 +7199,18 @@
                         data.data.sdp
                     );
 
-                await pc.setRemoteDescription(
-                    new RTCSessionDescription({
-                        type:
-                            data.data.type
-                            ||
-                            'offer',
+                pc =
+                    await applyRemoteOfferSafely(
+                        from,
+                        new RTCSessionDescription({
+                            type:
+                                data.data.type
+                                ||
+                                'offer',
 
-                        sdp
-                    })
-                );
+                            sdp
+                        })
+                    );
 
                 await syncLocalTracksToPeer(
                     from
@@ -7224,16 +7292,54 @@
                     'have-local-offer'
                 ) {
 
-                    await pc.setRemoteDescription(
-                        new RTCSessionDescription({
-                            type:
-                                data.data.type
-                                ||
-                                'answer',
+                    try {
 
-                            sdp
-                        })
-                    );
+                        await pc.setRemoteDescription(
+                            new RTCSessionDescription({
+                                type:
+                                    data.data.type
+                                    ||
+                                    'answer',
+
+                                sdp
+                            })
+                        );
+
+                    } catch (error) {
+
+                        const message =
+                            String(
+                                error?.message
+                                ||
+                                error
+                                ||
+                                ''
+                            );
+
+                        if (
+                            error?.name
+                            ===
+                            'InvalidAccessError'
+                            &&
+                            (
+                                message.includes('m-lines')
+                                ||
+                                message.includes("doesn't match order")
+                                ||
+                                message.includes('different order')
+                            )
+                        ) {
+
+                            console.warn(
+                                'Ignoring stale SDP answer from peer',
+                                from
+                            );
+
+                            return;
+                        }
+
+                        throw error;
+                    }
 
                     if (
                         pendingCandidates[
@@ -7555,11 +7661,11 @@
             }
             setTimeout(startRecognition, 50);
             connectToAll();
-            await syncTracksToEveryPeer(true);
+            await syncTracksToEveryPeer(false);
             [120, 450].forEach(delay => setTimeout(() => {
                 if (isMicOn) {
                     connectToAll();
-                    syncTracksToEveryPeer(true);
+                    syncTracksToEveryPeer(false);
                 }
             }, delay));
 
@@ -7593,36 +7699,6 @@
         await syncTracksToEveryPeer(
             false
         );
-
-        if (isMicOn) {
-
-            Object
-                .keys(peers)
-                .forEach(
-                    uid => {
-
-                        if (
-                            shouldInitiatePeer(
-                                uid
-                            )
-                        ) {
-
-                            queuePeerNegotiation(
-                                uid,
-                                {
-                                    reason:
-                                        'microphone-enabled',
-
-                                    delay:
-                                        10
-                                }
-                            );
-                        }
-
-                    }
-                );
-        }
-
         broadcastMyMicStatus();
     }
 
@@ -8680,6 +8756,10 @@
                     event.error
                     !==
                     'no-speech'
+                    &&
+                    event.error
+                    !==
+                    'network'
                 ) {
 
                     console.warn(
@@ -10236,14 +10316,45 @@
             event.track.onunmute = applyRemote;
             event.track.onmute = () => {
                 if (event.track.kind !== 'video') return;
-                const video = document.getElementById('rvideo-' + uid);
-                const avatar = document.getElementById('avatar-' + uid);
-                if (video) video.style.display = 'none';
-                if (avatar) avatar.style.display = 'flex';
+
+                // A WebRTC video track can become muted for a fraction of a second
+                // during jitter / ICE switching. Do not blank a perfectly healthy
+                // tile immediately. Only fall back to the avatar if the same track
+                // is still muted after a short grace period.
+                setTimeout(() => {
+                    if (event.track.readyState !== 'live' || !event.track.muted) return;
+
+                    const current = remoteStreams?.[uid]
+                        ?.getVideoTracks?.()
+                        .find(t => t.readyState === 'live' && !t.muted);
+
+                    if (current) return;
+
+                    const video = document.getElementById('rvideo-' + uid);
+                    const avatar = document.getElementById('avatar-' + uid);
+
+                    if (video) video.style.display = 'none';
+                    if (avatar) avatar.style.display = 'flex';
+                }, 1800);
             };
+
             event.track.onended = () => {
                 try { stream.removeTrack(event.track); } catch (e) {}
                 attachRemoteStream(uid);
+
+                // Recover only if the remote media track actually ended.
+                if (!leftUsers.has(uid)) {
+                    const pcNow = peers[uid];
+                    if (
+                        pcNow &&
+                        (
+                            ['failed','disconnected'].includes(pcNow.connectionState) ||
+                            ['failed','disconnected'].includes(pcNow.iceConnectionState)
+                        )
+                    ) {
+                        schedulePeerRecovery(uid, 'remote-track-ended', 500);
+                    }
+                }
             };
             applyRemote();
         };
@@ -10410,7 +10521,7 @@
             setTimeout(() => {
                 broadcastMyMicStatus();
                 broadcastMyCameraStatus();
-                syncTracksToEveryPeer(true);
+                syncTracksToEveryPeer(false);
                 unlockAllRemoteAudioV5();
             }, 80);
             return;
@@ -10505,7 +10616,7 @@
                     if (sender && track) sender.replaceTrack(track).catch(console.warn);
                 });
 
-                await syncTracksToEveryPeer(true);
+                await syncTracksToEveryPeer(false);
                 broadcastMyMicStatus();
                 unlockAllRemoteAudioV5();
             }, 120);
@@ -10515,7 +10626,7 @@
 
         camBtn?.addEventListener('click', () => {
             setTimeout(async () => {
-                await syncTracksToEveryPeer(true);
+                await syncTracksToEveryPeer(false);
                 broadcastMyCameraStatus();
             }, 180);
 
@@ -10925,7 +11036,7 @@
             [180, 750].forEach(delay => setTimeout(async () => {
                 Object.keys(peers).forEach(uid => smV6SyncPeerMedia(uid));
                 broadcastMyMicStatus();
-                Object.keys(peers).forEach(uid => smV6ForceHandshake(uid, 'mic-toggle'));
+                // No renegotiation needed: the audio transceiver already exists.
             }, delay));
         });
 
@@ -10933,7 +11044,7 @@
             [220, 800].forEach(delay => setTimeout(async () => {
                 Object.keys(peers).forEach(uid => smV6SyncPeerMedia(uid));
                 broadcastMyCameraStatus();
-                Object.keys(peers).forEach(uid => smV6ForceHandshake(uid, 'camera-toggle'));
+                // No renegotiation needed: the video transceiver already exists.
             }, delay));
         });
     });
