@@ -4999,5 +4999,174 @@
     });
 
 </script>
+
+<script>
+    /* ============================================================
+       SMARTMEET V8 FINAL STABILITY PATCH
+       - never replaceTrack() on a closed RTCPeerConnection
+       - recreate closed peers cleanly
+       - realtime transcript listener for every joined user
+       - transcript POST errors are visible in console
+       ============================================================ */
+
+    function smV8EnsureOpenPeer(uid) {
+        uid = String(uid);
+
+        let pc = peers?.[uid] || null;
+
+        if (pc && (pc.signalingState === 'closed' || pc.connectionState === 'closed')) {
+            try { pc.ontrack = null; pc.onicecandidate = null; pc.onconnectionstatechange = null; } catch (e) {}
+            try { pc.close(); } catch (e) {}
+            delete peers[uid];
+            pc = null;
+        }
+
+        if (!pc) {
+            pc = createPeerConnection(uid);
+        }
+
+        return pc;
+    }
+
+    /* Override the V6 helper with a closed-peer-safe version. */
+    async function smV6SyncPeerMedia(uid) {
+        uid = String(uid);
+
+        const pc = smV8EnsureOpenPeer(uid);
+        if (!pc || pc.signalingState === 'closed' || pc.connectionState === 'closed') return;
+
+        const audioTrack =
+            localStream?.getAudioTracks?.().find(t => t.readyState === 'live') || null;
+
+        const videoTrack =
+            localStream?.getVideoTracks?.().find(t => t.readyState === 'live') || null;
+
+        const audioSender = smV4SenderForKind(pc, 'audio');
+        const videoSender = smV4SenderForKind(pc, 'video');
+
+        if (audioSender && pc.signalingState !== 'closed' && pc.connectionState !== 'closed') {
+            try {
+                await audioSender.replaceTrack(audioTrack);
+            } catch (error) {
+                if (error?.name !== 'InvalidStateError') {
+                    console.warn('Audio replaceTrack failed:', error);
+                }
+            }
+        }
+
+        if (videoSender && pc.signalingState !== 'closed' && pc.connectionState !== 'closed') {
+            try {
+                await videoSender.replaceTrack(videoTrack);
+            } catch (error) {
+                if (error?.name !== 'InvalidStateError') {
+                    console.warn('Video replaceTrack failed:', error);
+                }
+            }
+        }
+
+        if (audioTrack) audioTrack.enabled = Boolean(isMicOn);
+        if (videoTrack) videoTrack.enabled = Boolean(isCameraOn);
+    }
+
+    /* Override force-handshake so it never negotiates a dead peer. */
+    async function smV6ForceHandshake(userId, reason = 'presence') {
+        const uid = String(userId);
+
+        if (!uid || uid === String(MY_USER_ID) || leftUsers.has(uid)) return;
+
+        const info = knownParticipants?.[uid];
+        if (info && info.hasJoined === false && !onlineUsers.has(uid)) return;
+
+        const pc = smV8EnsureOpenPeer(uid);
+        if (!pc || pc.signalingState === 'closed' || pc.connectionState === 'closed') return;
+
+        await smV6SyncPeerMedia(uid);
+
+        if (pc.connectionState === 'connected' &&
+            ['connected', 'completed'].includes(pc.iceConnectionState)) {
+            attachRemoteStream(uid);
+            return;
+        }
+
+        if (pc.signalingState !== 'stable') return;
+
+        const now = Date.now();
+        if ((window.__smV6?.lastOfferAt?.[uid] || 0) + 900 > now) return;
+
+        window.__smV6.lastOfferAt[uid] = now;
+
+        queuePeerNegotiation(uid, {
+            reason: 'v8-' + reason,
+            force: true,
+            iceRestart:
+                ['failed', 'disconnected'].includes(pc.iceConnectionState) ||
+                ['failed', 'disconnected'].includes(pc.connectionState),
+            delay: 20
+        });
+    }
+
+    /* Realtime transcription for all OTHER users. */
+    if (!window.__smartMeetV8TranscriptListener && window.Echo) {
+        window.__smartMeetV8TranscriptListener = true;
+
+        window.Echo
+            .channel('meeting.' + MEETING_ID)
+            .listen('.transcript', data => {
+                if (!data) return;
+
+                if (String(data.userId) === String(MY_USER_ID)) return;
+
+                handleTranscript({
+                    userId: String(data.userId || ''),
+                    userName: data.userName || 'User',
+                    userInitials: data.userInitials || '?',
+                    text: data.text || '',
+                    spokenAt: data.spokenAt || ''
+                });
+            });
+    }
+
+    /* Save transcript and surface backend failures clearly. */
+    async function saveTranscript(text) {
+        try {
+            const response = await fetch(TRANSCRIPT_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': CSRF
+                },
+                body: JSON.stringify({ text })
+            });
+
+            if (!response.ok) {
+                const body = await response.text();
+                console.error('Transcript endpoint failed:', response.status, body);
+            }
+        } catch (error) {
+            console.error('Transcript save error:', error);
+        }
+    }
+
+    /* Clean dead peers instead of repeatedly trying replaceTrack on them. */
+    setInterval(() => {
+        Object.keys(peers || {}).forEach(uid => {
+            const pc = peers[uid];
+
+            if (!pc) return;
+
+            if (pc.signalingState === 'closed' || pc.connectionState === 'closed') {
+                try { pc.close(); } catch (e) {}
+                delete peers[uid];
+
+                if (!leftUsers.has(String(uid)) &&
+                    (knownParticipants?.[uid]?.hasJoined || onlineUsers.has(String(uid)))) {
+                    setTimeout(() => smV6ForceHandshake(uid, 'recreate-closed-peer'), 150);
+                }
+            }
+        });
+    }, 2500);
+</script>
+
 </body>
 </html>
