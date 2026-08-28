@@ -1,3 +1,4 @@
+```
 <!DOCTYPE html>
 <html lang="en">
 
@@ -1544,6 +1545,88 @@
         }
         @media(max-width:700px){.video-grid{gap:8px!important;padding:10px!important;}}
     </style>
+
+    <style>
+        /* ============================================================
+           SMARTMEET V5 FINAL LAYOUT
+           - wider 1–2 person tiles (not taller)
+           - camera fills the full tile
+           - info bar overlays the video instead of consuming tile height
+           ============================================================ */
+        .video-grid{
+            gap:10px !important;
+            padding:12px !important;
+            grid-auto-rows:auto !important;
+            align-content:start !important;
+            justify-content:start !important;
+        }
+        .video-grid:has(> .video-tile:only-child){
+            grid-template-columns:minmax(600px,780px) !important;
+        }
+        .video-grid:has(> .video-tile:first-child:nth-last-child(2)){
+            grid-template-columns:repeat(2,minmax(480px,650px)) !important;
+        }
+        .video-grid .video-tile{
+            width:100% !important;
+            max-width:650px !important;
+            min-height:0 !important;
+            height:auto !important;
+            aspect-ratio:16/9 !important;
+            position:relative !important;
+        }
+        .video-grid:has(> .video-tile:only-child) .video-tile{
+            max-width:780px !important;
+        }
+        .video-grid .video-placeholder{
+            position:absolute !important;
+            inset:0 !important;
+            width:100% !important;
+            height:100% !important;
+        }
+        .video-grid .video-placeholder video{
+            position:absolute !important;
+            inset:0 !important;
+            width:100% !important;
+            height:100% !important;
+            object-fit:cover !important;
+        }
+        .video-grid .tile-info{
+            position:absolute !important;
+            left:0 !important;
+            right:0 !important;
+            bottom:0 !important;
+            z-index:8 !important;
+            min-height:44px !important;
+            background:linear-gradient(to top,rgba(2,6,23,.95),rgba(2,6,23,.62),transparent) !important;
+        }
+        .video-grid .you-badge,
+        .video-grid .tile-expand-btn,
+        .video-grid .mic-off,
+        .video-grid .speaking-indicator{
+            z-index:10 !important;
+        }
+        @media(max-width:1150px){
+            .video-grid:has(> .video-tile:only-child),
+            .video-grid:has(> .video-tile:first-child:nth-last-child(2)){
+                grid-template-columns:repeat(auto-fit,minmax(360px,1fr)) !important;
+            }
+            .video-grid .video-tile{
+                max-width:100% !important;
+            }
+        }
+        @media(max-width:700px){
+            .video-grid{
+                grid-template-columns:1fr !important;
+                gap:8px !important;
+                padding:9px !important;
+            }
+            .video-grid .video-tile{
+                max-width:100% !important;
+                aspect-ratio:16/10 !important;
+            }
+        }
+    </style>
+
 </head>
 
 @php
@@ -9781,8 +9864,303 @@
     }
 
 
+
+    /* ============================================================
+       SMARTMEET V5 REALTIME STATE + AUDIO HARDENING
+       This is intentionally an independent status listener so that
+       leave/mic/camera/cancel UI updates are not dependent on SDP flow.
+       ============================================================ */
+    window.__smV5LeftSeen = window.__smV5LeftSeen || new Set();
+    window.__smV5CancelSeen = window.__smV5CancelSeen || false;
+
+    function smV5SetRemoteMic(uid, muted) {
+        uid = String(uid);
+        participantMicStatus[uid] = Boolean(muted);
+
+        const tileMic = document.getElementById('micoff-' + uid);
+        if (tileMic) tileMic.style.display = muted ? 'flex' : 'none';
+
+        const peopleIcon = document.getElementById('participant-mic-icon-' + uid);
+        if (peopleIcon) {
+            peopleIcon.className = muted ? 'fa fa-microphone-slash' : 'fa fa-microphone';
+            peopleIcon.style.color = muted ? 'var(--red)' : 'var(--green)';
+        }
+    }
+
+    function smV5SetRemoteCamera(uid, cameraOn) {
+        uid = String(uid);
+        cameraOn = Boolean(cameraOn);
+        participantCameraStatus[uid] = cameraOn;
+
+        const video = document.getElementById('rvideo-' + uid);
+        const avatar = document.getElementById('avatar-' + uid);
+
+        if (!cameraOn) {
+            if (video) video.style.display = 'none';
+            if (avatar) avatar.style.display = 'flex';
+            return;
+        }
+
+        attachRemoteStream(uid);
+        const stream = remoteStreams[uid];
+        const liveVideo = stream?.getVideoTracks?.().find(t => t.readyState === 'live');
+        if (liveVideo && video) {
+            video.style.display = 'block';
+            video.muted = true;
+            video.autoplay = true;
+            video.playsInline = true;
+            video.play().catch(() => {});
+            if (avatar) avatar.style.display = 'none';
+        }
+    }
+
+    function smV5ProcessPresenceSignal(data) {
+        if (!data || !data.type) return;
+
+        const uid = String(data.data?.userId || data.fromUserId || '');
+        const myId = String(MY_USER_ID);
+
+        if (data.type === 'user-joined' && uid && uid !== myId) {
+            leftUsers.delete(uid);
+            window.__smV5LeftSeen.delete(uid);
+
+            if (!knownParticipants[uid]) {
+                knownParticipants[uid] = {
+                    name: data.data?.name || 'Participant',
+                    initials: data.data?.initials || '?',
+                    isOrganizer: Boolean(data.data?.isOrganizer),
+                    hasJoined: true
+                };
+            } else {
+                knownParticipants[uid].hasJoined = true;
+                if (data.data?.name) knownParticipants[uid].name = data.data.name;
+                if (data.data?.initials) knownParticipants[uid].initials = data.data.initials;
+                if (data.data?.isOrganizer !== undefined) knownParticipants[uid].isOrganizer = Boolean(data.data.isOrganizer);
+            }
+
+            const info = knownParticipants[uid];
+            ensurePanelRow(uid, info.name, info.initials, Boolean(info.isOrganizer));
+            addParticipantTile(uid, info.name, info.initials, Boolean(info.isOrganizer));
+            markOnline(uid);
+            createPeerConnection(uid);
+
+            // Exchange current UI/media state immediately.
+            setTimeout(() => {
+                broadcastMyMicStatus();
+                broadcastMyCameraStatus();
+                syncTracksToEveryPeer(true);
+                unlockAllRemoteAudioV5();
+            }, 80);
+            return;
+        }
+
+        if (data.type === 'user-left' && uid && uid !== myId) {
+            const name = data.data?.name || knownParticipants[uid]?.name || 'A participant';
+
+            // Always remove media/tile and mark the People row offline immediately.
+            handleUserLeft(uid);
+            if (knownParticipants[uid]) knownParticipants[uid].hasJoined = false;
+            markOffline(uid);
+
+            if (!window.__smV5LeftSeen.has(uid)) {
+                window.__smV5LeftSeen.add(uid);
+                showToast(`👋 ${name} left the meeting.`);
+            }
+            return;
+        }
+
+        if (data.type === 'mic-status' && uid && uid !== myId) {
+            smV5SetRemoteMic(uid, Boolean(data.data?.muted));
+            return;
+        }
+
+        if (data.type === 'camera-status' && uid && uid !== myId) {
+            smV5SetRemoteCamera(uid, Boolean(data.data?.cameraOn));
+            return;
+        }
+
+        if (data.type === 'meeting-cancelled') {
+            if (window.__smV5CancelSeen) return;
+            window.__smV5CancelSeen = true;
+            showToast('🚫 The organizer cancelled the meeting for everyone.');
+            cleanup();
+            setTimeout(() => { window.location.href = LEAVE_URL; }, 1700);
+            return;
+        }
+
+        if (data.type === 'meeting-ended') {
+            showToast(data.data?.auto ? '⏰ Meeting time has ended.' : '📞 Meeting has ended.');
+            cleanup();
+            setTimeout(() => { window.location.href = LEAVE_URL; }, 1800);
+        }
+    }
+
+    function unlockAllRemoteAudioV5() {
+        Object.keys(remoteStreams || {}).forEach(uid => {
+            if (String(uid) === String(MY_USER_ID) || leftUsers.has(String(uid))) return;
+            attachRemoteStream(uid);
+        });
+
+        document.querySelectorAll('audio[data-peer-id]').forEach(audio => {
+            audio.autoplay = true;
+            audio.playsInline = true;
+            audio.muted = false;
+            audio.defaultMuted = false;
+            audio.volume = 1;
+            audio.play().catch(() => {});
+        });
+    }
+
+    // Browser autoplay policies require a real user gesture. Any meeting action
+    // now unlocks every existing remote audio element.
+    ['pointerdown','touchstart','keydown','click'].forEach(eventName => {
+        document.addEventListener(eventName, unlockAllRemoteAudioV5, { passive:true });
+    });
+
+    // Add a second lightweight Reverb listener dedicated to realtime UI state.
+    // Main handleSignal still handles SDP/ICE/chat/transcription.
+    if (!window.__smartMeetV5StatusListener && window.Echo) {
+        window.__smartMeetV5StatusListener = true;
+        const smV5Channel = window.Echo.channel('meeting.' + MEETING_ID);
+        smV5Channel.listen('.signal', smV5ProcessPresenceSignal);
+    }
+
+    // When the user toggles mic/camera, re-sync the real MediaStreamTrack and
+    // rebroadcast state after the original button handler completes.
+    window.addEventListener('load', () => {
+        const micBtn = document.getElementById('ctrl-mic');
+        const camBtn = document.getElementById('ctrl-camera');
+
+        micBtn?.addEventListener('click', () => {
+            setTimeout(async () => {
+                const track = localStream?.getAudioTracks?.().find(t => t.readyState === 'live');
+                if (track) track.enabled = Boolean(isMicOn);
+
+                Object.keys(peers).forEach(uid => {
+                    const pc = peers[uid];
+                    if (!pc || pc.signalingState === 'closed') return;
+                    const sender = smV4SenderForKind(pc, 'audio');
+                    if (sender && track) sender.replaceTrack(track).catch(console.warn);
+                });
+
+                await syncTracksToEveryPeer(true);
+                broadcastMyMicStatus();
+                unlockAllRemoteAudioV5();
+            }, 120);
+
+            setTimeout(() => broadcastMyMicStatus(), 500);
+        });
+
+        camBtn?.addEventListener('click', () => {
+            setTimeout(async () => {
+                await syncTracksToEveryPeer(true);
+                broadcastMyCameraStatus();
+            }, 180);
+
+            setTimeout(() => broadcastMyCameraStatus(), 600);
+        });
+    });
+
+    // Periodic state refresh repairs a missed status packet without reloading.
+    if (!window.__smartMeetV5StateHeartbeat) {
+        window.__smartMeetV5StateHeartbeat = true;
+        setInterval(() => {
+            if (document.visibilityState !== 'visible') return;
+            broadcastMyMicStatus();
+            broadcastMyCameraStatus();
+            unlockAllRemoteAudioV5();
+        }, 5000);
+    }
+
+    // Backup leave notification for closing/back-navigation.
+    // keepalive lets the POST continue while the page is unloading.
+    if (!window.__smartMeetV5PageHide) {
+        window.__smartMeetV5PageHide = true;
+        window.addEventListener('pagehide', () => {
+            if (disconnectNotified) return;
+            disconnectNotified = true;
+
+            try {
+                sendSignal('all', 'user-left', {
+                    userId: MY_USER_ID,
+                    name: MY_NAME
+                });
+            } catch (e) {}
+
+            try {
+                fetch(MARK_LEFT_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': CSRF
+                    },
+                    body: JSON.stringify({}),
+                    keepalive: true
+                });
+            } catch (e) {}
+        });
+    }
+
+    // Strong leave path: first tell every connected client immediately, then
+    // persist left_at on the backend, then navigate away.
+    async function leaveMeeting() {
+        if (disconnectNotified) return;
+        disconnectNotified = true;
+
+        if (typeof autoEndTimer !== 'undefined' && autoEndTimer) {
+            clearTimeout(autoEndTimer);
+        }
+
+        showToast('📞 You left the meeting.');
+
+        try {
+            await sendSignal('all', 'user-left', {
+                userId: MY_USER_ID,
+                name: MY_NAME
+            });
+        } catch (e) {}
+
+        // Give Reverb a short moment to deliver the realtime leave event.
+        await new Promise(resolve => setTimeout(resolve, 140));
+
+        try {
+            await fetch(MARK_LEFT_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': CSRF
+                },
+                body: JSON.stringify({}),
+                keepalive: true
+            });
+        } catch (error) {
+            console.error('markLeft error:', error);
+        }
+
+        cleanup();
+        setTimeout(() => { window.location.href = LEAVE_URL; }, 350);
+    }
+
+
+    // Organizer cancellation: notify everyone before the HTTP form redirects.
+    async function cancelMeeting() {
+        if (window.__smV5Cancelling) return;
+        window.__smV5Cancelling = true;
+
+        try {
+            await sendSignal('all', 'meeting-cancelled', {
+                message: 'Meeting has been cancelled by the organizer.'
+            });
+        } catch (e) {}
+
+        showToast('🚫 Meeting cancelled for everyone.');
+
+        await new Promise(resolve => setTimeout(resolve, 220));
+        cleanup();
+        document.getElementById('cancel-form')?.submit();
+    }
+
 </script>
 
 </body>
 </html>
-
