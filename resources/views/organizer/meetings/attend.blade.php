@@ -1529,6 +1529,43 @@
             margin:8px 10px !important;
         }
 
+
+        /* ===== SmartMeet FINAL live-room layout override ===== */
+        .video-grid{
+            display:grid !important;
+            grid-template-columns:repeat(auto-fill,minmax(380px,500px)) !important;
+            grid-auto-rows:auto !important;
+            justify-content:start !important;
+            align-content:start !important;
+            align-items:start !important;
+            gap:10px !important;
+            padding:12px !important;
+        }
+        .video-grid .video-tile{
+            width:100% !important;
+            max-width:500px !important;
+            min-width:0 !important;
+            min-height:0 !important;
+            height:auto !important;
+            aspect-ratio:16/10 !important;
+        }
+        .video-grid:has(> .video-tile:only-child){
+            grid-template-columns:minmax(420px,540px) !important;
+        }
+        .video-grid:has(> .video-tile:only-child) .video-tile{max-width:540px !important;}
+        .video-grid:has(> .video-tile:first-child:nth-last-child(2)){
+            grid-template-columns:repeat(2,minmax(360px,480px)) !important;
+        }
+        .video-grid:has(> .video-tile:first-child:nth-last-child(2)) .video-tile{max-width:480px !important;}
+        @media(max-width:900px){
+            .video-grid,.video-grid:has(> .video-tile:only-child),.video-grid:has(> .video-tile:first-child:nth-last-child(2)){
+                grid-template-columns:minmax(0,1fr) !important;
+            }
+            .video-grid .video-tile,.video-grid:has(> .video-tile:only-child) .video-tile,.video-grid:has(> .video-tile:first-child:nth-last-child(2)) .video-tile{
+                max-width:560px !important;
+            }
+        }
+
     </style>
 </head>
 
@@ -9527,6 +9564,30 @@
         setTimeout(() => { el.style.opacity='0'; el.style.transition='opacity .25s'; }, 3200);
         setTimeout(() => el.remove(), 3500);
     }
+
+
+    /* ===== SmartMeet FINAL realtime recovery heartbeat =====
+       Re-announces presence after a WebSocket reconnect and continuously
+       re-syncs active local tracks with every known joined peer. */
+    let smartMeetRecoveryTimer = null;
+    function smartMeetRealtimeRecoveryTick() {
+        try {
+            announceJoin();
+            connectToAll();
+            Promise.resolve(syncTracksToEveryPeer(true)).catch(console.warn);
+            broadcastMyMicStatus();
+            broadcastMyCameraStatus();
+        } catch (error) {
+            console.warn('SmartMeet realtime recovery tick:', error);
+        }
+    }
+    window.addEventListener('load', () => {
+        setTimeout(smartMeetRealtimeRecoveryTick, 1500);
+        smartMeetRecoveryTimer = setInterval(smartMeetRealtimeRecoveryTick, 5000);
+    });
+    window.addEventListener('pagehide', () => {
+        if (smartMeetRecoveryTimer) clearInterval(smartMeetRecoveryTimer);
+    });
 
 </script>
 
