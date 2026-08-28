@@ -1,4 +1,3 @@
-```
 <!DOCTYPE html>
 
 <html lang="en">
@@ -1213,6 +1212,85 @@
                 max-width:100% !important;
                 aspect-ratio:16/10 !important;
             }
+        }
+    </style>
+
+
+    <style>
+        /* ============================================================
+           SMARTMEET V6 — balanced professional tiles
+           Smaller than V5, full 16:9 camera surface, no wasted black area.
+           ============================================================ */
+        .video-grid{
+            display:grid !important;
+            grid-template-columns:repeat(auto-fill,minmax(360px,520px)) !important;
+            grid-auto-rows:auto !important;
+            justify-content:start !important;
+            align-content:start !important;
+            align-items:start !important;
+            gap:10px !important;
+            padding:12px !important;
+        }
+        .video-grid:has(> .video-tile:only-child){
+            grid-template-columns:minmax(440px,560px) !important;
+        }
+        .video-grid:has(> .video-tile:first-child:nth-last-child(2)){
+            grid-template-columns:repeat(2,minmax(390px,520px)) !important;
+        }
+        .video-grid .video-tile{
+            width:100% !important;
+            max-width:520px !important;
+            height:auto !important;
+            min-height:0 !important;
+            aspect-ratio:16/9 !important;
+            position:relative !important;
+            overflow:hidden !important;
+        }
+        .video-grid:has(> .video-tile:only-child) .video-tile{
+            max-width:560px !important;
+        }
+        .video-grid .video-placeholder{
+            position:absolute !important;
+            inset:0 !important;
+            width:100% !important;
+            height:100% !important;
+            min-height:0 !important;
+        }
+        .video-grid .video-placeholder video{
+            position:absolute !important;
+            inset:0 !important;
+            display:block;
+            width:100% !important;
+            height:100% !important;
+            object-fit:cover !important;
+            background:#050816 !important;
+        }
+        .video-grid .tile-info{
+            position:absolute !important;
+            left:0 !important;
+            right:0 !important;
+            bottom:0 !important;
+            z-index:8 !important;
+            min-height:42px !important;
+            padding:8px 10px !important;
+            background:linear-gradient(to top,rgba(2,6,23,.96),rgba(2,6,23,.68),transparent) !important;
+        }
+        @media(max-width:1000px){
+            .video-grid,
+            .video-grid:has(> .video-tile:only-child),
+            .video-grid:has(> .video-tile:first-child:nth-last-child(2)){
+                grid-template-columns:repeat(auto-fit,minmax(320px,1fr)) !important;
+            }
+            .video-grid .video-tile{max-width:100% !important;}
+        }
+        @media(max-width:700px){
+            .video-grid,
+            .video-grid:has(> .video-tile:only-child),
+            .video-grid:has(> .video-tile:first-child:nth-last-child(2)){
+                grid-template-columns:1fr !important;
+            }
+            .video-grid{gap:8px !important;padding:9px !important;}
+            .video-grid .video-tile{max-width:100% !important;aspect-ratio:16/10 !important;}
         }
     </style>
 
@@ -4280,6 +4358,322 @@
         cleanup();
         setTimeout(() => { window.location.href = LEAVE_URL; }, 350);
     }
+
+
+    /* ============================================================
+       SMARTMEET V6 — WEBRTC HANDSHAKE / MEDIA / STATUS REPAIR
+       Main purpose:
+       1) guarantee an SDP offer is actually created after presence,
+       2) repair peers stuck in "new",
+       3) derive mic/camera UI from the real MediaStreamTrack,
+       4) make incoming audio play after the first normal page gesture.
+       ============================================================ */
+
+    window.__smV6 = window.__smV6 || {
+        handshakeTimers: {},
+        lastOfferAt: {},
+        statusChannelBound: false
+    };
+
+    function smV6RealMicOn() {
+        const track = localStream?.getAudioTracks?.().find(t => t.readyState === 'live');
+        return Boolean(track && track.enabled);
+    }
+
+    function smV6RealCameraOn() {
+        const track = localStream?.getVideoTracks?.().find(t => t.readyState === 'live');
+        return Boolean(track && track.enabled);
+    }
+
+    /* Override status broadcasters so remote UI always reflects the REAL track,
+       not a stale boolean left over from an earlier toggle. */
+    function broadcastMyMicStatus() {
+        const micOn = smV6RealMicOn();
+        isMicOn = micOn;
+        sendSignal('all', 'mic-status', {
+            userId: MY_USER_ID,
+            muted: !micOn
+        });
+    }
+
+    function broadcastMyCameraStatus() {
+        const cameraOn = smV6RealCameraOn();
+        isCameraOn = cameraOn;
+        sendSignal('all', 'camera-status', {
+            userId: MY_USER_ID,
+            cameraOn
+        });
+    }
+
+    async function smV6SyncPeerMedia(uid) {
+        uid = String(uid);
+        const pc = peers[uid] || createPeerConnection(uid);
+        if (!pc || pc.signalingState === 'closed') return;
+
+        const audioTrack = localStream?.getAudioTracks?.().find(t => t.readyState === 'live') || null;
+        const videoTrack = localStream?.getVideoTracks?.().find(t => t.readyState === 'live') || null;
+
+        const audioSender = smV4SenderForKind(pc, 'audio');
+        const videoSender = smV4SenderForKind(pc, 'video');
+
+        if (audioSender) {
+            try { await audioSender.replaceTrack(audioTrack); } catch (e) { console.warn('V6 audio replaceTrack', e); }
+        }
+        if (videoSender) {
+            try { await videoSender.replaceTrack(videoTrack); } catch (e) { console.warn('V6 video replaceTrack', e); }
+        }
+
+        if (audioTrack) audioTrack.enabled = Boolean(isMicOn);
+        if (videoTrack) videoTrack.enabled = Boolean(isCameraOn);
+    }
+
+    /* We intentionally allow either side to force one offer if a connection is
+       stuck at "new". Existing perfect-negotiation collision handling decides
+       which offer wins, preventing the old deterministic-side deadlock. */
+    async function smV6ForceHandshake(userId, reason = 'presence') {
+        const uid = String(userId);
+        if (!uid || uid === String(MY_USER_ID) || leftUsers.has(uid)) return;
+
+        const info = knownParticipants?.[uid];
+        if (info && info.hasJoined === false && !onlineUsers.has(uid)) return;
+
+        const pc = createPeerConnection(uid);
+        if (!pc || pc.signalingState === 'closed') return;
+
+        await smV6SyncPeerMedia(uid);
+
+        if (pc.connectionState === 'connected' &&
+            (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed')) {
+            attachRemoteStream(uid);
+            return;
+        }
+
+        if (pc.signalingState !== 'stable') return;
+
+        const now = Date.now();
+        if ((window.__smV6.lastOfferAt[uid] || 0) + 700 > now) return;
+        window.__smV6.lastOfferAt[uid] = now;
+
+        queuePeerNegotiation(uid, {
+            reason: 'v6-' + reason,
+            force: true,
+            iceRestart: ['failed','disconnected'].includes(pc.iceConnectionState) ||
+                ['failed','disconnected'].includes(pc.connectionState),
+            delay: 10
+        });
+    }
+
+    function smV6HandshakeBurst(uid, reason = 'join') {
+        uid = String(uid);
+        [40, 280, 850, 1800, 3500].forEach(delay => {
+            setTimeout(() => smV6ForceHandshake(uid, reason), delay);
+        });
+    }
+
+    function smV6SetRemoteMic(uid, muted) {
+        uid = String(uid);
+        muted = Boolean(muted);
+        participantMicStatus[uid] = muted;
+
+        const tileIcon = document.getElementById('micoff-' + uid);
+        if (tileIcon) tileIcon.style.display = muted ? 'flex' : 'none';
+
+        const peopleIcon = document.getElementById('participant-mic-icon-' + uid);
+        if (peopleIcon) {
+            peopleIcon.className = muted ? 'fa fa-microphone-slash' : 'fa fa-microphone';
+            peopleIcon.style.color = muted ? 'var(--red)' : 'var(--green)';
+        }
+    }
+
+    function smV6SetRemoteCamera(uid, cameraOn) {
+        uid = String(uid);
+        cameraOn = Boolean(cameraOn);
+        participantCameraStatus[uid] = cameraOn;
+
+        attachRemoteStream(uid);
+
+        const stream = remoteStreams?.[uid];
+        const videoTrack = stream?.getVideoTracks?.().find(t => t.readyState === 'live');
+        const video = document.getElementById('rvideo-' + uid);
+        const avatar = document.getElementById('avatar-' + uid);
+
+        const actuallyVisible = cameraOn && Boolean(videoTrack);
+        if (video) {
+            video.autoplay = true;
+            video.playsInline = true;
+            video.muted = true;
+            video.style.display = actuallyVisible ? 'block' : 'none';
+            if (actuallyVisible) video.play().catch(() => {});
+        }
+        if (avatar) avatar.style.display = actuallyVisible ? 'none' : 'flex';
+    }
+
+    function smV6UnlockRemoteAudio() {
+        document.querySelectorAll('audio[data-peer-id]').forEach(audio => {
+            audio.autoplay = true;
+            audio.playsInline = true;
+            audio.muted = false;
+            audio.defaultMuted = false;
+            audio.volume = 1;
+            audio.play().catch(() => {});
+        });
+    }
+
+    /* A normal click on Mic/Camera/Chat/People/room is enough. No special
+       "tap to enable audio" action is required from the user. */
+    ['pointerdown','touchstart','keydown','click'].forEach(eventName => {
+        document.addEventListener(eventName, smV6UnlockRemoteAudio, { passive:true });
+    });
+
+    function smV6HandleStatus(data) {
+        if (!data?.type) return;
+        const uid = String(data.data?.userId || data.fromUserId || '');
+        if (!uid || uid === String(MY_USER_ID)) return;
+
+        if (data.type === 'user-joined') {
+            leftUsers.delete(uid);
+
+            if (!knownParticipants[uid]) {
+                knownParticipants[uid] = {
+                    name: data.data?.name || 'Participant',
+                    initials: data.data?.initials || '?',
+                    isOrganizer: Boolean(data.data?.isOrganizer),
+                    hasJoined: true
+                };
+            } else {
+                knownParticipants[uid].hasJoined = true;
+                if (data.data?.name) knownParticipants[uid].name = data.data.name;
+                if (data.data?.initials) knownParticipants[uid].initials = data.data.initials;
+                if (data.data?.isOrganizer !== undefined) {
+                    knownParticipants[uid].isOrganizer = Boolean(data.data.isOrganizer);
+                }
+            }
+
+            const info = knownParticipants[uid];
+            ensurePanelRow(uid, info.name, info.initials, Boolean(info.isOrganizer));
+            addParticipantTile(uid, info.name, info.initials, Boolean(info.isOrganizer));
+            markOnline(uid);
+
+            createPeerConnection(uid);
+            smV6HandshakeBurst(uid, 'user-joined');
+
+            setTimeout(() => {
+                broadcastMyMicStatus();
+                broadcastMyCameraStatus();
+            }, 120);
+            return;
+        }
+
+        if (data.type === 'mic-status') {
+            smV6SetRemoteMic(uid, Boolean(data.data?.muted));
+            return;
+        }
+
+        if (data.type === 'camera-status') {
+            smV6SetRemoteCamera(uid, Boolean(data.data?.cameraOn));
+            if (data.data?.cameraOn) smV6HandshakeBurst(uid, 'remote-camera-on');
+            return;
+        }
+
+        if (data.type === 'user-left') {
+            const name = data.data?.name || knownParticipants?.[uid]?.name || 'Participant';
+            handleUserLeft(uid);
+            if (knownParticipants?.[uid]) knownParticipants[uid].hasJoined = false;
+            markOffline(uid);
+            showToast(`👋 ${name} left the meeting.`);
+            return;
+        }
+
+        if (data.type === 'meeting-cancelled') {
+            showToast('🚫 The organizer cancelled the meeting for everyone.');
+            cleanup();
+            setTimeout(() => { window.location.href = LEAVE_URL; }, 1600);
+            return;
+        }
+
+        if (data.type === 'meeting-ended') {
+            showToast(data.data?.auto ? '⏰ Meeting time has ended.' : '📞 Meeting has ended.');
+            cleanup();
+            setTimeout(() => { window.location.href = LEAVE_URL; }, 1700);
+        }
+    }
+
+    /* Independent status listener. The original handleSignal remains responsible
+       for SDP offer/answer/ICE. */
+    if (!window.__smV6.statusChannelBound && window.Echo) {
+        window.__smV6.statusChannelBound = true;
+        window.Echo.channel('meeting.' + MEETING_ID).listen('.signal', smV6HandleStatus);
+    }
+
+    /* Initial join repair. */
+    window.addEventListener('load', () => {
+        [250, 700, 1600, 3200].forEach(delay => {
+            setTimeout(() => {
+                announceJoin();
+                Object.keys(knownParticipants || {}).forEach(uid => {
+                    uid = String(uid);
+                    if (uid === String(MY_USER_ID) || leftUsers.has(uid)) return;
+                    if (knownParticipants[uid]?.hasJoined || onlineUsers.has(uid)) {
+                        createPeerConnection(uid);
+                        smV6ForceHandshake(uid, 'page-load');
+                    }
+                });
+                broadcastMyMicStatus();
+                broadcastMyCameraStatus();
+            }, delay);
+        });
+    });
+
+    /* Repair peers that remain in "new"/"connecting". This is the exact state
+       visible in WebRTC Internals when no successful SDP/ICE path has formed. */
+    if (!window.__smV6RepairTimer) {
+        window.__smV6RepairTimer = setInterval(() => {
+            if (document.visibilityState !== 'visible') return;
+
+            Object.keys(knownParticipants || {}).forEach(uid => {
+                uid = String(uid);
+                if (uid === String(MY_USER_ID) || leftUsers.has(uid)) return;
+                if (!(knownParticipants[uid]?.hasJoined || onlineUsers.has(uid))) return;
+
+                const pc = peers[uid] || createPeerConnection(uid);
+                if (!pc) return;
+
+                smV6SyncPeerMedia(uid);
+
+                if (['new','connecting','disconnected','failed'].includes(pc.connectionState) ||
+                    ['new','checking','disconnected','failed'].includes(pc.iceConnectionState)) {
+                    smV6ForceHandshake(uid, 'repair');
+                } else {
+                    attachRemoteStream(uid);
+                }
+            });
+
+            broadcastMyMicStatus();
+            broadcastMyCameraStatus();
+            smV6UnlockRemoteAudio();
+        }, 3000);
+    }
+
+    /* Extra post-toggle repair. Existing handlers still request permissions and
+       update the buttons; V6 then guarantees the resulting real track reaches
+       every peer and advertises the correct status. */
+    window.addEventListener('load', () => {
+        document.getElementById('ctrl-mic')?.addEventListener('click', () => {
+            [100, 350, 900].forEach(delay => setTimeout(async () => {
+                Object.keys(peers).forEach(uid => smV6SyncPeerMedia(uid));
+                broadcastMyMicStatus();
+                Object.keys(peers).forEach(uid => smV6ForceHandshake(uid, 'mic-toggle'));
+            }, delay));
+        });
+
+        document.getElementById('ctrl-camera')?.addEventListener('click', () => {
+            [150, 450, 1000].forEach(delay => setTimeout(async () => {
+                Object.keys(peers).forEach(uid => smV6SyncPeerMedia(uid));
+                broadcastMyCameraStatus();
+                Object.keys(peers).forEach(uid => smV6ForceHandshake(uid, 'camera-toggle'));
+            }, delay));
+        });
+    });
 
 </script>
 </body>
