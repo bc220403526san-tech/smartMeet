@@ -8521,19 +8521,9 @@
                     );
                 }
 
-                if (
-                    isMicOn
-                    &&
-                    document.visibilityState
-                    ===
-                    'visible'
-                ) {
-
-                    setTimeout(
-                        startRecognition,
-                        100
-                    );
-                }
+                scheduleRecognitionRestart(
+                    300
+                );
             };
 
         recognition.onend =
@@ -8548,20 +8538,54 @@
                         'none';
                 }
 
-                if (
-                    isMicOn
-                    &&
-                    document.visibilityState
-                    ===
-                    'visible'
-                ) {
-
-                    setTimeout(
-                        startRecognition,
-                        80
-                    );
-                }
+                scheduleRecognitionRestart(
+                    300
+                );
             };
+    }
+
+    let recognitionRestartTimer =
+        null;
+
+    let recognitionStopping =
+        false;
+
+    function scheduleRecognitionRestart(
+        delay = 300
+    ) {
+
+        if (
+            !recognition
+            ||
+            recognitionStopping
+            ||
+            !isMicOn
+            ||
+            document.visibilityState
+            !==
+            'visible'
+        ) {
+            return;
+        }
+
+        if (recognitionRestartTimer) {
+
+            clearTimeout(
+                recognitionRestartTimer
+            );
+        }
+
+        recognitionRestartTimer =
+            setTimeout(
+                () => {
+
+                    recognitionRestartTimer =
+                        null;
+
+                    startRecognition();
+                },
+                delay
+            );
     }
 
     function startRecognition() {
@@ -8570,6 +8594,8 @@
             !recognition
             ||
             recognitionRunning
+            ||
+            recognitionStopping
             ||
             !isMicOn
             ||
@@ -8581,8 +8607,17 @@
         }
 
         try {
+
             recognition.start();
-        } catch (error) {}
+
+            recognitionRunning =
+                true;
+
+        } catch (error) {
+
+            recognitionRunning =
+                false;
+        }
     }
 
     function toggleTranscriptLanguage() {
@@ -8617,9 +8652,8 @@
 
         if (isMicOn) {
 
-            setTimeout(
-                startRecognition,
-                120
+            scheduleRecognitionRestart(
+                300
             );
         }
     }
@@ -8630,12 +8664,38 @@
             return;
         }
 
+        if (recognitionRestartTimer) {
+
+            clearTimeout(
+                recognitionRestartTimer
+            );
+
+            recognitionRestartTimer =
+                null;
+        }
+
+        recognitionStopping =
+            true;
+
+        try {
+
+            if (recognitionRunning) {
+                recognition.abort();
+            }
+
+        } catch (error) {}
+
         recognitionRunning =
             false;
 
-        try {
-            recognition.abort();
-        } catch (error) {}
+        setTimeout(
+            () => {
+
+                recognitionStopping =
+                    false;
+            },
+            250
+        );
     }
 
     function showLocalTranscript(
@@ -11050,3 +11110,4 @@
 
 </body>
 </html>
+

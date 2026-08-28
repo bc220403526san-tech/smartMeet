@@ -3616,25 +3616,67 @@
 
         recognition.onerror = (e) => {
             recognitionRunning = false;
+
             if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
                 showToast('Microphone/speech recognition permission is required.');
                 return;
             }
-            if (e.error !== 'aborted' && e.error !== 'no-speech') console.warn('Speech recognition:', e.error);
-            if (isMicOn && document.visibilityState === 'visible') setTimeout(startRecognition, 100);
+
+            if (e.error !== 'aborted' && e.error !== 'no-speech') {
+                console.warn('Speech recognition:', e.error);
+            }
+
+            scheduleRecognitionRestart(300);
         };
 
         recognition.onend = () => {
             recognitionRunning = false;
             if (indicator) indicator.style.display = 'none';
-            if (isMicOn && document.visibilityState === 'visible') setTimeout(startRecognition, 80);
+            scheduleRecognitionRestart(300);
         };
 
     }
 
+    let recognitionRestartTimer = null;
+    let recognitionStopping = false;
+
+    function scheduleRecognitionRestart(delay = 300) {
+        if (
+            !recognition ||
+            recognitionStopping ||
+            !isMicOn ||
+            document.visibilityState !== 'visible'
+        ) {
+            return;
+        }
+
+        if (recognitionRestartTimer) {
+            clearTimeout(recognitionRestartTimer);
+        }
+
+        recognitionRestartTimer = setTimeout(() => {
+            recognitionRestartTimer = null;
+            startRecognition();
+        }, delay);
+    }
+
     function startRecognition() {
-        if (!recognition || recognitionRunning || !isMicOn || document.visibilityState !== 'visible') return;
-        try { recognition.start(); } catch (e) {}
+        if (
+            !recognition ||
+            recognitionRunning ||
+            recognitionStopping ||
+            !isMicOn ||
+            document.visibilityState !== 'visible'
+        ) {
+            return;
+        }
+
+        try {
+            recognition.start();
+            recognitionRunning = true;
+        } catch (e) {
+            recognitionRunning = false;
+        }
     }
 
     function toggleTranscriptLanguage() {
@@ -3642,15 +3684,40 @@
         const btn = document.getElementById('lang-toggle-btn');
         if (btn) btn.textContent = '🌐 English only';
         showToast('Transcript language: English');
-        if (recognition) { stopRecognition(); recognition = null; }
+
+        if (recognition) {
+            stopRecognition();
+            recognition = null;
+        }
+
         startTranscript();
-        if (isMicOn) setTimeout(startRecognition, 80);
+
+        if (isMicOn) {
+            scheduleRecognitionRestart(300);
+        }
     }
 
     function stopRecognition() {
         if (!recognition) return;
+
+        if (recognitionRestartTimer) {
+            clearTimeout(recognitionRestartTimer);
+            recognitionRestartTimer = null;
+        }
+
+        recognitionStopping = true;
+
+        try {
+            if (recognitionRunning) {
+                recognition.abort();
+            }
+        } catch (e) {}
+
         recognitionRunning = false;
-        try { recognition.abort(); } catch(e) {}
+
+        setTimeout(() => {
+            recognitionStopping = false;
+        }, 250);
     }
 
 
