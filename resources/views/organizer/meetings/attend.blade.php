@@ -1530,8 +1530,40 @@
         }
 
 
-        /* SAFE MAXIMIZED TILE FIX
-           Visual-only: no WebRTC, audio, signaling, TURN, or media-track changes. */
+        /* ============================================================
+           SMARTMEET FINAL SAFE UI IMPROVEMENTS
+           Visual/layout only. Does not replace MediaStream tracks.
+           ============================================================ */
+
+        /* One or two people should use the room instead of leaving a huge empty area. */
+        .video-grid:has(> .video-tile:first-child:last-child) {
+            grid-template-columns: minmax(0, 1fr) !important;
+            grid-template-rows: minmax(0, 1fr) !important;
+            align-content: stretch !important;
+        }
+
+        .video-grid:has(> .video-tile:first-child:last-child) > .video-tile {
+            width: 100% !important;
+            height: 100% !important;
+            max-width: none !important;
+            min-height: 280px !important;
+        }
+
+        .video-grid:has(> .video-tile:nth-child(2):last-child) {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            grid-template-rows: minmax(0, 1fr) !important;
+            align-content: stretch !important;
+        }
+
+        .video-grid:has(> .video-tile:nth-child(2):last-child) > .video-tile {
+            width: 100% !important;
+            height: 100% !important;
+            max-width: none !important;
+            min-height: 260px !important;
+        }
+
+        /* Full / maximized tile: selected video fills the available room.
+           Tile info overlays the bottom; no extra black strip is reserved. */
         #maximized-overlay.active {
             display: block !important;
         }
@@ -1574,7 +1606,94 @@
             left: 0 !important;
             right: 0 !important;
             bottom: 0 !important;
-            z-index: 8 !important;
+            z-index: 9 !important;
+            background: linear-gradient(to top, rgba(2,6,23,.92), rgba(2,6,23,.35)) !important;
+        }
+
+        /* Simple, clean chat. No single-letter avatar circles. */
+        .chat-message-avatar {
+            display: none !important;
+        }
+
+        .chat-message-row {
+            width: 100% !important;
+            gap: 0 !important;
+            align-items: flex-start !important;
+        }
+
+        .chat-message-row.is-me {
+            justify-content: flex-start !important;
+            flex-direction: row !important;
+        }
+
+        .chat-message-row.is-other {
+            justify-content: flex-end !important;
+            flex-direction: row !important;
+        }
+
+        .chat-message-content {
+            width: auto !important;
+            max-width: 88% !important;
+            min-width: 110px !important;
+        }
+
+        .chat-message-meta,
+        .chat-message-row.is-me .chat-message-meta {
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: center !important;
+            gap: 8px !important;
+            margin: 0 4px 5px !important;
+        }
+
+        .chat-message-meta strong {
+            display: block !important;
+            max-width: 210px !important;
+            color: #f8fafc !important;
+            font-size: 10px !important;
+            font-weight: 700 !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            white-space: nowrap !important;
+        }
+
+        .chat-message-meta span,
+        .chat-message-row.is-me .chat-message-meta span {
+            margin-left: auto !important;
+            margin-right: 0 !important;
+            color: #64748b !important;
+            font-size: 8px !important;
+        }
+
+        .chat-message-bubble {
+            padding: 9px 12px !important;
+            border-radius: 13px !important;
+            background: rgba(30,41,59,.86) !important;
+            border: 1px solid rgba(148,163,184,.13) !important;
+            box-shadow: 0 5px 14px rgba(0,0,0,.12) !important;
+            font-size: 11px !important;
+            line-height: 1.5 !important;
+        }
+
+        .chat-message-row.is-me .chat-message-bubble {
+            border-radius: 13px !important;
+            background: rgba(37,99,235,.20) !important;
+            border-color: rgba(96,165,250,.28) !important;
+        }
+
+        .chat-message-row.is-other .chat-message-bubble {
+            background: rgba(15,23,42,.92) !important;
+        }
+
+        @media (max-width: 760px) {
+            .video-grid:has(> .video-tile:nth-child(2):last-child) {
+                grid-template-columns: 1fr !important;
+                grid-template-rows: repeat(2, minmax(180px, 1fr)) !important;
+            }
+
+            .chat-message-content {
+                max-width: 92% !important;
+            }
         }
 
     </style>
@@ -10404,15 +10523,10 @@
         });
     });
 
-    // Periodic state refresh repairs a missed status packet without reloading.
+    // V5 duplicate network heartbeat disabled.
+    // Realtime state is event-driven; repeated status POSTs were creating request storms.
     if (!window.__smartMeetV5StateHeartbeat) {
         window.__smartMeetV5StateHeartbeat = true;
-        setInterval(() => {
-            if (document.visibilityState !== 'visible') return;
-            broadcastMyMicStatus();
-            broadcastMyCameraStatus();
-            unlockAllRemoteAudioV5();
-        }, 5000);
     }
 
     // Backup leave notification for closing/back-navigation.
@@ -10578,6 +10692,12 @@
         const uid = String(userId);
         if (!uid || uid === String(MY_USER_ID) || leftUsers.has(uid)) return;
 
+        // Only the deterministic initiator creates recovery offers.
+        // This prevents simultaneous offers from producing SDP m-line order mismatches.
+        if (typeof shouldInitiatePeer === 'function' && !shouldInitiatePeer(uid)) {
+            return;
+        }
+
         const info = knownParticipants?.[uid];
         if (info && info.hasJoined === false && !onlineUsers.has(uid)) return;
 
@@ -10609,7 +10729,7 @@
 
     function smV6HandshakeBurst(uid, reason = 'join') {
         uid = String(uid);
-        [40, 280, 850, 1800, 3500].forEach(delay => {
+        [80, 900, 2600].forEach(delay => {
             setTimeout(() => smV6ForceHandshake(uid, reason), delay);
         });
     }
@@ -10751,7 +10871,7 @@
 
     /* Initial join repair. */
     window.addEventListener('load', () => {
-        [250, 700, 1600, 3200].forEach(delay => {
+        [350, 1800].forEach(delay => {
             setTimeout(() => {
                 announceJoin();
                 Object.keys(knownParticipants || {}).forEach(uid => {
@@ -10792,10 +10912,9 @@
                 }
             });
 
-            broadcastMyMicStatus();
-            broadcastMyCameraStatus();
+            // Local audio playback refresh only. Do not POST mic/camera status periodically.
             smV6UnlockRemoteAudio();
-        }, 3000);
+        }, 8000);
     }
 
     /* Extra post-toggle repair. Existing handlers still request permissions and
@@ -10803,7 +10922,7 @@
        every peer and advertises the correct status. */
     window.addEventListener('load', () => {
         document.getElementById('ctrl-mic')?.addEventListener('click', () => {
-            [100, 350, 900].forEach(delay => setTimeout(async () => {
+            [180, 750].forEach(delay => setTimeout(async () => {
                 Object.keys(peers).forEach(uid => smV6SyncPeerMedia(uid));
                 broadcastMyMicStatus();
                 Object.keys(peers).forEach(uid => smV6ForceHandshake(uid, 'mic-toggle'));
@@ -10811,7 +10930,7 @@
         });
 
         document.getElementById('ctrl-camera')?.addEventListener('click', () => {
-            [150, 450, 1000].forEach(delay => setTimeout(async () => {
+            [220, 800].forEach(delay => setTimeout(async () => {
                 Object.keys(peers).forEach(uid => smV6SyncPeerMedia(uid));
                 broadcastMyCameraStatus();
                 Object.keys(peers).forEach(uid => smV6ForceHandshake(uid, 'camera-toggle'));
@@ -10859,9 +10978,6 @@
         const row = document.createElement('div');
         row.className = `chat-message-row ${isMe ? 'is-me' : 'is-other'}`;
         row.innerHTML = `
-        <div class="chat-message-avatar">
-            ${escapeHtml(isMe ? MY_INITIALS : initials)}
-        </div>
         <div class="chat-message-content">
             <div class="chat-message-meta">
                 <strong>${escapeHtml(isMe ? `${MY_NAME} (You)` : safeName)}</strong>
