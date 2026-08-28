@@ -1117,45 +1117,22 @@
             margin:8px 10px !important;
         }
 
-
-        /* ===== SmartMeet FINAL live-room layout override ===== */
-        .video-grid{
-            display:grid !important;
-            grid-template-columns:repeat(auto-fill,minmax(380px,500px)) !important;
-            grid-auto-rows:auto !important;
-            justify-content:start !important;
-            align-content:start !important;
-            align-items:start !important;
-            gap:10px !important;
-            padding:12px !important;
-        }
-        .video-grid .video-tile{
-            width:100% !important;
-            max-width:500px !important;
-            min-width:0 !important;
-            min-height:0 !important;
-            height:auto !important;
-            aspect-ratio:16/10 !important;
-        }
-        .video-grid:has(> .video-tile:only-child){
-            grid-template-columns:minmax(420px,540px) !important;
-        }
-        .video-grid:has(> .video-tile:only-child) .video-tile{max-width:540px !important;}
-        .video-grid:has(> .video-tile:first-child:nth-last-child(2)){
-            grid-template-columns:repeat(2,minmax(360px,480px)) !important;
-        }
-        .video-grid:has(> .video-tile:first-child:nth-last-child(2)) .video-tile{max-width:480px !important;}
-        @media(max-width:900px){
-            .video-grid,.video-grid:has(> .video-tile:only-child),.video-grid:has(> .video-tile:first-child:nth-last-child(2)){
-                grid-template-columns:minmax(0,1fr) !important;
-            }
-            .video-grid .video-tile,.video-grid:has(> .video-tile:only-child) .video-tile,.video-grid:has(> .video-tile:first-child:nth-last-child(2)) .video-tile{
-                max-width:560px !important;
-            }
-        }
-
     </style>
 
+
+    <style>
+        /* SmartMeet V4: larger 1–2 person layout with tighter spacing */
+        .video-grid{gap:10px!important;padding:14px!important;}
+        .video-grid:has(> .video-tile:only-child){grid-template-columns:minmax(520px,720px)!important;}
+        .video-grid:has(> .video-tile:first-child:nth-last-child(2)){grid-template-columns:repeat(2,minmax(420px,570px))!important;}
+        .video-grid .video-tile{max-width:570px!important;}
+        @media(max-width:980px){
+            .video-grid:has(> .video-tile:only-child),
+            .video-grid:has(> .video-tile:first-child:nth-last-child(2)){grid-template-columns:repeat(auto-fit,minmax(320px,1fr))!important;}
+            .video-grid .video-tile{max-width:100%!important;}
+        }
+        @media(max-width:700px){.video-grid{gap:8px!important;padding:10px!important;}}
+    </style>
 </head>
 
 @php
@@ -3706,28 +3683,243 @@
     }
 
 
-    /* ===== SmartMeet FINAL realtime recovery heartbeat =====
-       Re-announces presence after a WebSocket reconnect and continuously
-       re-syncs active local tracks with every known joined peer. */
-    let smartMeetRecoveryTimer = null;
-    function smartMeetRealtimeRecoveryTick() {
-        try {
+    /* ============================================================
+       SMARTMEET RELIABLE WEBRTC MESH V4
+       - deterministic single-offer peer negotiation
+       - permanent audio/video transceivers
+       - camera replaceTrack without page refresh
+       - remote audio autoplay recovery
+       - keeps joined tiles visible during ICE recovery
+    ============================================================ */
+
+    function smV4SenderForKind(pc, kind) {
+        if (!pc) return null;
+        if (kind === 'audio' && pc.__smAudioSender) return pc.__smAudioSender;
+        if (kind === 'video' && pc.__smVideoSender) return pc.__smVideoSender;
+        const tx = (pc.getTransceivers?.() || []).find(t => t.receiver?.track?.kind === kind);
+        return tx?.sender || pc.getSenders().find(s => s.track?.kind === kind) || null;
+    }
+
+    async function syncLocalTracksToPeer(userId) {
+        const uid = String(userId);
+        const pc = peers[uid];
+        if (!pc || pc.signalingState === 'closed') return false;
+
+        const audioTrack = localStream?.getAudioTracks?.().find(t => t.readyState === 'live') || null;
+        const videoTrack = localStream?.getVideoTracks?.().find(t => t.readyState === 'live') || null;
+        let changed = false;
+
+        const audioSender = smV4SenderForKind(pc, 'audio');
+        const videoSender = smV4SenderForKind(pc, 'video');
+
+        if (audioSender && audioSender.track !== audioTrack) {
+            try { await audioSender.replaceTrack(audioTrack); changed = true; } catch (e) { console.warn('Audio replaceTrack failed', uid, e); }
+        }
+        if (videoSender && videoSender.track !== videoTrack) {
+            try { await videoSender.replaceTrack(videoTrack); changed = true; } catch (e) { console.warn('Video replaceTrack failed', uid, e); }
+        }
+
+        return changed;
+    }
+
+    async function syncTracksToEveryPeer(forceNegotiation = false) {
+        Object.keys(knownParticipants || {}).forEach(uid => {
+            uid = String(uid);
+            if (uid === String(MY_USER_ID) || leftUsers.has(uid)) return;
+            if (knownParticipants[uid]?.hasJoined || onlineUsers.has(uid)) createPeerConnection(uid);
+        });
+
+        const jobs = Object.keys(peers).map(async uid => {
+            const pc = peers[uid];
+            if (!pc || pc.signalingState === 'closed') return;
+            await syncLocalTracksToPeer(uid);
+
+            // Only ONE deterministic side creates offers. This removes glare/
+            // collision loops that previously left media at "2 online" but with
+            // no audio/video flowing.
+            if (shouldInitiatePeer(uid) && pc.signalingState === 'stable') {
+                if (!pc.remoteDescription || forceNegotiation || pc.connectionState === 'failed') {
+                    queuePeerNegotiation(uid, {
+                        reason: forceNegotiation ? 'media-track-sync' : 'initial-mesh',
+                        iceRestart: pc.connectionState === 'failed',
+                        force: false,
+                        delay: 25
+                    });
+                }
+            }
+        });
+        await Promise.allSettled(jobs);
+    }
+
+    async function syncCameraToAllPeers(videoTrack) {
+        if (!videoTrack) return;
+        if (localStream && !localStream.getVideoTracks().includes(videoTrack)) localStream.addTrack(videoTrack);
+        await syncTracksToEveryPeer(false);
+    }
+
+    function createPeerConnection(userId) {
+        const uid = String(userId);
+        if (!uid || uid === String(MY_USER_ID) || leftUsers.has(uid)) return null;
+
+        let pc = peers[uid];
+        if (pc && !['closed', 'failed'].includes(pc.connectionState)) return pc;
+        if (pc) { try { pc.close(); } catch (e) {} }
+
+        pc = new RTCPeerConnection(iceConfig);
+        peers[uid] = pc;
+
+        // Create BOTH m-lines immediately. Camera can therefore be turned on
+        // later with replaceTrack() and becomes visible remotely without reload.
+        const audioTx = pc.addTransceiver('audio', { direction: 'sendrecv' });
+        const videoTx = pc.addTransceiver('video', { direction: 'sendrecv' });
+        pc.__smAudioSender = audioTx.sender;
+        pc.__smVideoSender = videoTx.sender;
+
+        syncLocalTracksToPeer(uid).catch(console.warn);
+
+        pc.onnegotiationneeded = () => {
+            if (!shouldInitiatePeer(uid) || pc.signalingState !== 'stable') return;
+            queuePeerNegotiation(uid, { reason: 'negotiation-needed-v4', delay: 30 });
+        };
+
+        pc.onicecandidate = event => {
+            if (!event.candidate) return;
+            sendSignal(uid, 'ice-candidate', { candidate: event.candidate.toJSON() });
+        };
+
+        pc.ontrack = event => {
+            if (uid === String(MY_USER_ID) || leftUsers.has(uid)) return;
+
+            const info = knownParticipants[uid];
+            if (info) {
+                info.hasJoined = true;
+                addParticipantTile(uid, info.name, info.initials, Boolean(info.isOrganizer));
+                markOnline(uid);
+            } else {
+                ensureParticipantTileVisible(uid);
+            }
+
+            const stream = getOrCreateRemoteStream(uid);
+            if (!stream.getTracks().some(t => t.id === event.track.id)) stream.addTrack(event.track);
+
+            const applyRemote = () => {
+                attachRemoteStream(uid);
+                if (event.track.kind === 'audio') {
+                    const audio = document.getElementById('audio-' + uid);
+                    if (audio) {
+                        audio.muted = false;
+                        audio.defaultMuted = false;
+                        audio.volume = 1;
+                        audio.play().catch(() => {});
+                    }
+                }
+                if (event.track.kind === 'video' && event.track.readyState === 'live' && !event.track.muted) {
+                    participantCameraStatus[uid] = true;
+                    const video = document.getElementById('rvideo-' + uid);
+                    const avatar = document.getElementById('avatar-' + uid);
+                    if (video) {
+                        video.style.display = 'block';
+                        video.autoplay = true;
+                        video.playsInline = true;
+                        video.muted = true;
+                        video.play().catch(() => {});
+                    }
+                    if (avatar) avatar.style.display = 'none';
+                }
+            };
+
+            event.track.onunmute = applyRemote;
+            event.track.onmute = () => {
+                if (event.track.kind !== 'video') return;
+                const video = document.getElementById('rvideo-' + uid);
+                const avatar = document.getElementById('avatar-' + uid);
+                if (video) video.style.display = 'none';
+                if (avatar) avatar.style.display = 'flex';
+            };
+            event.track.onended = () => {
+                try { stream.removeTrack(event.track); } catch (e) {}
+                attachRemoteStream(uid);
+            };
+            applyRemote();
+        };
+
+        const recover = () => {
+            if (leftUsers.has(uid)) return;
+            const current = peers[uid];
+            if (current !== pc) return;
+            if (shouldInitiatePeer(uid)) {
+                if (pc.signalingState === 'stable') {
+                    queuePeerNegotiation(uid, { reason: 'ice-recovery-v4', iceRestart: true, delay: 120 });
+                }
+            } else {
+                // Wake the deterministic offerer. user-joined is intentionally a
+                // broadcast event in the controllers, so it works as a safe probe.
+                announceJoin();
+            }
+        };
+
+        pc.oniceconnectionstatechange = () => {
+            const state = pc.iceConnectionState;
+            if (state === 'connected' || state === 'completed') {
+                if (offlineTimers[uid]) { clearTimeout(offlineTimers[uid]); delete offlineTimers[uid]; }
+                ensureParticipantTileVisible(uid);
+                attachRemoteStream(uid);
+                syncLocalTracksToPeer(uid);
+                broadcastMyMicStatus();
+                broadcastMyCameraStatus();
+            } else if (state === 'failed') {
+                // Do NOT remove the participant tile. Presence and media state are
+                // separate; recover ICE in-place instead of forcing a page refresh.
+                setTimeout(recover, 250);
+            } else if (state === 'disconnected') {
+                if (offlineTimers[uid]) clearTimeout(offlineTimers[uid]);
+                offlineTimers[uid] = setTimeout(recover, 1200);
+            }
+        };
+
+        pc.onconnectionstatechange = () => {
+            if (pc.connectionState === 'failed') setTimeout(recover, 200);
+        };
+
+        // Only the deterministic initiator sends the initial SDP offer.
+        if (shouldInitiatePeer(uid)) {
+            setTimeout(() => {
+                if (peers[uid] === pc && pc.signalingState === 'stable') {
+                    queuePeerNegotiation(uid, { reason: 'peer-created-v4', delay: 10 });
+                }
+            }, 40);
+        }
+
+        return pc;
+    }
+
+    function connectToAll() {
+        Object.keys(knownParticipants || {}).forEach(uid => {
+            uid = String(uid);
+            if (uid === String(MY_USER_ID) || leftUsers.has(uid)) return;
+            if (knownParticipants[uid]?.hasJoined || onlineUsers.has(uid)) createPeerConnection(uid);
+        });
+    }
+
+    // Re-announce presence periodically. This makes a user who opened the room a
+    // fraction of a second before another subscription visible without refresh.
+    if (!window.__smartMeetPresenceV4) {
+        window.__smartMeetPresenceV4 = true;
+        window.addEventListener('load', () => {
+            [250, 900, 2200, 5000].forEach(delay => setTimeout(() => {
+                announceJoin();
+                connectToAll();
+                syncTracksToEveryPeer(false);
+            }, delay));
+        });
+        setInterval(() => {
+            if (document.visibilityState !== 'visible') return;
             announceJoin();
             connectToAll();
-            Promise.resolve(syncTracksToEveryPeer(true)).catch(console.warn);
-            broadcastMyMicStatus();
-            broadcastMyCameraStatus();
-        } catch (error) {
-            console.warn('SmartMeet realtime recovery tick:', error);
-        }
+            syncTracksToEveryPeer(false);
+        }, 8000);
     }
-    window.addEventListener('load', () => {
-        setTimeout(smartMeetRealtimeRecoveryTick, 1500);
-        smartMeetRecoveryTimer = setInterval(smartMeetRealtimeRecoveryTick, 5000);
-    });
-    window.addEventListener('pagehide', () => {
-        if (smartMeetRecoveryTimer) clearInterval(smartMeetRecoveryTimer);
-    });
+
 
 </script>
 </body>
