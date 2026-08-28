@@ -1119,39 +1119,55 @@
 
 
         /* ============================================================
-           SMARTMEET FINAL SAFE UI IMPROVEMENTS
-           Visual/layout only. Does not replace MediaStream tracks.
+           SMARTMEET SAFE COMPACT ROOM + SIMPLE CHAT
+           IMPORTANT: visual only — no WebRTC/audio/video track changes.
            ============================================================ */
 
-        /* One or two people should use the room instead of leaving a huge empty area. */
+        .video-grid {
+            align-content: start !important;
+            grid-auto-rows: auto !important;
+        }
+
+        /* One participant: wider tile, moderate height. */
         .video-grid:has(> .video-tile:first-child:last-child) {
-            grid-template-columns: minmax(0, 1fr) !important;
-            grid-template-rows: minmax(0, 1fr) !important;
-            align-content: stretch !important;
+            grid-template-columns: minmax(0, min(900px, 88%)) !important;
+            justify-content: start !important;
         }
 
         .video-grid:has(> .video-tile:first-child:last-child) > .video-tile {
             width: 100% !important;
-            height: 100% !important;
-            max-width: none !important;
-            min-height: 280px !important;
+            max-width: 900px !important;
+            aspect-ratio: 16 / 9 !important;
+            min-height: 0 !important;
+            height: auto !important;
         }
 
+        /* Two participants: wider cards, less vertical stretching. */
         .video-grid:has(> .video-tile:nth-child(2):last-child) {
             grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-            grid-template-rows: minmax(0, 1fr) !important;
-            align-content: stretch !important;
+            gap: 12px !important;
+            align-content: start !important;
         }
 
         .video-grid:has(> .video-tile:nth-child(2):last-child) > .video-tile {
             width: 100% !important;
-            height: 100% !important;
-            max-width: none !important;
-            min-height: 260px !important;
+            aspect-ratio: 16 / 9 !important;
+            min-height: 0 !important;
+            height: auto !important;
+            max-height: 440px !important;
         }
 
-        /* Full / maximized tile: selected video fills the available room.
-           Tile info overlays the bottom; no extra black strip is reserved. */
+        .video-grid:has(> .video-tile:nth-child(3)) {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        }
+
+        .video-grid:has(> .video-tile:nth-child(3)) > .video-tile {
+            aspect-ratio: 16 / 9 !important;
+            min-height: 0 !important;
+            height: auto !important;
+        }
+
+        /* Keep maximized video filling the complete stage with no reserved black strip. */
         #maximized-overlay.active {
             display: block !important;
         }
@@ -1161,10 +1177,10 @@
             inset: 0 !important;
             width: 100% !important;
             height: 100% !important;
-            min-width: 0 !important;
-            min-height: 0 !important;
             max-width: none !important;
             max-height: none !important;
+            min-width: 0 !important;
+            min-height: 0 !important;
             aspect-ratio: auto !important;
             margin: 0 !important;
             transform: none !important;
@@ -1175,16 +1191,11 @@
             inset: 0 !important;
             width: 100% !important;
             height: 100% !important;
-            min-height: 0 !important;
         }
 
-        #maximized-overlay.active > .video-tile .video-placeholder video {
-            position: absolute !important;
-            inset: 0 !important;
+        #maximized-overlay.active > .video-tile video {
             width: 100% !important;
             height: 100% !important;
-            max-width: none !important;
-            max-height: none !important;
             object-fit: cover !important;
             object-position: center center !important;
         }
@@ -1194,19 +1205,25 @@
             left: 0 !important;
             right: 0 !important;
             bottom: 0 !important;
-            z-index: 9 !important;
-            background: linear-gradient(to top, rgba(2,6,23,.92), rgba(2,6,23,.35)) !important;
+            z-index: 8 !important;
+            background: linear-gradient(to top, rgba(2,6,23,.92), rgba(2,6,23,.24)) !important;
         }
 
-        /* Simple, clean chat. No single-letter avatar circles. */
+        /* Simple attractive chat — full names, no alphabet avatar circles. */
         .chat-message-avatar {
             display: none !important;
         }
 
+        .chat-body {
+            gap: 9px !important;
+            padding: 12px !important;
+        }
+
         .chat-message-row {
             width: 100% !important;
-            gap: 0 !important;
+            display: flex !important;
             align-items: flex-start !important;
+            gap: 0 !important;
         }
 
         .chat-message-row.is-me {
@@ -1221,8 +1238,8 @@
 
         .chat-message-content {
             width: auto !important;
+            min-width: 130px !important;
             max-width: 88% !important;
-            min-width: 110px !important;
         }
 
         .chat-message-meta,
@@ -1231,18 +1248,18 @@
             flex-direction: row !important;
             align-items: center !important;
             gap: 8px !important;
-            margin: 0 4px 5px !important;
+            margin: 0 5px 4px !important;
         }
 
         .chat-message-meta strong {
             display: block !important;
-            max-width: 210px !important;
-            color: #f8fafc !important;
-            font-size: 10px !important;
-            font-weight: 700 !important;
+            max-width: 240px !important;
             overflow: hidden !important;
             text-overflow: ellipsis !important;
             white-space: nowrap !important;
+            color: #f1f5f9 !important;
+            font-size: 10px !important;
+            font-weight: 750 !important;
         }
 
         .chat-message-meta span,
@@ -1253,34 +1270,33 @@
             font-size: 8px !important;
         }
 
-        .chat-message-bubble {
+        .chat-message-bubble,
+        .chat-message-row.is-me .chat-message-bubble {
+            border-radius: 12px !important;
             padding: 9px 12px !important;
-            border-radius: 13px !important;
-            background: rgba(30,41,59,.86) !important;
-            border: 1px solid rgba(148,163,184,.13) !important;
-            box-shadow: 0 5px 14px rgba(0,0,0,.12) !important;
             font-size: 11px !important;
             line-height: 1.5 !important;
+            box-shadow: none !important;
         }
 
         .chat-message-row.is-me .chat-message-bubble {
-            border-radius: 13px !important;
             background: rgba(37,99,235,.20) !important;
-            border-color: rgba(96,165,250,.28) !important;
+            border: 1px solid rgba(96,165,250,.26) !important;
         }
 
         .chat-message-row.is-other .chat-message-bubble {
-            background: rgba(15,23,42,.92) !important;
+            background: rgba(30,41,59,.82) !important;
+            border: 1px solid rgba(148,163,184,.13) !important;
         }
 
         @media (max-width: 760px) {
-            .video-grid:has(> .video-tile:nth-child(2):last-child) {
+            .video-grid:has(> .video-tile:nth-child(2):last-child),
+            .video-grid:has(> .video-tile:nth-child(3)) {
                 grid-template-columns: 1fr !important;
-                grid-template-rows: repeat(2, minmax(180px, 1fr)) !important;
             }
 
-            .chat-message-content {
-                max-width: 92% !important;
+            .video-grid > .video-tile {
+                max-height: none !important;
             }
         }
 
@@ -2612,7 +2628,7 @@
             if (isMicOn) startRecognition();
         }
     });
-    setInterval(() => recoverAllJoinedPeers('periodic-health-check'), 10000);
+    setInterval(() => recoverAllJoinedPeers('periodic-health-check'), 3000);
 
 
 
@@ -3063,72 +3079,6 @@
 
     }
 
-
-    async function applyRemoteOfferSafely(userId, description) {
-        const uid = String(userId);
-
-        let pc = createPeerConnection(uid);
-        if (!pc) {
-            throw new Error('Could not create peer connection for ' + uid);
-        }
-
-        try {
-            await pc.setRemoteDescription(description);
-            return pc;
-        } catch (error) {
-            const message = String(error?.message || error || '');
-            const isMLineMismatch =
-                error?.name === 'InvalidAccessError' &&
-                (
-                    message.includes('m-lines') ||
-                    message.includes("doesn't match order") ||
-                    message.includes('different order')
-                );
-
-            if (!isMLineMismatch) {
-                throw error;
-            }
-
-            console.warn(
-                'Repairing stale WebRTC negotiation state for peer',
-                uid
-            );
-
-            // The current PeerConnection has an incompatible historical SDP
-            // layout. Rebuild just this peer; local MediaStream tracks are kept.
-            try {
-                if (peers[uid]) peers[uid].close();
-            } catch (e) {}
-
-            delete peers[uid];
-            delete makingOffer[uid];
-            delete ignoreOffer[uid];
-
-            const queuedCandidates = pendingCandidates[uid] || [];
-            pendingCandidates[uid] = [];
-
-            pc = createPeerConnection(uid);
-
-            if (!pc) {
-                throw error;
-            }
-
-            await pc.setRemoteDescription(description);
-            await syncLocalTracksToPeer(uid);
-
-            // Candidates received before the fresh offer can still be tried.
-            for (const candidate of queuedCandidates) {
-                try {
-                    await pc.addIceCandidate(
-                        new RTCIceCandidate(candidate)
-                    );
-                } catch (e) {}
-            }
-
-            return pc;
-        }
-    }
-
     function decodeSdp(sdp) { if (!sdp) return ''; try { return decodeURIComponent(escape(atob(sdp))); } catch(e) { return sdp; } }
 
     function removeParticipantTileSilently(userId, announce) {
@@ -3188,6 +3138,8 @@
     }
 
     // ── HANDLE SIGNAL ──
+
+    window.__smartMeetSeenChatIds = window.__smartMeetSeenChatIds || new Set();
 
     async function handleSignal(data) {
 
@@ -3329,6 +3281,16 @@
 
             if (!text) return;
 
+            const messageId = data.data?.messageId || '';
+            if (messageId) {
+                if (window.__smartMeetSeenChatIds.has(messageId)) return;
+                window.__smartMeetSeenChatIds.add(messageId);
+                if (window.__smartMeetSeenChatIds.size > 500) {
+                    window.__smartMeetSeenChatIds.clear();
+                    window.__smartMeetSeenChatIds.add(messageId);
+                }
+            }
+
             addChatBubble(name, text, false);
 
             if (activeTab !== 'chat') { unreadChat++; updateChatBadge(); }
@@ -3383,7 +3345,7 @@
 
             if (data.type === 'offer') {
 
-                let pc = createPeerConnection(from);
+                const pc = createPeerConnection(from);
 
                 const polite = isPolite(from);
 
@@ -3395,13 +3357,7 @@
 
                 const sdp = decodeSdp(data.data.sdp);
 
-                pc = await applyRemoteOfferSafely(
-                    from,
-                    new RTCSessionDescription({
-                        type: data.data.type || 'offer',
-                        sdp
-                    })
-                );
+                await pc.setRemoteDescription(new RTCSessionDescription({ type: data.data.type || 'offer', sdp }));
 
                 // Guarantee that our audio-only track and any active camera
                 // track are attached before generating the answer.
@@ -3429,28 +3385,7 @@
 
                 if (pc.signalingState === 'have-local-offer') {
 
-                    try {
-                        await pc.setRemoteDescription(
-                            new RTCSessionDescription({
-                                type: data.data.type || 'answer',
-                                sdp
-                            })
-                        );
-                    } catch (error) {
-                        const message = String(error?.message || error || '');
-                        if (
-                            error?.name === 'InvalidAccessError' &&
-                            (
-                                message.includes('m-lines') ||
-                                message.includes("doesn't match order") ||
-                                message.includes('different order')
-                            )
-                        ) {
-                            console.warn('Ignoring stale SDP answer from peer', from);
-                            return;
-                        }
-                        throw error;
-                    }
+                    await pc.setRemoteDescription(new RTCSessionDescription({ type: data.data.type || 'answer', sdp }));
 
                     if (pendingCandidates[from]?.length) {
 
@@ -3524,16 +3459,91 @@
 
     }
 
-    async function sendSignal(toUserId, type, data) {
+
+    const signalThrottleState = new Map();
+
+    function shouldThrottleSignal(type, data) {
+        if (!['mic-status', 'camera-status', 'user-joined'].includes(type)) {
+            return false;
+        }
+
+        const key = type + ':' + JSON.stringify(data || {});
+        const now = Date.now();
+        const previous = signalThrottleState.get(key) || 0;
+
+        if (now - previous < 2500) {
+            return true;
+        }
+
+        signalThrottleState.set(key, now);
+        return false;
+    }
+
+    async function postSignalOnce(toUserId, type, data, timeoutMs = 7000) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
 
         try {
+            const response = await fetch(
+                SIGNAL_URL,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': CSRF
+                    },
+                    body: JSON.stringify({
+                        to_user_id: toUserId,
+                        type,
+                        data
+                    }),
+                    signal: controller.signal
+                }
+            );
 
-            const res = await fetch(SIGNAL_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': CSRF }, body: JSON.stringify({ to_user_id: toUserId, type, data }) });
+            if (!response.ok) {
+                console.warn('sendSignal failed:', response.status);
+                return false;
+            }
 
-            if (!res.ok) console.error('sendSignal failed:', await res.text());
+            return true;
+        } catch (error) {
+            if (error?.name !== 'AbortError') {
+                console.warn('sendSignal network error:', type);
+            }
+            return false;
+        } finally {
+            clearTimeout(timer);
+        }
+    }
 
-        } catch (err) { console.error('sendSignal error:', err); }
+    async function sendSignal(toUserId, type, data) {
+        if (shouldThrottleSignal(type, data)) {
+            return true;
+        }
 
+        // Chat is user-visible, so retry it twice on a temporary HTTP/network failure.
+        // SDP/ICE are never blindly retried here because duplicate negotiation packets
+        // can destabilize an otherwise healthy WebRTC call.
+        if (type === 'chat') {
+            const payload = {
+                ...(data || {}),
+                messageId: data?.messageId || (
+                    String(MY_USER_ID) + '-' + Date.now() + '-' +
+                    Math.random().toString(36).slice(2, 8)
+                )
+            };
+
+            if (await postSignalOnce(toUserId, type, payload, 7000)) return true;
+
+            await new Promise(resolve => setTimeout(resolve, 700));
+            if (await postSignalOnce(toUserId, type, payload, 7000)) return true;
+
+            await new Promise(resolve => setTimeout(resolve, 1400));
+            return await postSignalOnce(toUserId, type, payload, 7000);
+        }
+
+        return await postSignalOnce(toUserId, type, data, 7000);
     }
 
     // ── TOGGLE MIC ──
@@ -3567,11 +3577,11 @@
 
             // Ensure every currently joined peer has this audio track now.
             connectToAll();
-            await syncTracksToEveryPeer(false);
+            await syncTracksToEveryPeer(true);
             [120, 450].forEach(delay => setTimeout(() => {
                 if (isMicOn) {
                     connectToAll();
-                    syncTracksToEveryPeer(false);
+                    syncTracksToEveryPeer(true);
                 }
             }, delay));
 
@@ -3590,6 +3600,11 @@
         // The audio track remains attached while muted. Enabling it
         // therefore starts audio-only calling immediately on every peer.
         await syncTracksToEveryPeer(isMicOn);
+        if (isMicOn) {
+            Object.keys(peers).forEach(uid => {
+                if (shouldInitiatePeer(uid)) queuePeerNegotiation(uid, { reason: 'microphone-enabled', delay: 10 });
+            });
+        }
         broadcastMyMicStatus();
 
     }
@@ -3630,7 +3645,7 @@
                     localVideo.play().catch(() => {});
                 }
 
-                await syncTracksToEveryPeer(false);
+                await syncTracksToEveryPeer(true);
             } catch (error) {
                 console.error('Camera access failed:', error);
                 showToast('📷 Camera could not start. Allow camera access in browser settings.');
@@ -3663,7 +3678,7 @@
 
         // replaceTrack/addTrack on every peer, then renegotiate so every
         // joined device receives the camera without refreshing.
-        await syncTracksToEveryPeer(false);
+        await syncTracksToEveryPeer(true);
         broadcastMyCameraStatus();
     }
 
@@ -3877,16 +3892,13 @@
                 return;
             }
 
-            if (e.error === 'network') {
-                // Browser speech service temporarily unavailable.
-                // Meeting audio/video must continue unaffected.
-                if (indicator) indicator.style.display = 'none';
-                scheduleRecognitionRestart(3000);
-                return;
+            if (e.error !== 'aborted' && e.error !== 'no-speech' && e.error !== 'network') {
+                console.warn('Speech recognition:', e.error);
             }
 
-            if (e.error !== 'aborted' && e.error !== 'no-speech') {
-                console.warn('Speech recognition:', e.error);
+            if (e.error === 'network') {
+                scheduleRecognitionRestart(2500);
+                return;
             }
 
             scheduleRecognitionRestart(300);
@@ -4460,45 +4472,14 @@
             event.track.onunmute = applyRemote;
             event.track.onmute = () => {
                 if (event.track.kind !== 'video') return;
-
-                // A WebRTC video track can become muted for a fraction of a second
-                // during jitter / ICE switching. Do not blank a perfectly healthy
-                // tile immediately. Only fall back to the avatar if the same track
-                // is still muted after a short grace period.
-                setTimeout(() => {
-                    if (event.track.readyState !== 'live' || !event.track.muted) return;
-
-                    const current = remoteStreams?.[uid]
-                        ?.getVideoTracks?.()
-                        .find(t => t.readyState === 'live' && !t.muted);
-
-                    if (current) return;
-
-                    const video = document.getElementById('rvideo-' + uid);
-                    const avatar = document.getElementById('avatar-' + uid);
-
-                    if (video) video.style.display = 'none';
-                    if (avatar) avatar.style.display = 'flex';
-                }, 1800);
+                const video = document.getElementById('rvideo-' + uid);
+                const avatar = document.getElementById('avatar-' + uid);
+                if (video) video.style.display = 'none';
+                if (avatar) avatar.style.display = 'flex';
             };
-
             event.track.onended = () => {
                 try { stream.removeTrack(event.track); } catch (e) {}
                 attachRemoteStream(uid);
-
-                // Recover only if the remote media track actually ended.
-                if (!leftUsers.has(uid)) {
-                    const pcNow = peers[uid];
-                    if (
-                        pcNow &&
-                        (
-                            ['failed','disconnected'].includes(pcNow.connectionState) ||
-                            ['failed','disconnected'].includes(pcNow.iceConnectionState)
-                        )
-                    ) {
-                        schedulePeerRecovery(uid, 'remote-track-ended', 500);
-                    }
-                }
             };
             applyRemote();
         };
@@ -4665,7 +4646,7 @@
             setTimeout(() => {
                 broadcastMyMicStatus();
                 broadcastMyCameraStatus();
-                syncTracksToEveryPeer(false);
+                syncTracksToEveryPeer(true);
                 unlockAllRemoteAudioV5();
             }, 80);
             return;
@@ -4760,7 +4741,7 @@
                     if (sender && track) sender.replaceTrack(track).catch(console.warn);
                 });
 
-                await syncTracksToEveryPeer(false);
+                await syncTracksToEveryPeer(true);
                 broadcastMyMicStatus();
                 unlockAllRemoteAudioV5();
             }, 120);
@@ -4770,7 +4751,7 @@
 
         camBtn?.addEventListener('click', () => {
             setTimeout(async () => {
-                await syncTracksToEveryPeer(false);
+                await syncTracksToEveryPeer(true);
                 broadcastMyCameraStatus();
             }, 180);
 
@@ -4778,10 +4759,15 @@
         });
     });
 
-    // V5 duplicate network heartbeat disabled.
-    // Realtime state is event-driven; repeated status POSTs were creating request storms.
+    // Periodic state refresh repairs a missed status packet without reloading.
     if (!window.__smartMeetV5StateHeartbeat) {
         window.__smartMeetV5StateHeartbeat = true;
+        setInterval(() => {
+            if (document.visibilityState !== 'visible') return;
+            broadcastMyMicStatus();
+            broadcastMyCameraStatus();
+            unlockAllRemoteAudioV5();
+        }, 5000);
     }
 
     // Backup leave notification for closing/back-navigation.
@@ -4928,12 +4914,6 @@
         const uid = String(userId);
         if (!uid || uid === String(MY_USER_ID) || leftUsers.has(uid)) return;
 
-        // Only the deterministic initiator creates recovery offers.
-        // This prevents simultaneous offers from producing SDP m-line order mismatches.
-        if (typeof shouldInitiatePeer === 'function' && !shouldInitiatePeer(uid)) {
-            return;
-        }
-
         const info = knownParticipants?.[uid];
         if (info && info.hasJoined === false && !onlineUsers.has(uid)) return;
 
@@ -4965,7 +4945,7 @@
 
     function smV6HandshakeBurst(uid, reason = 'join') {
         uid = String(uid);
-        [80, 900, 2600].forEach(delay => {
+        [40, 280, 850, 1800, 3500].forEach(delay => {
             setTimeout(() => smV6ForceHandshake(uid, reason), delay);
         });
     }
@@ -5107,7 +5087,7 @@
 
     /* Initial join repair. */
     window.addEventListener('load', () => {
-        [350, 1800].forEach(delay => {
+        [250, 700, 1600, 3200].forEach(delay => {
             setTimeout(() => {
                 announceJoin();
                 Object.keys(knownParticipants || {}).forEach(uid => {
@@ -5148,9 +5128,10 @@
                 }
             });
 
-            // Local audio playback refresh only. Do not POST mic/camera status periodically.
+            broadcastMyMicStatus();
+            broadcastMyCameraStatus();
             smV6UnlockRemoteAudio();
-        }, 8000);
+        }, 3000);
     }
 
     /* Extra post-toggle repair. Existing handlers still request permissions and
@@ -5158,18 +5139,18 @@
        every peer and advertises the correct status. */
     window.addEventListener('load', () => {
         document.getElementById('ctrl-mic')?.addEventListener('click', () => {
-            [180, 750].forEach(delay => setTimeout(async () => {
+            [100, 350, 900].forEach(delay => setTimeout(async () => {
                 Object.keys(peers).forEach(uid => smV6SyncPeerMedia(uid));
                 broadcastMyMicStatus();
-                // No renegotiation needed: the audio transceiver already exists.
+                Object.keys(peers).forEach(uid => smV6ForceHandshake(uid, 'mic-toggle'));
             }, delay));
         });
 
         document.getElementById('ctrl-camera')?.addEventListener('click', () => {
-            [220, 800].forEach(delay => setTimeout(async () => {
+            [150, 450, 1000].forEach(delay => setTimeout(async () => {
                 Object.keys(peers).forEach(uid => smV6SyncPeerMedia(uid));
                 broadcastMyCameraStatus();
-                // No renegotiation needed: the video transceiver already exists.
+                Object.keys(peers).forEach(uid => smV6ForceHandshake(uid, 'camera-toggle'));
             }, delay));
         });
     });
@@ -5530,4 +5511,3 @@
 
 </body>
 </html>
-
