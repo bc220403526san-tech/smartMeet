@@ -1294,6 +1294,145 @@
         }
     </style>
 
+
+    <style>
+        /* ============================================================
+           SMARTMEET FINAL UI PATCH
+           ============================================================ */
+
+        /* Remove mic status button/icon from every video tile only. */
+        .video-tile .mic-off,
+        .video-tile [id^="micoff-"]{
+            display:none !important;
+        }
+
+        /* Balanced compact tiles: full camera coverage without oversized cards. */
+        .video-grid{
+            grid-template-columns:repeat(auto-fill,minmax(340px,460px)) !important;
+            gap:10px !important;
+            padding:12px !important;
+            justify-content:start !important;
+            align-content:start !important;
+            grid-auto-rows:auto !important;
+        }
+        .video-grid:has(> .video-tile:only-child){
+            grid-template-columns:minmax(400px,500px) !important;
+        }
+        .video-grid:has(> .video-tile:first-child:nth-last-child(2)){
+            grid-template-columns:repeat(2,minmax(360px,460px)) !important;
+        }
+        .video-grid .video-tile{
+            width:100% !important;
+            max-width:460px !important;
+            min-height:0 !important;
+            height:auto !important;
+            aspect-ratio:16/9 !important;
+            position:relative !important;
+            overflow:hidden !important;
+        }
+        .video-grid:has(> .video-tile:only-child) .video-tile{
+            max-width:500px !important;
+        }
+        .video-grid .video-placeholder{
+            position:absolute !important;
+            inset:0 !important;
+            width:100% !important;
+            height:100% !important;
+        }
+        .video-grid .video-placeholder video{
+            position:absolute !important;
+            inset:0 !important;
+            width:100% !important;
+            height:100% !important;
+            object-fit:cover !important;
+        }
+        .video-grid .tile-info{
+            position:absolute !important;
+            left:0 !important;
+            right:0 !important;
+            bottom:0 !important;
+            z-index:8 !important;
+            min-height:40px !important;
+            background:linear-gradient(to top,rgba(2,6,23,.96),rgba(2,6,23,.64),transparent) !important;
+        }
+
+        /* Chat: MY messages LEFT, messages received from others RIGHT. */
+        .chat-message-row{
+            width:100% !important;
+            display:flex !important;
+            align-items:flex-end !important;
+            gap:8px !important;
+            margin:7px 0 !important;
+        }
+        .chat-message-row.is-me{
+            flex-direction:row !important;
+            justify-content:flex-start !important;
+        }
+        .chat-message-row.is-other{
+            flex-direction:row-reverse !important;
+            justify-content:flex-start !important;
+        }
+        .chat-message-content{
+            max-width:min(82%,320px) !important;
+        }
+        .chat-message-row.is-me .chat-message-content{
+            text-align:left !important;
+        }
+        .chat-message-row.is-other .chat-message-content{
+            text-align:right !important;
+        }
+        .chat-message-row.is-me .chat-message-meta{
+            flex-direction:row !important;
+            justify-content:flex-start !important;
+        }
+        .chat-message-row.is-other .chat-message-meta{
+            flex-direction:row-reverse !important;
+            justify-content:flex-start !important;
+        }
+        .chat-message-row.is-me .chat-message-bubble{
+            border-radius:6px 15px 15px 15px !important;
+        }
+        .chat-message-row.is-other .chat-message-bubble{
+            border-radius:15px 6px 15px 15px !important;
+        }
+        .chat-voice-btn{
+            width:36px;
+            height:36px;
+            flex:0 0 36px;
+            border:1px solid rgba(148,163,184,.18);
+            border-radius:10px;
+            background:rgba(15,23,42,.88);
+            color:#e2e8f0;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            cursor:pointer;
+        }
+        .chat-voice-btn.listening{
+            color:#ef4444;
+            border-color:rgba(239,68,68,.55);
+            background:rgba(239,68,68,.12);
+        }
+
+        @media(max-width:950px){
+            .video-grid,
+            .video-grid:has(> .video-tile:only-child),
+            .video-grid:has(> .video-tile:first-child:nth-last-child(2)){
+                grid-template-columns:repeat(auto-fit,minmax(300px,1fr)) !important;
+            }
+            .video-grid .video-tile{
+                max-width:100% !important;
+            }
+        }
+        @media(max-width:700px){
+            .video-grid,
+            .video-grid:has(> .video-tile:only-child),
+            .video-grid:has(> .video-tile:first-child:nth-last-child(2)){
+                grid-template-columns:1fr !important;
+            }
+        }
+    </style>
+
 </head>
 
 @php
@@ -4672,6 +4811,190 @@
                 broadcastMyCameraStatus();
                 Object.keys(peers).forEach(uid => smV6ForceHandshake(uid, 'camera-toggle'));
             }, delay));
+        });
+    });
+
+
+    /* ============================================================
+       SMARTMEET FINAL CHAT + MEDIA STATUS PATCH
+       ============================================================ */
+
+    window.__smartMeetChatSeen = window.__smartMeetChatSeen || new Set();
+
+    function smartMeetChatKey(name, text, fromUserId='') {
+        return `${String(fromUserId)}|${String(name)}|${String(text)}`;
+    }
+
+    /* Render own message on LEFT and remote messages on RIGHT. */
+    function addChatBubble(name, text, isMe, fromUserId = '') {
+        const body = document.getElementById('chat-body');
+        if (!body) return;
+
+        body.querySelector('[data-empty]')?.remove();
+
+        const safeName = String(name || (isMe ? MY_NAME : 'User')).trim() || 'User';
+        const key = smartMeetChatKey(safeName, text, isMe ? MY_USER_ID : fromUserId);
+
+        if (window.__smartMeetChatSeen.has(key)) return;
+        window.__smartMeetChatSeen.add(key);
+
+        const initials = safeName
+            .split(/\s+/)
+            .filter(Boolean)
+            .slice(0,2)
+            .map(part => part.charAt(0))
+            .join('')
+            .toUpperCase() || '?';
+
+        const time = new Date().toLocaleTimeString('en-US', {
+            hour:'2-digit',
+            minute:'2-digit'
+        });
+
+        const row = document.createElement('div');
+        row.className = `chat-message-row ${isMe ? 'is-me' : 'is-other'}`;
+        row.innerHTML = `
+        <div class="chat-message-avatar">
+            ${escapeHtml(isMe ? MY_INITIALS : initials)}
+        </div>
+        <div class="chat-message-content">
+            <div class="chat-message-meta">
+                <strong>${escapeHtml(isMe ? `${MY_NAME} (You)` : safeName)}</strong>
+                <span>${time}</span>
+            </div>
+            <div class="chat-message-bubble">${escapeHtml(text)}</div>
+        </div>
+    `;
+
+        body.appendChild(row);
+        body.scrollTop = body.scrollHeight;
+    }
+
+    function sendChat() {
+        const input = document.getElementById('chat-input');
+        if (!input) return;
+
+        const text = input.value.trim();
+        if (!text) return;
+
+        addChatBubble(MY_NAME, text, true, MY_USER_ID);
+        input.value = '';
+
+        sendSignal('all', 'chat', {
+            text,
+            name: MY_NAME,
+            initials: MY_INITIALS,
+            userId: MY_USER_ID
+        });
+    }
+
+    /* Dedicated realtime chat listener. It is independent from the media
+       negotiation code and guarantees every joined browser receives chat. */
+    if (!window.__smartMeetFinalChatListener && window.Echo) {
+        window.__smartMeetFinalChatListener = true;
+
+        window.Echo
+            .channel('meeting.' + MEETING_ID)
+            .listen('.signal', payload => {
+                if (!payload || payload.type !== 'chat') return;
+
+                const from = String(payload.fromUserId || payload.data?.userId || '');
+                if (from === String(MY_USER_ID)) return;
+
+                addChatBubble(
+                    payload.data?.name || knownParticipants?.[from]?.name || 'User',
+                    payload.data?.text || '',
+                    false,
+                    from
+                );
+
+                if (typeof activeTab !== 'undefined' && activeTab !== 'chat') {
+                    if (typeof unreadChat !== 'undefined') unreadChat++;
+                    if (typeof updateChatBadge === 'function') updateChatBadge();
+                }
+            });
+    }
+
+    /* Web Speech API for CHAT INPUT. This is separate from meeting transcript. */
+    window.addEventListener('load', () => {
+        const input = document.getElementById('chat-input');
+        if (!input || document.getElementById('chat-voice-btn')) return;
+
+        const sendBtn = input.parentElement?.querySelector('.btn-send');
+        if (!sendBtn) return;
+
+        const voiceBtn = document.createElement('button');
+        voiceBtn.type = 'button';
+        voiceBtn.id = 'chat-voice-btn';
+        voiceBtn.className = 'chat-voice-btn';
+        voiceBtn.title = 'Voice input';
+        voiceBtn.innerHTML = '<i class="fa fa-microphone"></i>';
+        sendBtn.parentElement.insertBefore(voiceBtn, sendBtn);
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            voiceBtn.disabled = true;
+            voiceBtn.title = 'Voice input is not supported in this browser';
+            return;
+        }
+
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'en-US';
+        recognition.continuous = false;
+        recognition.interimResults = true;
+        recognition.maxAlternatives = 1;
+
+        let baseText = '';
+
+        voiceBtn.addEventListener('click', () => {
+            try {
+                baseText = input.value.trim();
+                voiceBtn.classList.add('listening');
+                recognition.start();
+            } catch (e) {}
+        });
+
+        recognition.onresult = event => {
+            let spoken = '';
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                spoken += event.results[i][0].transcript;
+            }
+            input.value = [baseText, spoken.trim()].filter(Boolean).join(' ');
+            input.focus();
+        };
+
+        recognition.onend = () => voiceBtn.classList.remove('listening');
+        recognition.onerror = () => voiceBtn.classList.remove('listening');
+    });
+
+    /* Always derive mic/camera status from the actual local tracks. */
+    function smartMeetBroadcastRealMediaStatus() {
+        const audioTrack = localStream?.getAudioTracks?.().find(t => t.readyState === 'live');
+        const videoTrack = localStream?.getVideoTracks?.().find(t => t.readyState === 'live');
+
+        isMicOn = Boolean(audioTrack && audioTrack.enabled);
+        isCameraOn = Boolean(videoTrack && videoTrack.enabled);
+
+        sendSignal('all', 'mic-status', {
+            userId: MY_USER_ID,
+            muted: !isMicOn
+        });
+
+        sendSignal('all', 'camera-status', {
+            userId: MY_USER_ID,
+            cameraOn: isCameraOn
+        });
+    }
+
+    window.addEventListener('load', () => {
+        document.getElementById('ctrl-mic')?.addEventListener('click', () => {
+            setTimeout(smartMeetBroadcastRealMediaStatus, 180);
+            setTimeout(smartMeetBroadcastRealMediaStatus, 600);
+        });
+
+        document.getElementById('ctrl-camera')?.addEventListener('click', () => {
+            setTimeout(smartMeetBroadcastRealMediaStatus, 220);
+            setTimeout(smartMeetBroadcastRealMediaStatus, 700);
         });
     });
 
