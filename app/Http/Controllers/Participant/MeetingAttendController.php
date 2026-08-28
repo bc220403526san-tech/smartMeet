@@ -7,40 +7,46 @@ use App\Events\TranscriptUpdated;
 use App\Http\Controllers\Controller;
 use App\Models\Meeting;
 use App\Models\MeetingTranscript;
+use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\View\View;
 
 class MeetingAttendController extends Controller
 {
-    public function attend(Meeting $meeting)
+    public function attend(Meeting $meeting): View
     {
+        $this->authorizeParticipant($meeting);
+
         $user = auth()->user();
+        $now = now();
 
-        $participant = $meeting->participants()
-            ->where('user_id', $user->id)
-            ->first();
-
-        abort_unless($participant, 403);
-
+        /*
+         * This participant is now really inside the room.
+         * Keep joined_at as the latest real join time and clear left_at.
+         */
         $meeting->participants()
             ->where('user_id', $user->id)
             ->update([
-                'joined_at' => now(),
-                'left_at'   => null,
+                'joined_at' => $now,
+                'left_at' => null,
             ]);
 
-        broadcast(new MeetingSignal(
-            meetingId: (string) $meeting->id,
+        $this->broadcastSignal(
+            meeting: $meeting,
             fromUserId: (string) $user->id,
             toUserId: 'all',
             type: 'user-joined',
             data: [
-                'userId'   => (string) $user->id,
-                'name'     => $user->name,
+                'userId' => (string) $user->id,
+                'name' => $user->name,
                 'initials' => $this->initials($user->name),
+                'isOrganizer' => false,
             ]
-        ))->toOthers();
+        );
 
-        $meeting->load([
+        $meeting->loadMissing([
             'participants.user',
             'organizer',
         ]);
@@ -48,58 +54,38 @@ class MeetingAttendController extends Controller
         $allUserIds = $meeting->participants
             ->pluck('user_id')
             ->push($meeting->organizer_id)
+            ->filter()
             ->map(fn ($id) => (string) $id)
             ->unique()
             ->values();
 
-        $isCurrentlyJoined = static function ($participant): bool {
-            if ($participant->joined_at === null) {
-                return false;
-            }
-
-            return $participant->left_at === null
-                || $participant->left_at < $participant->joined_at;
-        };
-
         $alreadyJoined = $meeting->participants
-            ->filter(
-                fn ($participant) =>
-                    $isCurrentlyJoined($participant)
-                    && (string) $participant->user_id !== (string) $user->id
+            ->filter(fn ($participant) =>
+                $this->participantIsCurrentlyJoined($participant)
+                && (string) $participant->user_id !== (string) $user->id
+                && $participant->user !== null
             )
             ->map(fn ($participant) => [
-                'userId'   => (string) $participant->user->id,
-                'name'     => $participant->user->name,
+                'userId' => (string) $participant->user->id,
+                'name' => $participant->user->name,
                 'initials' => $this->initials($participant->user->name),
             ])
             ->values();
 
         $allParticipants = $meeting->participants
-            ->filter(
-                fn ($participant) =>
-                    (string) $participant->user_id !== (string) $user->id
+            ->filter(fn ($participant) =>
+                (string) $participant->user_id !== (string) $user->id
+                && $participant->user !== null
             )
             ->map(fn ($participant) => [
-                'userId'    => (string) $participant->user->id,
-                'name'      => $participant->user->name,
-                'initials'  => $this->initials($participant->user->name),
-                'hasJoined' => $isCurrentlyJoined($participant),
+                'userId' => (string) $participant->user->id,
+                'name' => $participant->user->name,
+                'initials' => $this->initials($participant->user->name),
+                'hasJoined' => $this->participantIsCurrentlyJoined($participant),
             ])
             ->values();
 
-        $organizerJoinedAt = $meeting->organizer_joined_at
-            ? \Carbon\Carbon::parse($meeting->organizer_joined_at)
-            : null;
-
-        $organizerLeftAt = $meeting->organizer_left_at
-            ? \Carbon\Carbon::parse($meeting->organizer_left_at)
-            : null;
-
-        $organizerJoined = $organizerJoinedAt !== null
-            && (
-                $organizerLeftAt === null
-                || $organizerLeftAt->lt($organizerJoinedAt)
-            );
+        $organizerJoined = $this->organizerIsCurrentlyJoined($meeting);
 
         return view('participant.meetings.attend', compact(
             'meeting',
@@ -110,77 +96,91 @@ class MeetingAttendController extends Controller
         ));
     }
 
-    public function signal(Request $request, Meeting $meeting)
+    public function signal(Request $request, Meeting $meeting): JsonResponse
     {
         $this->authorizeParticipant($meeting);
 
         $validated = $request->validate([
-            'to_user_id' => 'nullable|string',
-            'type' => 'required|in:offer,answer,ice-candidate,chat,mute,unmute,mic-status,camera-status,transcript,user-joined,user-left,meeting-cancelled,meeting-ended',
-            'data' => 'required|array',
+            'to_user_id' => ['nullable', 'string'],
+            'type' => [
+                'required',
+                'string',
+                'in:offer,answer,ice-candidate,chat,mute,unmute,mic-status,camera-status,transcript,user-joined,user-left,meeting-cancelled,meeting-ended',
+            ],
+            'data' => ['required', 'array'],
         ]);
 
         $fromUserId = (string) auth()->id();
+        $type = $validated['type'];
+        $data = $validated['data'];
 
         $broadcastTypes = [
             'chat',
             'mic-status',
             'camera-status',
-            'user-left',
             'user-joined',
+            'user-left',
             'meeting-cancelled',
             'meeting-ended',
         ];
 
-        if (in_array($validated['type'], $broadcastTypes, true)) {
-            broadcast(new MeetingSignal(
-                meetingId: (string) $meeting->id,
+        if (in_array($type, $broadcastTypes, true)) {
+            $this->broadcastSignal(
+                meeting: $meeting,
                 fromUserId: $fromUserId,
                 toUserId: 'all',
-                type: $validated['type'],
-                data: $validated['data']
-            ))->toOthers();
+                type: $type,
+                data: $data
+            );
 
             return response()->json([
                 'status' => 'broadcast sent',
             ]);
         }
 
+        $toUserId = trim((string) ($validated['to_user_id'] ?? ''));
+
         abort_if(
-            empty($validated['to_user_id']),
+            $toUserId === '',
             422,
             'A target user is required for direct signaling.'
         );
 
-        broadcast(new MeetingSignal(
-            meetingId: (string) $meeting->id,
+        abort_if(
+            $toUserId === $fromUserId,
+            422,
+            'A user cannot signal itself.'
+        );
+
+        $this->broadcastSignal(
+            meeting: $meeting,
             fromUserId: $fromUserId,
-            toUserId: (string) $validated['to_user_id'],
-            type: $validated['type'],
-            data: $validated['data']
-        ))->toOthers();
+            toUserId: $toUserId,
+            type: $type,
+            data: $data
+        );
 
         return response()->json([
             'status' => 'signal sent',
         ]);
     }
 
-    public function saveTranscript(Request $request, Meeting $meeting)
+    public function saveTranscript(Request $request, Meeting $meeting): JsonResponse
     {
         $this->authorizeParticipant($meeting);
 
         $validated = $request->validate([
-            'text' => 'required|string|max:5000',
+            'text' => ['required', 'string', 'max:5000'],
         ]);
 
         $user = auth()->user();
         $spokenAt = now();
 
-        MeetingTranscript::create([
+        $transcript = MeetingTranscript::create([
             'meeting_id' => $meeting->id,
-            'user_id'    => $user->id,
-            'text'       => $validated['text'],
-            'spoken_at'  => $spokenAt,
+            'user_id' => $user->id,
+            'text' => trim($validated['text']),
+            'spoken_at' => $spokenAt,
         ]);
 
         broadcast(new TranscriptUpdated(
@@ -188,7 +188,7 @@ class MeetingAttendController extends Controller
             userId: (string) $user->id,
             userName: $user->name,
             userInitials: $this->initials($user->name),
-            text: $validated['text'],
+            text: $transcript->text,
             spokenAt: $spokenAt->format('h:i A')
         ))->toOthers();
 
@@ -197,36 +197,41 @@ class MeetingAttendController extends Controller
         ]);
     }
 
-    public function markLeft(Meeting $meeting)
+    public function markLeft(Meeting $meeting): JsonResponse
     {
         $this->authorizeParticipant($meeting);
 
         $user = auth()->user();
+        $now = now();
 
+        /*
+         * Keep joined_at for correct ordering/history.
+         * left_at marks the participant offline because left_at >= joined_at.
+         */
         $meeting->participants()
             ->where('user_id', $user->id)
             ->update([
-                'joined_at' => null,
-                'left_at'   => now(),
+                'left_at' => $now,
             ]);
 
-        broadcast(new MeetingSignal(
-            meetingId: (string) $meeting->id,
+        $this->broadcastSignal(
+            meeting: $meeting,
             fromUserId: (string) $user->id,
             toUserId: 'all',
             type: 'user-left',
             data: [
                 'userId' => (string) $user->id,
-                'name'   => $user->name,
+                'name' => $user->name,
+                'isOrganizer' => false,
             ]
-        ))->toOthers();
+        );
 
         return response()->json([
             'status' => 'left',
         ]);
     }
 
-    public function leave(Meeting $meeting)
+    public function leave(Meeting $meeting): RedirectResponse
     {
         $this->authorizeParticipant($meeting);
 
@@ -245,15 +250,72 @@ class MeetingAttendController extends Controller
         );
     }
 
+    private function participantIsCurrentlyJoined($participant): bool
+    {
+        $joinedAt = $participant->joined_at
+            ?? $participant->pivot?->joined_at;
+
+        $leftAt = $participant->left_at
+            ?? $participant->pivot?->left_at;
+
+        if ($joinedAt === null) {
+            return false;
+        }
+
+        if ($leftAt === null) {
+            return true;
+        }
+
+        return Carbon::parse($joinedAt)->gt(Carbon::parse($leftAt));
+    }
+
+    private function organizerIsCurrentlyJoined(Meeting $meeting): bool
+    {
+        if ($meeting->organizer_joined_at === null) {
+            return false;
+        }
+
+        if ($meeting->organizer_left_at === null) {
+            return true;
+        }
+
+        return Carbon::parse($meeting->organizer_joined_at)
+            ->gt(Carbon::parse($meeting->organizer_left_at));
+    }
+
+    private function broadcastSignal(
+        Meeting $meeting,
+        string $fromUserId,
+        string $toUserId,
+        string $type,
+        array $data
+    ): void {
+        broadcast(new MeetingSignal(
+            meetingId: (string) $meeting->id,
+            fromUserId: $fromUserId,
+            toUserId: $toUserId,
+            type: $type,
+            data: $data
+        ))->toOthers();
+    }
+
     private function initials(string $name): string
     {
         $parts = preg_split('/\s+/', trim($name)) ?: [];
+
+        if ($parts === []) {
+            return '';
+        }
+
         $first = $parts[0] ?? '';
         $last = $parts[count($parts) - 1] ?? '';
 
-        return strtoupper(
-            mb_substr($first, 0, 1) .
-            mb_substr($last, 0, 1)
-        );
+        $initials = mb_substr($first, 0, 1);
+
+        if (count($parts) > 1) {
+            $initials .= mb_substr($last, 0, 1);
+        }
+
+        return strtoupper($initials);
     }
 }

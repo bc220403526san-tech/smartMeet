@@ -1531,8 +1531,8 @@
 
 
         /* ============================================================
-           SMARTMEET SAFE COMPACT ROOM + SIMPLE CHAT
-           IMPORTANT: visual only — no WebRTC/audio/video track changes.
+           SMARTMEET FINAL RELIABLE ROOM UI
+           Layout/chat only. WebRTC tracks, SDP, ICE and TURN are untouched.
            ============================================================ */
 
         .video-grid {
@@ -1540,21 +1540,22 @@
             grid-auto-rows: auto !important;
         }
 
-        /* One participant: wider tile, moderate height. */
+        /* 1 visible tile: wide, not excessively tall */
         .video-grid:has(> .video-tile:first-child:last-child) {
-            grid-template-columns: minmax(0, min(900px, 88%)) !important;
+            grid-template-columns: minmax(0, min(920px, 92%)) !important;
             justify-content: start !important;
+            align-content: start !important;
         }
 
         .video-grid:has(> .video-tile:first-child:last-child) > .video-tile {
             width: 100% !important;
-            max-width: 900px !important;
+            max-width: 920px !important;
             aspect-ratio: 16 / 9 !important;
-            min-height: 0 !important;
             height: auto !important;
+            min-height: 0 !important;
         }
 
-        /* Two participants: wider cards, less vertical stretching. */
+        /* 2 visible tiles: use the width, keep a cinematic ratio */
         .video-grid:has(> .video-tile:nth-child(2):last-child) {
             grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
             gap: 12px !important;
@@ -1564,22 +1565,12 @@
         .video-grid:has(> .video-tile:nth-child(2):last-child) > .video-tile {
             width: 100% !important;
             aspect-ratio: 16 / 9 !important;
-            min-height: 0 !important;
             height: auto !important;
-            max-height: 440px !important;
-        }
-
-        .video-grid:has(> .video-tile:nth-child(3)) {
-            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-        }
-
-        .video-grid:has(> .video-tile:nth-child(3)) > .video-tile {
-            aspect-ratio: 16 / 9 !important;
             min-height: 0 !important;
-            height: auto !important;
+            max-height: 430px !important;
         }
 
-        /* Keep maximized video filling the complete stage with no reserved black strip. */
+        /* maximized tile fills stage */
         #maximized-overlay.active {
             display: block !important;
         }
@@ -1591,7 +1582,6 @@
             height: 100% !important;
             max-width: none !important;
             max-height: none !important;
-            min-width: 0 !important;
             min-height: 0 !important;
             aspect-ratio: auto !important;
             margin: 0 !important;
@@ -1609,7 +1599,7 @@
             width: 100% !important;
             height: 100% !important;
             object-fit: cover !important;
-            object-position: center center !important;
+            object-position: center !important;
         }
 
         #maximized-overlay.active > .video-tile .tile-info {
@@ -1618,10 +1608,9 @@
             right: 0 !important;
             bottom: 0 !important;
             z-index: 8 !important;
-            background: linear-gradient(to top, rgba(2,6,23,.92), rgba(2,6,23,.24)) !important;
         }
 
-        /* Simple attractive chat — full names, no alphabet avatar circles. */
+        /* Clean chat: full sender names, no alphabet avatar */
         .chat-message-avatar {
             display: none !important;
         }
@@ -1632,10 +1621,10 @@
         }
 
         .chat-message-row {
-            width: 100% !important;
             display: flex !important;
-            align-items: flex-start !important;
+            width: 100% !important;
             gap: 0 !important;
+            align-items: flex-start !important;
         }
 
         .chat-message-row.is-me {
@@ -1649,7 +1638,6 @@
         }
 
         .chat-message-content {
-            width: auto !important;
             min-width: 130px !important;
             max-width: 88% !important;
         }
@@ -1666,12 +1654,12 @@
         .chat-message-meta strong {
             display: block !important;
             max-width: 240px !important;
+            color: #f8fafc !important;
+            font-size: 10px !important;
+            font-weight: 750 !important;
             overflow: hidden !important;
             text-overflow: ellipsis !important;
             white-space: nowrap !important;
-            color: #f1f5f9 !important;
-            font-size: 10px !important;
-            font-weight: 750 !important;
         }
 
         .chat-message-meta span,
@@ -1684,8 +1672,8 @@
 
         .chat-message-bubble,
         .chat-message-row.is-me .chat-message-bubble {
-            border-radius: 12px !important;
             padding: 9px 12px !important;
+            border-radius: 12px !important;
             font-size: 11px !important;
             line-height: 1.5 !important;
             box-shadow: none !important;
@@ -1693,22 +1681,17 @@
 
         .chat-message-row.is-me .chat-message-bubble {
             background: rgba(37,99,235,.20) !important;
-            border: 1px solid rgba(96,165,250,.26) !important;
+            border: 1px solid rgba(96,165,250,.28) !important;
         }
 
         .chat-message-row.is-other .chat-message-bubble {
-            background: rgba(30,41,59,.82) !important;
-            border: 1px solid rgba(148,163,184,.13) !important;
+            background: rgba(30,41,59,.86) !important;
+            border: 1px solid rgba(148,163,184,.14) !important;
         }
 
         @media (max-width: 760px) {
-            .video-grid:has(> .video-tile:nth-child(2):last-child),
-            .video-grid:has(> .video-tile:nth-child(3)) {
+            .video-grid:has(> .video-tile:nth-child(2):last-child) {
                 grid-template-columns: 1fr !important;
-            }
-
-            .video-grid > .video-tile {
-                max-height: none !important;
             }
         }
 
@@ -2025,6 +2008,25 @@
                 grid-template-columns:1fr !important;
             }
         }
+    </style>
+
+
+    <style id="smartmeet-final-ui-polish">
+        /* Final visual authority: compact, balanced room without oversized single tiles. */
+        :root{--sm-bg:#06111f;--sm-panel:#0b1728;--sm-panel2:#101f34;--sm-line:rgba(148,163,184,.16);--sm-text:#f8fafc;--sm-muted:#94a3b8;--sm-blue:#38bdf8;--sm-violet:#8b5cf6;--sm-green:#22c55e;--sm-red:#ef4444}
+        body{background:radial-gradient(circle at 12% 8%,rgba(56,189,248,.12),transparent 28%),radial-gradient(circle at 88% 18%,rgba(139,92,246,.10),transparent 28%),linear-gradient(145deg,#040a14,#071525 55%,#07101d)!important}
+        .main{padding:12px!important;gap:12px!important}.video-area{background:linear-gradient(145deg,rgba(8,18,33,.94),rgba(5,13,25,.96))!important;border:1px solid rgba(125,211,252,.14)!important;border-radius:18px!important}
+        .video-grid{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(280px,520px))!important;grid-auto-rows:auto!important;align-content:start!important;justify-content:start!important;gap:12px!important;padding:14px!important;overflow:auto!important}
+        .video-grid>.video-tile{width:100%!important;max-width:520px!important;min-height:0!important;aspect-ratio:16/9!important;border-radius:16px!important;background:linear-gradient(145deg,#12233a,#081424)!important;border:1px solid rgba(148,163,184,.16)!important;box-shadow:0 16px 42px rgba(0,0,0,.25)!important}
+        .video-grid:has(>.video-tile:only-child){grid-template-columns:minmax(320px,500px)!important;justify-content:start!important;align-content:center!important}.video-grid:has(>.video-tile:only-child)>.video-tile{max-width:500px!important}
+        .video-placeholder,.video-placeholder video{width:100%!important;height:100%!important}.video-placeholder video{object-fit:cover!important}
+        .tile-info{background:linear-gradient(to top,rgba(2,6,23,.95),rgba(2,6,23,.62))!important}.mic-off{display:none!important}
+        #side-panel{background:linear-gradient(180deg,rgba(12,26,45,.98),rgba(7,16,30,.98))!important;border:1px solid rgba(125,211,252,.14)!important}
+        .participant-offline{filter:saturate(.35);opacity:.38!important}.participant-online{opacity:1!important;filter:none!important;border-color:rgba(34,197,94,.28)!important}
+        .chat-body{background:linear-gradient(180deg,rgba(8,18,34,.55),rgba(5,13,25,.75))!important}.chat-message-row.is-me .chat-message-bubble{background:linear-gradient(135deg,#2563eb,#0891b2)!important}.chat-message-row:not(.is-me) .chat-message-bubble{background:linear-gradient(135deg,#172554,#312e81)!important}
+        .controls{background:rgba(5,13,25,.94)!important;border-color:rgba(148,163,184,.14)!important}.ctrl-icon.active{background:linear-gradient(135deg,rgba(37,99,235,.45),rgba(8,145,178,.35))!important}
+        @media(max-width:900px){.video-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;justify-content:stretch!important}.video-grid>.video-tile{max-width:none!important}.video-grid:has(>.video-tile:only-child){grid-template-columns:minmax(260px,480px)!important}}
+        @media(max-width:620px){.video-grid{grid-template-columns:1fr!important;padding:8px!important;gap:8px!important}.video-grid>.video-tile,.video-grid:has(>.video-tile:only-child)>.video-tile{max-width:100%!important}.main{padding:6px!important}}
     </style>
 
 </head>
@@ -6444,8 +6446,6 @@
    HANDLE SIGNAL
 ============================================================ */
 
-    window.__smartMeetSeenChatIds = window.__smartMeetSeenChatIds || new Set();
-
     async function handleSignal(
         data
     ) {
@@ -6459,6 +6459,21 @@
             from
             ===
             String(MY_USER_ID);
+
+        const incomingSignalId = data.data?._signalId || '';
+        if (incomingSignalId) {
+            if (receivedSignalIds.has(incomingSignalId)) {
+                return;
+            }
+
+            receivedSignalIds.add(incomingSignalId);
+
+            if (receivedSignalIds.size > 1000) {
+                receivedSignalIds.clear();
+                receivedSignalIds.add(incomingSignalId);
+            }
+        }
+
 
         if (
             isSelf
@@ -6812,16 +6827,6 @@
                 return;
             }
 
-            const messageId = data.data?.messageId || '';
-            if (messageId) {
-                if (window.__smartMeetSeenChatIds.has(messageId)) return;
-                window.__smartMeetSeenChatIds.add(messageId);
-                if (window.__smartMeetSeenChatIds.size > 500) {
-                    window.__smartMeetSeenChatIds.clear();
-                    window.__smartMeetSeenChatIds.add(messageId);
-                }
-            }
-
             addChatBubble(
                 name,
                 text,
@@ -6856,6 +6861,23 @@
                     ||
                     data.fromUserId
                 );
+
+            const liveInfo = knownParticipants[uid];
+            if (
+                liveInfo &&
+                uid !== String(MY_USER_ID) &&
+                !leftUsers.has(uid)
+            ) {
+                liveInfo.hasJoined = true;
+                addParticipantTile(
+                    uid,
+                    liveInfo.name,
+                    liveInfo.initials,
+                    Boolean(liveInfo.isOrganizer)
+                );
+                markOnline(uid);
+            }
+
 
             if (
                 uid ===
@@ -7449,33 +7471,22 @@
 ============================================================ */
 
 
-    const signalThrottleState = new Map();
+    const receivedSignalIds = new Set();
 
-    function shouldThrottleSignal(type, data) {
-        if (!['mic-status', 'camera-status', 'user-joined'].includes(type)) {
-            return false;
-        }
-
-        const key = type + ':' + JSON.stringify(data || {});
-        const now = Date.now();
-        const previous = signalThrottleState.get(key) || 0;
-
-        if (now - previous < 2500) {
-            return true;
-        }
-
-        signalThrottleState.set(key, now);
-        return false;
+    function makeSignalId(type) {
+        return String(MY_USER_ID)
+            + ':' + String(type)
+            + ':' + Date.now()
+            + ':' + Math.random().toString(36).slice(2, 8);
     }
 
-    async function postSignalOnce(toUserId, type, data, timeoutMs = 7000) {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), timeoutMs);
+    async function postSignalReliable(toUserId, type, payload, attempts = 3) {
+        for (let attempt = 0; attempt < attempts; attempt++) {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 6500);
 
-        try {
-            const response = await fetch(
-                SIGNAL_URL,
-                {
+            try {
+                const response = await fetch(SIGNAL_URL, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -7484,55 +7495,41 @@
                     body: JSON.stringify({
                         to_user_id: toUserId,
                         type,
-                        data
+                        data: payload
                     }),
                     signal: controller.signal
+                });
+
+                if (response.ok) {
+                    return true;
                 }
-            );
-
-            if (!response.ok) {
-                console.warn('sendSignal failed:', response.status);
-                return false;
+            } catch (error) {
+                // Temporary network failure. Retry the SAME signal id.
+            } finally {
+                clearTimeout(timeout);
             }
 
-            return true;
-        } catch (error) {
-            if (error?.name !== 'AbortError') {
-                console.warn('sendSignal network error:', type);
+            if (attempt < attempts - 1) {
+                await new Promise(resolve =>
+                    setTimeout(resolve, 450 * (attempt + 1))
+                );
             }
-            return false;
-        } finally {
-            clearTimeout(timer);
         }
+
+        console.warn('Signal delivery failed after retries:', type);
+        return false;
     }
 
     async function sendSignal(toUserId, type, data) {
-        if (shouldThrottleSignal(type, data)) {
-            return true;
-        }
+        const payload = {
+            ...(data || {}),
+            _signalId: data?._signalId || makeSignalId(type)
+        };
 
-        // Chat is user-visible, so retry it twice on a temporary HTTP/network failure.
-        // SDP/ICE are never blindly retried here because duplicate negotiation packets
-        // can destabilize an otherwise healthy WebRTC call.
-        if (type === 'chat') {
-            const payload = {
-                ...(data || {}),
-                messageId: data?.messageId || (
-                    String(MY_USER_ID) + '-' + Date.now() + '-' +
-                    Math.random().toString(36).slice(2, 8)
-                )
-            };
-
-            if (await postSignalOnce(toUserId, type, payload, 7000)) return true;
-
-            await new Promise(resolve => setTimeout(resolve, 700));
-            if (await postSignalOnce(toUserId, type, payload, 7000)) return true;
-
-            await new Promise(resolve => setTimeout(resolve, 1400));
-            return await postSignalOnce(toUserId, type, payload, 7000);
-        }
-
-        return await postSignalOnce(toUserId, type, data, 7000);
+        // Idempotent retries: every retry carries the same _signalId and
+        // receivers ignore duplicate copies. This makes temporary /signal
+        // timeouts survivable without creating duplicate SDP/chat events.
+        return await postSignalReliable(toUserId, type, payload, 3);
     }
 
     /* ============================================================
@@ -10011,26 +10008,10 @@
                             participant.initials,
                             false
                         );
+                        // Do not create a remote video tile from historical DB state.
+                        // A live user-joined / mic-status / camera-status / ontrack event
+                        // will create it only when this participant is actually online.
 
-                        if (
-                            participant.hasJoined
-                        ) {
-
-                            addParticipantTile(
-                                userId,
-                                participant.name,
-                                participant.initials,
-                                false
-                            );
-
-                            markOnline(
-                                userId
-                            );
-
-                            createPeerConnection(
-                                userId
-                            );
-                        }
 
                     }
                 );
@@ -11330,3 +11311,4 @@
 
 </body>
 </html>
+
