@@ -1530,17 +1530,15 @@
         }
 
 
-        /* SMARTMEET SAFE MAXIMIZED VIDEO FIX
-           Keep the selected tile filling the complete meeting video area.
-           Does not touch WebRTC/media tracks. */
+        /* SAFE MAXIMIZED TILE FIX
+           Visual-only: no WebRTC, audio, signaling, TURN, or media-track changes. */
         #maximized-overlay.active {
-            display: flex !important;
-            align-items: stretch !important;
-            justify-content: stretch !important;
+            display: block !important;
         }
 
         #maximized-overlay.active > .video-tile {
-            position: relative !important;
+            position: absolute !important;
+            inset: 0 !important;
             width: 100% !important;
             height: 100% !important;
             min-width: 0 !important;
@@ -1549,22 +1547,18 @@
             max-height: none !important;
             aspect-ratio: auto !important;
             margin: 0 !important;
-            grid-column: auto !important;
-            grid-row: auto !important;
             transform: none !important;
-            border-radius: 12px !important;
         }
 
-        #maximized-overlay.active > .video-tile > .video-placeholder {
+        #maximized-overlay.active > .video-tile .video-placeholder {
             position: absolute !important;
-            inset: 0 0 42px 0 !important;
+            inset: 0 !important;
             width: 100% !important;
-            height: auto !important;
+            height: 100% !important;
             min-height: 0 !important;
-            max-height: none !important;
         }
 
-        #maximized-overlay.active > .video-tile > .video-placeholder video {
+        #maximized-overlay.active > .video-tile .video-placeholder video {
             position: absolute !important;
             inset: 0 !important;
             width: 100% !important;
@@ -1575,23 +1569,12 @@
             object-position: center center !important;
         }
 
-        #maximized-overlay.active > .video-tile > .tile-info {
+        #maximized-overlay.active > .video-tile .tile-info {
             position: absolute !important;
             left: 0 !important;
             right: 0 !important;
             bottom: 0 !important;
-            height: 42px !important;
-            min-height: 42px !important;
             z-index: 8 !important;
-        }
-
-        #maximized-overlay.active .tile-expand-btn {
-            opacity: 1 !important;
-            z-index: 12 !important;
-        }
-
-        #maximized-overlay.active .maximize-close-btn {
-            z-index: 20 !important;
         }
 
     </style>
@@ -8586,6 +8569,24 @@
                     );
                 }
 
+                if (
+                    event.error
+                    ===
+                    'network'
+                ) {
+
+                    if (indicator) {
+                        indicator.style.display =
+                            'none';
+                    }
+
+                    scheduleRecognitionRestart(
+                        1500
+                    );
+
+                    return;
+                }
+
                 scheduleRecognitionRestart(
                     300
                 );
@@ -10403,10 +10404,15 @@
         });
     });
 
-    // V5 network heartbeat disabled.
-    // Original handlers + V6 already synchronize state; duplicate POSTs caused /signal request storms.
+    // Periodic state refresh repairs a missed status packet without reloading.
     if (!window.__smartMeetV5StateHeartbeat) {
         window.__smartMeetV5StateHeartbeat = true;
+        setInterval(() => {
+            if (document.visibilityState !== 'visible') return;
+            broadcastMyMicStatus();
+            broadcastMyCameraStatus();
+            unlockAllRemoteAudioV5();
+        }, 5000);
     }
 
     // Backup leave notification for closing/back-navigation.
@@ -10743,30 +10749,27 @@
         window.Echo.channel('meeting.' + MEETING_ID).listen('.signal', smV6HandleStatus);
     }
 
-    /* Initial join repair — one controlled pass only.
-       Avoid repeated announce/status POST bursts on page load. */
+    /* Initial join repair. */
     window.addEventListener('load', () => {
-        setTimeout(() => {
-            announceJoin();
-
-            Object.keys(knownParticipants || {}).forEach(uid => {
-                uid = String(uid);
-                if (uid === String(MY_USER_ID) || leftUsers.has(uid)) return;
-
-                if (knownParticipants[uid]?.hasJoined || onlineUsers.has(uid)) {
-                    createPeerConnection(uid);
-                    smV6ForceHandshake(uid, 'page-load');
-                }
-            });
-
-            broadcastMyMicStatus();
-            broadcastMyCameraStatus();
-            smV6UnlockRemoteAudio();
-        }, 350);
+        [250, 700, 1600, 3200].forEach(delay => {
+            setTimeout(() => {
+                announceJoin();
+                Object.keys(knownParticipants || {}).forEach(uid => {
+                    uid = String(uid);
+                    if (uid === String(MY_USER_ID) || leftUsers.has(uid)) return;
+                    if (knownParticipants[uid]?.hasJoined || onlineUsers.has(uid)) {
+                        createPeerConnection(uid);
+                        smV6ForceHandshake(uid, 'page-load');
+                    }
+                });
+                broadcastMyMicStatus();
+                broadcastMyCameraStatus();
+            }, delay);
+        });
     });
 
-    /* Repair only genuinely unhealthy peers.
-       Healthy calls generate ZERO periodic /signal POST traffic. */
+    /* Repair peers that remain in "new"/"connecting". This is the exact state
+       visible in WebRTC Internals when no successful SDP/ICE path has formed. */
     if (!window.__smV6RepairTimer) {
         window.__smV6RepairTimer = setInterval(() => {
             if (document.visibilityState !== 'visible') return;
@@ -10776,48 +10779,43 @@
                 if (uid === String(MY_USER_ID) || leftUsers.has(uid)) return;
                 if (!(knownParticipants[uid]?.hasJoined || onlineUsers.has(uid))) return;
 
-                const pc = peers[uid];
-                if (!pc || pc.signalingState === 'closed') return;
+                const pc = peers[uid] || createPeerConnection(uid);
+                if (!pc) return;
 
-                const unhealthy =
-                    ['new','connecting','disconnected','failed'].includes(pc.connectionState) ||
-                    ['new','checking','disconnected','failed'].includes(pc.iceConnectionState);
+                smV6SyncPeerMedia(uid);
 
-                if (unhealthy) {
-                    smV6SyncPeerMedia(uid);
+                if (['new','connecting','disconnected','failed'].includes(pc.connectionState) ||
+                    ['new','checking','disconnected','failed'].includes(pc.iceConnectionState)) {
                     smV6ForceHandshake(uid, 'repair');
                 } else {
                     attachRemoteStream(uid);
                 }
             });
 
-            // Audio playback refresh is local-only and creates no network request.
+            broadcastMyMicStatus();
+            broadcastMyCameraStatus();
             smV6UnlockRemoteAudio();
-        }, 8000);
+        }, 3000);
     }
 
-    /* One controlled post-toggle repair.
-       Existing toggle handlers already change the real media track. */
+    /* Extra post-toggle repair. Existing handlers still request permissions and
+       update the buttons; V6 then guarantees the resulting real track reaches
+       every peer and advertises the correct status. */
     window.addEventListener('load', () => {
         document.getElementById('ctrl-mic')?.addEventListener('click', () => {
-            setTimeout(() => {
-                Object.keys(peers).forEach(uid => {
-                    smV6SyncPeerMedia(uid);
-                    smV6ForceHandshake(uid, 'mic-toggle');
-                });
+            [100, 350, 900].forEach(delay => setTimeout(async () => {
+                Object.keys(peers).forEach(uid => smV6SyncPeerMedia(uid));
                 broadcastMyMicStatus();
-                smV6UnlockRemoteAudio();
-            }, 220);
+                Object.keys(peers).forEach(uid => smV6ForceHandshake(uid, 'mic-toggle'));
+            }, delay));
         });
 
         document.getElementById('ctrl-camera')?.addEventListener('click', () => {
-            setTimeout(() => {
-                Object.keys(peers).forEach(uid => {
-                    smV6SyncPeerMedia(uid);
-                    smV6ForceHandshake(uid, 'camera-toggle');
-                });
+            [150, 450, 1000].forEach(delay => setTimeout(async () => {
+                Object.keys(peers).forEach(uid => smV6SyncPeerMedia(uid));
                 broadcastMyCameraStatus();
-            }, 280);
+                Object.keys(peers).forEach(uid => smV6ForceHandshake(uid, 'camera-toggle'));
+            }, delay));
         });
     });
 
@@ -11178,4 +11176,3 @@
 
 </body>
 </html>
-
