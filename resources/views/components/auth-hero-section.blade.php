@@ -5,10 +5,11 @@
 ])
 
 <!-- LEFT SIDEBAR / HERO SECTION -->
-<div class="auth-hero w-full md:w-1/2 relative flex flex-col justify-center items-center bg-white overflow-hidden
-            rounded-t-2xl md:rounded-l-2xl md:rounded-tr-none
-            shadow-lg
-            min-h-[45vh] sm:min-h-[50vh] md:min-h-[calc(100vh-3rem)]">
+<div class="w-full md:w-1/2 relative flex flex-col justify-center items-center bg-white overflow-hidden
+                rounded-t-2xl md:rounded-l-2xl md:rounded-tr-none
+                shadow-lg md:shadow-[20px_0_30px_rgba(1,1,1,0.15)]
+                border-l-0 border-l-4 border-blue-700
+                min-h-[45vh] sm:min-h-[50vh] md:min-h-[calc(100vh-3rem)]">
 
     <!-- Logo -->
     <div class="absolute top-4 left-4 sm:left-6 flex items-center gap-2 z-20">
@@ -17,10 +18,9 @@
         <h1 class="text-md sm:text-lg font-semibold text-blue-600">SmartMeet</h1>
     </div>
 
-    <!-- Image Area -->
+    <!-- Image -->
     <div class="w-full flex justify-center items-center px-4 pt-20 pb-6 sm:pt-24 md:pt-16 md:pb-10">
-        <div class="relative w-full max-w-[280px] sm:max-w-[350px] md:max-w-[430px] lg:max-w-[470px]
-                    aspect-square flex items-center justify-center">
+        <div class="relative w-full max-w-[260px] sm:max-w-[340px] md:max-w-[440px] lg:max-w-[500px] aspect-square flex items-center justify-center">
 
             <img src="{{ asset($image) }}"
                  alt="Hero Image"
@@ -35,6 +35,7 @@
                     {{ $subtitle }}
                 </p>
             </div>
+
         </div>
     </div>
 
@@ -46,19 +47,6 @@
         <p class="text-sm sm:text-base text-gray-500 mt-1">
             {{ $subtitle }}
         </p>
-    </div>
-
-    <!-- ONLY END CURVE / DESIGN -->
-    <div class="hidden md:block absolute top-0 -right-[38px] w-[76px] h-full z-30 pointer-events-none">
-        <svg viewBox="0 0 76 1000" preserveAspectRatio="none" class="w-full h-full">
-            <path
-                d="M0,0
-                   C58,120 18,230 54,340
-                   C84,430 8,520 48,620
-                   C82,710 22,825 76,1000
-                   L0,1000 Z"
-                fill="#ffffff"/>
-        </svg>
     </div>
 
 </div>
