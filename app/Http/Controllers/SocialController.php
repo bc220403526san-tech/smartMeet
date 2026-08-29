@@ -10,7 +10,6 @@ class SocialController extends Controller
 {
     public function redirect($provider)
     {
-
         return Socialite::driver($provider)->redirect();
     }
 
@@ -19,50 +18,77 @@ class SocialController extends Controller
         try {
             $socialUser = Socialite::driver($provider)->user();
         } catch (\Exception $e) {
-            return redirect('/login')->with('error', ucfirst($provider) . ' login failed. Try again.');
+            return redirect('/login')->with(
+                'error',
+                ucfirst($provider) . ' login failed. Try again.'
+            );
         }
 
         $email = $socialUser->getEmail();
 
-        if ($email) {
-            $existingUser = User::where('email', $email)
-                ->whereNull('provider')
-                ->first();
+        // 1. Pehle provider + provider_id se existing user dhoondo
+        $user = User::where('provider', $provider)
+            ->where('provider_id', $socialUser->getId())
+            ->first();
 
-            if ($existingUser) {
-                return redirect('/login')->with('error',
-                    'This email is registered normally. Please login with password.');
-            }
+        // 2. Agar provider se user na mile, to same email wala existing account use karo
+        if (!$user && $email) {
+            $user = User::where('email', $email)->first();
         }
 
-        // Find or create — pehle dhoondein, na milay to naya banayein
-        $user = User::firstOrNew([
-            'provider'    => $provider,
-            'provider_id' => $socialUser->getId(),
-        ]);
+        // 3. Agar user bilkul naya hai to create karo
+        if (!$user) {
+            $user = new User();
 
-        $user->name              = $socialUser->getName();
-        $user->email             = $email;
-        $user->image             = $socialUser->getAvatar();
-        $user->email_verified_at = now();
-
-        // 👇 Sirf NAYE user ke liye role/is_active set karein — existing user ka role kabhi overwrite na ho
-        if (!$user->exists) {
-            $user->role      = 'participant'; // default role naye social signups ke liye
+            // Sirf naye social user ke liye default values
+            $user->role = 'participant';
             $user->is_active = 1;
+        }
+
+        // 4. Social account details update/link karo
+        $user->provider = $provider;
+        $user->provider_id = $socialUser->getId();
+
+        if ($socialUser->getName()) {
+            $user->name = $socialUser->getName();
+        }
+
+        if ($email) {
+            $user->email = $email;
+        }
+
+        if ($socialUser->getAvatar()) {
+            $user->image = $socialUser->getAvatar();
+        }
+
+        if (!$user->email_verified_at) {
+            $user->email_verified_at = now();
         }
 
         $user->save();
 
+        // 5. Deactivated account ko login na karne dein
         if (!$user->is_active) {
-            return redirect('/login')->with('error', 'Your account has been deactivated.');
+            return redirect('/login')->with(
+                'error',
+                'Your account has been deactivated.'
+            );
         }
 
+        // 6. Login user
         Auth::login($user);
+
         request()->session()->regenerate();
 
-        if ($user->role == 'admin') return redirect('/admin/dashboard');
-        if ($user->role == 'organizer') return redirect('/organizer/dashboard');
+        // 7. Role ke according dashboard redirect
+        if ($user->role === 'admin') {
+            return redirect('/admin/dashboard');
+        }
+
+        if ($user->role === 'organizer') {
+            return redirect('/organizer/dashboard');
+        }
+
         return redirect('/participant/dashboard');
     }
 }
