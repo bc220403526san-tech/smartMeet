@@ -24,7 +24,7 @@
 
             <img src="{{ asset($image) }}"
                  alt="Hero Image"
-                 class="w-full h-full object-contain">
+                 class="w-full h-full object-contain mt-10">
 
             <!-- Desktop text over image -->
             <div class="hidden md:block absolute top-6 left-2 lg:left-4 z-10">
