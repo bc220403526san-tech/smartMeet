@@ -2444,6 +2444,318 @@
         }
 
     </style>
+
+    <style>
+
+        /* ===============================================================
+           SMARTMEET CONTROL BAR POSITION FIX — UI ONLY
+           Existing onclick handlers / IDs / JS logic remain unchanged.
+           =============================================================== */
+        .controls{
+            position:fixed !important;
+            left:50% !important;
+            right:auto !important;
+            bottom:18px !important;
+            top:auto !important;
+            transform:translateX(-50%) !important;
+
+            display:inline-flex !important;
+            flex:0 0 auto !important;
+            width:max-content !important;
+            min-width:0 !important;
+            max-width:calc(100vw - 28px) !important;
+            height:auto !important;
+            min-height:64px !important;
+
+            margin:0 !important;
+            padding:8px 11px !important;
+            gap:6px !important;
+
+            align-items:center !important;
+            justify-content:center !important;
+            flex-wrap:nowrap !important;
+            overflow-x:auto !important;
+            overflow-y:hidden !important;
+
+            border:1px solid rgba(148,163,184,.13) !important;
+            border-radius:999px !important;
+            background:rgba(13,18,33,.96) !important;
+            box-shadow:0 18px 50px rgba(0,0,0,.38) !important;
+            backdrop-filter:blur(18px) !important;
+            -webkit-backdrop-filter:blur(18px) !important;
+            z-index:90 !important;
+
+            scrollbar-width:none;
+        }
+        .controls::-webkit-scrollbar{display:none!important}
+
+        /* Actual project class is .ctrl-btn, not .control-btn */
+        .controls .ctrl-btn{
+            flex:0 0 auto !important;
+            min-width:50px !important;
+            width:auto !important;
+            padding:3px 4px !important;
+            gap:4px !important;
+            display:flex !important;
+            flex-direction:column !important;
+            align-items:center !important;
+            justify-content:center !important;
+            border-radius:12px !important;
+        }
+        .controls .ctrl-icon{
+            width:40px !important;
+            height:40px !important;
+            min-width:40px !important;
+            min-height:40px !important;
+            display:flex !important;
+            align-items:center !important;
+            justify-content:center !important;
+            border-radius:50% !important;
+            background:#1a2131 !important;
+            border:1px solid rgba(148,163,184,.12) !important;
+            color:#f8fafc !important;
+            font-size:13px !important;
+            transition:.18s ease !important;
+        }
+        .controls .ctrl-btn:hover .ctrl-icon{
+            transform:translateY(-2px) !important;
+            background:#222b3e !important;
+        }
+        .controls .ctrl-icon.active{
+            background:rgba(109,107,255,.20) !important;
+            border-color:rgba(109,107,255,.38) !important;
+            color:#c4c3ff !important;
+        }
+        .controls .ctrl-icon.off{
+            background:#242a38 !important;
+            color:#cbd5e1 !important;
+        }
+        .controls .ctrl-label{
+            display:block !important;
+            font-size:8px !important;
+            line-height:1 !important;
+            color:#9aa5b8 !important;
+            white-space:nowrap !important;
+        }
+        .controls .ctrl-divider{
+            flex:0 0 1px !important;
+            width:1px !important;
+            height:30px !important;
+            margin:0 2px !important;
+            background:rgba(148,163,184,.15) !important;
+        }
+
+        /* Existing end/leave/cancel buttons retain their actions, only appearance */
+        .controls .btn-end,
+        .controls .leave-btn,
+        .controls .cancel-btn{
+            flex:0 0 auto !important;
+        }
+
+        /* Keep stage content clear of floating bar */
+        .video-area{
+            padding-bottom:100px !important;
+        }
+
+        @media(max-width:760px){
+            .controls{
+                bottom:8px !important;
+                max-width:calc(100vw - 14px) !important;
+                min-height:56px !important;
+                padding:6px 7px !important;
+                gap:3px !important;
+            }
+            .controls .ctrl-btn{
+                min-width:44px !important;
+                padding:2px !important;
+            }
+            .controls .ctrl-icon{
+                width:36px !important;
+                height:36px !important;
+                min-width:36px !important;
+                min-height:36px !important;
+                font-size:12px !important;
+            }
+            .controls .ctrl-label{
+                font-size:7px !important;
+            }
+            .controls .ctrl-divider{
+                height:26px !important;
+                margin:0 1px !important;
+            }
+            .video-area{
+                padding-bottom:82px !important;
+            }
+        }
+
+    </style>
+
+    <style>
+
+        /* ===============================================================
+           SMARTMEET TABLET / RESPONSIVE TILE SPACING FIX — UI ONLY
+           No WebRTC / Reverb / chat / transcript / presence JS changed.
+           =============================================================== */
+
+        /* Keep controls truly centered on desktop/tablet */
+        .controls{
+            position:fixed !important;
+            left:50% !important;
+            right:auto !important;
+            bottom:16px !important;
+            transform:translateX(-50%) !important;
+            width:max-content !important;
+            max-width:calc(100vw - 24px) !important;
+            margin:0 !important;
+        }
+
+        /* Give the meeting stage enough room around all tiles */
+        .video-area{
+            overflow:auto !important;
+            padding:18px 18px 104px !important;
+        }
+
+        /* Desktop / laptop */
+        .video-grid{
+            display:grid !important;
+            width:100% !important;
+            max-width:1220px !important;
+            margin:0 auto !important;
+            padding:0 !important;
+            gap:16px !important;
+            row-gap:16px !important;
+            column-gap:16px !important;
+            align-items:stretch !important;
+            justify-items:stretch !important;
+            grid-auto-rows:auto !important;
+        }
+
+        /* Never let tiles visually collide */
+        .video-grid > .video-tile{
+            margin:0 !important;
+            min-width:0 !important;
+            min-height:0 !important;
+            width:100% !important;
+            box-sizing:border-box !important;
+        }
+
+        /* 1 tile */
+        .video-grid:has(> .video-tile:first-child:last-child){
+            grid-template-columns:minmax(320px,min(860px,82vw)) !important;
+            justify-content:center !important;
+        }
+        .video-grid:has(> .video-tile:first-child:last-child) > .video-tile{
+            aspect-ratio:16/9 !important;
+            max-height:56vh !important;
+        }
+
+        /* 2 tiles */
+        .video-grid:has(> .video-tile:nth-child(2):last-child){
+            grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+        }
+        .video-grid:has(> .video-tile:nth-child(2):last-child) > .video-tile{
+            aspect-ratio:16/9 !important;
+        }
+
+        /* 3-4 tiles */
+        .video-grid:has(> .video-tile:nth-child(3)){
+            grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+        }
+        .video-grid:has(> .video-tile:nth-child(3)) > .video-tile{
+            aspect-ratio:16/9 !important;
+        }
+
+        /* Tablet landscape / medium width */
+        @media (max-width:1100px){
+            .video-area{
+                padding:16px 16px 96px !important;
+            }
+
+            .video-grid{
+                gap:14px !important;
+                row-gap:14px !important;
+                column-gap:14px !important;
+            }
+
+            .video-grid:has(> .video-tile:nth-child(2):last-child),
+            .video-grid:has(> .video-tile:nth-child(3)){
+                grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+            }
+
+            .video-grid > .video-tile{
+                aspect-ratio:16/9 !important;
+                height:auto !important;
+            }
+        }
+
+        /* Tablet portrait */
+        @media (max-width:820px){
+            .video-area{
+                padding:14px 12px 90px !important;
+            }
+
+            .video-grid{
+                grid-template-columns:1fr !important;
+                gap:14px !important;
+                row-gap:14px !important;
+                max-width:720px !important;
+            }
+
+            .video-grid:has(> .video-tile:first-child:last-child),
+            .video-grid:has(> .video-tile:nth-child(2):last-child),
+            .video-grid:has(> .video-tile:nth-child(3)),
+            .video-grid:has(> .video-tile:nth-child(5)){
+                grid-template-columns:1fr !important;
+            }
+
+            .video-grid > .video-tile{
+                width:100% !important;
+                max-width:100% !important;
+                aspect-ratio:16/9 !important;
+                height:auto !important;
+                max-height:none !important;
+                margin-bottom:0 !important;
+            }
+
+            /* Sidebar remains toggle panel and should not squeeze/merge tiles */
+            #side-panel,
+            .sidebar{
+                max-width:100% !important;
+            }
+
+            .controls{
+                bottom:8px !important;
+                max-width:calc(100vw - 12px) !important;
+            }
+        }
+
+        /* Phones */
+        @media (max-width:560px){
+            .video-area{
+                padding:10px 8px 82px !important;
+            }
+
+            .video-grid{
+                gap:10px !important;
+                row-gap:10px !important;
+            }
+
+            .video-grid > .video-tile{
+                border-radius:14px !important;
+            }
+
+            .controls{
+                left:50% !important;
+                right:auto !important;
+                transform:translateX(-50%) !important;
+                bottom:6px !important;
+                width:max-content !important;
+                max-width:calc(100vw - 8px) !important;
+                overflow-x:auto !important;
+            }
+        }
+
+    </style>
 </head>
 
 @php
