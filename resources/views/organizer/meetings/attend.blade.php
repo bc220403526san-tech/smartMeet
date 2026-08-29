@@ -12858,6 +12858,415 @@
     })();
 </script>
 
+
+
+<script>
+    /* =====================================================================
+       SMARTMEET REALTIME MEDIA FINAL
+       Goal:
+       - mic ON => current joined peers receive audio without refresh
+       - camera ON => current joined peers receive video without refresh
+       - new join => peer is connected immediately
+       This patch keeps the existing fixed audio/video transceiver architecture.
+       It intentionally avoids renegotiating healthy connected peers.
+       ===================================================================== */
+    (() => {
+        const SELF = String(MY_USER_ID);
+        const ROOM = 'meeting.' + MEETING_ID;
+
+        window.__smRealtimeMedia = window.__smRealtimeMedia || {
+            bound: false,
+            syncing: false,
+            joinTimers: {}
+        };
+
+        function liveAudioTrack() {
+            return localStream?.getAudioTracks?.().find(t => t.readyState === 'live') || null;
+        }
+
+        function liveVideoTrack() {
+            return localStream?.getVideoTracks?.().find(t => t.readyState === 'live') || null;
+        }
+
+        function peerSender(pc, kind) {
+            if (!pc) return null;
+
+            if (kind === 'audio' && pc.__smAudioSender) return pc.__smAudioSender;
+            if (kind === 'video' && pc.__smVideoSender) return pc.__smVideoSender;
+
+            return (pc.getTransceivers?.() || [])
+                    .find(tx => tx.receiver?.track?.kind === kind)?.sender
+                || pc.getSenders?.().find(sender => sender.track?.kind === kind)
+                || null;
+        }
+
+        function joinedPeerIds() {
+            const ids = new Set();
+
+            try {
+                onlineUsers?.forEach(uid => {
+                    uid = String(uid);
+                    if (uid !== SELF && !leftUsers.has(uid)) ids.add(uid);
+                });
+            } catch (e) {}
+
+            try {
+                Object.keys(knownParticipants || {}).forEach(uid => {
+                    uid = String(uid);
+                    if (
+                        uid !== SELF &&
+                        !leftUsers.has(uid) &&
+                        knownParticipants?.[uid]?.hasJoined
+                    ) {
+                        ids.add(uid);
+                    }
+                });
+            } catch (e) {}
+
+            return [...ids];
+        }
+
+        async function ensurePeerMedia(uid, { allowInitialOffer = true } = {}) {
+            uid = String(uid);
+
+            if (!uid || uid === SELF || leftUsers.has(uid)) return null;
+
+            const info = knownParticipants?.[uid];
+            if (info && info.hasJoined === false && !onlineUsers.has(uid)) return null;
+
+            const pc = peers?.[uid] || createPeerConnection(uid);
+            if (!pc || pc.signalingState === 'closed') return null;
+
+            const audioTrack = liveAudioTrack();
+            const videoTrack = liveVideoTrack();
+
+            const audioSender = peerSender(pc, 'audio');
+            const videoSender = peerSender(pc, 'video');
+
+            try {
+                if (audioSender && audioSender.track !== audioTrack) {
+                    await audioSender.replaceTrack(audioTrack);
+                }
+            } catch (error) {
+                console.warn('Realtime audio replaceTrack failed:', uid, error);
+            }
+
+            try {
+                if (videoSender && videoSender.track !== videoTrack) {
+                    await videoSender.replaceTrack(videoTrack);
+                }
+            } catch (error) {
+                console.warn('Realtime video replaceTrack failed:', uid, error);
+            }
+
+            /*
+             * Permanent sendrecv transceivers mean mic/camera toggles themselves
+             * do NOT need a new SDP offer. Only create an offer if this peer has
+             * never negotiated, or ICE is genuinely failed.
+             */
+            const healthy =
+                pc.connectionState === 'connected' &&
+                ['connected', 'completed'].includes(pc.iceConnectionState);
+
+            if (healthy) {
+                try { attachRemoteStream(uid); } catch (e) {}
+                return pc;
+            }
+
+            const needsInitialSdp = !pc.localDescription && !pc.remoteDescription;
+            const failed =
+                ['failed'].includes(pc.connectionState) ||
+                ['failed'].includes(pc.iceConnectionState);
+
+            if (
+                pc.signalingState === 'stable' &&
+                typeof shouldInitiatePeer === 'function' &&
+                shouldInitiatePeer(uid) &&
+                ((allowInitialOffer && needsInitialSdp) || failed)
+            ) {
+                queuePeerNegotiation(uid, {
+                    reason: needsInitialSdp ? 'realtime-initial-peer' : 'realtime-ice-repair',
+                    iceRestart: failed,
+                    force: false,
+                    delay: 20
+                });
+            }
+
+            return pc;
+        }
+
+        async function syncMediaToJoinedPeers() {
+            if (window.__smRealtimeMedia.syncing) return;
+            window.__smRealtimeMedia.syncing = true;
+
+            try {
+                const ids = joinedPeerIds();
+                await Promise.allSettled(ids.map(uid => ensurePeerMedia(uid)));
+            } finally {
+                window.__smRealtimeMedia.syncing = false;
+            }
+        }
+
+        function unlockIncomingAudio() {
+            document.querySelectorAll('audio[data-peer-id]').forEach(audio => {
+                audio.autoplay = true;
+                audio.playsInline = true;
+                audio.muted = false;
+                audio.defaultMuted = false;
+                audio.volume = 1;
+                audio.play().catch(() => {});
+            });
+        }
+
+        ['pointerdown', 'click', 'touchstart', 'keydown'].forEach(eventName => {
+            document.addEventListener(eventName, unlockIncomingAudio, {
+                passive: true
+            });
+        });
+
+        /* ---------------- MIC: authoritative final override ---------------- */
+        const previousToggleMic = window.toggleMic || (typeof toggleMic === 'function' ? toggleMic : null);
+
+        window.toggleMic = async function () {
+            if (!localStream || !localStream.getAudioTracks().some(t => t.readyState === 'live')) {
+                await startAudio();
+            }
+
+            const track = liveAudioTrack();
+
+            if (!track) {
+                showToast('🎙️ Microphone could not start. Allow microphone access in browser settings.');
+                return;
+            }
+
+            isMicOn = !Boolean(isMicOn);
+            track.enabled = isMicOn;
+
+            const button = document.getElementById('ctrl-mic');
+            const micOff = document.getElementById('micoff-' + SELF);
+            const speaking = document.getElementById('speaking-' + SELF);
+
+            if (button) {
+                button.innerHTML = isMicOn
+                    ? '<i class="fa fa-microphone"></i>'
+                    : '<i class="fa fa-microphone-slash"></i>';
+                button.classList.toggle('off', !isMicOn);
+            }
+
+            if (micOff) micOff.style.display = isMicOn ? 'none' : 'flex';
+            if (!isMicOn && speaking) speaking.style.display = 'none';
+
+            if (isMicOn) {
+                if (!recognition) {
+                    try { startTranscript(); } catch (e) {}
+                }
+                setTimeout(() => {
+                    try { startRecognition(); } catch (e) {}
+                }, 40);
+            } else {
+                try { stopRecognition(); } catch (e) {}
+            }
+
+            /*
+             * The same audio track remains installed in every sender. Enabling it
+             * starts sound immediately; no refresh and no healthy-peer renegotiation.
+             */
+            await syncMediaToJoinedPeers();
+
+            try { broadcastMyMicStatus(); } catch (e) {
+                sendSignal('all', 'mic-status', {
+                    userId: MY_USER_ID,
+                    muted: !isMicOn
+                });
+            }
+
+            /* A small second replaceTrack pass helps Safari/Chrome after permission. */
+            if (isMicOn) {
+                setTimeout(syncMediaToJoinedPeers, 180);
+            }
+        };
+
+        try { toggleMic = window.toggleMic; } catch (e) {}
+
+        /* ---------------- CAMERA: authoritative final override ------------- */
+        window.toggleCamera = async function () {
+            if (!localStream) {
+                await startAudio();
+                if (!localStream) return;
+            }
+
+            let track = liveVideoTrack();
+
+            if (!isCameraOn && !track) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        audio: false,
+                        video: {
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 },
+                            frameRate: { ideal: 24, max: 30 },
+                            facingMode: 'user'
+                        }
+                    });
+
+                    track = stream.getVideoTracks()[0] || null;
+
+                    if (!track) throw new Error('No camera video track returned.');
+
+                    /* Remove only dead/stale video tracks. */
+                    localStream.getVideoTracks().forEach(oldTrack => {
+                        if (oldTrack !== track && oldTrack.readyState !== 'live') {
+                            try { localStream.removeTrack(oldTrack); } catch (e) {}
+                            try { oldTrack.stop(); } catch (e) {}
+                        }
+                    });
+
+                    localStream.addTrack(track);
+
+                    try { track.contentHint = 'motion'; } catch (e) {}
+                } catch (error) {
+                    console.error('Camera access failed:', error);
+                    showToast('📷 Camera could not start. Allow camera access in browser settings.');
+                    return;
+                }
+            }
+
+            track = liveVideoTrack();
+
+            if (!track) {
+                showToast('📷 Camera track is unavailable.');
+                return;
+            }
+
+            isCameraOn = !Boolean(isCameraOn);
+            track.enabled = isCameraOn;
+
+            const button = document.getElementById('ctrl-camera');
+            const localVideo = document.getElementById('localVideo');
+            const avatar = document.getElementById('avatar-' + SELF);
+
+            if (button) {
+                button.innerHTML = isCameraOn
+                    ? '<i class="fa fa-video"></i>'
+                    : '<i class="fa fa-video-slash"></i>';
+                button.classList.toggle('off', !isCameraOn);
+            }
+
+            if (localVideo) {
+                localVideo.srcObject = localStream;
+                localVideo.autoplay = true;
+                localVideo.playsInline = true;
+                localVideo.muted = true;
+                localVideo.style.display = isCameraOn ? 'block' : 'none';
+
+                if (isCameraOn) {
+                    localVideo.play().catch(() => {});
+                }
+            }
+
+            if (avatar) avatar.style.display = isCameraOn ? 'none' : 'flex';
+
+            /*
+             * Replace the sender's video track for every currently joined user.
+             * Because the video transceiver was negotiated from peer creation,
+             * turning camera on becomes visible remotely without page refresh.
+             */
+            await syncMediaToJoinedPeers();
+
+            try { broadcastMyCameraStatus(); } catch (e) {
+                sendSignal('all', 'camera-status', {
+                    userId: MY_USER_ID,
+                    cameraOn: isCameraOn
+                });
+            }
+
+            if (isCameraOn) {
+                [160, 520].forEach(delay => {
+                    setTimeout(async () => {
+                        if (!isCameraOn) return;
+                        await syncMediaToJoinedPeers();
+                        try { broadcastMyCameraStatus(); } catch (e) {}
+                    }, delay);
+                });
+            }
+        };
+
+        try { toggleCamera = window.toggleCamera; } catch (e) {}
+
+        /* ---------------- Realtime join/status bridge ---------------------- */
+        function onRealtimeSignal(event) {
+            if (!event?.type) return;
+
+            const uid = String(event.data?.userId || event.fromUserId || '');
+            if (!uid || uid === SELF) return;
+
+            if (event.type === 'user-joined') {
+                leftUsers.delete(uid);
+
+                if (!knownParticipants[uid]) {
+                    knownParticipants[uid] = {
+                        name: event.data?.name || 'Participant',
+                        initials: event.data?.initials || '?',
+                        isOrganizer: Boolean(event.data?.isOrganizer),
+                        hasJoined: true
+                    };
+                } else {
+                    knownParticipants[uid].hasJoined = true;
+                }
+
+                try {
+                    const info = knownParticipants[uid];
+                    ensurePanelRow(uid, info.name, info.initials, Boolean(info.isOrganizer));
+                    addParticipantTile(uid, info.name, info.initials, Boolean(info.isOrganizer));
+                    markOnline(uid);
+                } catch (e) {}
+
+                /* Create/sync immediately so no page refresh is required. */
+                ensurePeerMedia(uid).then(() => {
+                    setTimeout(() => ensurePeerMedia(uid), 180);
+                });
+
+                setTimeout(() => {
+                    try { broadcastMyMicStatus(); } catch (e) {}
+                    try { broadcastMyCameraStatus(); } catch (e) {}
+                }, 80);
+
+                return;
+            }
+
+            if (event.type === 'camera-status' && event.data?.cameraOn) {
+                ensurePeerMedia(uid);
+                setTimeout(() => {
+                    try { attachRemoteStream(uid); } catch (e) {}
+                }, 120);
+                return;
+            }
+
+            if (event.type === 'mic-status' && !event.data?.muted) {
+                ensurePeerMedia(uid);
+                setTimeout(unlockIncomingAudio, 80);
+            }
+        }
+
+        if (!window.__smRealtimeMedia.bound && window.Echo) {
+            window.__smRealtimeMedia.bound = true;
+            window.Echo.channel(ROOM).listen('.signal', onRealtimeSignal);
+        }
+
+        /* Initial room repair: current live users connect without refresh. */
+        window.addEventListener('load', () => {
+            [120, 480, 1200].forEach(delay => {
+                setTimeout(async () => {
+                    await syncMediaToJoinedPeers();
+                    try { announceJoin(); } catch (e) {}
+                    try { broadcastMyMicStatus(); } catch (e) {}
+                    try { broadcastMyCameraStatus(); } catch (e) {}
+                }, delay);
+            });
+        });
+    })();
+</script>
+
 </body>
 </html>
 
