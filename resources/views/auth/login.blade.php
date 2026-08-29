@@ -14,7 +14,7 @@
     <x-auth-hero-section
         title="Welcome to Smartmeet"
         subtitle="Connect, Meet, Collaborate"
-        image="images/login-illustration.png"
+        image="images/meeting.png"
     />
     <!-- RIGHT LOGIN CARD SECTION -->
     <div class="w-full md:w-1/2 flex justify-center items-center bg-blue-50
