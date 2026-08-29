@@ -4932,30 +4932,35 @@
    ICE
 ============================================================ */
     /* ============================================================
-       ICE / STUN / TURN — production configuration
-       Add TURN_HOST, TURN_USERNAME and TURN_CREDENTIAL in .env and
-       config/services.php as shown in the deployment guide.
+       ICE / STUN / TURN — AWS production configuration
+       IMPORTANT:
+       Replace ONLY PASTE_YOUR_TURN_PASSWORD_HERE below with the
+       same password used in /etc/turnserver.conf:
+           user=smartmeet:YOUR_PASSWORD
     ============================================================ */
-    const TURN_HOST = @json(config('services.turn.host', 'smartmeet.live'));
-    const TURN_USERNAME = @json(config('services.turn.username', 'smartmeet'));
-    const TURN_CREDENTIAL = @json(config('services.turn.credential', ''));
+    const TURN_HOST = 'smartmeet.live';
+    const TURN_IP = '13.203.230.232';
+    const TURN_USERNAME = 'smartmeet';
+    const TURN_CREDENTIAL = 'PASTE_YOUR_TURN_PASSWORD_HERE';
 
     const iceServers = [
-        { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }
-    ];
-
-    if (TURN_HOST && TURN_USERNAME && TURN_CREDENTIAL) {
-        iceServers.push({
+        {
+            urls: [
+                'stun:stun.l.google.com:19302',
+                'stun:stun1.l.google.com:19302'
+            ]
+        },
+        {
             urls: [
                 `turn:${TURN_HOST}:3478?transport=udp`,
-                `turn:${TURN_HOST}:3478?transport=tcp`
+                `turn:${TURN_HOST}:3478?transport=tcp`,
+                `turn:${TURN_IP}:3478?transport=udp`,
+                `turn:${TURN_IP}:3478?transport=tcp`
             ],
             username: TURN_USERNAME,
             credential: TURN_CREDENTIAL
-        });
-    } else {
-        console.warn('TURN is not configured. Cross-network WebRTC may be unreliable.');
-    }
+        }
+    ];
 
     const iceConfig = {
         iceServers,
@@ -4964,6 +4969,8 @@
         bundlePolicy: 'max-bundle',
         rtcpMuxPolicy: 'require'
     };
+
+    console.info('SmartMeet ICE ready: STUN + TURN configured for cross-network audio/video.');
 
     function isPolite(
         otherUserId

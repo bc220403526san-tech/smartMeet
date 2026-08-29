@@ -7,22 +7,22 @@
     <x-success />
     <x-error />
 
-    <div class="p-4 bg-gray-50 rounded-2xl m-2 mt-0 space-y-4 overflow-y-auto min-h-screen">
+    <div class="participant-meetings-responsive p-4 bg-gray-50 rounded-2xl m-2 mt-0 space-y-4 overflow-y-auto min-h-screen">
 
-            {{-- PAGE HEADER --}}
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
-                <div>
-                    <h1 class="text-2xl font-bold text-gray-800">My Meetings</h1>
-                    <p class="text-sm text-gray-500 mt-1">
-                        Manage your upcoming collaborative sessions and review previous meeting history.
-                    </p>
-                </div>
+        {{-- PAGE HEADER --}}
+        <div class="dashboard-header flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+            <div>
+                <h1 class="page-title-main text-2xl font-bold text-gray-800">My Meetings</h1>
+                <p class="page-description text-sm text-gray-500 mt-1">
+                    Manage your upcoming collaborative sessions and review previous meeting history.
+                </p>
             </div>
+        </div>
 
         <!-- STATS -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="stats-grid grid grid-cols-1 sm:grid-cols-3 gap-4">
 
-            <div class="bg-white rounded-2xl p-5 border border-blue-100 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-[1.02]">
+            <div class="stat-card bg-white rounded-2xl p-5 border border-blue-100 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-[1.02]">
                 <div class="flex items-start justify-between">
                     <div>
                         <p class="text-xs font-semibold text-blue-600 uppercase tracking-widest">Upcoming Today</p>
@@ -30,7 +30,7 @@
                             {{ str_pad($upcomingToday, 2, '0', STR_PAD_LEFT) }}
                         </h2>
                     </div>
-                    <div class="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center backdrop-blur-sm border border-blue-200/50">
+                    <div class="stat-icon-wrap w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center backdrop-blur-sm border border-blue-200/50">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6 text-blue-600">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                         </svg>
@@ -42,7 +42,7 @@
                 </div>
             </div>
 
-            <div class="bg-white rounded-2xl p-5 border border-amber-100 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-[1.02]">
+            <div class="stat-card bg-white rounded-2xl p-5 border border-amber-100 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-[1.02]">
                 <div class="flex items-start justify-between">
                     <div>
                         <p class="text-xs font-semibold text-amber-600 uppercase tracking-widest">Total Meetings</p>
@@ -50,7 +50,7 @@
                             {{ str_pad($totalMeetings, 2, '0', STR_PAD_LEFT) }}
                         </h2>
                     </div>
-                    <div class="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center backdrop-blur-sm border border-amber-200/50">
+                    <div class="stat-icon-wrap w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center backdrop-blur-sm border border-amber-200/50">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6 text-amber-600">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
                         </svg>
@@ -62,7 +62,7 @@
                 </div>
             </div>
 
-            <div class="bg-white rounded-2xl p-5 border border-emerald-100 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-[1.02]">
+            <div class="stat-card bg-white rounded-2xl p-5 border border-emerald-100 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-[1.02]">
                 <div class="flex items-start justify-between">
                     <div>
                         <p class="text-xs font-semibold text-emerald-600 uppercase tracking-widest">Completed Meetings</p>
@@ -70,7 +70,7 @@
                             {{ str_pad($completedMeetings, 2, '0', STR_PAD_LEFT) }}
                         </h2>
                     </div>
-                    <div class="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center backdrop-blur-sm border border-emerald-200/50">
+                    <div class="stat-icon-wrap w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center backdrop-blur-sm border border-emerald-200/50">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6 text-emerald-600">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                         </svg>
@@ -85,14 +85,14 @@
         </div>
 
         <!-- MEETINGS TABLE -->
-        <div class="bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="meetings-shell bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden">
 
             <!-- TOP BAR -->
-            <div class="px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
-                <div class="flex items-center justify-between">
+            <div class="meetings-topbar px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
+                <div class="meetings-topbar-inner flex items-center justify-between">
                     <div>
-                        <h2 class="font-semibold text-gray-800 text-lg">Meetings Overview</h2>
-                        <p class="text-xs text-gray-400 mt-0.5">Track upcoming, active and completed meetings</p>
+                        <h2 class="meetings-topbar-title font-semibold text-gray-800 text-lg">Meetings Overview</h2>
+                        <p class="meetings-topbar-subtitle text-xs text-gray-400 mt-0.5">Track upcoming, active and completed meetings</p>
                     </div>
                     <div class="flex items-center gap-2">
                         <button class="p-2 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 transition shadow-sm" title="Filter">
@@ -105,7 +105,7 @@
             </div>
 
             <!-- TABLE HEAD -->
-            <div class="grid grid-cols-6 px-5 py-3 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            <div class="meeting-head grid grid-cols-6 px-5 py-3 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                 <div class="flex items-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
@@ -149,18 +149,18 @@
                     $organizer = $meeting->organizer;
                     $orgInitials = strtoupper(substr($organizer->name, 0, 1) . substr(strrchr($organizer->name, ' ') ?: ' ', 1, 1));
                 @endphp
-                <div class="grid grid-cols-6 items-center px-5 py-4 border-b border-gray-100 hover:bg-blue-50/30 transition duration-200 group"
+                <div class="meeting-row grid grid-cols-6 items-center px-5 py-4 border-b border-gray-100 hover:bg-blue-50/30 transition duration-200 group"
                      data-meeting-id="{{ $meeting->id }}"
                      data-current-status="{{ $meeting->status }}">
                     <!-- TITLE -->
-                    <div>
-                        <h3 class="text-sm font-semibold text-gray-800 group-hover:text-blue-600 transition">
+                    <div class="meeting-cell" data-label="Meeting">
+                        <h3 class="meeting-title-text text-sm font-semibold text-gray-800 group-hover:text-blue-600 transition">
                             {{ $meeting->title }}
                         </h3>
                         <p class="text-xs text-gray-400 mt-1">ID: SM-{{ $meeting->id }}</p>
                     </div>
                     <!-- DATE -->
-                    <div>
+                    <div class="meeting-cell" data-label="Date & Time">
                         <p class="text-sm font-medium text-gray-700">
                             {{ \Carbon\Carbon::parse($meeting->date)->format('M d, Y') }}
                         </p>
@@ -169,7 +169,7 @@
                         </p>
                     </div>
                     <!-- DURATION -->
-                    <div>
+                    <div class="meeting-cell" data-label="Duration">
                         <span class="inline-flex items-center px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-xs font-semibold border border-gray-200">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3 mr-1 text-gray-400">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
@@ -178,17 +178,17 @@
                         </span>
                     </div>
                     <!-- ORGANIZER -->
-                    <div class="flex items-center gap-3">
-                        <div class="w-9 h-9 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center text-xs font-bold text-blue-700 ring-2 ring-gray-100">
+                    <div class="meeting-cell meeting-organizer flex items-center gap-3" data-label="Organizer">
+                        <div class="meeting-organizer-avatar w-9 h-9 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center text-xs font-bold text-blue-700 ring-2 ring-gray-100">
                             {{ $orgInitials }}
                         </div>
                         <div>
-                            <p class="text-sm font-medium text-gray-700">{{ $organizer->name }}</p>
+                            <p class="organizer-name-text text-sm font-medium text-gray-700">{{ $organizer->name }}</p>
                             <p class="text-xs text-gray-400">{{ ucfirst($organizer->role) }}</p>
                         </div>
                     </div>
                     <!-- STATUS -->
-                    <div id="status-badge-{{ $meeting->id }}">
+                    <div class="meeting-cell" data-label="Status" id="status-badge-{{ $meeting->id }}">
                         <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border
                             {{ $meeting->status == 'upcoming'   ? 'bg-blue-50 text-blue-700 border-blue-200'     : '' }}
                             {{ $meeting->status == 'active'     ? 'bg-orange-50 text-orange-600 border-orange-200' : '' }}
@@ -206,7 +206,7 @@
                         </span>
                     </div>
                     <!-- ACTIONS -->
-                    <div class="flex items-center justify-end gap-2">
+                    <div class="meeting-cell meeting-actions flex items-center justify-end gap-2" data-label="Actions">
                         <div id="attend-col-{{ $meeting->id }}">
                             @if($meeting->status === 'active')
                                 <a href="{{ route('participant.meetings.attend', $meeting) }}"
@@ -241,7 +241,7 @@
             @endforelse
 
             <!-- PAGINATION -->
-            <div class="flex flex-col sm:flex-row justify-between items-center gap-3 px-5 py-4 border-t border-gray-100 bg-gray-50/50">
+            <div class="pagination-wrap flex flex-col sm:flex-row justify-between items-center gap-3 px-5 py-4 border-t border-gray-100 bg-gray-50/50">
                 <p class="text-xs text-gray-500">
                     Showing {{ $meetings->firstItem() ?? 0 }}–{{ $meetings->lastItem() ?? 0 }}
                     of {{ $meetings->total() }} meetings
@@ -254,6 +254,369 @@
     </div>
 
 </x-layouts.app>
+
+
+<style>
+    /* ================================================================
+       SMARTMEET PARTICIPANT MEETINGS INDEX — FULL RESPONSIVE UI
+       Logic / polling / routes unchanged.
+    ================================================================ */
+
+    /* Prevent any horizontal page overflow */
+    html, body {
+        max-width: 100%;
+        overflow-x: hidden;
+    }
+
+    /* Main dashboard wrapper */
+    .participant-meetings-responsive {
+        width: 100%;
+        min-width: 0;
+    }
+
+    /* Stats cards */
+    .participant-meetings-responsive .stats-grid {
+        min-width: 0;
+    }
+
+    /* Meeting card/table shell */
+    .participant-meetings-responsive .meetings-shell {
+        min-width: 0;
+    }
+
+    /* Desktop table */
+    .participant-meetings-responsive .meeting-head,
+    .participant-meetings-responsive .meeting-row {
+        grid-template-columns:
+        minmax(180px, 1.35fr)
+        minmax(150px, 1fr)
+        minmax(115px, .75fr)
+        minmax(170px, 1.1fr)
+        minmax(120px, .8fr)
+        minmax(145px, .9fr);
+        column-gap: 14px;
+    }
+
+    /* Every table cell can shrink safely */
+    .participant-meetings-responsive .meeting-head > *,
+    .participant-meetings-responsive .meeting-row > * {
+        min-width: 0;
+    }
+
+    /* Long text protection */
+    .participant-meetings-responsive .meeting-title-text,
+    .participant-meetings-responsive .organizer-name-text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* Keep buttons usable */
+    .participant-meetings-responsive .meeting-actions {
+        min-width: 0;
+    }
+
+    /* Pagination never breaks page */
+    .participant-meetings-responsive nav[role="navigation"] {
+        max-width: 100%;
+    }
+
+    .participant-meetings-responsive nav[role="navigation"] > div {
+        max-width: 100%;
+    }
+
+    /* ================================================================
+       LAPTOP / SMALL DESKTOP
+    ================================================================ */
+    @media (max-width: 1180px) {
+        .participant-meetings-responsive {
+            padding-left: 12px !important;
+            padding-right: 12px !important;
+        }
+
+        .participant-meetings-responsive .meeting-head,
+        .participant-meetings-responsive .meeting-row {
+            grid-template-columns:
+            minmax(155px, 1.25fr)
+            minmax(130px, 1fr)
+            minmax(100px, .7fr)
+            minmax(145px, 1fr)
+            minmax(105px, .75fr)
+            minmax(125px, .85fr);
+            column-gap: 10px;
+        }
+
+        .participant-meetings-responsive .meeting-row {
+            padding-left: 14px !important;
+            padding-right: 14px !important;
+        }
+
+        .participant-meetings-responsive .meeting-head {
+            padding-left: 14px !important;
+            padding-right: 14px !important;
+        }
+    }
+
+    /* ================================================================
+       TABLET
+       Convert each desktop row into a responsive card.
+    ================================================================ */
+    @media (max-width: 900px) {
+        .participant-meetings-responsive {
+            margin: 0 !important;
+            padding: 14px !important;
+            border-radius: 16px !important;
+        }
+
+        .participant-meetings-responsive .page-title-main {
+            font-size: 1.35rem !important;
+        }
+
+        .participant-meetings-responsive .page-description {
+            max-width: 680px;
+            line-height: 1.55;
+        }
+
+        .participant-meetings-responsive .stats-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+            gap: 12px !important;
+        }
+
+        .participant-meetings-responsive .stat-card {
+            padding: 16px !important;
+        }
+
+        .participant-meetings-responsive .stat-card h2 {
+            font-size: 1.75rem !important;
+        }
+
+        .participant-meetings-responsive .meetings-shell {
+            overflow: visible !important;
+            background: transparent !important;
+            border: 0 !important;
+            box-shadow: none !important;
+        }
+
+        .participant-meetings-responsive .meetings-topbar {
+            border: 1px solid rgb(229 231 235) !important;
+            border-radius: 18px !important;
+            margin-bottom: 12px;
+            background: linear-gradient(to right, rgb(239 246 255), rgb(238 242 255)) !important;
+        }
+
+        /* Hide desktop labels */
+        .participant-meetings-responsive .meeting-head {
+            display: none !important;
+        }
+
+        /* Rows become cards */
+        .participant-meetings-responsive .meeting-row {
+            display: grid !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 14px !important;
+            padding: 16px !important;
+            margin-bottom: 12px;
+            background: #fff;
+            border: 1px solid rgb(229 231 235) !important;
+            border-radius: 18px !important;
+            box-shadow: 0 4px 14px rgba(15, 23, 42, .05);
+        }
+
+        .participant-meetings-responsive .meeting-row:hover {
+            background: #fff !important;
+        }
+
+        .participant-meetings-responsive .meeting-row > div {
+            min-width: 0;
+        }
+
+        /* Add mobile/tablet field labels */
+        .participant-meetings-responsive .meeting-cell {
+            position: relative;
+            padding-top: 20px;
+        }
+
+        .participant-meetings-responsive .meeting-cell::before {
+            content: attr(data-label);
+            position: absolute;
+            top: 0;
+            left: 0;
+            color: rgb(156 163 175);
+            font-size: 10px;
+            line-height: 1;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+        }
+
+        .participant-meetings-responsive .meeting-actions {
+            grid-column: 1 / -1;
+            justify-content: flex-start !important;
+            padding-top: 22px;
+            flex-wrap: wrap;
+        }
+
+        .participant-meetings-responsive .meeting-actions #attend-col-placeholder,
+        .participant-meetings-responsive .meeting-actions > div {
+            min-width: 0;
+        }
+
+        .participant-meetings-responsive .meeting-actions a,
+        .participant-meetings-responsive .meeting-actions span {
+            max-width: 100%;
+        }
+
+        .participant-meetings-responsive .pagination-wrap {
+            border: 1px solid rgb(229 231 235);
+            border-radius: 16px;
+            background: white !important;
+            padding: 14px !important;
+        }
+    }
+
+    /* ================================================================
+       MOBILE
+    ================================================================ */
+    @media (max-width: 640px) {
+        .participant-meetings-responsive {
+            padding: 10px !important;
+            min-height: calc(100dvh - 20px) !important;
+        }
+
+        .participant-meetings-responsive .dashboard-header {
+            margin-bottom: 16px !important;
+        }
+
+        .participant-meetings-responsive .page-title-main {
+            font-size: 1.2rem !important;
+        }
+
+        .participant-meetings-responsive .page-description {
+            font-size: .78rem !important;
+        }
+
+        /* Stats stack cleanly */
+        .participant-meetings-responsive .stats-grid {
+            grid-template-columns: 1fr !important;
+            gap: 10px !important;
+        }
+
+        .participant-meetings-responsive .stat-card {
+            padding: 14px !important;
+            border-radius: 16px !important;
+        }
+
+        .participant-meetings-responsive .stat-card h2 {
+            font-size: 1.55rem !important;
+        }
+
+        .participant-meetings-responsive .stat-card .stat-icon-wrap {
+            width: 42px !important;
+            height: 42px !important;
+            border-radius: 14px !important;
+        }
+
+        .participant-meetings-responsive .meetings-topbar {
+            padding: 14px !important;
+            border-radius: 16px !important;
+        }
+
+        .participant-meetings-responsive .meetings-topbar-inner {
+            gap: 10px;
+            align-items: flex-start !important;
+        }
+
+        .participant-meetings-responsive .meetings-topbar-title {
+            font-size: .95rem !important;
+        }
+
+        .participant-meetings-responsive .meetings-topbar-subtitle {
+            font-size: .7rem !important;
+            line-height: 1.4;
+        }
+
+        /* One column meeting card */
+        .participant-meetings-responsive .meeting-row {
+            grid-template-columns: 1fr !important;
+            gap: 12px !important;
+            padding: 14px !important;
+            border-radius: 16px !important;
+        }
+
+        .participant-meetings-responsive .meeting-title-text,
+        .participant-meetings-responsive .organizer-name-text {
+            white-space: normal;
+            overflow: visible;
+            text-overflow: initial;
+            overflow-wrap: anywhere;
+        }
+
+        .participant-meetings-responsive .meeting-organizer {
+            gap: 10px !important;
+        }
+
+        .participant-meetings-responsive .meeting-organizer-avatar {
+            width: 34px !important;
+            height: 34px !important;
+            min-width: 34px !important;
+        }
+
+        .participant-meetings-responsive .meeting-actions {
+            grid-column: auto !important;
+            display: grid !important;
+            grid-template-columns: 1fr auto;
+            gap: 8px !important;
+            width: 100%;
+        }
+
+        .participant-meetings-responsive .meeting-actions > div,
+        .participant-meetings-responsive .meeting-actions > div > a,
+        .participant-meetings-responsive .meeting-actions > div > span {
+            width: 100%;
+        }
+
+        .participant-meetings-responsive .meeting-actions > div > a,
+        .participant-meetings-responsive .meeting-actions > div > span {
+            justify-content: center;
+        }
+
+        .participant-meetings-responsive .meeting-actions > a {
+            width: 42px !important;
+            height: 42px !important;
+            min-width: 42px !important;
+        }
+
+        .participant-meetings-responsive .pagination-wrap {
+            align-items: stretch !important;
+            text-align: center;
+        }
+
+        .participant-meetings-responsive .pagination-wrap nav {
+            width: 100%;
+            overflow-x: auto;
+            padding-bottom: 3px;
+        }
+    }
+
+    /* ================================================================
+       VERY SMALL MOBILE
+    ================================================================ */
+    @media (max-width: 380px) {
+        .participant-meetings-responsive {
+            padding-left: 7px !important;
+            padding-right: 7px !important;
+        }
+
+        .participant-meetings-responsive .meeting-row {
+            padding: 12px !important;
+        }
+
+        .participant-meetings-responsive .meeting-actions {
+            grid-template-columns: 1fr auto;
+        }
+    }
+</style>
+
 
 {{-- ================================================================
      LIVE STATUS POLLING (bina refresh ke Upcoming → Attend switch)
