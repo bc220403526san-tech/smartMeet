@@ -2345,6 +2345,546 @@
         }
 
     </style>
+
+    <style>
+
+        /* =====================================================================
+           SMARTMEET FULL RESPONSIVE FINAL — UI ONLY
+           Existing WebRTC / Laravel Reverb / chat / transcription / presence /
+           leave / cancel JavaScript remains unchanged.
+           ===================================================================== */
+
+        html, body {
+            width: 100% !important;
+            max-width: 100% !important;
+            overflow-x: hidden !important;
+        }
+
+        body {
+            min-height: 100dvh !important;
+        }
+
+        /* ---------- HEADER ---------- */
+        .header {
+            width: 100% !important;
+            min-width: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            flex-wrap: nowrap !important;
+            gap: 10px !important;
+            padding: 8px 14px !important;
+        }
+
+        .header-left {
+            flex: 1 1 auto !important;
+            min-width: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+        }
+
+        .header-right {
+            flex: 0 0 auto !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+        }
+
+        .header-center {
+            flex: 0 0 auto !important;
+        }
+
+        .header-meeting-info {
+            min-width: 0 !important;
+        }
+
+        .meeting-title,
+        .meeting-meta {
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            white-space: nowrap !important;
+        }
+
+        /* ---------- MAIN ---------- */
+        .main {
+            width: 100% !important;
+            min-width: 0 !important;
+            min-height: 0 !important;
+            display: flex !important;
+            gap: 10px !important;
+            overflow: hidden !important;
+        }
+
+        .video-area {
+            flex: 1 1 auto !important;
+            min-width: 0 !important;
+            min-height: 0 !important;
+            overflow: auto !important;
+            padding: 14px 14px 100px !important;
+        }
+
+        .video-grid {
+            width: 100% !important;
+            max-width: 1240px !important;
+            margin: 0 auto !important;
+            display: grid !important;
+            gap: 14px !important;
+            row-gap: 14px !important;
+            column-gap: 14px !important;
+            align-items: stretch !important;
+            justify-items: stretch !important;
+            grid-auto-rows: auto !important;
+        }
+
+        .video-grid > .video-tile {
+            width: 100% !important;
+            min-width: 0 !important;
+            min-height: 0 !important;
+            height: auto !important;
+            margin: 0 !important;
+            box-sizing: border-box !important;
+            aspect-ratio: 16 / 9 !important;
+        }
+
+        /* 1 tile */
+        .video-grid:has(> .video-tile:first-child:last-child) {
+            grid-template-columns: minmax(0, min(860px, 92%)) !important;
+            justify-content: center !important;
+        }
+
+        .video-grid:has(> .video-tile:first-child:last-child) > .video-tile {
+            max-width: 860px !important;
+            max-height: 58vh !important;
+        }
+
+        /* 2 tiles */
+        .video-grid:has(> .video-tile:nth-child(2):last-child) {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        }
+
+        /* 3-4 tiles */
+        .video-grid:has(> .video-tile:nth-child(3)) {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        }
+
+        /* 5+ */
+        .video-grid:has(> .video-tile:nth-child(5)) {
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        }
+
+        /* ---------- SIDE PANEL ---------- */
+        #side-panel,
+        .sidebar {
+            flex: 0 0 min(330px, 32vw) !important;
+            width: min(330px, 32vw) !important;
+            min-width: 260px !important;
+            max-width: 360px !important;
+            height: 100% !important;
+            overflow: hidden !important;
+        }
+
+        /* ---------- CONTROLS ---------- */
+        .controls {
+            position: fixed !important;
+            left: 50% !important;
+            right: auto !important;
+            bottom: 12px !important;
+            top: auto !important;
+            transform: translateX(-50%) !important;
+
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            flex-wrap: nowrap !important;
+
+            width: max-content !important;
+            min-width: 0 !important;
+            max-width: calc(100vw - 24px) !important;
+
+            margin: 0 !important;
+            padding: 7px 10px !important;
+            gap: 5px !important;
+
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            scrollbar-width: none !important;
+
+            z-index: 100 !important;
+        }
+
+        .controls::-webkit-scrollbar {
+            display: none !important;
+        }
+
+        .controls .ctrl-btn {
+            flex: 0 0 auto !important;
+            min-width: 46px !important;
+            width: auto !important;
+        }
+
+        .controls .ctrl-icon,
+        .controls .btn-end {
+            flex: 0 0 auto !important;
+        }
+
+        /* ==========================================================
+           LARGE LAPTOP / SMALL DESKTOP
+           ========================================================== */
+        @media (max-width: 1280px) {
+            #side-panel,
+            .sidebar {
+                flex-basis: 300px !important;
+                width: 300px !important;
+                min-width: 280px !important;
+            }
+
+            .video-grid:has(> .video-tile:nth-child(5)) {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            }
+        }
+
+        /* ==========================================================
+           TABLET LANDSCAPE / DEVTOOLS-SQUEEZED VIEW
+           ========================================================== */
+        @media (max-width: 1024px) {
+            .header {
+                padding: 7px 10px !important;
+                gap: 7px !important;
+            }
+
+            .meeting-title {
+                max-width: 32vw !important;
+                font-size: 13px !important;
+            }
+
+            .meeting-meta {
+                font-size: 8px !important;
+            }
+
+            .participants-count {
+                padding: 4px 7px !important;
+                font-size: 9px !important;
+            }
+
+            .btn-leave {
+                padding: 5px 8px !important;
+                font-size: 9px !important;
+            }
+
+            .main {
+                gap: 8px !important;
+            }
+
+            .video-area {
+                padding: 12px 12px 92px !important;
+            }
+
+            .video-grid {
+                gap: 12px !important;
+                row-gap: 12px !important;
+                column-gap: 12px !important;
+            }
+
+            .video-grid:has(> .video-tile:nth-child(2):last-child),
+            .video-grid:has(> .video-tile:nth-child(3)),
+            .video-grid:has(> .video-tile:nth-child(5)) {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            }
+
+            #side-panel,
+            .sidebar {
+                flex-basis: 280px !important;
+                width: 280px !important;
+                min-width: 250px !important;
+            }
+
+            .controls {
+                bottom: 8px !important;
+                max-width: calc(100vw - 16px) !important;
+            }
+        }
+
+        /* ==========================================================
+           TABLET PORTRAIT
+           Side panel becomes overlay, so video tiles never get crushed.
+           ========================================================== */
+        @media (max-width: 820px) {
+            .header {
+                min-height: 58px !important;
+                flex-wrap: nowrap !important;
+            }
+
+            .header-brand-text {
+                display: none !important;
+            }
+
+            .header-brand {
+                padding-right: 6px !important;
+            }
+
+            .meeting-title {
+                max-width: 42vw !important;
+                font-size: 12px !important;
+            }
+
+            .meeting-meta {
+                display: none !important;
+            }
+
+            .header-center {
+                min-width: auto !important;
+                padding: 4px 7px !important;
+                font-size: 10px !important;
+            }
+
+            .main {
+                display: block !important;
+                position: relative !important;
+                overflow: hidden !important;
+            }
+
+            .video-area {
+                width: 100% !important;
+                height: 100% !important;
+                padding: 10px 10px 86px !important;
+            }
+
+            .video-grid,
+            .video-grid:has(> .video-tile:first-child:last-child),
+            .video-grid:has(> .video-tile:nth-child(2):last-child),
+            .video-grid:has(> .video-tile:nth-child(3)),
+            .video-grid:has(> .video-tile:nth-child(5)) {
+                grid-template-columns: 1fr !important;
+                max-width: 700px !important;
+                gap: 12px !important;
+                row-gap: 12px !important;
+            }
+
+            .video-grid > .video-tile {
+                width: 100% !important;
+                max-width: 100% !important;
+                height: auto !important;
+                max-height: none !important;
+                aspect-ratio: 16 / 9 !important;
+            }
+
+            #side-panel,
+            .sidebar {
+                position: fixed !important;
+                left: 8px !important;
+                right: 8px !important;
+                bottom: 72px !important;
+                top: auto !important;
+
+                width: auto !important;
+                min-width: 0 !important;
+                max-width: none !important;
+                height: min(62dvh, 540px) !important;
+
+                border-radius: 18px !important;
+                z-index: 95 !important;
+            }
+
+            .controls {
+                bottom: 6px !important;
+                min-height: 54px !important;
+                padding: 5px 7px !important;
+                gap: 3px !important;
+            }
+
+            .controls .ctrl-btn {
+                min-width: 42px !important;
+            }
+
+            .controls .ctrl-icon,
+            .controls .btn-end {
+                width: 35px !important;
+                height: 35px !important;
+                min-width: 35px !important;
+                min-height: 35px !important;
+                font-size: 11px !important;
+            }
+
+            .controls .ctrl-label {
+                font-size: 7px !important;
+            }
+        }
+
+        /* ==========================================================
+           MOBILE
+           ========================================================== */
+        @media (max-width: 600px) {
+            .header {
+                min-height: 52px !important;
+                padding: 6px 8px !important;
+                gap: 5px !important;
+            }
+
+            .header-brand {
+                display: none !important;
+            }
+
+            .live-badge {
+                font-size: 8px !important;
+                padding: 2px 6px !important;
+            }
+
+            .meeting-title {
+                max-width: 44vw !important;
+                font-size: 11px !important;
+            }
+
+            .header-center {
+                font-size: 9px !important;
+                padding: 3px 6px !important;
+            }
+
+            .participants-count {
+                display: none !important;
+            }
+
+            .btn-leave {
+                width: 32px !important;
+                height: 32px !important;
+                min-width: 32px !important;
+                padding: 0 !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                border-radius: 50% !important;
+            }
+
+            .btn-leave span {
+                display: none !important;
+            }
+
+            .video-area {
+                padding: 8px 7px 78px !important;
+            }
+
+            .video-grid {
+                gap: 9px !important;
+                row-gap: 9px !important;
+            }
+
+            .video-grid > .video-tile {
+                border-radius: 14px !important;
+            }
+
+            #side-panel,
+            .sidebar {
+                left: 5px !important;
+                right: 5px !important;
+                bottom: 65px !important;
+                height: min(66dvh, 500px) !important;
+                border-radius: 15px !important;
+            }
+
+            .controls {
+                bottom: 5px !important;
+                max-width: calc(100vw - 8px) !important;
+                min-height: 50px !important;
+                padding: 4px 5px !important;
+                gap: 2px !important;
+            }
+
+            .controls .ctrl-btn {
+                min-width: 39px !important;
+            }
+
+            .controls .ctrl-icon,
+            .controls .btn-end {
+                width: 33px !important;
+                height: 33px !important;
+                min-width: 33px !important;
+                min-height: 33px !important;
+                font-size: 10px !important;
+            }
+
+            .controls .ctrl-label {
+                display: none !important;
+            }
+
+            .controls .ctrl-divider {
+                height: 24px !important;
+                margin: 0 1px !important;
+            }
+        }
+
+        /* ==========================================================
+           VERY SMALL PHONES
+           ========================================================== */
+        @media (max-width: 390px) {
+            .meeting-title {
+                max-width: 38vw !important;
+                font-size: 10px !important;
+            }
+
+            .header-center {
+                display: none !important;
+            }
+
+            .video-area {
+                padding-left: 5px !important;
+                padding-right: 5px !important;
+            }
+
+            .controls .ctrl-btn {
+                min-width: 36px !important;
+            }
+
+            .controls .ctrl-icon,
+            .controls .btn-end {
+                width: 31px !important;
+                height: 31px !important;
+                min-width: 31px !important;
+                min-height: 31px !important;
+            }
+        }
+
+        /* ==========================================================
+           SHORT / LANDSCAPE DEVICES
+           ========================================================== */
+        @media (max-height: 520px) and (orientation: landscape) {
+            .header {
+                min-height: 46px !important;
+                padding-top: 4px !important;
+                padding-bottom: 4px !important;
+            }
+
+            .video-area {
+                padding: 7px 8px 64px !important;
+            }
+
+            .video-grid {
+                gap: 8px !important;
+            }
+
+            .video-grid:has(> .video-tile:nth-child(2):last-child),
+            .video-grid:has(> .video-tile:nth-child(3)),
+            .video-grid:has(> .video-tile:nth-child(5)) {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            }
+
+            .controls {
+                bottom: 4px !important;
+                min-height: 45px !important;
+                padding: 3px 5px !important;
+            }
+
+            .controls .ctrl-label {
+                display: none !important;
+            }
+
+            #side-panel,
+            .sidebar {
+                height: calc(100dvh - 60px) !important;
+                bottom: 52px !important;
+            }
+        }
+
+    </style>
 </head>
 
 @php
