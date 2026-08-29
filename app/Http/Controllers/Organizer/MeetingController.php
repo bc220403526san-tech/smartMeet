@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Organizer;
 
+use App\Events\MeetingSignal;
 use App\Http\Controllers\Controller;
 use App\Mail\MeetingInviteMail;
 use App\Models\Meeting;
@@ -312,6 +313,21 @@ class MeetingController extends Controller
                 'This meeting cannot be cancelled.'
             );
         }
+
+        /*
+         * Broadcast BEFORE the DB write so anyone currently sitting in the
+         * live room (organizer_attend / participant_attend blade) is kicked
+         * out immediately, even if something below throws.
+         */
+        broadcast(new MeetingSignal(
+            meetingId: (string) $meeting->id,
+            fromUserId: (string) auth()->id(),
+            toUserId: 'all',
+            type: 'meeting-cancelled',
+            data: [
+                'by' => auth()->user()->name,
+            ]
+        ))->toOthers();
 
         $meeting->update([
             'status' => 'cancelled',
