@@ -5,15 +5,19 @@ namespace App\Events;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
-use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
+/**
+ * Fired whenever a participant/organizer's speech is transcribed and saved.
+ * Public channel "meeting.{id}", event name "transcript" so the client's
+ * `.listen('.transcript', ...)` picks it up.
+ */
 class TranscriptUpdated implements ShouldBroadcastNow
 {
-    use Dispatchable, InteractsWithSockets, SerializesModels;
+    use InteractsWithSockets, SerializesModels;
 
     public string $meetingId;
-    public string $userId;       // ✅ ADDED — JS needs this to skip own transcript
+    public string $userId;
     public string $userName;
     public string $userInitials;
     public string $text;
@@ -21,18 +25,18 @@ class TranscriptUpdated implements ShouldBroadcastNow
 
     public function __construct(
         string $meetingId,
-        string $userId,           // ✅ ADDED
+        string $userId,
         string $userName,
         string $userInitials,
         string $text,
         string $spokenAt
     ) {
-        $this->meetingId    = $meetingId;
-        $this->userId       = $userId;   // ✅ ADDED
-        $this->userName     = $userName;
+        $this->meetingId = $meetingId;
+        $this->userId = $userId;
+        $this->userName = $userName;
         $this->userInitials = $userInitials;
-        $this->text         = $text;
-        $this->spokenAt     = $spokenAt;
+        $this->text = $text;
+        $this->spokenAt = $spokenAt;
     }
 
     public function broadcastOn(): array
@@ -47,10 +51,10 @@ class TranscriptUpdated implements ShouldBroadcastNow
         return 'transcript';
     }
 
-    // ✅ Explicitly send userId in the payload
     public function broadcastWith(): array
     {
         return [
+            'meetingId'    => $this->meetingId,
             'userId'       => $this->userId,
             'userName'     => $this->userName,
             'userInitials' => $this->userInitials,
