@@ -925,14 +925,6 @@
             $('#rec-dot').style.display = 'none';
         }
 
-        window.Echo
-            .channel('meeting.' + MEETING_ID)
-            .listen('.transcript', (data) => {
-                if (!data || String(data.userId) === String(MY_USER_ID)) return;
-                appendTranscript({ userName: data.userName || 'User', text: data.text || '', spokenAt: data.spokenAt || '' });
-            })
-            .listen('.signal', handleSignal);
-
         // ============================================================
         // CONTROLS
         // ============================================================
@@ -1014,6 +1006,30 @@
             navigator.sendBeacon?.(MARK_LEFT_URL, new Blob([JSON.stringify({})], { type: 'application/json' }));
             teardown();
         });
+
+        // ============================================================
+        // REALTIME (Laravel Echo / Reverb)
+        // Deliberately wired up LAST and defensively: if Echo/Reverb isn't
+        // configured correctly, everything above (video, mic/camera, chat
+        // sending, leave) still works — you just won't see other people
+        // join in realtime, and won't be notified of a cancellation until
+        // Echo is fixed.
+        // ============================================================
+        try {
+            if (!window.Echo) {
+                console.error('SmartMeet: window.Echo is not defined — check resources/js/app.js / bootstrap.js Echo setup and Reverb .env config.');
+            } else {
+                window.Echo
+                    .channel('meeting.' + MEETING_ID)
+                    .listen('.transcript', (data) => {
+                        if (!data || String(data.userId) === String(MY_USER_ID)) return;
+                        appendTranscript({ userName: data.userName || 'User', text: data.text || '', spokenAt: data.spokenAt || '' });
+                    })
+                    .listen('.signal', handleSignal);
+            }
+        } catch (e) {
+            console.error('SmartMeet: failed to subscribe to Echo channel.', e);
+        }
 
         // ============================================================
         // INIT
