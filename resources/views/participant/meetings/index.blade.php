@@ -94,11 +94,26 @@
                         <h2 class="meetings-topbar-title font-semibold text-gray-800 text-lg">Meetings Overview</h2>
                         <p class="meetings-topbar-subtitle text-xs text-gray-400 mt-0.5">Track upcoming, active and completed meetings</p>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <button class="p-2 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 transition shadow-sm" title="Filter">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-500">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />
-                            </svg>
+                    <div class="meeting-status-filters flex items-center gap-2 flex-wrap justify-end" aria-label="Filter meetings by status">
+                        <button type="button" data-status-filter="all"
+                                class="meeting-filter-btn is-active px-3 py-2 rounded-xl text-xs font-semibold border transition">
+                            All
+                        </button>
+                        <button type="button" data-status-filter="upcoming"
+                                class="meeting-filter-btn px-3 py-2 rounded-xl text-xs font-semibold border transition">
+                            Upcoming
+                        </button>
+                        <button type="button" data-status-filter="active"
+                                class="meeting-filter-btn px-3 py-2 rounded-xl text-xs font-semibold border transition">
+                            Active
+                        </button>
+                        <button type="button" data-status-filter="completed"
+                                class="meeting-filter-btn px-3 py-2 rounded-xl text-xs font-semibold border transition">
+                            Completed
+                        </button>
+                        <button type="button" data-status-filter="cancelled"
+                                class="meeting-filter-btn px-3 py-2 rounded-xl text-xs font-semibold border transition">
+                            Cancelled
                         </button>
                     </div>
                 </div>
@@ -615,12 +630,96 @@
             grid-template-columns: 1fr auto;
         }
     }
+
+    /* STATUS FILTERS */
+    .participant-meetings-responsive .meeting-status-filters {
+        min-width: 0;
+    }
+
+    .participant-meetings-responsive .meeting-filter-btn {
+        background: #fff;
+        color: rgb(75 85 99);
+        border-color: rgb(229 231 235);
+        white-space: nowrap;
+    }
+
+    .participant-meetings-responsive .meeting-filter-btn:hover {
+        background: rgb(249 250 251);
+        color: rgb(37 99 235);
+        border-color: rgb(191 219 254);
+    }
+
+    .participant-meetings-responsive .meeting-filter-btn.is-active {
+        background: rgb(37 99 235);
+        color: #fff;
+        border-color: rgb(37 99 235);
+        box-shadow: 0 4px 10px rgba(37, 99, 235, .18);
+    }
+
+    @media (max-width: 900px) {
+        .participant-meetings-responsive .meetings-topbar-inner {
+            flex-wrap: wrap;
+        }
+
+        .participant-meetings-responsive .meeting-status-filters {
+            width: 100%;
+            justify-content: flex-start !important;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .participant-meetings-responsive .meeting-status-filters {
+            display: grid !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 7px !important;
+        }
+
+        .participant-meetings-responsive .meeting-filter-btn {
+            width: 100%;
+            padding: 8px 7px !important;
+            font-size: 11px !important;
+        }
+
+        .participant-meetings-responsive .meeting-filter-btn:first-child {
+            grid-column: 1 / -1;
+        }
+    }
+
 </style>
 
 
 {{-- ================================================================
      LIVE STATUS POLLING (bina refresh ke Upcoming → Attend switch)
 ================================================================ --}}
+<script>
+    /* Client-side status filters: no page refresh required. */
+    (function () {
+        const buttons = Array.from(document.querySelectorAll('[data-status-filter]'));
+
+        function applyMeetingFilter(status) {
+            document.querySelectorAll('[data-meeting-id]').forEach(row => {
+                const current = String(row.dataset.currentStatus || '').toLowerCase();
+                row.style.display = (status === 'all' || current === status) ? '' : 'none';
+            });
+        }
+
+        buttons.forEach(button => {
+            button.addEventListener('click', function () {
+                buttons.forEach(btn => btn.classList.remove('is-active'));
+                this.classList.add('is-active');
+                applyMeetingFilter(this.dataset.statusFilter || 'all');
+            });
+        });
+
+        /* Expose for live polling so current filter remains correct
+           when Upcoming changes to Active without refresh. */
+        window.smartMeetApplyMeetingFilter = function () {
+            const active = document.querySelector('[data-status-filter].is-active');
+            applyMeetingFilter(active?.dataset.statusFilter || 'all');
+        };
+    })();
+</script>
+
 <script>
     (function () {
         const rows = Array.from(document.querySelectorAll('[data-meeting-id]'));
@@ -688,6 +787,10 @@
                     const attend = document.getElementById('attend-col-' + id);
                     if (attend) attend.innerHTML = attendHtml(status, id);
                 });
+
+                if (typeof window.smartMeetApplyMeetingFilter === 'function') {
+                    window.smartMeetApplyMeetingFilter();
+                }
             } catch (e) {
                 console.error('Participant meeting poll failed:', e);
             }
