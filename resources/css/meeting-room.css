@@ -692,3 +692,659 @@ body{
     background:rgba(255,255,255,.12);
     border-radius:999px;
 }
+
+/* =========================================================
+   RESPONSIVE STYLES
+========================================================= */
+
+@media(max-width:1200px){
+    .video-grid{
+        grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));
+        gap:16px;
+    }
+    .video-tile{
+        height:240px;
+        border-radius:24px;
+    }
+}
+
+@media(max-width:1024px){
+    .video-grid{
+        grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
+        gap:14px;
+    }
+    .video-tile{
+        height:220px;
+        border-radius:20px;
+    }
+    .transcript-panel{
+        width:300px;
+    }
+    .header{
+        padding:0 16px;
+        height:68px;
+    }
+    .meeting-title{
+        font-size:14px;
+    }
+    .header-center{
+        padding:8px 14px;
+        font-size:14px;
+    }
+}
+
+@media(max-width:900px){
+    .main{
+        flex-direction:column;
+        height:calc(100vh - 140px);
+    }
+    .video-area{
+        padding:14px;
+    }
+    .video-grid{
+        grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));
+        gap:14px;
+    }
+    .video-tile{
+        height:200px;
+        border-radius:18px;
+    }
+    .transcript-panel{
+        width:100%;
+        height:45vh;
+        border-left:none;
+        border-top:1px solid var(--border);
+        position:fixed;
+        bottom:0;
+        left:0;
+        right:0;
+        z-index:50;
+        border-radius:20px 20px 0 0;
+        box-shadow:0 -10px 40px rgba(0,0,0,.4);
+    }
+    .avatar-circle{
+        width:64px;
+        height:64px;
+        font-size:22px;
+    }
+    .avatar-circle.lg{
+        width:80px;
+        height:80px;
+        font-size:28px;
+    }
+    .header-center{
+        order:3;
+        width:100%;
+        justify-content:center;
+        margin-top:4px;
+    }
+    .header{
+        flex-wrap:wrap;
+        height:auto;
+        padding:10px 16px;
+        gap:6px;
+    }
+    .header-left{
+        flex:1;
+        min-width:0;
+        gap:10px;
+    }
+    .meeting-title{
+        font-size:13px;
+    }
+    .meeting-meta{
+        font-size:10px;
+        gap:6px;
+    }
+    .live-badge{
+        font-size:10px;
+        padding:4px 10px;
+    }
+}
+
+@media(max-width:768px){
+    .video-area{
+        padding:12px;
+    }
+    .video-grid{
+        grid-template-columns:repeat(auto-fit, minmax(170px, 1fr));
+        gap:12px;
+    }
+    .video-tile{
+        height:180px;
+        border-radius:16px;
+    }
+    .tile-info{
+        padding:10px 12px;
+    }
+    .tile-name{
+        font-size:12px;
+        gap:4px;
+    }
+    .tile-icons{
+        gap:4px;
+    }
+    .live-mic, .mic-off{
+        width:22px;
+        height:22px;
+        font-size:10px;
+    }
+    .you-badge{
+        top:10px;
+        right:10px;
+        font-size:9px;
+        padding:3px 8px;
+    }
+    .transcript-panel{
+        height:40vh;
+        border-radius:16px 16px 0 0;
+    }
+    .controls{
+        height:66px;
+        gap:14px;
+        padding:0 10px;
+    }
+    .ctrl-icon{
+        width:44px;
+        height:44px;
+        border-radius:14px;
+        font-size:14px;
+    }
+    .ctrl-label{
+        font-size:10px;
+    }
+    .ctrl-divider{
+        height:28px;
+    }
+    .btn-end{
+        width:46px;
+        height:46px;
+        border-radius:14px;
+        font-size:14px;
+    }
+    .header-right .btn-leave{
+        padding:8px 14px;
+        font-size:12px;
+        gap:6px;
+    }
+    .participants-count{
+        font-size:10px;
+        padding:6px 10px;
+    }
+    .header-center{
+        font-size:12px;
+        padding:6px 12px;
+        gap:6px;
+    }
+}
+
+@media(max-width:640px){
+    .header{
+        padding:6px 10px;
+        gap:4px;
+    }
+    .header-left{
+        gap:6px;
+    }
+    .live-badge{
+        font-size:8px;
+        padding:3px 8px;
+        gap:4px;
+    }
+    .live-dot{
+        width:5px;
+        height:5px;
+    }
+    .meeting-title{
+        font-size:11px;
+    }
+    .meeting-meta{
+        font-size:9px;
+        gap:4px;
+    }
+    .meeting-meta span:last-child{
+        display:none;
+    }
+    .header-center{
+        font-size:11px;
+        padding:4px 10px;
+        gap:4px;
+        order:3;
+        width:100%;
+        justify-content:center;
+    }
+    .header-right{
+        gap:6px;
+    }
+    .participants-count{
+        font-size:9px;
+        padding:4px 8px;
+    }
+    .participants-count span{
+        display:none;
+    }
+    .header-right .btn-leave{
+        padding:6px 10px;
+        font-size:10px;
+        gap:4px;
+        border-radius:10px;
+    }
+    .header-right .btn-leave span{
+        display:none;
+    }
+    .video-area{
+        padding:8px;
+    }
+    .video-grid{
+        grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));
+        gap:10px;
+    }
+    .video-tile{
+        height:160px;
+        border-radius:14px;
+        border-width:1.5px;
+    }
+    .tile-info{
+        padding:8px 10px;
+    }
+    .tile-name{
+        font-size:11px;
+        gap:4px;
+    }
+    .avatar-circle{
+        width:50px;
+        height:50px;
+        font-size:18px;
+    }
+    .avatar-circle.lg{
+        width:64px;
+        height:64px;
+        font-size:22px;
+    }
+    .you-badge{
+        top:8px;
+        right:8px;
+        font-size:8px;
+        padding:2px 6px;
+    }
+    .transcript-panel{
+        height:35vh;
+        border-radius:14px 14px 0 0;
+    }
+    .panel-tabs .tab{
+        padding:12px;
+        font-size:11px;
+    }
+    .transcript-body, .chat-body{
+        padding:10px;
+    }
+    .transcript-entry{
+        padding:8px 10px;
+        gap:8px;
+        border-radius:12px;
+    }
+    .transcript-avatar{
+        width:28px;
+        height:28px;
+        font-size:10px;
+    }
+    .transcript-name{
+        font-size:11px;
+    }
+    .transcript-text{
+        font-size:11px;
+    }
+    .chat-msg{
+        gap:6px;
+        margin-bottom:8px;
+    }
+    .chat-bubble{
+        font-size:11px;
+        padding:8px 12px;
+        border-radius:14px;
+        max-width:200px;
+    }
+    .chat-input-area{
+        padding:10px;
+        gap:8px;
+    }
+    .chat-input{
+        font-size:12px;
+        padding:8px 12px;
+        border-radius:10px;
+    }
+    .btn-send{
+        width:40px;
+        height:40px;
+        border-radius:10px;
+        font-size:14px;
+    }
+    .controls{
+        height:58px;
+        gap:8px;
+        padding:0 6px;
+    }
+    .ctrl-btn{
+        gap:3px;
+    }
+    .ctrl-icon{
+        width:38px;
+        height:38px;
+        border-radius:12px;
+        font-size:12px;
+    }
+    .ctrl-label{
+        font-size:8px;
+    }
+    .ctrl-divider{
+        height:24px;
+    }
+    .btn-end{
+        width:38px;
+        height:38px;
+        border-radius:12px;
+        font-size:12px;
+    }
+}
+
+@media(max-width:480px){
+    .header{
+        padding:4px 6px;
+        gap:3px;
+        min-height:44px;
+    }
+    .header-left{
+        gap:4px;
+    }
+    .live-badge{
+        font-size:7px;
+        padding:2px 6px;
+        gap:3px;
+    }
+    .live-dot{
+        width:4px;
+        height:4px;
+    }
+    .meeting-title{
+        font-size:10px;
+        max-width:80px;
+        white-space:nowrap;
+        overflow:hidden;
+        text-overflow:ellipsis;
+    }
+    .meeting-meta{
+        font-size:8px;
+        gap:2px;
+    }
+    .meeting-meta span:first-child{
+        display:none;
+    }
+    .header-center{
+        font-size:10px;
+        padding:3px 8px;
+        gap:3px;
+        order:3;
+        width:100%;
+        justify-content:center;
+    }
+    .header-right{
+        gap:4px;
+    }
+    .participants-count{
+        font-size:8px;
+        padding:3px 6px;
+        gap:3px;
+    }
+    .participants-count span{
+        display:none;
+    }
+    .header-right .btn-leave{
+        padding:4px 8px;
+        font-size:9px;
+        gap:3px;
+        border-radius:8px;
+        min-width:auto;
+    }
+    .header-right .btn-leave span{
+        display:none;
+    }
+    .video-area{
+        padding:6px;
+    }
+    .video-grid{
+        grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));
+        gap:8px;
+    }
+    .video-tile{
+        height:140px;
+        border-radius:12px;
+        border-width:1px;
+    }
+    .tile-info{
+        padding:6px 8px;
+    }
+    .tile-name{
+        font-size:10px;
+        gap:3px;
+    }
+    .avatar-circle{
+        width:40px;
+        height:40px;
+        font-size:14px;
+    }
+    .avatar-circle.lg{
+        width:50px;
+        height:50px;
+        font-size:18px;
+    }
+    .live-mic, .mic-off{
+        width:18px;
+        height:18px;
+        font-size:8px;
+        border-radius:50%;
+    }
+    .speaking-indicator{
+        gap:2px;
+    }
+    .speaking-bar{
+        width:3px;
+        height:10px;
+    }
+    @keyframes speak{
+        from{height:4px}
+        to{height:12px}
+    }
+    .you-badge{
+        top:6px;
+        right:6px;
+        font-size:7px;
+        padding:2px 5px;
+        border-radius:999px;
+    }
+    .transcript-panel{
+        height:30vh;
+        border-radius:12px 12px 0 0;
+    }
+    .panel-tabs .tab{
+        padding:8px;
+        font-size:10px;
+    }
+    .transcript-body, .chat-body{
+        padding:8px;
+    }
+    .transcript-entry{
+        padding:6px 8px;
+        gap:6px;
+        border-radius:10px;
+    }
+    .transcript-avatar{
+        width:22px;
+        height:22px;
+        font-size:8px;
+    }
+    .transcript-name{
+        font-size:10px;
+    }
+    .transcript-text{
+        font-size:10px;
+        line-height:1.4;
+    }
+    .transcript-time{
+        font-size:8px;
+    }
+    .chat-msg{
+        gap:4px;
+        margin-bottom:6px;
+    }
+    .chat-bubble{
+        font-size:10px;
+        padding:6px 10px;
+        border-radius:12px;
+        max-width:160px;
+    }
+    .chat-input-area{
+        padding:6px 8px;
+        gap:6px;
+    }
+    .chat-input{
+        font-size:10px;
+        padding:6px 10px;
+        border-radius:8px;
+        min-height:32px;
+    }
+    .btn-send{
+        width:32px;
+        height:32px;
+        border-radius:8px;
+        font-size:12px;
+    }
+    .controls{
+        height:52px;
+        gap:4px;
+        padding:0 4px;
+    }
+    .ctrl-btn{
+        gap:2px;
+    }
+    .ctrl-icon{
+        width:32px;
+        height:32px;
+        border-radius:10px;
+        font-size:10px;
+    }
+    .ctrl-label{
+        font-size:7px;
+    }
+    .ctrl-divider{
+        height:20px;
+    }
+    .btn-end{
+        width:32px;
+        height:32px;
+        border-radius:10px;
+        font-size:10px;
+    }
+}
+
+@media(max-width:380px){
+    .video-grid{
+        grid-template-columns:repeat(auto-fit, minmax(110px, 1fr));
+        gap:6px;
+    }
+    .video-tile{
+        height:120px;
+        border-radius:10px;
+    }
+    .tile-info{
+        padding:4px 6px;
+    }
+    .tile-name{
+        font-size:9px;
+        gap:2px;
+    }
+    .avatar-circle{
+        width:32px;
+        height:32px;
+        font-size:11px;
+    }
+    .avatar-circle.lg{
+        width:40px;
+        height:40px;
+        font-size:14px;
+    }
+    .live-mic, .mic-off{
+        width:14px;
+        height:14px;
+        font-size:6px;
+    }
+    .speaking-bar{
+        width:2px;
+        height:8px;
+    }
+    @keyframes speak{
+        from{height:3px}
+        to{height:10px}
+    }
+    .you-badge{
+        top:4px;
+        right:4px;
+        font-size:6px;
+        padding:1px 4px;
+    }
+    .transcript-panel{
+        height:25vh;
+        border-radius:10px 10px 0 0;
+    }
+    .panel-tabs .tab{
+        padding:6px;
+        font-size:9px;
+    }
+    .transcript-body, .chat-body{
+        padding:6px;
+    }
+    .chat-bubble{
+        font-size:9px;
+        padding:5px 8px;
+        max-width:130px;
+    }
+    .chat-input{
+        font-size:9px;
+        padding:4px 8px;
+        min-height:28px;
+    }
+    .btn-send{
+        width:28px;
+        height:28px;
+        font-size:10px;
+    }
+    .controls{
+        height:44px;
+        gap:2px;
+    }
+    .ctrl-icon{
+        width:26px;
+        height:26px;
+        border-radius:8px;
+        font-size:8px;
+    }
+    .ctrl-label{
+        font-size:6px;
+    }
+    .ctrl-divider{
+        height:16px;
+    }
+    .btn-end{
+        width:26px;
+        height:26px;
+        border-radius:8px;
+        font-size:8px;
+    }
+    .header-center{
+        font-size:9px;
+        padding:2px 6px;
+    }
+    .meeting-title{
+        font-size:9px;
+        max-width:60px;
+    }
+}
