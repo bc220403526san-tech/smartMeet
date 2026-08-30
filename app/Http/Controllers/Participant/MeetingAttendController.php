@@ -15,33 +15,22 @@ use Illuminate\View\View;
 
 class MeetingAttendController extends Controller
 {
-    public function attend(Meeting $meeting): View|RedirectResponse
+    public function attend(Meeting $meeting): View
     {
+        $this->authorizeParticipant($meeting);
+
         $user = auth()->user();
+        $now = now();
 
-        $participant = $meeting->participants()
-            ->where('user_id', $user->id)
-            ->first();
-
-        abort_unless($participant, 403);
-
-        if ($meeting->status === 'cancelled') {
-            return redirect()
-                ->route('participant.meetings.index')
-                ->with('error', 'This meeting has been cancelled by the organizer.');
-        }
-
-        if ($meeting->status !== 'active') {
-            return redirect()
-                ->route('participant.meetings.index')
-                ->with('info', "This meeting hasn't started yet. You'll be able to join once the organizer starts it.");
-        }
-
+        /*
+         * This participant is now really inside the room.
+         * Keep joined_at as the latest real join time and clear left_at.
+         */
         $meeting->participants()
             ->where('user_id', $user->id)
             ->update([
-                'joined_at' => now(),
-                'left_at'   => null,
+                'joined_at' => $now,
+                'left_at' => null,
             ]);
 
         $this->broadcastSignal(
@@ -50,9 +39,10 @@ class MeetingAttendController extends Controller
             toUserId: 'all',
             type: 'user-joined',
             data: [
-                'userId'   => (string) $user->id,
-                'name'     => $user->name,
+                'userId' => (string) $user->id,
+                'name' => $user->name,
                 'initials' => $this->initials($user->name),
+                'isOrganizer' => false,
             ]
         );
 
@@ -70,38 +60,32 @@ class MeetingAttendController extends Controller
             ->values();
 
         $alreadyJoined = $meeting->participants
-            ->filter(fn ($p) => $this->participantIsCurrentlyJoined($p))
-            ->filter(fn ($p) => $p->user !== null && (string) $p->user_id !== (string) $user->id)
-            ->map(fn ($p) => [
-                'userId'   => (string) $p->user->id,
-                'name'     => $p->user->name,
-                'initials' => $this->initials($p->user->name),
+            ->filter(fn ($participant) =>
+                $this->participantIsCurrentlyJoined($participant)
+                && (string) $participant->user_id !== (string) $user->id
+                && $participant->user !== null
+            )
+            ->map(fn ($participant) => [
+                'userId' => (string) $participant->user->id,
+                'name' => $participant->user->name,
+                'initials' => $this->initials($participant->user->name),
             ])
             ->values();
 
         $allParticipants = $meeting->participants
-            ->filter(fn ($p) => $p->user !== null && (string) $p->user_id !== (string) $user->id)
-            ->map(fn ($p) => [
-                'userId'    => (string) $p->user->id,
-                'name'      => $p->user->name,
-                'initials'  => $this->initials($p->user->name),
-                'hasJoined' => $this->participantIsCurrentlyJoined($p),
+            ->filter(fn ($participant) =>
+                (string) $participant->user_id !== (string) $user->id
+                && $participant->user !== null
+            )
+            ->map(fn ($participant) => [
+                'userId' => (string) $participant->user->id,
+                'name' => $participant->user->name,
+                'initials' => $this->initials($participant->user->name),
+                'hasJoined' => $this->participantIsCurrentlyJoined($participant),
             ])
             ->values();
 
-        $organizerJoinedAt = $meeting->organizer_joined_at
-            ? Carbon::parse($meeting->organizer_joined_at)
-            : null;
-
-        $organizerLeftAt = $meeting->organizer_left_at
-            ? Carbon::parse($meeting->organizer_left_at)
-            : null;
-
-        $organizerJoined = $organizerJoinedAt !== null
-            && (
-                $organizerLeftAt === null
-                || $organizerLeftAt->lt($organizerJoinedAt)
-            );
+        $organizerJoined = $this->organizerIsCurrentlyJoined($meeting);
 
         return view('participant.meetings.attend', compact(
             'meeting',
@@ -127,6 +111,8 @@ class MeetingAttendController extends Controller
         ]);
 
         $fromUserId = (string) auth()->id();
+        $type = $validated['type'];
+        $data = $validated['data'];
 
         $broadcastTypes = [
             'chat',
@@ -137,9 +123,6 @@ class MeetingAttendController extends Controller
             'meeting-cancelled',
             'meeting-ended',
         ];
-
-        $type = $validated['type'];
-        $data = $validated['data'];
 
         if (in_array($type, $broadcastTypes, true)) {
             $this->broadcastSignal(
@@ -195,9 +178,9 @@ class MeetingAttendController extends Controller
 
         $transcript = MeetingTranscript::create([
             'meeting_id' => $meeting->id,
-            'user_id'    => $user->id,
-            'text'       => trim($validated['text']),
-            'spoken_at'  => $spokenAt,
+            'user_id' => $user->id,
+            'text' => trim($validated['text']),
+            'spoken_at' => $spokenAt,
         ]);
 
         broadcast(new TranscriptUpdated(
@@ -219,12 +202,16 @@ class MeetingAttendController extends Controller
         $this->authorizeParticipant($meeting);
 
         $user = auth()->user();
+        $now = now();
 
+        /*
+         * Keep joined_at for correct ordering/history.
+         * left_at marks the participant offline because left_at >= joined_at.
+         */
         $meeting->participants()
             ->where('user_id', $user->id)
             ->update([
-                'joined_at' => null,
-                'left_at'   => now(),
+                'left_at' => $now,
             ]);
 
         $this->broadcastSignal(
@@ -234,7 +221,8 @@ class MeetingAttendController extends Controller
             type: 'user-left',
             data: [
                 'userId' => (string) $user->id,
-                'name'   => $user->name,
+                'name' => $user->name,
+                'isOrganizer' => false,
             ]
         );
 
@@ -264,8 +252,11 @@ class MeetingAttendController extends Controller
 
     private function participantIsCurrentlyJoined($participant): bool
     {
-        $joinedAt = $participant->joined_at;
-        $leftAt = $participant->left_at;
+        $joinedAt = $participant->joined_at
+            ?? $participant->pivot?->joined_at;
+
+        $leftAt = $participant->left_at
+            ?? $participant->pivot?->left_at;
 
         if ($joinedAt === null) {
             return false;
@@ -276,6 +267,20 @@ class MeetingAttendController extends Controller
         }
 
         return Carbon::parse($joinedAt)->gt(Carbon::parse($leftAt));
+    }
+
+    private function organizerIsCurrentlyJoined(Meeting $meeting): bool
+    {
+        if ($meeting->organizer_joined_at === null) {
+            return false;
+        }
+
+        if ($meeting->organizer_left_at === null) {
+            return true;
+        }
+
+        return Carbon::parse($meeting->organizer_joined_at)
+            ->gt(Carbon::parse($meeting->organizer_left_at));
     }
 
     private function broadcastSignal(
