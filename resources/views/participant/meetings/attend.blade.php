@@ -1092,7 +1092,7 @@
                 ensureTileVisible(uid);
                 attachRemoteStream(uid);
                 unlockRemoteAudio();
-                sendSignal(uid,'media-sync-request',{requesterId:MY_USER_ID});
+                pc.__restartAttempts=0;
             }else if(pc.connectionState==='disconnected'){
                 clearTimeout(pc.__disconnectTimer);
                 pc.__disconnectTimer=setTimeout(()=>{
@@ -1119,16 +1119,31 @@
         const pc=peers[uid];
         if(!pc || pc.signalingState==='closed') return;
 
+        // Backoff + cap: without this, a persistently broken relay path (e.g. bad
+        // TURN credentials) causes an endless offer/answer loop that hammers the
+        // signaling server and battery without ever actually recovering the call.
+        pc.__restartAttempts = pc.__restartAttempts || 0;
+        const backoff = Math.min(20000, 1500 * Math.pow(1.8, pc.__restartAttempts));
+        const sinceLast = Date.now() - (pc.__lastRestartAt || 0);
+        if(pc.__lastRestartAt && sinceLast < backoff) return;
+
         clearTimeout(pc.__restartTimer);
         pc.__restartTimer=setTimeout(async ()=>{
+            if(!peers[uid] || peers[uid]!==pc || pc.signalingState==='closed' || leftUsers.has(uid)) return;
+            if(pc.iceConnectionState==='connected' || pc.iceConnectionState==='completed'){ pc.__restartAttempts=0; return; }
+            pc.__lastRestartAt=Date.now();
+            pc.__restartAttempts++;
             try{
-                if(pc.restartIce) pc.restartIce();
-                if(shouldInitiate(uid)){
-                    await negotiatePeer(uid,true);
-                }else{
-                    await sendSignal(uid,'ice-restart-request',{requesterId:MY_USER_ID});
-                }
+                // createOffer({iceRestart:true}) already generates fresh ICE credentials —
+                // calling pc.restartIce() as well fired a SECOND, overlapping negotiation
+                // and was the cause of the continuous offer/answer loop. Either side may
+                // now initiate a restart; the polite/impolite handling in handleOffer()
+                // safely resolves any collision if both sides try at once.
+                await negotiatePeer(uid,true);
             }catch(e){ console.warn('[SmartMeet] ICE restart failed', uid, e); }
+            if(pc.__restartAttempts===5){
+                showToast('⚠️ Connection to a participant is unstable — this usually means the TURN relay server needs checking.');
+            }
         },250);
     }
 
@@ -1313,55 +1328,6 @@
             if(!wasOnline) showToast(`✅ ${escapeHtml(data.data.name)} has joined the meeting.`);
             sendSignal(uid,'mic-status',{ userId:MY_USER_ID, muted:!isMicOn });
             sendSignal(uid,'camera-status',{ userId:MY_USER_ID, cameraOn:isCameraOn });
-            sendSignal(uid,'media-sync-request',{ requesterId:MY_USER_ID });
-            // Tell the newly joined browser that THIS already-connected user is here.
-            // This is metadata/presence only; camera/mic capture settings are not changed.
-            sendSignal(uid,'presence-sync',{
-                userId:MY_USER_ID,
-                name:MY_NAME,
-                initials:MY_INITIALS,
-                isOrganizer:IS_ORGANIZER,
-                muted:!isMicOn,
-                cameraOn:isCameraOn
-            });
-            return;
-        }
-        if(data.type==='presence-sync'){
-            // Targeted reply used by late joiners so every already-connected user appears.
-            if(String(data.toUserId)!==String(MY_USER_ID)) return;
-            const uid=String(data.data?.userId||from);
-            if(uid===String(MY_USER_ID)) return;
-
-            leftUsers.delete(uid);
-            const isOrg=Boolean(data.data?.isOrganizer);
-            const name=data.data?.name || knownParticipants[uid]?.name || 'User';
-            const initials=data.data?.initials || knownParticipants[uid]?.initials || initialsOf(name);
-
-            if(!knownParticipants[uid]){
-                knownParticipants[uid]={ name, initials, isOrganizer:isOrg, hasJoined:true };
-            }else{
-                knownParticipants[uid].name=name;
-                knownParticipants[uid].initials=initials;
-                knownParticipants[uid].isOrganizer=isOrg || knownParticipants[uid].isOrganizer;
-                knownParticipants[uid].hasJoined=true;
-            }
-
-            addParticipantTile(uid, name, initials, isOrg);
-            markOnline(uid);
-
-            if(typeof data.data?.muted!=='undefined'){
-                micStatus[uid]=Boolean(data.data.muted);
-                const micEl=document.getElementById('micoff-'+uid);
-                if(micEl) micEl.style.display=micStatus[uid]?'flex':'none';
-            }
-            if(typeof data.data?.cameraOn!=='undefined'){
-                camStatus[uid]=Boolean(data.data.cameraOn);
-            }
-
-            createPeerConnection(uid);
-            if(shouldInitiate(uid)) setTimeout(()=>negotiatePeer(uid,false),80);
-            sendSignal(uid,'media-sync-request',{ requesterId:MY_USER_ID });
-            attachRemoteStream(uid);
             return;
         }
 
@@ -1390,33 +1356,11 @@
             const uid=String(data.data.userId||from); if(uid===String(MY_USER_ID)) return;
             camStatus[uid]=Boolean(data.data.cameraOn);
             attachRemoteStream(uid);
-            if(camStatus[uid]){
-                // Ask the sender to re-attach its current camera track to this peer.
-                // This does not change the sender's camera settings or on/off state.
-                sendSignal(uid,'media-sync-request',{ requesterId:MY_USER_ID });
-            }
             return;
         }
         if(String(data.toUserId)!==String(MY_USER_ID)) return;
         if(!data.data) return;
         if(leftUsers.has(from) && ['offer','ice-candidate'].includes(data.type)) return;
-
-        if(data.type==='media-sync-request'){
-            const pc=createPeerConnection(from);
-            await syncLocalTracksToPeer(from);
-            broadcastMyMicStatus();
-            broadcastMyCameraStatus();
-            if(pc && shouldInitiate(from) && (pc.connectionState==='new' || pc.connectionState==='connecting')){
-                const age=Date.now()-(pc.__lastOfferAt||0);
-                if(age>1200) await negotiatePeer(from,false);
-            }
-            return;
-        }
-        if(data.type==='ice-restart-request'){
-            const pc=createPeerConnection(from);
-            if(pc && shouldInitiate(from)) await negotiatePeer(from,true);
-            return;
-        }
 
         if(data.type==='offer') return handleOffer(from, data.data);
         if(data.type==='answer') return handleAnswer(from, data.data);
@@ -1478,7 +1422,6 @@
         }
         await syncTracksToEveryPeer();
         broadcastMyMicStatus();
-        Object.keys(peers).forEach(uid=>sendSignal(uid,'media-sync-request',{requesterId:MY_USER_ID}));
     }
     async function toggleCamera(){
         // Camera is intentionally independent from microphone permission.
@@ -1502,7 +1445,6 @@
         if(avatar) avatar.style.display = isCameraOn ? 'none' : 'flex';
         await syncTracksToEveryPeer();
         broadcastMyCameraStatus();
-        Object.keys(peers).forEach(uid=>sendSignal(uid,'media-sync-request',{requesterId:MY_USER_ID}));
         if(isCameraOn){
             // Re-sync after the camera track has had time to become live on slower phones.
             setTimeout(()=>{ syncTracksToEveryPeer(); broadcastMyCameraStatus(); },250);
@@ -1739,7 +1681,6 @@
             if(pc.connectionState==='failed') restartPeer(uid);
             else if(pc.connectionState==='connected'){
                 attachRemoteStream(uid);
-                sendSignal(uid,'media-sync-request',{requesterId:MY_USER_ID});
             }
         });
         unlockRemoteAudio();
