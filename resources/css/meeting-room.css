@@ -60,6 +60,7 @@ body{
     display:flex;
     align-items:center;
     gap:18px;
+    flex-shrink:0;
 }
 
 .live-badge{
@@ -78,6 +79,7 @@ body{
 
     font-size:12px;
     font-weight:700;
+    flex-shrink:0;
 }
 
 .live-dot{
@@ -105,6 +107,10 @@ body{
 .meeting-title{
     font-size:15px;
     font-weight:700;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    max-width:200px;
 }
 
 .meeting-meta{
@@ -130,12 +136,14 @@ body{
     border-radius:14px;
 
     font-weight:700;
+    flex-shrink:0;
 }
 
 .header-right{
     display:flex;
     align-items:center;
     gap:14px;
+    flex-shrink:0;
 }
 
 .participants-count{
@@ -151,6 +159,7 @@ body{
     border-radius:999px;
 
     font-size:12px;
+    white-space:nowrap;
 }
 
 .btn-leave{
@@ -173,6 +182,7 @@ body{
     gap:8px;
 
     transition:.25s;
+    flex-shrink:0;
 }
 
 .btn-leave:hover{
@@ -196,6 +206,7 @@ body{
     flex:1;
     padding:20px;
     overflow:auto;
+    min-width:0;
 }
 
 .video-grid{
@@ -229,6 +240,7 @@ body{
     flex-direction:column;
     justify-content:center;
     align-items:center;
+    min-width:0;
 }
 
 .video-tile:hover{
@@ -251,6 +263,7 @@ body{
     align-items:center;
     justify-content:center;
     flex:1;
+    width:100%;
 }
 
 .avatar-circle{
@@ -268,6 +281,7 @@ body{
     font-weight:700;
 
     color:white;
+    flex-shrink:0;
 }
 
 .avatar-circle.lg{
@@ -298,12 +312,16 @@ body{
     display:flex;
     align-items:center;
     gap:8px;
+    overflow:hidden;
+    white-space:nowrap;
+    text-overflow:ellipsis;
 }
 
 .tile-icons{
     display:flex;
     align-items:center;
     gap:8px;
+    flex-shrink:0;
 }
 
 .live-mic{
@@ -322,6 +340,7 @@ body{
     justify-content:center;
 
     font-size:12px;
+    flex-shrink:0;
 }
 
 .mic-off{
@@ -338,6 +357,7 @@ body{
     display:flex;
     align-items:center;
     justify-content:center;
+    flex-shrink:0;
 }
 
 .speaking-indicator{
@@ -403,6 +423,8 @@ body{
 .transcript-panel{
 
     width:360px;
+    min-width:320px;
+    max-width:420px;
 
     background:rgba(15,23,42,.92);
 
@@ -410,6 +432,7 @@ body{
 
     display:flex;
     flex-direction:column;
+    flex-shrink:0;
 }
 
 .panel-tabs{
@@ -581,6 +604,7 @@ body{
     color:white;
 
     outline:none;
+    min-width:0;
 }
 
 .btn-send{
@@ -596,6 +620,7 @@ body{
     background:linear-gradient(135deg,#3b82f6,#06b6d4);
 
     color:white;
+    flex-shrink:0;
 }
 
 /* =========================================================
@@ -615,6 +640,7 @@ body{
     justify-content:center;
 
     gap:20px;
+    flex-shrink:0;
 }
 
 .ctrl-btn{
@@ -622,6 +648,7 @@ body{
     flex-direction:column;
     align-items:center;
     gap:6px;
+    flex-shrink:0;
 }
 
 .ctrl-icon{
@@ -662,6 +689,7 @@ body{
     width:1px;
     height:34px;
     background:var(--border);
+    flex-shrink:0;
 }
 
 .btn-end{
@@ -678,6 +706,7 @@ body{
     color:white;
 
     cursor:pointer;
+    flex-shrink:0;
 }
 
 /* =========================================================
@@ -706,6 +735,10 @@ body{
         height:240px;
         border-radius:24px;
     }
+    .transcript-panel{
+        width:320px;
+        min-width:280px;
+    }
 }
 
 @media(max-width:1024px){
@@ -719,6 +752,7 @@ body{
     }
     .transcript-panel{
         width:300px;
+        min-width:260px;
     }
     .header{
         padding:0 16px;
@@ -726,6 +760,7 @@ body{
     }
     .meeting-title{
         font-size:14px;
+        max-width:150px;
     }
     .header-center{
         padding:8px 14px;
@@ -740,6 +775,7 @@ body{
     }
     .video-area{
         padding:14px;
+        flex:1;
     }
     .video-grid{
         grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));
@@ -750,17 +786,13 @@ body{
         border-radius:18px;
     }
     .transcript-panel{
-        width:100%;
+        width:100% !important;
+        min-width:0 !important;
+        max-width:100% !important;
         height:45vh;
         border-left:none;
         border-top:1px solid var(--border);
-        position:fixed;
-        bottom:0;
-        left:0;
-        right:0;
-        z-index:50;
-        border-radius:20px 20px 0 0;
-        box-shadow:0 -10px 40px rgba(0,0,0,.4);
+        flex-shrink:0;
     }
     .avatar-circle{
         width:64px;
@@ -772,33 +804,47 @@ body{
         height:80px;
         font-size:28px;
     }
-    .header-center{
-        order:3;
-        width:100%;
-        justify-content:center;
-        margin-top:4px;
-    }
     .header{
         flex-wrap:wrap;
         height:auto;
-        padding:10px 16px;
-        gap:6px;
+        padding:8px 14px;
+        gap:4px;
+        min-height:60px;
     }
     .header-left{
         flex:1;
         min-width:0;
-        gap:10px;
+        gap:8px;
+    }
+    .header-center{
+        order:2;
+        padding:6px 12px;
+        font-size:13px;
+        gap:6px;
+        flex-shrink:0;
+    }
+    .header-right{
+        gap:8px;
     }
     .meeting-title{
         font-size:13px;
+        max-width:120px;
     }
     .meeting-meta{
         font-size:10px;
-        gap:6px;
+        gap:4px;
     }
     .live-badge{
         font-size:10px;
         padding:4px 10px;
+    }
+    .participants-count{
+        font-size:10px;
+        padding:5px 10px;
+    }
+    .btn-leave{
+        padding:8px 14px;
+        font-size:11px;
     }
 }
 
@@ -807,7 +853,7 @@ body{
         padding:12px;
     }
     .video-grid{
-        grid-template-columns:repeat(auto-fit, minmax(170px, 1fr));
+        grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
         gap:12px;
     }
     .video-tile{
@@ -837,7 +883,6 @@ body{
     }
     .transcript-panel{
         height:40vh;
-        border-radius:16px 16px 0 0;
     }
     .controls{
         height:66px;
@@ -862,34 +907,26 @@ body{
         border-radius:14px;
         font-size:14px;
     }
-    .header-right .btn-leave{
-        padding:8px 14px;
-        font-size:12px;
-        gap:6px;
-    }
-    .participants-count{
-        font-size:10px;
-        padding:6px 10px;
-    }
     .header-center{
         font-size:12px;
-        padding:6px 12px;
-        gap:6px;
+        padding:5px 10px;
+        gap:4px;
     }
 }
 
 @media(max-width:640px){
     .header{
         padding:6px 10px;
-        gap:4px;
+        gap:3px;
+        min-height:52px;
     }
     .header-left{
-        gap:6px;
+        gap:4px;
     }
     .live-badge{
         font-size:8px;
         padding:3px 8px;
-        gap:4px;
+        gap:3px;
     }
     .live-dot{
         width:5px;
@@ -897,24 +934,24 @@ body{
     }
     .meeting-title{
         font-size:11px;
+        max-width:100px;
     }
     .meeting-meta{
         font-size:9px;
-        gap:4px;
+        gap:3px;
     }
     .meeting-meta span:last-child{
         display:none;
     }
     .header-center{
         font-size:11px;
-        padding:4px 10px;
-        gap:4px;
-        order:3;
-        width:100%;
-        justify-content:center;
+        padding:4px 8px;
+        gap:3px;
+        order:2;
+        flex-shrink:0;
     }
     .header-right{
-        gap:6px;
+        gap:4px;
     }
     .participants-count{
         font-size:9px;
@@ -923,20 +960,20 @@ body{
     .participants-count span{
         display:none;
     }
-    .header-right .btn-leave{
-        padding:6px 10px;
+    .btn-leave{
+        padding:5px 10px;
         font-size:10px;
         gap:4px;
         border-radius:10px;
     }
-    .header-right .btn-leave span{
+    .btn-leave span{
         display:none;
     }
     .video-area{
         padding:8px;
     }
     .video-grid{
-        grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));
+        grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));
         gap:10px;
     }
     .video-tile{
@@ -949,7 +986,7 @@ body{
     }
     .tile-name{
         font-size:11px;
-        gap:4px;
+        gap:3px;
     }
     .avatar-circle{
         width:50px;
@@ -969,7 +1006,6 @@ body{
     }
     .transcript-panel{
         height:35vh;
-        border-radius:14px 14px 0 0;
     }
     .panel-tabs .tab{
         padding:12px;
@@ -1002,7 +1038,7 @@ body{
         font-size:11px;
         padding:8px 12px;
         border-radius:14px;
-        max-width:200px;
+        max-width:180px;
     }
     .chat-input-area{
         padding:10px;
@@ -1021,7 +1057,7 @@ body{
     }
     .controls{
         height:58px;
-        gap:8px;
+        gap:10px;
         padding:0 6px;
     }
     .ctrl-btn{
@@ -1038,6 +1074,7 @@ body{
     }
     .ctrl-divider{
         height:24px;
+        margin:0 2px;
     }
     .btn-end{
         width:38px;
@@ -1050,16 +1087,17 @@ body{
 @media(max-width:480px){
     .header{
         padding:4px 6px;
-        gap:3px;
+        gap:2px;
         min-height:44px;
     }
     .header-left{
-        gap:4px;
+        gap:3px;
+        flex:0 1 auto;
     }
     .live-badge{
         font-size:7px;
         padding:2px 6px;
-        gap:3px;
+        gap:2px;
     }
     .live-dot{
         width:4px;
@@ -1067,10 +1105,7 @@ body{
     }
     .meeting-title{
         font-size:10px;
-        max-width:80px;
-        white-space:nowrap;
-        overflow:hidden;
-        text-overflow:ellipsis;
+        max-width:70px;
     }
     .meeting-meta{
         font-size:8px;
@@ -1081,38 +1116,36 @@ body{
     }
     .header-center{
         font-size:10px;
-        padding:3px 8px;
-        gap:3px;
-        order:3;
-        width:100%;
-        justify-content:center;
+        padding:3px 6px;
+        gap:2px;
+        order:2;
     }
     .header-right{
-        gap:4px;
+        gap:3px;
     }
     .participants-count{
         font-size:8px;
         padding:3px 6px;
-        gap:3px;
+        gap:2px;
     }
     .participants-count span{
         display:none;
     }
-    .header-right .btn-leave{
+    .btn-leave{
         padding:4px 8px;
         font-size:9px;
-        gap:3px;
+        gap:2px;
         border-radius:8px;
         min-width:auto;
     }
-    .header-right .btn-leave span{
+    .btn-leave span{
         display:none;
     }
     .video-area{
         padding:6px;
     }
     .video-grid{
-        grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));
+        grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));
         gap:8px;
     }
     .video-tile{
@@ -1125,7 +1158,7 @@ body{
     }
     .tile-name{
         font-size:10px;
-        gap:3px;
+        gap:2px;
     }
     .avatar-circle{
         width:40px;
@@ -1141,7 +1174,6 @@ body{
         width:18px;
         height:18px;
         font-size:8px;
-        border-radius:50%;
     }
     .speaking-indicator{
         gap:2px;
@@ -1159,11 +1191,9 @@ body{
         right:6px;
         font-size:7px;
         padding:2px 5px;
-        border-radius:999px;
     }
     .transcript-panel{
         height:30vh;
-        border-radius:12px 12px 0 0;
     }
     .panel-tabs .tab{
         padding:8px;
@@ -1200,7 +1230,7 @@ body{
         font-size:10px;
         padding:6px 10px;
         border-radius:12px;
-        max-width:160px;
+        max-width:140px;
     }
     .chat-input-area{
         padding:6px 8px;
@@ -1220,7 +1250,7 @@ body{
     }
     .controls{
         height:52px;
-        gap:4px;
+        gap:6px;
         padding:0 4px;
     }
     .ctrl-btn{
@@ -1237,6 +1267,7 @@ body{
     }
     .ctrl-divider{
         height:20px;
+        margin:0 1px;
     }
     .btn-end{
         width:32px;
@@ -1248,7 +1279,7 @@ body{
 
 @media(max-width:380px){
     .video-grid{
-        grid-template-columns:repeat(auto-fit, minmax(110px, 1fr));
+        grid-template-columns:repeat(auto-fit, minmax(120px, 1fr));
         gap:6px;
     }
     .video-tile{
@@ -1293,7 +1324,6 @@ body{
     }
     .transcript-panel{
         height:25vh;
-        border-radius:10px 10px 0 0;
     }
     .panel-tabs .tab{
         padding:6px;
@@ -1305,7 +1335,7 @@ body{
     .chat-bubble{
         font-size:9px;
         padding:5px 8px;
-        max-width:130px;
+        max-width:110px;
     }
     .chat-input{
         font-size:9px;
@@ -1319,7 +1349,7 @@ body{
     }
     .controls{
         height:44px;
-        gap:2px;
+        gap:4px;
     }
     .ctrl-icon{
         width:26px;
@@ -1345,6 +1375,6 @@ body{
     }
     .meeting-title{
         font-size:9px;
-        max-width:60px;
+        max-width:50px;
     }
 }
