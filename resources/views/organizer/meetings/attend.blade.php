@@ -267,6 +267,133 @@
             .btn-leave span,.btn-cancel span{display:none}
             .btn-leave,.btn-cancel{padding:9px; width:36px; height:36px; border-radius:50%; justify-content:center}
         }
+
+        /* ================================================================
+           FINAL UI/PRESENCE/AUDIO FIXES
+           ================================================================ */
+
+        /* Keep video area and side panel visually separate on desktop. */
+        .main{gap:12px !important}
+
+        /* Cleaner muted-mic indicator inside video tiles. */
+        .mic-off{
+            background:rgba(30,41,59,.94) !important;
+            color:#cbd5e1 !important;
+            border:1px solid rgba(148,163,184,.28) !important;
+            box-shadow:0 4px 12px rgba(0,0,0,.22) !important;
+        }
+
+        /* One tile stays centered and clean. */
+        .video-grid:has(> .video-tile:only-child){
+            grid-template-columns:1fr !important;
+            place-items:center !important;
+            align-content:center !important;
+        }
+        .video-grid:has(> .video-tile:only-child) > .video-tile{
+            width:min(720px,86%) !important;
+            max-width:720px !important;
+            min-width:0 !important;
+        }
+
+        /* The old empty-stage video icon/text was overlapping the only tile. */
+        #empty-stage{display:none !important}
+
+        /* Desktop: normal right-side panel, never merged with video area. */
+        @media (min-width:901px){
+            #side-panel{
+                position:relative !important;
+                inset:auto !important;
+                transform:none !important;
+                width:min(340px,32vw) !important;
+                min-width:300px !important;
+                max-width:360px !important;
+                height:auto !important;
+                align-self:stretch !important;
+                flex:0 0 min(340px,32vw) !important;
+                border-radius:20px !important;
+            }
+        }
+
+        /* Small screen: near-full available screen, centered with tiny margins.
+           It does not become a narrow box and does not merge with the video area. */
+        @media (max-width:900px){
+            #side-panel{
+                position:fixed !important;
+                left:8px !important;
+                right:8px !important;
+                top:68px !important;
+                bottom:76px !important;
+                width:auto !important;
+                min-width:0 !important;
+                max-width:none !important;
+                height:auto !important;
+                max-height:none !important;
+                transform:none !important;
+                margin:0 !important;
+                border-radius:18px !important;
+                z-index:90 !important;
+            }
+
+            .video-grid:has(> .video-tile:only-child) > .video-tile{
+                width:min(650px,94%) !important;
+                max-width:94% !important;
+            }
+        }
+
+        @media (max-width:640px){
+            #side-panel{
+                left:6px !important;
+                right:6px !important;
+                top:58px !important;
+                bottom:68px !important;
+                border-radius:16px !important;
+            }
+            .video-grid:has(> .video-tile:only-child) > .video-tile{
+                width:100% !important;
+                max-width:100% !important;
+            }
+        }
+
+        /* Tiny top drag handle for resizing the small-screen panel. */
+        #side-panel{position:relative}
+        .panel-resize-handle{
+            position:absolute;
+            top:4px;
+            left:50%;
+            transform:translateX(-50%);
+            width:64px;
+            height:18px;
+            z-index:120;
+            cursor:ns-resize;
+            touch-action:none;
+            user-select:none;
+            display:none;
+            align-items:flex-start;
+            justify-content:center;
+        }
+        .panel-resize-handle::before{
+            content:"";
+            width:42px;
+            height:4px;
+            border-radius:999px;
+            background:rgba(203,213,225,.5);
+        }
+        @media(max-width:900px){
+            .panel-resize-handle{display:flex}
+        }
+
+        /* Make room for the small drag handle without changing panel design. */
+        @media(max-width:900px){
+            .panel-tabbar{padding-top:8px}
+        }
+
+        .person-muted-note{
+            color:#94a3b8;
+            font-size:9px;
+            margin-left:4px;
+            white-space:nowrap;
+        }
+
     </style>
 </head>
 @php
@@ -323,16 +450,14 @@
 <div class="main">
     <div class="video-area">
         <div class="video-grid" id="video-grid"></div>
-        <div class="empty-stage" id="empty-stage" style="display:none">
-            <i class="fa fa-video"></i>
-            <span>You're the only one here right now. Others will appear as soon as they join.</span>
-        </div>
+        <div class="empty-stage" id="empty-stage" style="display:none"></div>
         <div id="maximized-overlay">
             <button class="maximize-close-btn" onclick="restoreMaximized()"><i class="fa fa-compress"></i></button>
         </div>
     </div>
 
     <div id="side-panel">
+        <div class="panel-resize-handle" id="panel-resize-handle" title="Drag up/down to resize"></div>
         <div class="panel-tabbar">
             <button class="panel-tabbtn" data-tab="transcript" onclick="toggleSidePanel('transcript')"><i class="fa fa-closed-captioning"></i> Transcript</button>
             <button class="panel-tabbtn" data-tab="chat" onclick="toggleSidePanel('chat')">Chat</button>
@@ -484,17 +609,29 @@
         const isMe = uid===String(MY_USER_ID);
         const info = isMe ? { name: MY_NAME, initials: MY_INITIALS, isOrganizer: true } : knownParticipants[uid];
         if(!info) return;
+
         const isOnline = isMe || onlineUsers.has(uid);
+        const muted = isMe ? !isMicOn : micStatus[uid] === true;
+
         let row=document.getElementById('person-row-'+uid);
         if(!row){ row=document.createElement('div'); row.id='person-row-'+uid; body.appendChild(row); }
         row.className='person-row '+(isOnline?'joined':'pending');
+
         const color=colorFor(uid, info.isOrganizer);
         const canMute = IS_ORGANIZER && !isMe && isOnline;
+
         row.innerHTML = `
         <div class="person-avatar" style="background:linear-gradient(135deg,${color})">${escapeHtml(info.initials||initialsOf(info.name))}</div>
         <div class="person-info">
-            <div class="person-name">${escapeHtml(info.name)}${isMe?' <span style="color:var(--blue);font-weight:600;">(You)</span>':''}${info.isOrganizer?'<i class="fa fa-crown" style="color:#fbbf24;font-size:10px;"></i>':''}</div>
-            <div class="person-status ${isOnline?'on':''}">${info.isOrganizer?'Organizer':'Participant'} • ${isOnline?'Joined':'Not joined yet'}</div>
+            <div class="person-name">
+                ${escapeHtml(info.name)}
+                ${isMe?' <span style="color:var(--blue);font-weight:600;">(You)</span>':''}
+                ${info.isOrganizer?'<i class="fa fa-crown" style="color:#fbbf24;font-size:10px;"></i>':''}
+            </div>
+            <div class="person-status ${isOnline?'on':''}">
+                ${info.isOrganizer?'Organizer':'Participant'} • ${isOnline?'Joined':'Not joined yet'}
+                ${isOnline && muted ? '<span class="person-muted-note">• Mic off</span>' : ''}
+            </div>
         </div>
         ${canMute ? `<button class="person-action" onclick="muteParticipant('${uid}')" title="Mute this participant"><i class="fa fa-microphone-slash"></i></button>` : ''}
         <span class="person-dot ${isOnline?'on':''}"></span>`;
@@ -526,10 +663,12 @@
     }
 
     function refreshEmptyStage(){
-        const grid=document.getElementById('video-grid');
+        /*
+         * Removed intentionally: the previous empty-state camera icon/text
+         * overlapped the single local video tile.
+         */
         const stage=document.getElementById('empty-stage');
-        if(!grid||!stage) return;
-        stage.style.display = grid.children.length<=1 ? 'flex' : 'none';
+        if(stage) stage.style.display='none';
     }
 
     /* ---------- Tiles ---------- */
@@ -716,10 +855,36 @@
 
     async function syncLocalTracksToPeer(uid){
         const pc=peers[uid]; if(!pc || pc.signalingState==='closed') return;
-        const audioTrack = localStream?.getAudioTracks?.()[0] || null;
-        const videoTrack = localStream?.getVideoTracks?.()[0] || null;
-        try{ if(pc.__audioTx?.sender) await pc.__audioTx.sender.replaceTrack(audioTrack); }catch(e){}
-        try{ if(pc.__videoTx?.sender) await pc.__videoTx.sender.replaceTrack(videoTrack); }catch(e){}
+
+        const audioTrack=localStream?.getAudioTracks?.()[0]||null;
+        const videoTrack=localStream?.getVideoTracks?.()[0]||null;
+
+        if(audioTrack){
+            try{ audioTrack.contentHint='speech'; }catch(e){}
+        }
+
+        try{
+            if(pc.__audioTx?.sender){
+                await pc.__audioTx.sender.replaceTrack(audioTrack);
+
+                /* Give Opus enough headroom while keeping speech stable. */
+                try{
+                    const params=pc.__audioTx.sender.getParameters();
+                    if(params.encodings?.length){
+                        params.encodings[0].maxBitrate=96000;
+                        await pc.__audioTx.sender.setParameters(params);
+                    }
+                }catch(e){}
+            }
+        }catch(e){
+            console.warn('audio sender sync failed', uid, e);
+        }
+
+        try{
+            if(pc.__videoTx?.sender) await pc.__videoTx.sender.replaceTrack(videoTrack);
+        }catch(e){
+            console.warn('video sender sync failed', uid, e);
+        }
     }
     async function syncTracksToEveryPeer(){ await Promise.allSettled(Object.keys(peers).map(uid=>syncLocalTracksToPeer(uid))); }
 
@@ -727,21 +892,70 @@
         uid=String(uid);
         const source=getOrCreateRemoteStream(uid);
         const localIds=new Set((localStream?.getTracks?.()||[]).map(t=>t.id));
-        const audioTracks=source.getAudioTracks().filter(t=>t.readyState!=='ended' && !localIds.has(t.id));
-        let audio=document.getElementById('audio-'+uid);
-        if(!audio){ audio=document.createElement('audio'); audio.id='audio-'+uid; audio.autoplay=true; audio.playsInline=true; audio.style.display='none'; document.body.appendChild(audio); }
-        audio.srcObject=new MediaStream(audioTracks); audio.muted=false; audio.volume=1;
-        if(audioTracks.length) audio.play().catch(()=>{ armAudioUnlock(); });
 
-        const videoTracks=source.getVideoTracks().filter(t=>t.readyState!=='ended' && !localIds.has(t.id) && !t.muted);
+        const audioTracks=source.getAudioTracks().filter(t=>
+            t.readyState!=='ended' && !localIds.has(t.id)
+        );
+
+        audioTracks.forEach(t=>{ try{ t.contentHint='speech'; }catch(e){} });
+
+        let audio=document.getElementById('audio-'+uid);
+        if(!audio){
+            audio=document.createElement('audio');
+            audio.id='audio-'+uid;
+            audio.autoplay=true;
+            audio.playsInline=true;
+            audio.preload='auto';
+            audio.style.display='none';
+            document.body.appendChild(audio);
+        }
+
+        /*
+         * Do not replace srcObject on every mic/camera status event.
+         * Replacing it repeatedly causes audible cuts/pops in Chrome.
+         */
+        const currentAudioIds=(audio.srcObject?.getAudioTracks?.()||[]).map(t=>t.id).sort().join(',');
+        const nextAudioIds=audioTracks.map(t=>t.id).sort().join(',');
+
+        if(currentAudioIds!==nextAudioIds){
+            audio.srcObject=new MediaStream(audioTracks);
+        }
+
+        audio.muted=false;
+        audio.defaultMuted=false;
+        audio.volume=1;
+
+        if(audioTracks.length){
+            audio.play().catch(()=>{ armAudioUnlock(); });
+        }
+
+        const videoTracks=source.getVideoTracks().filter(t=>
+            t.readyState!=='ended' && !localIds.has(t.id) && !t.muted
+        );
+
         const video=document.getElementById('rvideo-'+uid);
         const avatar=document.getElementById('avatar-'+uid);
+
         if(video){
-            video.srcObject=new MediaStream(videoTracks); video.muted=true; video.playsInline=true;
-            const show = videoTracks.length>0 && camStatus[uid]!==false;
-            video.style.display = show ? 'block' : 'none';
-            if(avatar) avatar.style.display = show ? 'none' : 'flex';
-            if(show) video.play().catch(()=>{});
+            const currentVideoIds=(video.srcObject?.getVideoTracks?.()||[]).map(t=>t.id).sort().join(',');
+            const nextVideoIds=videoTracks.map(t=>t.id).sort().join(',');
+
+            if(currentVideoIds!==nextVideoIds){
+                video.srcObject=new MediaStream(videoTracks);
+            }
+
+            video.muted=true;
+            video.playsInline=true;
+
+            const show=videoTracks.length>0 && camStatus[uid]!==false;
+            video.style.display=show?'block':'none';
+            if(avatar) avatar.style.display=show?'none':'flex';
+
+            if(show){
+                video.play().catch(error=>{
+                    if(error?.name!=='AbortError') console.warn('remote video play failed', error);
+                });
+            }
         }
     }
     let audioUnlockArmed=false;
@@ -836,9 +1050,20 @@
             const uid=String(data.data.userId); if(uid===String(MY_USER_ID)) return;
             const wasOnline=onlineUsers.has(uid);
             leftUsers.delete(uid);
-            if(!knownParticipants[uid]) knownParticipants[uid]={ name:data.data.name, initials:data.data.initials, isOrganizer:false, hasJoined:true };
-            else knownParticipants[uid].hasJoined=true;
-            addParticipantTile(uid, data.data.name, data.data.initials, false);
+            if(!knownParticipants[uid]){
+                knownParticipants[uid]={
+                    name:data.data.name,
+                    initials:data.data.initials,
+                    isOrganizer:Boolean(data.data.isOrganizer),
+                    hasJoined:true
+                };
+            }else{
+                knownParticipants[uid].hasJoined=true;
+                if(typeof data.data.isOrganizer!=='undefined'){
+                    knownParticipants[uid].isOrganizer=Boolean(data.data.isOrganizer);
+                }
+            }
+            addParticipantTile(uid, data.data.name, data.data.initials, Boolean(data.data.isOrganizer));
             markOnline(uid);
             createPeerConnection(uid);
             if(!wasOnline) showToast(`✅ ${escapeHtml(data.data.name)} has joined the meeting.`);
@@ -862,9 +1087,15 @@
             return;
         }
         if(data.type==='mic-status'){
-            const uid=String(data.data.userId||from); if(uid===String(MY_USER_ID)) return;
-            micStatus[uid]=data.data.muted;
-            const el=document.getElementById('micoff-'+uid); if(el) el.style.display=data.data.muted?'flex':'none';
+            const uid=String(data.data.userId||from);
+            if(uid===String(MY_USER_ID)) return;
+
+            micStatus[uid]=Boolean(data.data.muted);
+
+            const el=document.getElementById('micoff-'+uid);
+            if(el) el.style.display=micStatus[uid]?'flex':'none';
+
+            renderPersonRow(uid);
             return;
         }
         if(data.type==='camera-status'){
@@ -897,27 +1128,70 @@
     const audioConstraints = { echoCancellation:true, noiseSuppression:true, autoGainControl:true, channelCount:1 };
     async function startAudio(){
         if(localStream) return;
+
         try{
-            const stream=await navigator.mediaDevices.getUserMedia({ audio:audioConstraints, video:false });
+            const stream=await navigator.mediaDevices.getUserMedia({
+                audio:{
+                    echoCancellation:{ ideal:true },
+                    noiseSuppression:{ ideal:true },
+                    autoGainControl:{ ideal:true },
+                    channelCount:{ ideal:1 },
+                    sampleRate:{ ideal:48000 },
+                    sampleSize:{ ideal:16 },
+                    latency:{ ideal:0.02 }
+                },
+                video:false
+            });
+
             localStream=new MediaStream();
-            stream.getAudioTracks().forEach(t=>{ t.enabled=false; localStream.addTrack(t); });
+
+            stream.getAudioTracks().forEach(track=>{
+                track.enabled=false;
+                try{ track.contentHint='speech'; }catch(e){}
+                localStream.addTrack(track);
+            });
+
             isMicOn=false;
+            micStatus[String(MY_USER_ID)]=true;
+
             const localVideo=document.getElementById('localVideo');
-            if(localVideo){ localVideo.srcObject=localStream; localVideo.play().catch(()=>{}); }
+            if(localVideo){
+                localVideo.srcObject=localStream;
+                localVideo.play().catch(()=>{});
+            }
+
             setMicButton(false);
             startTranscript();
             broadcastMyMicStatus();
+
         }catch(err){
             console.error('mic error', err);
-            if(err.name==='NotAllowedError') showToast('🎙️ Microphone blocked — allow it in browser settings then reload.');
-            else if(err.name==='NotFoundError') showToast('🎙️ No microphone was found on this device.');
-            else showToast('🎙️ Could not start meeting audio.');
+
+            if(err.name==='NotAllowedError'){
+                showToast('🎙️ Microphone blocked — allow it in browser settings then reload.');
+            }else if(err.name==='NotFoundError'){
+                showToast('🎙️ No microphone was found on this device.');
+            }else{
+                showToast('🎙️ Could not start meeting audio.');
+            }
         }
     }
     function setMicButton(on){
-        const btn=document.getElementById('ctrl-mic'); const off=document.getElementById('micoff-'+MY_USER_ID);
-        if(btn){ btn.innerHTML = on ? '<i class="fa fa-microphone"></i>' : '<i class="fa fa-microphone-slash"></i>'; btn.classList.toggle('off', !on); btn.classList.toggle('active', on); }
-        if(off) off.style.display = on ? 'none' : 'flex';
+        const btn=document.getElementById('ctrl-mic');
+        const off=document.getElementById('micoff-'+MY_USER_ID);
+
+        if(btn){
+            btn.innerHTML=on
+                ? '<i class="fa fa-microphone"></i>'
+                : '<i class="fa fa-microphone-slash"></i>';
+            btn.classList.toggle('off', !on);
+            btn.classList.toggle('active', on);
+        }
+
+        if(off) off.style.display=on?'none':'flex';
+
+        micStatus[String(MY_USER_ID)]=!on;
+        renderPersonRow(String(MY_USER_ID));
     }
     async function toggleMic(){
         if(!localStream) await startAudio();
@@ -1128,17 +1402,65 @@
             if(knownParticipants[uid]?.hasJoined || onlineUsers.has(uid)) createPeerConnection(uid);
         });
     }
-    function announceJoin(){ sendSignal('all','user-joined',{ userId:MY_USER_ID, name:MY_NAME, initials:MY_INITIALS }); }
+    function announceJoin(){ sendSignal('all','user-joined',{ userId:MY_USER_ID, name:MY_NAME, initials:MY_INITIALS, isOrganizer:true }); }
 
     window.addEventListener('online', ()=>{ connectToAll(); syncTracksToEveryPeer(); });
     window.addEventListener('pageshow', ()=>{ connectToAll(); syncTracksToEveryPeer(); });
     document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible'){ connectToAll(); syncTracksToEveryPeer(); if(isMicOn) startRecognition(); } });
     document.addEventListener('pointerdown', ()=>document.querySelectorAll('audio[id^="audio-"]').forEach(a=>a.play().catch(()=>{})), { passive:true });
 
+
+    /* ---------- Small-screen side panel resize ---------- */
+    function setupPanelResize(){
+        const panel=document.getElementById('side-panel');
+        const handle=document.getElementById('panel-resize-handle');
+        if(!panel || !handle || handle.dataset.ready==='1') return;
+        handle.dataset.ready='1';
+
+        let dragging=false;
+        let startY=0;
+        let startTop=0;
+
+        const begin=(y)=>{
+            if(window.innerWidth>900) return;
+            dragging=true;
+            startY=y;
+            startTop=panel.getBoundingClientRect().top;
+            document.body.style.userSelect='none';
+        };
+
+        const move=(y)=>{
+            if(!dragging || window.innerWidth>900) return;
+            const bottomGap=window.innerWidth<=640 ? 68 : 76;
+            const minTop=window.innerWidth<=640 ? 52 : 60;
+            const minHeight=220;
+            const maxTop=window.innerHeight-bottomGap-minHeight;
+            const nextTop=Math.max(minTop, Math.min(maxTop, startTop+(y-startY)));
+            panel.style.setProperty('top', nextTop+'px', 'important');
+            panel.style.setProperty('bottom', bottomGap+'px', 'important');
+            panel.style.setProperty('height', 'auto', 'important');
+        };
+
+        const end=()=>{
+            dragging=false;
+            document.body.style.userSelect='';
+        };
+
+        handle.addEventListener('pointerdown', e=>{
+            handle.setPointerCapture?.(e.pointerId);
+            begin(e.clientY);
+        });
+        handle.addEventListener('pointermove', e=>move(e.clientY));
+        handle.addEventListener('pointerup', end);
+        handle.addEventListener('pointercancel', end);
+    }
+
+
     /* ---------- Boot ---------- */
     window.addEventListener('load', async () => {
         renderMyOwnTile();
         renderPeopleList();
+        setupPanelResize();
 
         ALL_PARTICIPANTS.forEach(p=>{ if(p.hasJoined){ addParticipantTile(p.userId, p.name, p.initials, false); markOnline(p.userId); } });
         refreshEmptyStage();
