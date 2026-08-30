@@ -1378,3 +1378,25 @@ body{
         max-width:50px;
     }
 }
+
+/* =========================================================
+   RESPONSIVE COMPATIBILITY OVERRIDES
+   Keeps the shared stylesheet from forcing fixed tile heights
+   in the newer organizer/participant room templates.
+========================================================= */
+.video-grid{
+    grid-auto-rows:auto;
+}
+.video-tile{
+    min-width:0;
+}
+@media(max-width:900px){
+    .main{
+        min-height:0;
+    }
+    .video-area{
+        min-width:0;
+        min-height:0;
+    }
+}
+

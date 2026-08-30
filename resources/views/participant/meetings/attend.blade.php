@@ -249,31 +249,176 @@
         }
         .moderation-notice.show{opacity:1}
 
+
         /* ---------- RESPONSIVE ---------- */
-        @media(max-width:900px){
-            .main{flex-direction:column; padding:8px; gap:8px}
-            #side-panel{
-                position:fixed; left:50%; right:auto; bottom:78px; transform:translateX(-50%);
-                width:min(94vw,460px); min-width:0; height:min(56vh,520px); min-height:220px; max-height:calc(100dvh - 150px);
-                z-index:55; border-radius:18px;
+        /*
+         * Layout-only rules. Meeting/WebRTC/transcription/chat logic is untouched.
+         * Important: meeting-room.css contains older fixed tile heights, so the
+         * rules below explicitly neutralize those fixed heights for this room.
+         */
+        .main{height:auto !important; min-height:0;}
+        .video-area{padding:0 !important; overflow:hidden !important;}
+        .video-grid{
+            grid-auto-rows:auto !important;
+            align-items:start;
+            align-content:start;
+            justify-items:stretch;
+        }
+        .video-tile{
+            height:auto !important;
+            min-height:0 !important;
+            max-width:none;
+            margin:0;
+            width:100%;
+            aspect-ratio:16/10;
+        }
+        #maximized-overlay .video-tile{
+            height:100% !important;
+            min-height:0 !important;
+            max-width:none;
+            aspect-ratio:auto;
+        }
+
+        /* Wide desktop: let participant count naturally create rows/columns. */
+        @media(min-width:1201px){
+            .video-grid{
+                grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr));
+                gap:16px;
+                padding:16px;
             }
-            .video-grid{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+            #side-panel{
+                height:100%;
+                min-height:0;
+                align-self:stretch;
+            }
+        }
+
+        /* Laptop / iPad landscape. */
+        @media(min-width:901px) and (max-width:1200px){
+            .main{padding:10px; gap:10px}
+            .video-grid{
+                grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));
+                gap:14px;
+                padding:14px;
+            }
+            .video-tile{aspect-ratio:16/10}
+            #side-panel{
+                width:clamp(280px,31vw,340px);
+                min-width:280px;
+                max-width:360px;
+                height:100%;
+                min-height:0;
+                align-self:stretch;
+            }
+        }
+
+        /*
+         * Tablet portrait and smaller:
+         * side panel becomes a true full-width bottom sheet.
+         * Height remains draggable, but width always stays full.
+         */
+        @media(max-width:900px){
+            .main{
+                flex-direction:column;
+                padding:8px;
+                gap:8px;
+                min-height:0;
+            }
+            .video-area{
+                flex:1 1 auto;
+                min-height:0;
+                width:100%;
+            }
+            .video-grid{
+                grid-template-columns:repeat(2,minmax(0,1fr));
+                grid-auto-rows:auto !important;
+                gap:12px;
+                padding:12px;
+                overflow-y:auto;
+                align-content:start;
+            }
+            .video-tile{
+                width:100%;
+                height:auto !important;
+                min-height:0 !important;
+                aspect-ratio:16/10;
+            }
+            #side-panel{
+                position:fixed;
+                left:0;
+                right:0;
+                bottom:76px;
+                transform:none;
+                width:100% !important;
+                min-width:0 !important;
+                max-width:none !important;
+                height:min(58dvh,540px);
+                min-height:220px;
+                max-height:calc(100dvh - 128px);
+                z-index:55;
+                border-radius:18px 18px 0 0;
+            }
             .header-center{order:3; width:100%; justify-content:center}
             .panel-drag-handle{display:flex}
         }
+
         @media(min-width:901px){
             .panel-drag-handle{display:none}
         }
+
+        /* Phones: one clean tile per row, never overlapping/merging. */
         @media(max-width:640px){
             .header{padding:8px 10px}
             .header-brand-text,.participants-count,.meeting-meta{display:none}
             .meeting-title{max-width:44vw; font-size:12.5px}
-            .video-grid{grid-template-columns:1fr; grid-auto-rows:minmax(190px,auto); padding:10px; gap:10px}
-            .video-grid:has(>.video-tile:only-child){grid-template-columns:1fr}
-            .controls{gap:2px; padding:7px 8px}
+            .video-grid{
+                grid-template-columns:minmax(0,1fr);
+                grid-auto-rows:auto !important;
+                gap:12px;
+                padding:10px;
+            }
+            .video-grid:has(>.video-tile:only-child){grid-template-columns:minmax(0,1fr)}
+            .video-tile{
+                height:auto !important;
+                min-height:0 !important;
+                width:100%;
+                max-width:none;
+                aspect-ratio:16/9;
+                border-radius:14px;
+            }
+            .tile-info{padding:8px 10px}
+            .controls{gap:2px; padding:7px 8px; margin:0 6px 6px}
             .ctrl-btn{min-width:44px}
             .btn-leave span,.btn-cancel span{display:none}
-            .btn-leave,.btn-cancel{padding:9px; width:36px; height:36px; border-radius:50%; justify-content:center}
+            .btn-leave,.btn-cancel{
+                padding:9px;
+                width:36px;
+                height:36px;
+                border-radius:50%;
+                justify-content:center;
+            }
+            #side-panel{
+                bottom:70px;
+                width:100% !important;
+                max-width:none !important;
+                border-left:none;
+                border-right:none;
+                border-bottom:none;
+            }
+        }
+
+        @media(max-width:420px){
+            .main{padding:5px}
+            .video-grid{padding:8px; gap:10px}
+            .video-tile{aspect-ratio:16/9}
+            .avatar-circle{width:58px; height:58px; font-size:20px}
+            .tile-name{font-size:11px}
+            .role-badge{font-size:7px}
+            .controls{padding:6px 4px; gap:0}
+            .ctrl-btn{min-width:42px; padding:3px 4px}
+            .ctrl-icon{width:36px; height:36px}
+            .ctrl-label{font-size:8px}
+            #side-panel{bottom:66px}
         }
     </style>
 </head>
@@ -604,21 +749,51 @@
         const handle=document.getElementById('panel-drag-handle');
         if(!panel || !handle || handle.dataset.bound) return;
         handle.dataset.bound='1';
+
         let dragging=false, startY=0, startHeight=0;
         const isMobile=()=>window.innerWidth<=900;
-        const begin=(y)=>{ if(!isMobile()) return; dragging=true; startY=y; startHeight=panel.getBoundingClientRect().height; document.body.style.userSelect='none'; };
+
+        const resetForViewport=()=>{
+            if(!isMobile()){
+                /* Remove mobile drag height so desktop/right sidebar stretches full height again. */
+                panel.style.removeProperty('height');
+            }
+        };
+
+        const begin=(y)=>{
+            if(!isMobile()) return;
+            dragging=true;
+            startY=y;
+            startHeight=panel.getBoundingClientRect().height;
+            document.body.style.userSelect='none';
+        };
+
         const move=(y)=>{
             if(!dragging || !isMobile()) return;
             const delta=startY-y;
-            const maxH=window.innerHeight-150;
+            const controls=document.querySelector('.controls');
+            const controlsH=controls ? controls.getBoundingClientRect().height : 70;
+            const maxH=Math.max(220, window.innerHeight-controlsH-58);
             const nextH=Math.max(220, Math.min(maxH, startHeight+delta));
             panel.style.setProperty('height', nextH+'px', 'important');
         };
-        const end=()=>{ dragging=false; document.body.style.userSelect=''; };
-        handle.addEventListener('pointerdown', e=>{ try{ handle.setPointerCapture(e.pointerId); }catch(err){} begin(e.clientY); });
+
+        const end=()=>{
+            dragging=false;
+            document.body.style.userSelect='';
+        };
+
+        handle.addEventListener('pointerdown', e=>{
+            try{ handle.setPointerCapture(e.pointerId); }catch(err){}
+            begin(e.clientY);
+        });
         handle.addEventListener('pointermove', e=>move(e.clientY));
         handle.addEventListener('pointerup', end);
         handle.addEventListener('pointercancel', end);
+
+        window.addEventListener('resize', resetForViewport, {passive:true});
+        window.addEventListener('orientationchange', resetForViewport, {passive:true});
+        resetForViewport();
     }
 
     /* ---------- Side panel tabs ---------- */
