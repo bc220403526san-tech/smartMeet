@@ -85,12 +85,13 @@
         }
         .video-grid{
             height:100%; width:100%; display:grid; overflow-y:auto;
-            grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
-            grid-auto-rows:minmax(190px, 1fr); align-content:center; justify-content:center;
-            gap:22px; padding:22px; background-color:#02060f;
+            grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+            grid-auto-rows:minmax(150px,220px); align-content:start; justify-content:center;
+            gap:16px; padding:16px; background-color:#02060f;
         }
-        .video-grid:has(> .video-tile:only-child){grid-template-columns:minmax(300px,min(760px,86%))}
-        .video-grid:has(> .video-tile:first-child:nth-last-child(2)){grid-template-columns:repeat(2,minmax(280px,520px))}
+        .video-grid:has(> .video-tile:only-child){grid-template-columns:minmax(240px,min(620px,92%)); align-content:center}
+        .video-tile{max-width:420px; margin:0 auto; width:100%}
+        .video-grid:has(> .video-tile:only-child) .video-tile{max-width:620px}
 
         .video-tile{
             position:relative; border-radius:var(--radius-md); overflow:hidden; aspect-ratio:16/10;
@@ -146,8 +147,14 @@
         #side-panel{
             width:min(340px,32vw); min-width:300px; flex-shrink:0; display:none; flex-direction:column;
             border-radius:var(--radius-lg); border:1px solid var(--line); background:var(--panel);
-            box-shadow:var(--shadow-lg); overflow:hidden; backdrop-filter:blur(20px);
+            box-shadow:var(--shadow-lg); overflow:hidden; backdrop-filter:blur(20px); position:relative;
         }
+        .panel-drag-handle{
+            display:none; align-items:center; justify-content:center; height:16px; flex-shrink:0;
+            cursor:ns-resize; touch-action:none; user-select:none;
+        }
+        .panel-drag-handle::before{content:""; width:36px; height:4px; border-radius:99px; background:rgba(203,213,225,.4)}
+        .panel-drag-handle:hover::before{background:rgba(96,165,250,.7)}
         .panel-tabbar{display:flex; border-bottom:1px solid var(--line)}
         .panel-tabbtn{
             flex:1; text-align:center; padding:10px 6px; font-size:11.5px; font-weight:700; color:var(--muted);
@@ -245,16 +252,24 @@
         /* ---------- RESPONSIVE ---------- */
         @media(max-width:900px){
             .main{flex-direction:column; padding:8px; gap:8px}
-            #side-panel{position:fixed; left:8px; right:8px; bottom:78px; width:auto; min-width:0; height:min(58vh,540px); z-index:55}
-            .video-grid{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+            #side-panel{
+                position:fixed; left:50%; right:auto; bottom:78px; transform:translateX(-50%);
+                width:min(94vw,460px); min-width:0; height:min(56vh,520px); min-height:220px; max-height:calc(100dvh - 150px);
+                z-index:55; border-radius:18px;
+            }
+            .video-grid{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
             .header-center{order:3; width:100%; justify-content:center}
+            .panel-drag-handle{display:flex}
+        }
+        @media(min-width:901px){
+            .panel-drag-handle{display:none}
         }
         @media(max-width:640px){
             .header{padding:8px 10px}
             .header-brand-text,.participants-count,.meeting-meta{display:none}
             .meeting-title{max-width:44vw; font-size:12.5px}
             .video-grid{grid-template-columns:1fr; grid-auto-rows:minmax(190px,auto); padding:10px; gap:10px}
-            .video-grid:has(>.video-tile:only-child),.video-grid:has(>.video-tile:first-child:nth-last-child(2)){grid-template-columns:1fr}
+            .video-grid:has(>.video-tile:only-child){grid-template-columns:1fr}
             .controls{gap:2px; padding:7px 8px}
             .ctrl-btn{min-width:44px}
             .btn-leave span,.btn-cancel span{display:none}
@@ -318,6 +333,7 @@
     </div>
 
     <div id="side-panel">
+        <div class="panel-drag-handle" id="panel-drag-handle" title="Drag to resize"></div>
         <div class="panel-tabbar">
             <button class="panel-tabbtn" data-tab="transcript" onclick="toggleSidePanel('transcript')"><i class="fa fa-closed-captioning"></i> Transcript</button>
             <button class="panel-tabbtn" data-tab="chat" onclick="toggleSidePanel('chat')">Chat</button>
@@ -582,6 +598,29 @@
         });
     }
 
+    /* ---------- Side panel drag-resize (mobile only) ---------- */
+    function setupPanelResize(){
+        const panel=document.getElementById('side-panel');
+        const handle=document.getElementById('panel-drag-handle');
+        if(!panel || !handle || handle.dataset.bound) return;
+        handle.dataset.bound='1';
+        let dragging=false, startY=0, startHeight=0;
+        const isMobile=()=>window.innerWidth<=900;
+        const begin=(y)=>{ if(!isMobile()) return; dragging=true; startY=y; startHeight=panel.getBoundingClientRect().height; document.body.style.userSelect='none'; };
+        const move=(y)=>{
+            if(!dragging || !isMobile()) return;
+            const delta=startY-y;
+            const maxH=window.innerHeight-150;
+            const nextH=Math.max(220, Math.min(maxH, startHeight+delta));
+            panel.style.setProperty('height', nextH+'px', 'important');
+        };
+        const end=()=>{ dragging=false; document.body.style.userSelect=''; };
+        handle.addEventListener('pointerdown', e=>{ try{ handle.setPointerCapture(e.pointerId); }catch(err){} begin(e.clientY); });
+        handle.addEventListener('pointermove', e=>move(e.clientY));
+        handle.addEventListener('pointerup', end);
+        handle.addEventListener('pointercancel', end);
+    }
+
     /* ---------- Side panel tabs ---------- */
     function toggleSidePanel(tab){
         const panel=document.getElementById('side-panel'); if(!panel) return;
@@ -618,9 +657,17 @@
             username:TURN_USERNAME, credential:TURN_CREDENTIAL
         });
     } else {
-        console.warn('TURN is not configured — calls across different networks/NATs may fail to connect.');
+        console.warn('[SmartMeet] Custom TURN is not configured.');
     }
+    /* Public backup TURN relay — used in addition to the primary TURN above so a
+       call can still connect even if smartmeet.live's own coturn is unreachable. */
+    iceServers.push(
+        { urls:'turn:openrelay.metered.ca:80', username:'openrelayproject', credential:'openrelayproject' },
+        { urls:'turn:openrelay.metered.ca:443', username:'openrelayproject', credential:'openrelayproject' },
+        { urls:'turn:openrelay.metered.ca:443?transport=tcp', username:'openrelayproject', credential:'openrelayproject' }
+    );
     const iceConfig = { iceServers, iceCandidatePoolSize:10, bundlePolicy:'max-bundle', rtcpMuxPolicy:'require' };
+    console.log('[SmartMeet] ICE servers configured:', iceServers.map(s=>s.urls));
 
     function isPolite(otherUserId){
         const a=Number(MY_USER_ID), b=Number(otherUserId);
@@ -645,10 +692,14 @@
 
         pc.onnegotiationneeded = async () => {
             try{
+                if(pc.signalingState!=='stable') return;
                 makingOffer[uid]=true;
-                await pc.setLocalDescription();
+                const offer=await pc.createOffer();
+                if(pc.signalingState!=='stable') return;
+                await pc.setLocalDescription(offer);
+                console.log('[SmartMeet] sending offer ->', uid);
                 sendSignal(uid,'offer',{ type:pc.localDescription.type, sdp:btoa(unescape(encodeURIComponent(pc.localDescription.sdp))) });
-            }catch(err){ console.warn('negotiationneeded failed', uid, err); }
+            }catch(err){ console.warn('[SmartMeet] negotiationneeded failed', uid, err); }
             finally{ makingOffer[uid]=false; }
         };
 
@@ -667,9 +718,12 @@
 
         pc.oniceconnectionstatechange = ()=>{
             const state=pc.iceConnectionState;
+            console.log('[SmartMeet] ICE state', uid, '->', state);
             if(state==='connected' || state==='completed'){ ensureTileVisible(uid); attachRemoteStream(uid); }
-            else if(state==='failed'){ restartPeer(uid); }
+            else if(state==='failed'){ console.warn('[SmartMeet] ICE FAILED for', uid, '- check TURN server reachability'); restartPeer(uid); }
         };
+        pc.onconnectionstatechange = ()=>{ console.log('[SmartMeet] connection state', uid, '->', pc.connectionState); };
+        pc.onicegatheringstatechange = ()=>{ console.log('[SmartMeet] ICE gathering', uid, '->', pc.iceGatheringState); };
 
         return pc;
     }
@@ -731,31 +785,35 @@
     function decodeSdp(sdp){ if(!sdp) return ''; try{ return decodeURIComponent(escape(atob(sdp))); }catch(e){ return sdp; } }
 
     async function handleOffer(from, data){
+        console.log('[SmartMeet] received offer <-', from);
         const pc=createPeerConnection(from); if(!pc) return;
         const polite=isPolite(from);
         const offerCollision = makingOffer[from] || pc.signalingState!=='stable';
         ignoreOffer[from] = !polite && offerCollision;
-        if(ignoreOffer[from]) return;
+        if(ignoreOffer[from]){ console.log('[SmartMeet] ignoring colliding offer from', from); return; }
         try{
             await pc.setRemoteDescription({ type:data.type||'offer', sdp:decodeSdp(data.sdp) });
             await syncLocalTracksToPeer(from);
             if(pendingCandidates[from]?.length){ for(const c of pendingCandidates[from]) await pc.addIceCandidate(c).catch(()=>{}); delete pendingCandidates[from]; }
-            await pc.setLocalDescription();
+            const answer=await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            console.log('[SmartMeet] sending answer ->', from);
             sendSignal(from,'answer',{ type:pc.localDescription.type, sdp:btoa(unescape(encodeURIComponent(pc.localDescription.sdp))) });
-        }catch(err){ console.warn('offer handling failed', from, err); }
+        }catch(err){ console.warn('[SmartMeet] offer handling failed', from, err); }
     }
     async function handleAnswer(from, data){
+        console.log('[SmartMeet] received answer <-', from);
         const pc=peers[from]; if(!pc) return;
         try{
             await pc.setRemoteDescription({ type:data.type||'answer', sdp:decodeSdp(data.sdp) });
             if(pendingCandidates[from]?.length){ for(const c of pendingCandidates[from]) await pc.addIceCandidate(c).catch(()=>{}); delete pendingCandidates[from]; }
-        }catch(err){ console.warn('answer handling failed', from, err); }
+        }catch(err){ console.warn('[SmartMeet] answer handling failed', from, err); }
     }
     async function handleIceCandidate(from, data){
         const candidate=data.candidate; if(!candidate) return;
         const pc=peers[from];
         if(!pc || !pc.remoteDescription){ (pendingCandidates[from]=pendingCandidates[from]||[]).push(candidate); return; }
-        try{ await pc.addIceCandidate(candidate); }catch(err){ if(!ignoreOffer[from]) console.warn('ICE candidate error', err); }
+        try{ await pc.addIceCandidate(candidate); }catch(err){ if(!ignoreOffer[from]) console.warn('[SmartMeet] ICE candidate error', from, err); }
     }
 
     /* ---------- Signal transport (idempotent + retried) ---------- */
@@ -1098,6 +1156,7 @@
     /* ---------- Boot ---------- */
     window.addEventListener('load', async () => {
         renderMyOwnTile();
+        setupPanelResize();
         renderPeopleList();
 
         if(ORGANIZER_JOINED){ addParticipantTile(ORGANIZER_ID, ORGANIZER_NAME, ORGANIZER_INITIALS, true); markOnline(ORGANIZER_ID); }
