@@ -249,42 +249,82 @@
         }
         .moderation-notice.show{opacity:1}
 
-
-        /* ---------- RESPONSIVE ---------- */
+        /* ---------- RESPONSIVE / NON-OVERLAPPING ROOM LAYOUT ---------- */
         /*
-         * Layout-only rules. Meeting/WebRTC/transcription/chat logic is untouched.
-         * Important: meeting-room.css contains older fixed tile heights, so the
-         * rules below explicitly neutralize those fixed heights for this room.
+         * Layout-only fixes:
+         * - header/timer stay on the same top row
+         * - tiles always reserve their own physical height
+         * - rows keep a visible gap and never overlap
+         * - video area gets its own vertical scrollbar as soon as another row is needed
+         * - mobile side panel remains full-width
          */
-        .main{height:auto !important; min-height:0;}
-        .video-area{padding:0 !important; overflow:hidden !important;}
+        html,body{
+            width:100%;
+            height:100%;
+            overflow:hidden;
+        }
+        body{
+            height:100dvh;
+            min-height:100dvh;
+            overflow:hidden;
+        }
+        .header{
+            flex:0 0 auto;
+        }
+        .main{
+            flex:1 1 0;
+            min-height:0;
+            height:auto !important;
+            overflow:hidden;
+        }
+        .video-area{
+            min-height:0;
+            padding:0 !important;
+            overflow:hidden !important;
+        }
         .video-grid{
-            grid-auto-rows:auto !important;
-            align-items:start;
+            width:100%;
+            height:100%;
+            min-height:0;
+            overflow-y:auto !important;
+            overflow-x:hidden !important;
+            scrollbar-gutter:stable;
+            overscroll-behavior:contain;
+            display:grid;
+            grid-auto-flow:row;
+            grid-auto-rows:max-content !important;
             align-content:start;
+            align-items:start;
             justify-items:stretch;
+            row-gap:16px;
+            column-gap:16px;
+            padding:16px;
         }
         .video-tile{
-            height:auto !important;
-            min-height:0 !important;
+            position:relative;
+            width:100%;
             max-width:none;
             margin:0;
-            width:100%;
-            aspect-ratio:16/10;
+            min-width:0;
+            min-height:220px !important;
+            height:clamp(220px,18vw,300px) !important;
+            aspect-ratio:auto !important;
+            align-self:start;
         }
         #maximized-overlay .video-tile{
+            width:100%;
             height:100% !important;
             min-height:0 !important;
             max-width:none;
-            aspect-ratio:auto;
+            aspect-ratio:auto !important;
         }
 
-        /* Wide desktop: let participant count naturally create rows/columns. */
+        /* Desktop */
         @media(min-width:1201px){
             .video-grid{
-                grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr));
-                gap:16px;
-                padding:16px;
+                grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+                gap:18px;
+                padding:18px;
             }
             #side-panel{
                 height:100%;
@@ -293,15 +333,18 @@
             }
         }
 
-        /* Laptop / iPad landscape. */
+        /* Laptop / iPad landscape */
         @media(min-width:901px) and (max-width:1200px){
             .main{padding:10px; gap:10px}
             .video-grid{
-                grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));
-                gap:14px;
-                padding:14px;
+                grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+                gap:16px;
+                padding:16px;
             }
-            .video-tile{aspect-ratio:16/10}
+            .video-tile{
+                min-height:200px !important;
+                height:clamp(200px,22vw,270px) !important;
+            }
             #side-panel{
                 width:clamp(280px,31vw,340px);
                 min-width:280px;
@@ -312,37 +355,65 @@
             }
         }
 
-        /*
-         * Tablet portrait and smaller:
-         * side panel becomes a true full-width bottom sheet.
-         * Height remains draggable, but width always stays full.
-         */
+        /* Tablet portrait and smaller */
         @media(max-width:900px){
+            .header{
+                flex-wrap:nowrap !important;
+                row-gap:0;
+                gap:8px;
+                min-height:58px;
+                padding:8px 10px;
+            }
+            .header-left{
+                flex:1 1 auto;
+                min-width:0;
+                gap:8px;
+                overflow:hidden;
+            }
+            .header-center{
+                order:0 !important;
+                width:auto !important;
+                min-width:max-content;
+                flex:0 0 auto;
+                justify-content:center;
+                padding:6px 10px;
+                margin:0;
+            }
+            .header-right{
+                flex:0 0 auto;
+                gap:7px;
+            }
+            .meeting-title{
+                max-width:24vw;
+                overflow:hidden;
+                text-overflow:ellipsis;
+                white-space:nowrap;
+            }
+
             .main{
                 flex-direction:column;
                 padding:8px;
-                gap:8px;
+                gap:10px;
                 min-height:0;
+                overflow:hidden;
             }
             .video-area{
-                flex:1 1 auto;
+                flex:1 1 0;
                 min-height:0;
                 width:100%;
             }
             .video-grid{
                 grid-template-columns:repeat(2,minmax(0,1fr));
-                grid-auto-rows:auto !important;
-                gap:12px;
-                padding:12px;
-                overflow-y:auto;
-                align-content:start;
+                grid-auto-rows:max-content !important;
+                gap:16px;
+                padding:14px;
+                overflow-y:auto !important;
             }
             .video-tile{
-                width:100%;
-                height:auto !important;
-                min-height:0 !important;
-                aspect-ratio:16/10;
+                min-height:190px !important;
+                height:clamp(190px,30vw,270px) !important;
             }
+
             #side-panel{
                 position:fixed;
                 left:0;
@@ -358,7 +429,6 @@
                 z-index:55;
                 border-radius:18px 18px 0 0;
             }
-            .header-center{order:3; width:100%; justify-content:center}
             .panel-drag-handle{display:flex}
         }
 
@@ -366,40 +436,88 @@
             .panel-drag-handle{display:none}
         }
 
-        /* Phones: one clean tile per row, never overlapping/merging. */
+        /* Phones: exactly one tile per row with a real gap between rows */
         @media(max-width:640px){
-            .header{padding:8px 10px}
+            .header{
+                padding:7px 8px;
+                gap:6px;
+                min-height:56px;
+            }
             .header-brand-text,.participants-count,.meeting-meta{display:none}
-            .meeting-title{max-width:44vw; font-size:12.5px}
-            .video-grid{
-                grid-template-columns:minmax(0,1fr);
-                grid-auto-rows:auto !important;
-                gap:12px;
-                padding:10px;
+            .header-brand{
+                padding-right:6px;
+                gap:4px;
             }
-            .video-grid:has(>.video-tile:only-child){grid-template-columns:minmax(0,1fr)}
-            .video-tile{
-                height:auto !important;
-                min-height:0 !important;
-                width:100%;
-                max-width:none;
-                aspect-ratio:16/9;
-                border-radius:14px;
+            .header-brand img{
+                width:28px;
+                height:28px;
             }
-            .tile-info{padding:8px 10px}
-            .controls{gap:2px; padding:7px 8px; margin:0 6px 6px}
-            .ctrl-btn{min-width:44px}
+            .live-badge{
+                padding:4px 7px;
+                font-size:9px;
+                gap:4px;
+            }
+            .meeting-title{
+                max-width:22vw;
+                font-size:12px;
+            }
+            .header-center{
+                padding:5px 8px;
+                font-size:11px;
+                gap:5px;
+            }
+            .header-right{gap:6px}
             .btn-leave span,.btn-cancel span{display:none}
             .btn-leave,.btn-cancel{
-                padding:9px;
+                padding:0;
                 width:36px;
                 height:36px;
                 border-radius:50%;
                 justify-content:center;
             }
+
+            .main{
+                padding:6px;
+                gap:10px;
+            }
+            .video-grid{
+                grid-template-columns:minmax(0,1fr) !important;
+                grid-auto-rows:max-content !important;
+                row-gap:16px !important;
+                column-gap:0 !important;
+                padding:10px;
+                overflow-y:auto !important;
+            }
+            .video-grid:has(>.video-tile:only-child){
+                grid-template-columns:minmax(0,1fr) !important;
+            }
+            .video-tile{
+                width:100%;
+                max-width:none;
+                min-height:220px !important;
+                height:clamp(220px,58vw,330px) !important;
+                aspect-ratio:auto !important;
+                border-radius:14px;
+                margin:0 !important;
+            }
+            .tile-info{
+                left:0;
+                right:0;
+                bottom:0;
+                padding:9px 11px;
+            }
+
+            .controls{
+                gap:2px;
+                padding:7px 8px;
+                margin:0 6px 6px;
+            }
+            .ctrl-btn{min-width:44px}
+
             #side-panel{
                 bottom:70px;
                 width:100% !important;
+                min-width:0 !important;
                 max-width:none !important;
                 border-left:none;
                 border-right:none;
@@ -408,9 +526,20 @@
         }
 
         @media(max-width:420px){
+            .header{gap:4px; padding:6px}
+            .header-left{gap:5px}
+            .header-brand{padding-right:3px}
+            .live-badge{padding:4px 6px}
+            .meeting-title{max-width:18vw; font-size:11.5px}
+            .header-center{padding:5px 6px; font-size:10.5px}
+            .btn-leave,.btn-cancel{width:34px; height:34px}
+
             .main{padding:5px}
-            .video-grid{padding:8px; gap:10px}
-            .video-tile{aspect-ratio:16/9}
+            .video-grid{padding:8px; row-gap:14px !important}
+            .video-tile{
+                min-height:210px !important;
+                height:clamp(210px,62vw,300px) !important;
+            }
             .avatar-circle{width:58px; height:58px; font-size:20px}
             .tile-name{font-size:11px}
             .role-badge{font-size:7px}
@@ -1062,8 +1191,55 @@
             if(!wasOnline) showToast(`✅ ${escapeHtml(data.data.name)} has joined the meeting.`);
             sendSignal(uid,'mic-status',{ userId:MY_USER_ID, muted:!isMicOn });
             sendSignal(uid,'camera-status',{ userId:MY_USER_ID, cameraOn:isCameraOn });
+            // Tell the newly joined browser that THIS already-connected user is here.
+            // This is metadata/presence only; camera/mic capture settings are not changed.
+            sendSignal(uid,'presence-sync',{
+                userId:MY_USER_ID,
+                name:MY_NAME,
+                initials:MY_INITIALS,
+                isOrganizer:IS_ORGANIZER,
+                muted:!isMicOn,
+                cameraOn:isCameraOn
+            });
             return;
         }
+        if(data.type==='presence-sync'){
+            // Targeted reply used by late joiners so every already-connected user appears.
+            if(String(data.toUserId)!==String(MY_USER_ID)) return;
+            const uid=String(data.data?.userId||from);
+            if(uid===String(MY_USER_ID)) return;
+
+            leftUsers.delete(uid);
+            const isOrg=Boolean(data.data?.isOrganizer);
+            const name=data.data?.name || knownParticipants[uid]?.name || 'User';
+            const initials=data.data?.initials || knownParticipants[uid]?.initials || initialsOf(name);
+
+            if(!knownParticipants[uid]){
+                knownParticipants[uid]={ name, initials, isOrganizer:isOrg, hasJoined:true };
+            }else{
+                knownParticipants[uid].name=name;
+                knownParticipants[uid].initials=initials;
+                knownParticipants[uid].isOrganizer=isOrg || knownParticipants[uid].isOrganizer;
+                knownParticipants[uid].hasJoined=true;
+            }
+
+            addParticipantTile(uid, name, initials, isOrg);
+            markOnline(uid);
+
+            if(typeof data.data?.muted!=='undefined'){
+                micStatus[uid]=Boolean(data.data.muted);
+                const micEl=document.getElementById('micoff-'+uid);
+                if(micEl) micEl.style.display=micStatus[uid]?'flex':'none';
+            }
+            if(typeof data.data?.cameraOn!=='undefined'){
+                camStatus[uid]=Boolean(data.data.cameraOn);
+            }
+
+            createPeerConnection(uid);
+            attachRemoteStream(uid);
+            return;
+        }
+
         if(data.type==='user-left'){
             if(isSelf) return;
             leftUsers.add(from);
@@ -1366,7 +1542,7 @@
         scheduleAutoEnd();
 
         [0, 500, 1500, 3500].forEach(delay=>setTimeout(()=>{ announceJoin(); connectToAll(); syncTracksToEveryPeer(); }, delay));
-        setInterval(()=>{ if(document.visibilityState==='visible'){ connectToAll(); broadcastMyMicStatus(); broadcastMyCameraStatus(); } }, 8000);
+        setInterval(()=>{ if(document.visibilityState==='visible'){ announceJoin(); connectToAll(); broadcastMyMicStatus(); broadcastMyCameraStatus(); } }, 8000);
     });
 </script>
 </body>
