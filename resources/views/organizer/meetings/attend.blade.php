@@ -87,7 +87,7 @@
             height:100%; width:100%; display:grid; overflow-y:auto;
             grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
             grid-auto-rows:minmax(190px, 1fr); align-content:center; justify-content:center;
-            gap:20px; padding:20px; background-color:rgba(0,0,0,.18);
+            gap:22px; padding:22px; background-color:#02060f;
         }
         .video-grid:has(> .video-tile:only-child){grid-template-columns:minmax(300px,min(760px,86%))}
         .video-grid:has(> .video-tile:first-child:nth-last-child(2)){grid-template-columns:repeat(2,minmax(280px,520px))}
@@ -117,7 +117,7 @@
         .role-badge.organizer{background:rgba(251,191,36,.18); color:#fbbf24}
         .role-badge.participant{background:rgba(59,130,246,.18); color:#60a5fa}
         .tile-icons{display:flex; align-items:center; gap:6px; flex-shrink:0}
-        .mic-off{width:24px; height:24px; border-radius:8px; background:rgba(239,68,68,.85); display:flex; align-items:center; justify-content:center; font-size:10px}
+        .mic-off{width:24px; height:24px; border-radius:8px; background:rgba(15,23,42,.92); border:1px solid rgba(148,163,184,.28); display:flex; align-items:center; justify-content:center; font-size:10px; color:#cbd5e1; box-shadow:0 4px 12px rgba(0,0,0,.3)}
         .speaking-indicator{display:flex; align-items:flex-end; gap:2px; height:14px}
         .speaking-bar{width:2.5px; background:var(--green); border-radius:2px; animation:speak 0.9s infinite ease-in-out}
         .speaking-bar:nth-child(2){animation-delay:.15s} .speaking-bar:nth-child(3){animation-delay:.3s}
@@ -141,13 +141,6 @@
             align-items:center; justify-content:center; font-size:15px; cursor:pointer;
         }
         .maximize-close-btn:hover{background:rgba(239,68,68,.85)}
-
-        .empty-stage{
-            position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
-            gap:10px; color:var(--muted); text-align:center; padding:20px;
-        }
-        .empty-stage i{font-size:34px; opacity:.5}
-        .empty-stage span{font-size:13px; max-width:280px}
 
         /* ---------- SIDE PANEL ---------- */
         #side-panel{
@@ -267,251 +260,6 @@
             .btn-leave span,.btn-cancel span{display:none}
             .btn-leave,.btn-cancel{padding:9px; width:36px; height:36px; border-radius:50%; justify-content:center}
         }
-
-        /* ================================================================
-           FINAL RESPONSIVE ROOM FIX
-           IMPORTANT: this is UI-only. Existing camera/WebRTC code is kept.
-           ================================================================ */
-
-        /* ---------- HEADER: keep timer inside the header ---------- */
-        .header{
-            flex-wrap:nowrap !important;
-            align-items:center !important;
-        }
-        .header-left{
-            min-width:0 !important;
-            flex:1 1 auto !important;
-        }
-        .header-center{
-            order:initial !important;
-            width:auto !important;
-            margin-left:auto !important;
-            flex:0 0 auto !important;
-        }
-        .header-right{
-            flex:0 0 auto !important;
-        }
-
-        /* ---------- VIDEO GRID: never overlap/merge tiles ---------- */
-        .video-grid{
-            display:grid !important;
-            width:100% !important;
-            height:100% !important;
-            min-width:0 !important;
-            overflow-y:auto !important;
-            overflow-x:hidden !important;
-            grid-template-columns:repeat(2,minmax(0,1fr)) !important;
-            grid-auto-rows:auto !important;
-            align-content:start !important;
-            justify-content:stretch !important;
-            gap:14px !important;
-            padding:16px !important;
-        }
-
-        .video-grid > .video-tile{
-            width:100% !important;
-            max-width:100% !important;
-            min-width:0 !important;
-            min-height:0 !important;
-            height:auto !important;
-            aspect-ratio:16 / 9 !important;
-            margin:0 !important;
-            position:relative !important;
-            overflow:hidden !important;
-        }
-
-        /* One user: centered normal-size tile. */
-        .video-grid:has(> .video-tile:only-child){
-            grid-template-columns:minmax(280px,720px) !important;
-            justify-content:center !important;
-            align-content:start !important;
-        }
-        .video-grid:has(> .video-tile:only-child) > .video-tile{
-            width:100% !important;
-            max-width:720px !important;
-        }
-
-        /* Wide desktop: 3 joined users can sit cleanly in one row. */
-        @media (min-width:1400px){
-            .video-grid:has(> .video-tile:nth-child(3)){
-                grid-template-columns:repeat(3,minmax(0,1fr)) !important;
-            }
-            .video-grid:has(> .video-tile:nth-child(4)){
-                grid-template-columns:repeat(2,minmax(0,1fr)) !important;
-            }
-        }
-
-        /* Remove the empty-room camera/fish icon + text completely.
-           It was overlapping the single video tile. */
-        #empty-stage{
-            display:none !important;
-        }
-
-        /* Cleaner mic-off badge inside tiles. */
-        .mic-off{
-            background:rgba(15,23,42,.94) !important;
-            color:#e2e8f0 !important;
-            border:1px solid rgba(148,163,184,.30) !important;
-            box-shadow:0 5px 16px rgba(0,0,0,.28) !important;
-        }
-        .mic-off i{
-            color:#cbd5e1 !important;
-        }
-
-        /* ---------- DESKTOP SIDEBAR: normal separate right panel ---------- */
-        @media (min-width:901px){
-            .main{
-                flex-direction:row !important;
-                gap:12px !important;
-            }
-            .video-area{
-                flex:1 1 auto !important;
-                min-width:0 !important;
-            }
-            #side-panel{
-                position:relative !important;
-                inset:auto !important;
-                transform:none !important;
-                flex:0 0 clamp(300px,22vw,350px) !important;
-                width:clamp(300px,22vw,350px) !important;
-                min-width:300px !important;
-                max-width:350px !important;
-                height:auto !important;
-                align-self:stretch !important;
-                margin:0 !important;
-                border-radius:20px !important;
-                z-index:40 !important;
-            }
-        }
-
-        /* ---------- SMALL SCREEN SIDEBAR ----------
-           Near-full available viewport, not a small floating box.
-           It stays centered with equal tiny margins. */
-        @media (max-width:900px){
-            .main{
-                flex-direction:column !important;
-                position:relative !important;
-            }
-
-            .video-area{
-                width:100% !important;
-                min-width:0 !important;
-                flex:1 1 auto !important;
-            }
-
-            #side-panel{
-                position:fixed !important;
-                left:8px !important;
-                right:8px !important;
-                top:64px !important;
-                bottom:74px !important;
-                width:auto !important;
-                min-width:0 !important;
-                max-width:none !important;
-                height:auto !important;
-                max-height:none !important;
-                margin:0 !important;
-                transform:none !important;
-                border-radius:18px !important;
-                z-index:95 !important;
-                overflow:hidden !important;
-                box-shadow:0 24px 70px rgba(0,0,0,.50) !important;
-            }
-
-            .panel-tabbar{
-                padding-top:8px !important;
-            }
-
-            .video-grid{
-                grid-template-columns:repeat(2,minmax(0,1fr)) !important;
-                gap:12px !important;
-                padding:12px !important;
-            }
-
-            .video-grid:has(> .video-tile:only-child){
-                grid-template-columns:minmax(260px,680px) !important;
-            }
-        }
-
-        @media (max-width:700px){
-            .video-grid{
-                grid-template-columns:1fr !important;
-            }
-            .video-grid:has(> .video-tile:only-child){
-                grid-template-columns:1fr !important;
-            }
-        }
-
-        @media (max-width:640px){
-            .header{
-                padding:7px 8px !important;
-                gap:7px !important;
-            }
-            .header-brand-text{
-                display:none !important;
-            }
-            .header-brand{
-                padding-right:7px !important;
-            }
-            .meeting-meta{
-                display:none !important;
-            }
-            .meeting-title{
-                max-width:32vw !important;
-                font-size:12px !important;
-            }
-            .participants-count{
-                display:none !important;
-            }
-            .header-center{
-                padding:5px 8px !important;
-                font-size:11px !important;
-            }
-
-            #side-panel{
-                left:6px !important;
-                right:6px !important;
-                top:56px !important;
-                bottom:66px !important;
-                border-radius:16px !important;
-            }
-
-            .video-grid{
-                padding:8px !important;
-                gap:10px !important;
-            }
-        }
-
-        /* Top drag handle only on small screens. */
-        .panel-resize-handle{
-            display:none;
-            position:absolute;
-            top:5px;
-            left:50%;
-            transform:translateX(-50%);
-            width:66px;
-            height:18px;
-            z-index:130;
-            cursor:ns-resize;
-            touch-action:none;
-            user-select:none;
-            align-items:flex-start;
-            justify-content:center;
-        }
-        .panel-resize-handle::before{
-            content:"";
-            display:block;
-            width:42px;
-            height:4px;
-            border-radius:999px;
-            background:rgba(203,213,225,.52);
-        }
-        @media(max-width:900px){
-            .panel-resize-handle{
-                display:flex;
-            }
-        }
-
     </style>
 </head>
 @php
@@ -568,17 +316,12 @@
 <div class="main">
     <div class="video-area">
         <div class="video-grid" id="video-grid"></div>
-        <div class="empty-stage" id="empty-stage" style="display:none">
-            <i class="fa fa-video"></i>
-            <span>You're the only one here right now. Others will appear as soon as they join.</span>
-        </div>
         <div id="maximized-overlay">
             <button class="maximize-close-btn" onclick="restoreMaximized()"><i class="fa fa-compress"></i></button>
         </div>
     </div>
 
     <div id="side-panel">
-        <div class="panel-resize-handle" id="panel-resize-handle" title="Drag up/down to resize"></div>
         <div class="panel-tabbar">
             <button class="panel-tabbtn" data-tab="transcript" onclick="toggleSidePanel('transcript')"><i class="fa fa-closed-captioning"></i> Transcript</button>
             <button class="panel-tabbtn" data-tab="chat" onclick="toggleSidePanel('chat')">Chat</button>
@@ -747,8 +490,9 @@
     }
     function muteParticipant(uid){
         uid=String(uid);
+        const info=knownParticipants[uid];
         sendSignal(uid, 'mute', {});
-        showToast('🎙️ Mute request sent.');
+        showToast(`🎙️ ${escapeHtml(info?info.name:'Participant')}'s microphone has been muted.`);
     }
 
     function renderMyOwnTile(){
@@ -771,12 +515,7 @@
         grid.appendChild(tile);
     }
 
-    function refreshEmptyStage(){
-        const grid=document.getElementById('video-grid');
-        const stage=document.getElementById('empty-stage');
-        if(!grid||!stage) return;
-        stage.style.display = grid.children.length<=1 ? 'flex' : 'none';
-    }
+    function refreshEmptyStage(){ /* empty-stage overlay removed by request */ }
 
     /* ---------- Tiles ---------- */
     function addParticipantTile(uid, name, initials, isOrganizer){
@@ -1127,20 +866,19 @@
         if(data.type==='answer') return handleAnswer(from, data.data);
         if(data.type==='ice-candidate') return handleIceCandidate(from, data.data);
         if(data.type==='mute'){
-            if(!localStream) return;
-            localStream.getAudioTracks().forEach(t=>t.enabled=false);
             isMicOn=false;
+            if(localStream) localStream.getAudioTracks().forEach(t=>t.enabled=false);
             setMicButton(false);
             stopRecognition();
             showModerationNotice('🎙️ Your microphone was muted by the organizer.');
-            broadcastMyMicStatus();
+            if(localStream) broadcastMyMicStatus();
             return;
         }
         if(data.type==='unmute'){ showModerationNotice('🎙️ The organizer allowed your microphone. Tap Mic to speak.'); return; }
     }
 
     /* ---------- Media ---------- */
-    const audioConstraints = { echoCancellation:true, noiseSuppression:true, autoGainControl:true, channelCount:1 };
+    const audioConstraints = { echoCancellation:true, noiseSuppression:true, autoGainControl:true, channelCount:1, sampleRate:48000, sampleSize:16 };
     async function startAudio(){
         if(localStream) return;
         try{
@@ -1381,65 +1119,10 @@
     document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible'){ connectToAll(); syncTracksToEveryPeer(); if(isMicOn) startRecognition(); } });
     document.addEventListener('pointerdown', ()=>document.querySelectorAll('audio[id^="audio-"]').forEach(a=>a.play().catch(()=>{})), { passive:true });
 
-
-    /* ---------- Side panel vertical resize on small screens ---------- */
-    function setupResponsiveSidePanelResize(){
-        const panel=document.getElementById('side-panel');
-        const handle=document.getElementById('panel-resize-handle');
-
-        if(!panel || !handle || handle.dataset.ready==='1') return;
-        handle.dataset.ready='1';
-
-        let dragging=false;
-        let startY=0;
-        let startTop=0;
-
-        const start=(clientY)=>{
-            if(window.innerWidth>900) return;
-            dragging=true;
-            startY=clientY;
-            startTop=panel.getBoundingClientRect().top;
-            document.body.style.userSelect='none';
-        };
-
-        const move=(clientY)=>{
-            if(!dragging || window.innerWidth>900) return;
-
-            const bottomGap=window.innerWidth<=640 ? 66 : 74;
-            const minTop=window.innerWidth<=640 ? 50 : 58;
-            const minHeight=230;
-            const maxTop=Math.max(minTop, window.innerHeight-bottomGap-minHeight);
-
-            const nextTop=Math.max(
-                minTop,
-                Math.min(maxTop, startTop+(clientY-startY))
-            );
-
-            panel.style.setProperty('top', nextTop+'px', 'important');
-            panel.style.setProperty('bottom', bottomGap+'px', 'important');
-            panel.style.setProperty('height', 'auto', 'important');
-        };
-
-        const end=()=>{
-            dragging=false;
-            document.body.style.userSelect='';
-        };
-
-        handle.addEventListener('pointerdown',event=>{
-            try{ handle.setPointerCapture(event.pointerId); }catch(e){}
-            start(event.clientY);
-        });
-        handle.addEventListener('pointermove',event=>move(event.clientY));
-        handle.addEventListener('pointerup',end);
-        handle.addEventListener('pointercancel',end);
-    }
-
-
     /* ---------- Boot ---------- */
     window.addEventListener('load', async () => {
         renderMyOwnTile();
         renderPeopleList();
-        setupResponsiveSidePanelResize();
 
         ALL_PARTICIPANTS.forEach(p=>{ if(p.hasJoined){ addParticipantTile(p.userId, p.name, p.initials, false); markOnline(p.userId); } });
         refreshEmptyStage();
