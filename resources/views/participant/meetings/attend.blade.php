@@ -2885,6 +2885,126 @@
         }
 
     </style>
+
+    <style id="sm-side-panel-final-fix">
+        /* ================================================================
+           SMARTMEET FINAL SIDE PANEL FIX
+           - Chat / Transcript / People never pushes the video grid left/right
+           - Desktop/tablet: floating panel stays on RIGHT
+           - Mobile: bottom sheet
+           - Top handle can be dragged vertically to resize panel height
+        ================================================================ */
+        #side-panel.sm-resizable-panel {
+            position: fixed !important;
+            right: 12px !important;
+            left: auto !important;
+            top: 70px !important;
+            bottom: 82px !important;
+            width: min(340px, calc(100vw - 24px)) !important;
+            min-width: 280px !important;
+            height: auto !important;
+            max-height: calc(100dvh - 152px) !important;
+            z-index: 85 !important;
+            display: none;
+            flex-direction: column !important;
+            overflow: hidden !important;
+            border-radius: 18px !important;
+            resize: none !important;
+        }
+
+        #side-panel.sm-resizable-panel.sm-panel-open {
+            display: flex !important;
+        }
+
+        #side-panel .sm-panel-resize-header {
+            flex: 0 0 34px;
+            height: 34px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(2, 6, 23, .72);
+            border-bottom: 1px solid rgba(148, 163, 184, .13);
+            cursor: ns-resize;
+            user-select: none;
+            touch-action: none;
+            z-index: 20;
+        }
+
+        #side-panel .sm-panel-drag-line {
+            width: 46px;
+            height: 5px;
+            border-radius: 999px;
+            background: rgba(203, 213, 225, .45);
+            transition: background .15s ease, width .15s ease;
+        }
+
+        #side-panel .sm-panel-resize-header:hover .sm-panel-drag-line {
+            width: 58px;
+            background: rgba(96, 165, 250, .85);
+        }
+
+        #side-panel .sm-panel-collapse-btn {
+            position: absolute;
+            right: 8px;
+            top: 5px;
+            width: 25px;
+            height: 25px;
+            border: 1px solid rgba(148, 163, 184, .15);
+            border-radius: 8px;
+            background: rgba(30, 41, 59, .72);
+            color: #cbd5e1;
+            display: grid;
+            place-items: center;
+            cursor: pointer;
+            font-size: 10px;
+        }
+
+        #side-panel.sm-panel-collapsed {
+            bottom: auto !important;
+            height: 34px !important;
+            min-height: 34px !important;
+        }
+
+        #side-panel.sm-panel-collapsed > :not(.sm-panel-resize-header) {
+            display: none !important;
+        }
+
+        #side-panel.sm-panel-collapsed .sm-panel-collapse-btn i {
+            transform: rotate(180deg);
+        }
+
+        /* The side panel is now an overlay, so video area always keeps full width. */
+        .main {
+            position: relative !important;
+        }
+        .video-area {
+            width: 100% !important;
+            flex: 1 1 100% !important;
+        }
+
+        /* Mobile bottom sheet; still never becomes a left sidebar. */
+        @media (max-width: 640px) {
+            #side-panel.sm-resizable-panel {
+                top: auto !important;
+                right: 7px !important;
+                left: 7px !important;
+                bottom: 70px !important;
+                width: auto !important;
+                min-width: 0 !important;
+                height: min(58dvh, 520px) !important;
+                max-height: calc(100dvh - 120px) !important;
+                border-radius: 18px 18px 12px 12px !important;
+            }
+
+            #side-panel.sm-panel-collapsed {
+                top: auto !important;
+                bottom: 70px !important;
+                height: 34px !important;
+            }
+        }
+    </style>
+
 </head>
 
 @php
@@ -7423,6 +7543,218 @@
                     try { broadcastMyCameraStatus(); } catch (e) {}
                 }, delay);
             });
+        });
+    })();
+</script>
+
+
+<script id="sm-side-panel-video-repair">
+    /* ================================================================
+       FINAL PANEL RESIZE + REMOTE VIDEO REPAIR
+    ================================================================ */
+    (() => {
+        /* ---------------- Side panel position / resize ---------------- */
+        const panel = document.getElementById('side-panel');
+
+        if (panel && !panel.dataset.smResizableReady) {
+            panel.dataset.smResizableReady = '1';
+            panel.classList.add('sm-resizable-panel');
+
+            const header = document.createElement('div');
+            header.className = 'sm-panel-resize-header';
+            header.title = 'Drag up/down to resize';
+
+            const dragLine = document.createElement('div');
+            dragLine.className = 'sm-panel-drag-line';
+
+            const collapse = document.createElement('button');
+            collapse.type = 'button';
+            collapse.className = 'sm-panel-collapse-btn';
+            collapse.title = 'Minimize / expand panel';
+            collapse.innerHTML = '<i class="fa fa-chevron-up"></i>';
+
+            header.appendChild(dragLine);
+            header.appendChild(collapse);
+            panel.insertBefore(header, panel.firstChild);
+
+            let dragging = false;
+            let startY = 0;
+            let startHeight = 0;
+
+            const beginResize = (clientY) => {
+                if (panel.classList.contains('sm-panel-collapsed')) return;
+                dragging = true;
+                startY = clientY;
+                startHeight = panel.getBoundingClientRect().height;
+                document.body.style.userSelect = 'none';
+            };
+
+            const moveResize = (clientY) => {
+                if (!dragging) return;
+
+                /*
+                 * Panel bottom remains stable. Pulling the TOP handle upward makes
+                 * the panel taller; pulling it downward makes it shorter.
+                 */
+                const delta = startY - clientY;
+                const maxHeight = Math.max(220, window.innerHeight - 145);
+                const nextHeight = Math.max(190, Math.min(maxHeight, startHeight + delta));
+
+                panel.style.setProperty('height', nextHeight + 'px', 'important');
+                panel.style.setProperty('top', 'auto', 'important');
+                panel.style.setProperty('max-height', maxHeight + 'px', 'important');
+            };
+
+            const endResize = () => {
+                if (!dragging) return;
+                dragging = false;
+                document.body.style.userSelect = '';
+            };
+
+            header.addEventListener('mousedown', e => {
+                if (e.target.closest('.sm-panel-collapse-btn')) return;
+                beginResize(e.clientY);
+            });
+
+            document.addEventListener('mousemove', e => moveResize(e.clientY));
+            document.addEventListener('mouseup', endResize);
+
+            header.addEventListener('touchstart', e => {
+                if (e.target.closest('.sm-panel-collapse-btn')) return;
+                const t = e.touches[0];
+                if (t) beginResize(t.clientY);
+            }, { passive: true });
+
+            document.addEventListener('touchmove', e => {
+                if (!dragging) return;
+                const t = e.touches[0];
+                if (t) moveResize(t.clientY);
+            }, { passive: true });
+
+            document.addEventListener('touchend', endResize);
+
+            collapse.addEventListener('click', e => {
+                e.stopPropagation();
+                panel.classList.toggle('sm-panel-collapsed');
+            });
+
+            /*
+             * Keep compatibility with the existing toggleSidePanel().
+             * MutationObserver only mirrors its display state into our final class.
+             */
+            const syncOpenState = () => {
+                const hidden = panel.style.display === 'none';
+                panel.classList.toggle('sm-panel-open', !hidden);
+            };
+
+            new MutationObserver(syncOpenState).observe(panel, {
+                attributes: true,
+                attributeFilter: ['style']
+            });
+
+            syncOpenState();
+        }
+
+        /* ---------------- Remote video visibility repair ----------------
+           A received LIVE video track is authoritative. This fixes the case where
+           the WebRTC track arrives before/after camera-status and the avatar stays
+           visible even though the other user's camera is actually streaming.
+        ---------------------------------------------------------------- */
+        function repairRemoteVideo(uid) {
+            uid = String(uid || '');
+            if (!uid || uid === String(MY_USER_ID)) return;
+
+            const stream = remoteStreams?.[uid];
+            const video = document.getElementById('rvideo-' + uid);
+            const avatar = document.getElementById('avatar-' + uid);
+
+            if (!stream || !video) return;
+
+            const tracks = stream.getVideoTracks().filter(track =>
+                track.readyState === 'live'
+            );
+
+            if (!tracks.length) return;
+
+            const liveTrack = tracks.find(track => track.enabled && !track.muted) || tracks[0];
+
+            if (!(video.srcObject instanceof MediaStream) ||
+                !video.srcObject.getVideoTracks().some(t => t.id === liveTrack.id)) {
+                video.srcObject = new MediaStream([liveTrack]);
+            }
+
+            video.autoplay = true;
+            video.playsInline = true;
+            video.muted = true;
+
+            const show = () => {
+                if (liveTrack.readyState !== 'live') return;
+                participantCameraStatus[uid] = true;
+                video.style.display = 'block';
+                if (avatar) avatar.style.display = 'none';
+                video.play().catch(() => {});
+            };
+
+            if (!liveTrack.muted) show();
+            liveTrack.addEventListener('unmute', show, { once: true });
+
+            setTimeout(() => {
+                if (liveTrack.readyState === 'live' && !liveTrack.muted) show();
+            }, 180);
+        }
+
+        function repairAllRemoteVideos() {
+            try {
+                Object.keys(remoteStreams || {}).forEach(repairRemoteVideo);
+            } catch (e) {}
+        }
+
+        /*
+         * Re-sync current local camera/audio tracks to every joined peer.
+         * Uses the existing replaceTrack-based implementation; it does NOT add
+         * new m-lines or repeatedly renegotiate healthy peer connections.
+         */
+        async function resyncCurrentMedia() {
+            try {
+                if (typeof syncMediaToJoinedPeers === 'function') {
+                    await syncMediaToJoinedPeers();
+                } else if (typeof syncTracksToEveryPeer === 'function') {
+                    await syncTracksToEveryPeer(false);
+                }
+            } catch (e) {
+                console.warn('SmartMeet media resync:', e);
+            }
+
+            repairAllRemoteVideos();
+        }
+
+        /* When a camera-status arrives, immediately repair the receiving tile. */
+        if (window.Echo && typeof ROOM !== 'undefined' && !window.__smFinalVideoRepairBound) {
+            window.__smFinalVideoRepairBound = true;
+
+            window.Echo.channel(ROOM).listen('.signal', event => {
+                const uid = String(event?.data?.userId || event?.fromUserId || '');
+                if (!uid || uid === String(MY_USER_ID)) return;
+
+                if (event?.type === 'camera-status' && event?.data?.cameraOn) {
+                    setTimeout(() => repairRemoteVideo(uid), 40);
+                    setTimeout(() => repairRemoteVideo(uid), 220);
+                    setTimeout(resyncCurrentMedia, 320);
+                }
+
+                if (event?.type === 'user-joined') {
+                    setTimeout(resyncCurrentMedia, 120);
+                    setTimeout(resyncCurrentMedia, 650);
+                }
+            });
+        }
+
+        window.addEventListener('load', () => {
+            [250, 900, 1800].forEach(ms => setTimeout(resyncCurrentMedia, ms));
+        });
+
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) setTimeout(resyncCurrentMedia, 120);
         });
     })();
 </script>
