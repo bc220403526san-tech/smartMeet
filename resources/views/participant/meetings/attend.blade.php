@@ -594,9 +594,13 @@
     <div class="header-center"><i class="fa fa-clock"></i><span id="timer">00:00:00</span></div>
     <div class="header-right">
         <div class="participants-count"><i class="fa fa-circle" style="color:var(--green);font-size:8px;"></i><span data-online-count>1</span> online</div>
+        <button class="btn-cancel" onclick="cancelMeeting()"><i class="fa fa-ban"></i><span>Cancel</span></button>
         <button class="btn-leave" onclick="leaveMeeting()"><i class="fa fa-phone-slash"></i><span>Leave</span></button>
     </div>
 </div>
+<form id="cancel-form" action="{{ route('organizer.meetings.cancel', $meeting) }}" method="POST" style="display:none;">
+    @csrf
+</form>
 
 <div class="main">
     <div class="video-area">
@@ -648,6 +652,7 @@
     <div class="ctrl-btn" onclick="toggleSidePanel('chat')"><div class="ctrl-icon" id="ctrl-chat"><i class="fa fa-comment"></i><span id="chat-badge">0</span></div><span class="ctrl-label">Chat</span></div>
     <div class="ctrl-btn" onclick="toggleSidePanel('people')"><div class="ctrl-icon" id="ctrl-people"><i class="fa fa-users"></i></div><span class="ctrl-label">People</span></div>
     <div class="ctrl-divider"></div>
+    <div class="ctrl-btn"><button class="btn-end" style="background:linear-gradient(135deg,#7f1d1d,#450a0a);" onclick="cancelMeeting()" title="Cancel meeting for everyone"><i class="fa fa-ban"></i></button><span class="ctrl-label" style="color:var(--red);">Cancel</span></div>
     <div class="ctrl-btn"><button class="btn-end" onclick="leaveMeeting()"><i class="fa fa-phone-slash"></i></button><span class="ctrl-label" style="color:var(--red);">Leave</span></div>
 </div>
 
@@ -657,21 +662,18 @@
     /* ============================================================
        SMARTMEET — PARTICIPANT ROOM (clean single implementation)
        ============================================================ */
-    const IS_ORGANIZER   = false;
+    const IS_ORGANIZER   = true;
     const MEETING_ID      = "{{ $meeting->id }}";
     const MY_USER_ID      = "{{ auth()->id() }}";
     const MY_NAME         = @json(auth()->user()->name);
     const MY_INITIALS     = @json($userInitials);
-    const SIGNAL_URL      = @json(route('participant.meetings.signal', $meeting));
-    const TRANSCRIPT_URL  = @json(route('participant.meetings.transcript', $meeting));
-    const MARK_LEFT_URL   = @json(route('participant.meetings.markLeft', $meeting));
-    const LEAVE_URL       = @json(route('participant.meetings.index'));
+    const SIGNAL_URL      = @json(route('organizer.meetings.signal', $meeting));
+    const TRANSCRIPT_URL  = @json(route('organizer.meetings.transcript', $meeting));
+    const MARK_LEFT_URL   = @json(route('organizer.meetings.markLeft', $meeting));
+    const LEAVE_URL       = @json(route('organizer.meetings.index'));
+    const CANCEL_URL      = @json(route('organizer.meetings.cancel', $meeting));
     const CSRF            = @json(csrf_token());
     const ALL_PARTICIPANTS = @json($allParticipants);
-    const ORGANIZER_ID    = "{{ $organizer->id }}";
-    const ORGANIZER_NAME  = @json($organizer->name);
-    const ORGANIZER_INITIALS = @json($orgInitials);
-    const ORGANIZER_JOINED   = @json($organizerJoined ?? false);
     const MEETING_END_TIME   = @json($meetingEnd);
     const ACTUAL_START = @json($meeting->actual_start ? \Carbon\Carbon::parse($meeting->actual_start)->utc()->toIso8601String() : now()->utc()->toIso8601String());
     const COLORS = ['#3b82f6,#06b6d4','#8b5cf6,#ec4899','#22c55e,#06b6d4','#f59e0b,#ef4444','#64748b,#334155','#ec4899,#f59e0b'];
@@ -679,7 +681,6 @@
 
     /* ---------- Known participants (id -> {name, initials, isOrganizer, hasJoined}) ---------- */
     const knownParticipants = {};
-    knownParticipants[ORGANIZER_ID] = { name: ORGANIZER_NAME, initials: ORGANIZER_INITIALS, isOrganizer: true, hasJoined: Boolean(ORGANIZER_JOINED) };
     ALL_PARTICIPANTS.forEach(p => { knownParticipants[String(p.userId)] = { name: p.name, initials: p.initials, isOrganizer: false, hasJoined: Boolean(p.hasJoined) }; });
 
     /* ---------- Runtime state ---------- */
@@ -753,27 +754,35 @@
     function renderPeopleList(){
         const body=document.getElementById('people-body'); if(!body) return;
         body.innerHTML='';
-        const ids=[String(MY_USER_ID), ORGANIZER_ID, ...ALL_PARTICIPANTS.map(p=>String(p.userId))];
+        const ids=[String(MY_USER_ID), ...ALL_PARTICIPANTS.map(p=>String(p.userId))];
         ids.forEach(uid=>renderPersonRow(uid));
     }
     function renderPersonRow(uid){
         uid=String(uid);
         const body=document.getElementById('people-body'); if(!body) return;
         const isMe = uid===String(MY_USER_ID);
-        const info = isMe ? { name: MY_NAME, initials: MY_INITIALS, isOrganizer: false } : knownParticipants[uid];
+        const info = isMe ? { name: MY_NAME, initials: MY_INITIALS, isOrganizer: true } : knownParticipants[uid];
         if(!info) return;
         const isOnline = isMe || onlineUsers.has(uid);
         let row=document.getElementById('person-row-'+uid);
         if(!row){ row=document.createElement('div'); row.id='person-row-'+uid; body.appendChild(row); }
         row.className='person-row '+(isOnline?'joined':'pending');
         const color=colorFor(uid, info.isOrganizer);
+        const canMute = IS_ORGANIZER && !isMe && isOnline;
         row.innerHTML = `
         <div class="person-avatar" style="background:linear-gradient(135deg,${color})">${escapeHtml(info.initials||initialsOf(info.name))}</div>
         <div class="person-info">
             <div class="person-name">${escapeHtml(info.name)}${isMe?' <span style="color:var(--blue);font-weight:600;">(You)</span>':''}${info.isOrganizer?'<i class="fa fa-crown" style="color:#fbbf24;font-size:10px;"></i>':''}</div>
             <div class="person-status ${isOnline?'on':''}">${info.isOrganizer?'Organizer':'Participant'} • ${isOnline?'Joined':'Not joined yet'}</div>
         </div>
+        ${canMute ? `<button class="person-action" onclick="muteParticipant('${uid}')" title="Mute this participant"><i class="fa fa-microphone-slash"></i></button>` : ''}
         <span class="person-dot ${isOnline?'on':''}"></span>`;
+    }
+    function muteParticipant(uid){
+        uid=String(uid);
+        const info=knownParticipants[uid];
+        sendSignal(uid, 'mute', {});
+        showToast(`🎙️ ${escapeHtml(info?info.name:'Participant')}'s microphone has been muted.`);
     }
 
     function renderMyOwnTile(){
@@ -787,7 +796,7 @@
             <button class="tile-expand-btn" onclick="toggleMaximize('${MY_USER_ID}')"><i class="fa fa-expand" id="expand-icon-${MY_USER_ID}"></i></button>
         </div>
         <div class="tile-info">
-            <div class="tile-name">${escapeHtml(MY_NAME)}<span class="role-badge participant">You</span></div>
+            <div class="tile-name"><i class="fa fa-crown" style="color:#fbbf24;font-size:10px;"></i> ${escapeHtml(MY_NAME)}<span class="role-badge organizer">You</span></div>
             <div class="tile-icons">
                 <div class="speaking-indicator" id="speaking-${MY_USER_ID}" style="display:none;"><div class="speaking-bar"></div><div class="speaking-bar"></div><div class="speaking-bar"></div></div>
                 <div class="mic-off" id="micoff-${MY_USER_ID}" style="display:flex;"><i class="fa fa-microphone-slash"></i></div>
@@ -959,21 +968,13 @@
         iceServers.push({
             urls:[
                 `turn:${TURN_HOST}:3478?transport=udp`,
-                `turn:${TURN_HOST}:3478?transport=tcp`,
-                `turns:${TURN_HOST}:5349?transport=tcp`
+                `turn:${TURN_HOST}:3478?transport=tcp`
             ],
             username:TURN_USERNAME, credential:TURN_CREDENTIAL
         });
     } else {
         console.warn('[SmartMeet] Custom TURN is not configured.');
     }
-    /* Public backup TURN relay — used in addition to the primary TURN above so a
-       call can still connect even if smartmeet.live's own coturn is unreachable. */
-    iceServers.push(
-        { urls:'turn:openrelay.metered.ca:80', username:'openrelayproject', credential:'openrelayproject' },
-        { urls:'turn:openrelay.metered.ca:443', username:'openrelayproject', credential:'openrelayproject' },
-        { urls:'turn:openrelay.metered.ca:443?transport=tcp', username:'openrelayproject', credential:'openrelayproject' }
-    );
     const iceConfig = { iceServers, iceCandidatePoolSize:10, bundlePolicy:'max-bundle', rtcpMuxPolicy:'require' };
     console.log('[SmartMeet] ICE servers configured:', iceServers.map(s=>s.urls));
 
@@ -996,6 +997,9 @@
         const pc=peers[uid];
         if(!pc || pc.signalingState==='closed' || leftUsers.has(uid)) return false;
         if(makingOffer[uid] || pc.signalingState!=='stable') return false;
+        // onnegotiationneeded + presence repair can fire almost together.
+        // Do not create a second normal offer while the first negotiation is settling.
+        if(!iceRestart && pc.__lastOfferAt && (Date.now()-pc.__lastOfferAt)<2000) return false;
         try{
             makingOffer[uid]=true;
             await syncLocalTracksToPeer(uid);
@@ -1248,6 +1252,13 @@
     async function handleAnswer(from, data){
         console.log('[SmartMeet] received answer <-', from);
         const pc=peers[from]; if(!pc) return;
+        // An answer is valid only while our local offer is outstanding.
+        // Reverb/repair retries can deliver an old or duplicate answer after the
+        // connection has already returned to stable; ignore it safely.
+        if(pc.signalingState!=='have-local-offer'){
+            console.log('[SmartMeet] ignoring stale/duplicate answer <-', from, 'state:', pc.signalingState);
+            return;
+        }
         try{
             await pc.setRemoteDescription({ type:data.type||'answer', sdp:decodeSdp(data.sdp) });
             await syncLocalTracksToPeer(from);
@@ -1319,9 +1330,9 @@
             const uid=String(data.data.userId); if(uid===String(MY_USER_ID)) return;
             const wasOnline=onlineUsers.has(uid);
             leftUsers.delete(uid);
-            if(!knownParticipants[uid]) knownParticipants[uid]={ name:data.data.name, initials:data.data.initials, isOrganizer:uid===ORGANIZER_ID, hasJoined:true };
+            if(!knownParticipants[uid]) knownParticipants[uid]={ name:data.data.name, initials:data.data.initials, isOrganizer:false, hasJoined:true };
             else knownParticipants[uid].hasJoined=true;
-            addParticipantTile(uid, data.data.name, data.data.initials, uid===ORGANIZER_ID);
+            addParticipantTile(uid, data.data.name, data.data.initials, false);
             markOnline(uid);
             createPeerConnection(uid);
             if(shouldInitiate(uid)) setTimeout(()=>negotiatePeer(uid,false),60);
@@ -1406,8 +1417,11 @@
         if(off) off.style.display = on ? 'none' : 'flex';
     }
     async function toggleMic(){
-        if(!localStream) await startAudio();
-        if(!localStream || !localStream.getAudioTracks().length) return;
+        // localStream may already exist because the camera was opened first.
+        // In that case the old code skipped startAudio() and the Mic button did nothing.
+        const liveAudio=localStream?.getAudioTracks?.().find(t=>t.readyState==='live');
+        if(!liveAudio) await startAudio();
+        if(!localStream || !localStream.getAudioTracks().some(t=>t.readyState==='live')) return;
         isMicOn=!isMicOn;
         localStream.getAudioTracks().forEach(t=>t.enabled=isMicOn);
         setMicButton(isMicOn);
@@ -1619,6 +1633,21 @@
         rec.onerror=()=>btn.classList.remove('listening');
     }
 
+    /* ---------- Cancel meeting (organizer only) ---------- */
+    let cancelling=false;
+    async function cancelMeeting(){
+        if(cancelling) return;
+        if(!window.confirm('Cancel this meeting for everyone? This cannot be undone.')) return;
+        cancelling=true; leftNotified=true;
+        if(autoEndTimer) clearTimeout(autoEndTimer);
+        try{
+            await sendSignal('all','meeting-cancelled',{ message:'Meeting has been cancelled by the organizer.' });
+        }catch(e){}
+        showToast('🚫 Meeting cancelled for everyone.');
+        cleanup();
+        setTimeout(()=>{ document.getElementById('cancel-form')?.submit(); }, 250);
+    }
+
     /* ---------- Leave / cleanup ---------- */
     async function leaveMeeting(){
         if(leftNotified) return; leftNotified=true;
@@ -1706,7 +1735,6 @@
         setupPanelResize();
         renderPeopleList();
 
-        if(ORGANIZER_JOINED){ addParticipantTile(ORGANIZER_ID, ORGANIZER_NAME, ORGANIZER_INITIALS, true); markOnline(ORGANIZER_ID); }
         ALL_PARTICIPANTS.forEach(p=>{ if(p.hasJoined){ addParticipantTile(p.userId, p.name, p.initials, false); markOnline(p.userId); } });
         refreshEmptyStage();
 
