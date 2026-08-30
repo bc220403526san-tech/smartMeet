@@ -985,47 +985,83 @@
 
     function getOrCreateRemoteStream(uid){ uid=String(uid); if(!remoteStreams[uid]) remoteStreams[uid]=new MediaStream(); return remoteStreams[uid]; }
 
+    function shouldInitiate(uid){
+        const a=Number(MY_USER_ID), b=Number(uid);
+        if(!Number.isNaN(a) && !Number.isNaN(b)) return a<b;
+        return String(MY_USER_ID)<String(uid);
+    }
+
+    async function negotiatePeer(uid, iceRestart=false){
+        uid=String(uid);
+        const pc=peers[uid];
+        if(!pc || pc.signalingState==='closed' || leftUsers.has(uid)) return false;
+        if(makingOffer[uid] || pc.signalingState!=='stable') return false;
+        try{
+            makingOffer[uid]=true;
+            await syncLocalTracksToPeer(uid);
+            const offer=await pc.createOffer(iceRestart ? {iceRestart:true} : undefined);
+            if(pc.signalingState!=='stable') return false;
+            await pc.setLocalDescription(offer);
+            pc.__lastOfferAt=Date.now();
+            console.log('[SmartMeet] sending offer ->', uid, iceRestart?'(ICE restart)':'');
+            return await sendSignal(uid,'offer',{
+                type:pc.localDescription.type,
+                sdp:btoa(unescape(encodeURIComponent(pc.localDescription.sdp))),
+                iceRestart:Boolean(iceRestart)
+            });
+        }catch(err){
+            console.warn('[SmartMeet] negotiate failed', uid, err);
+            return false;
+        }finally{
+            makingOffer[uid]=false;
+        }
+    }
+
     function createPeerConnection(uid){
         uid=String(uid);
         if(uid===String(MY_USER_ID) || leftUsers.has(uid)) return null;
         let pc=peers[uid];
-        if(pc && !['closed'].includes(pc.connectionState)) return pc;
+        if(pc && pc.signalingState!=='closed' && pc.connectionState!=='closed') return pc;
         if(pc){ try{ pc.close(); }catch(e){} }
 
         pc=new RTCPeerConnection(iceConfig);
         peers[uid]=pc;
+        pc.__createdAt=Date.now();
+        pc.__lastOfferAt=0;
+        pc.__connectedOnce=false;
         pc.__audioTx = pc.addTransceiver('audio', { direction:'sendrecv' });
         pc.__videoTx = pc.addTransceiver('video', { direction:'sendrecv' });
         syncLocalTracksToPeer(uid);
 
+        // Only one side proactively initiates. The other side answers.
+        // This avoids offer glare on mobile while still keeping perfect-negotiation handling.
         pc.onnegotiationneeded = async () => {
-            try{
-                if(pc.signalingState!=='stable') return;
-                makingOffer[uid]=true;
-                const offer=await pc.createOffer();
-                if(pc.signalingState!=='stable') return;
-                await pc.setLocalDescription(offer);
-                console.log('[SmartMeet] sending offer ->', uid);
-                sendSignal(uid,'offer',{ type:pc.localDescription.type, sdp:btoa(unescape(encodeURIComponent(pc.localDescription.sdp))) });
-            }catch(err){ console.warn('[SmartMeet] negotiationneeded failed', uid, err); }
-            finally{ makingOffer[uid]=false; }
+            if(shouldInitiate(uid)) await negotiatePeer(uid,false);
         };
 
-        pc.onicecandidate = (e)=>{ if(e.candidate) sendSignal(uid,'ice-candidate',{ candidate:e.candidate.toJSON() }); };
+        pc.onicecandidate = (e)=>{
+            if(e.candidate) sendSignal(uid,'ice-candidate',{ candidate:e.candidate.toJSON() });
+        };
+        pc.onicecandidateerror = (e)=>{
+            console.warn('[SmartMeet] ICE candidate error', uid, e?.errorCode||'', e?.errorText||'');
+        };
 
         pc.ontrack = (event)=>{
             if(leftUsers.has(uid)) return;
             const info=knownParticipants[uid];
             if(info){ info.hasJoined=true; addParticipantTile(uid, info.name, info.initials, Boolean(info.isOrganizer)); markOnline(uid); }
+
             const stream=getOrCreateRemoteStream(uid);
-            if(!stream.getTracks().some(t=>t.id===event.track.id)) stream.addTrack(event.track);
+            const incomingTracks = event.streams?.[0]?.getTracks?.() || [event.track];
+            incomingTracks.forEach(track=>{
+                if(track && !stream.getTracks().some(t=>t.id===track.id)) stream.addTrack(track);
+            });
+
             attachRemoteStream(uid);
+
             event.track.onunmute = ()=>{
                 attachRemoteStream(uid);
-                if(event.track.kind==='video' && camStatus[uid]===true){
-                    const v=document.getElementById('rvideo-'+uid);
-                    if(v) v.play().catch(()=>{});
-                }
+                unlockRemoteAudio();
             };
             event.track.onended = ()=>{
                 const s=remoteStreams[uid];
@@ -1038,20 +1074,30 @@
         pc.oniceconnectionstatechange = ()=>{
             const state=pc.iceConnectionState;
             console.log('[SmartMeet] ICE state', uid, '->', state);
-            if(state==='connected' || state==='completed'){ ensureTileVisible(uid); attachRemoteStream(uid); }
-            else if(state==='failed'){ console.warn('[SmartMeet] ICE FAILED for', uid, '- check TURN server reachability'); restartPeer(uid); }
+            if(state==='connected' || state==='completed'){
+                pc.__connectedOnce=true;
+                ensureTileVisible(uid);
+                attachRemoteStream(uid);
+                unlockRemoteAudio();
+            }else if(state==='failed'){
+                console.warn('[SmartMeet] ICE FAILED for', uid, '- attempting recovery');
+                restartPeer(uid);
+            }
         };
         pc.onconnectionstatechange = ()=>{
             console.log('[SmartMeet] connection state', uid, '->', pc.connectionState);
             if(pc.connectionState==='connected'){
+                pc.__connectedOnce=true;
+                clearTimeout(pc.__disconnectTimer);
                 ensureTileVisible(uid);
                 attachRemoteStream(uid);
                 unlockRemoteAudio();
+                sendSignal(uid,'media-sync-request',{requesterId:MY_USER_ID});
             }else if(pc.connectionState==='disconnected'){
                 clearTimeout(pc.__disconnectTimer);
                 pc.__disconnectTimer=setTimeout(()=>{
                     if(pc.connectionState==='disconnected') restartPeer(uid);
-                },1800);
+                },2500);
             }else if(pc.connectionState==='failed'){
                 restartPeer(uid);
             }
@@ -1070,11 +1116,20 @@
     async function restartPeer(uid){
         uid=String(uid);
         if(leftUsers.has(uid) || uid===String(MY_USER_ID)) return;
-        try{
-            const pc=peers[uid]; if(!pc) return;
-            await pc.setLocalDescription(await pc.createOffer({ iceRestart:true }));
-            sendSignal(uid,'offer',{ type:pc.localDescription.type, sdp:btoa(unescape(encodeURIComponent(pc.localDescription.sdp))), iceRestart:true });
-        }catch(e){ console.warn('ICE restart failed', uid, e); }
+        const pc=peers[uid];
+        if(!pc || pc.signalingState==='closed') return;
+
+        clearTimeout(pc.__restartTimer);
+        pc.__restartTimer=setTimeout(async ()=>{
+            try{
+                if(pc.restartIce) pc.restartIce();
+                if(shouldInitiate(uid)){
+                    await negotiatePeer(uid,true);
+                }else{
+                    await sendSignal(uid,'ice-restart-request',{requesterId:MY_USER_ID});
+                }
+            }catch(e){ console.warn('[SmartMeet] ICE restart failed', uid, e); }
+        },250);
     }
 
     async function syncLocalTracksToPeer(uid){
@@ -1086,29 +1141,49 @@
     }
     async function syncTracksToEveryPeer(){ await Promise.allSettled(Object.keys(peers).map(uid=>syncLocalTracksToPeer(uid))); }
 
+    function sameTrackSet(stream, tracks){
+        const a=(stream?.getTracks?.()||[]).map(t=>t.id).sort().join('|');
+        const b=(tracks||[]).map(t=>t.id).sort().join('|');
+        return a===b;
+    }
+
     function attachRemoteStream(uid){
         uid=String(uid);
         const source=getOrCreateRemoteStream(uid);
         const localIds=new Set((localStream?.getTracks?.()||[]).map(t=>t.id));
+
         const audioTracks=source.getAudioTracks().filter(t=>t.readyState!=='ended' && !localIds.has(t.id));
         let audio=document.getElementById('audio-'+uid);
-        if(!audio){ audio=document.createElement('audio'); audio.id='audio-'+uid; audio.autoplay=true; audio.playsInline=true; audio.style.display='none'; document.body.appendChild(audio); }
-        audio.srcObject=new MediaStream(audioTracks); audio.muted=false; audio.volume=1;
-        if(audioTracks.length) audio.play().catch(()=>{ armAudioUnlock(); });
+        if(!audio){
+            audio=document.createElement('audio');
+            audio.id='audio-'+uid;
+            audio.autoplay=true;
+            audio.playsInline=true;
+            audio.setAttribute('playsinline','');
+            audio.style.display='none';
+            document.body.appendChild(audio);
+        }
+        if(!sameTrackSet(audio.srcObject,audioTracks)) audio.srcObject=new MediaStream(audioTracks);
+        audio.muted=false;
+        audio.volume=1;
+        if(audioTracks.length){
+            audio.play().catch(()=>armAudioUnlock());
+        }
 
         const videoTracks=source.getVideoTracks().filter(t=>t.readyState!=='ended' && !localIds.has(t.id));
         const video=document.getElementById('rvideo-'+uid);
         const avatar=document.getElementById('avatar-'+uid);
         if(video){
-            video.srcObject=new MediaStream(videoTracks);
+            if(!sameTrackSet(video.srcObject,videoTracks)) video.srcObject=new MediaStream(videoTracks);
             video.muted=true;
-            video.playsInline=true;
             video.autoplay=true;
-            // A received live track is enough to show video unless sender explicitly said camera OFF.
-            // This removes the race where the video track arrives before camera-status on mobile.
-            const show = videoTracks.length>0 && camStatus[uid]!==false;
-            video.style.display = show ? 'block' : 'none';
-            if(avatar) avatar.style.display = show ? 'none' : 'flex';
+            video.playsInline=true;
+            video.setAttribute('playsinline','');
+
+            // Show an actual received track unless the sender explicitly reported camera OFF.
+            const show=videoTracks.some(t=>t.readyState==='live') && camStatus[uid]!==false;
+            video.style.display=show?'block':'none';
+            if(avatar) avatar.style.display=show?'none':'flex';
             if(show) video.play().catch(()=>{});
         }
     }
@@ -1160,7 +1235,12 @@
         const pc=peers[from]; if(!pc) return;
         try{
             await pc.setRemoteDescription({ type:data.type||'answer', sdp:decodeSdp(data.sdp) });
-            if(pendingCandidates[from]?.length){ for(const c of pendingCandidates[from]) await pc.addIceCandidate(c).catch(()=>{}); delete pendingCandidates[from]; }
+            await syncLocalTracksToPeer(from);
+            if(pendingCandidates[from]?.length){
+                for(const c of pendingCandidates[from]) await pc.addIceCandidate(c).catch(()=>{});
+                delete pendingCandidates[from];
+            }
+            attachRemoteStream(from);
         }catch(err){ console.warn('[SmartMeet] answer handling failed', from, err); }
     }
     async function handleIceCandidate(from, data){
@@ -1229,9 +1309,11 @@
             addParticipantTile(uid, data.data.name, data.data.initials, uid===ORGANIZER_ID);
             markOnline(uid);
             createPeerConnection(uid);
+            if(shouldInitiate(uid)) setTimeout(()=>negotiatePeer(uid,false),60);
             if(!wasOnline) showToast(`✅ ${escapeHtml(data.data.name)} has joined the meeting.`);
             sendSignal(uid,'mic-status',{ userId:MY_USER_ID, muted:!isMicOn });
             sendSignal(uid,'camera-status',{ userId:MY_USER_ID, cameraOn:isCameraOn });
+            sendSignal(uid,'media-sync-request',{ requesterId:MY_USER_ID });
             // Tell the newly joined browser that THIS already-connected user is here.
             // This is metadata/presence only; camera/mic capture settings are not changed.
             sendSignal(uid,'presence-sync',{
@@ -1277,6 +1359,8 @@
             }
 
             createPeerConnection(uid);
+            if(shouldInitiate(uid)) setTimeout(()=>negotiatePeer(uid,false),80);
+            sendSignal(uid,'media-sync-request',{ requesterId:MY_USER_ID });
             attachRemoteStream(uid);
             return;
         }
@@ -1318,9 +1402,19 @@
         if(leftUsers.has(from) && ['offer','ice-candidate'].includes(data.type)) return;
 
         if(data.type==='media-sync-request'){
+            const pc=createPeerConnection(from);
             await syncLocalTracksToPeer(from);
-            const pc=peers[from];
-            if(pc && pc.connectionState==='failed') restartPeer(from);
+            broadcastMyMicStatus();
+            broadcastMyCameraStatus();
+            if(pc && shouldInitiate(from) && (pc.connectionState==='new' || pc.connectionState==='connecting')){
+                const age=Date.now()-(pc.__lastOfferAt||0);
+                if(age>1200) await negotiatePeer(from,false);
+            }
+            return;
+        }
+        if(data.type==='ice-restart-request'){
+            const pc=createPeerConnection(from);
+            if(pc && shouldInitiate(from)) await negotiatePeer(from,true);
             return;
         }
 
@@ -1384,6 +1478,7 @@
         }
         await syncTracksToEveryPeer();
         broadcastMyMicStatus();
+        Object.keys(peers).forEach(uid=>sendSignal(uid,'media-sync-request',{requesterId:MY_USER_ID}));
     }
     async function toggleCamera(){
         // Camera is intentionally independent from microphone permission.
@@ -1407,11 +1502,12 @@
         if(avatar) avatar.style.display = isCameraOn ? 'none' : 'flex';
         await syncTracksToEveryPeer();
         broadcastMyCameraStatus();
+        Object.keys(peers).forEach(uid=>sendSignal(uid,'media-sync-request',{requesterId:MY_USER_ID}));
         if(isCameraOn){
-            // Re-announce shortly after camera start so slower mobile peers receive both
-            // the sender track and camera state even if signaling/media arrive out of order.
+            // Re-sync after the camera track has had time to become live on slower phones.
             setTimeout(()=>{ syncTracksToEveryPeer(); broadcastMyCameraStatus(); },250);
             setTimeout(()=>{ syncTracksToEveryPeer(); broadcastMyCameraStatus(); },900);
+            setTimeout(()=>{ syncTracksToEveryPeer(); broadcastMyCameraStatus(); },1800);
         }
     }
     function broadcastMyMicStatus(){ sendSignal('all','mic-status',{ userId:MY_USER_ID, muted:!isMicOn }); }
@@ -1420,8 +1516,9 @@
     /* ---------- Transcript (Web Speech API) ---------- */
     let recognition=null, recognitionRunning=false, recognitionStopping=false, recognitionRestartTimer=null;
     function startTranscript(){
-        // Mobile Chrome may let Web Speech compete with WebRTC for the same microphone.
-        // Meeting voice has priority; captions remain available on desktop browsers.
+        // Chrome Android can block Web Speech while WebRTC owns the microphone.
+        // Keep meeting audio/video stable there; mobile still receives everyone else's
+        // broadcast transcripts. Desktop Chrome/Edge can produce local captions.
         if(IS_MOBILE_BROWSER) return;
         const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
         if(!SR){ showToast('⚠️ Live captions require Chrome or Edge.'); return; }
@@ -1442,8 +1539,15 @@
         };
         recognition.onerror=(e)=>{
             recognitionRunning=false;
-            if(e.error==='not-allowed'||e.error==='service-not-allowed'){ showToast('Microphone/caption permission is required.'); return; }
-            scheduleRecognitionRestart(400);
+            if(e.error==='not-allowed'||e.error==='service-not-allowed'){
+                showToast('Microphone/caption permission is required.');
+                return;
+            }
+            if(e.error==='audio-capture'){
+                console.warn('[SmartMeet] SpeechRecognition audio capture unavailable; WebRTC audio stays active.');
+                return;
+            }
+            scheduleRecognitionRestart(e.error==='network'?1200:500);
         };
         recognition.onend=()=>{ recognitionRunning=false; const ind=document.getElementById('listening-indicator'); if(ind) ind.style.display='none'; scheduleRecognitionRestart(400); };
     }
@@ -1512,10 +1616,27 @@
         body.appendChild(div); body.scrollTop=body.scrollHeight;
     }
     async function saveTranscript(text){
-        try{
-            const res=await fetch(TRANSCRIPT_URL,{ method:'POST', headers:{ 'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':CSRF }, body:JSON.stringify({ text }) });
-            if(!res.ok) console.error('transcript save failed', res.status, await res.text());
-        }catch(e){ console.error('transcript save error', e); }
+        const clean=String(text||'').trim();
+        if(!clean) return false;
+        for(let attempt=0; attempt<2; attempt++){
+            try{
+                const ctrl=new AbortController();
+                const timer=setTimeout(()=>ctrl.abort(),6500);
+                const res=await fetch(TRANSCRIPT_URL,{
+                    method:'POST',
+                    headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':CSRF},
+                    body:JSON.stringify({text:clean}),
+                    signal:ctrl.signal
+                });
+                clearTimeout(timer);
+                if(res.ok) return true;
+                console.error('transcript save failed',res.status);
+            }catch(e){
+                console.error('transcript save error',e);
+            }
+            await new Promise(r=>setTimeout(r,350));
+        }
+        return false;
     }
 
     /* ---------- Chat ---------- */
@@ -1528,11 +1649,20 @@
         row.innerHTML = `<div class="chat-message-content"><div class="chat-message-meta"><strong>${escapeHtml(isMe?MY_NAME+' (You)':safeName)}</strong><span>${time}</span></div><div class="chat-message-bubble">${escapeHtml(text)}</div></div>`;
         body.appendChild(row); body.scrollTop=body.scrollHeight;
     }
-    function sendChat(){
-        const input=document.getElementById('chat-input'); if(!input) return;
+    let chatSending=false;
+    async function sendChat(){
+        const input=document.getElementById('chat-input'); if(!input || chatSending) return;
         const text=input.value.trim(); if(!text) return;
-        addChatBubble(MY_NAME, text, true); input.value='';
-        sendSignal('all','chat',{ text, name:MY_NAME });
+        chatSending=true;
+        const ok=await sendSignal('all','chat',{text,name:MY_NAME});
+        chatSending=false;
+        if(ok){
+            addChatBubble(MY_NAME,text,true);
+            input.value='';
+        }else{
+            showToast('💬 Message could not be sent. Check your connection.');
+            input.focus();
+        }
     }
     function setupChatVoiceInput(){
         const btn=document.getElementById('chat-voice-btn'); const input=document.getElementById('chat-input');
@@ -1577,14 +1707,54 @@
         Object.keys(knownParticipants).forEach(uid=>{
             uid=String(uid);
             if(uid===String(MY_USER_ID) || leftUsers.has(uid)) return;
-            if(knownParticipants[uid]?.hasJoined || onlineUsers.has(uid)) createPeerConnection(uid);
+            if(!(knownParticipants[uid]?.hasJoined || onlineUsers.has(uid))) return;
+
+            const pc=createPeerConnection(uid);
+            if(!pc) return;
+            syncLocalTracksToPeer(uid);
+
+            // If signaling was missed while a phone/laptop slept or changed network,
+            // deterministic initiator re-sends a fresh offer.
+            const age=Date.now()-(pc.__lastOfferAt||pc.__createdAt||0);
+            if(shouldInitiate(uid) &&
+                ['new','connecting','disconnected'].includes(pc.connectionState) &&
+                pc.signalingState==='stable' &&
+                age>3500){
+                negotiatePeer(uid,pc.connectionState==='disconnected');
+            }
         });
     }
     function announceJoin(){ sendSignal('all','user-joined',{ userId:MY_USER_ID, name:MY_NAME, initials:MY_INITIALS }); }
 
-    window.addEventListener('online', ()=>{ connectToAll(); syncTracksToEveryPeer(); });
-    window.addEventListener('pageshow', ()=>{ connectToAll(); syncTracksToEveryPeer(); });
-    document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible'){ connectToAll(); syncTracksToEveryPeer(); unlockRemoteAudio(); if(isMicOn && !IS_MOBILE_BROWSER) startRecognition(); } });
+    function repairMeetingMedia(){
+        if(document.visibilityState!=='visible') return;
+        announceJoin();
+        connectToAll();
+        syncTracksToEveryPeer();
+        broadcastMyMicStatus();
+        broadcastMyCameraStatus();
+        Object.keys(peers).forEach(uid=>{
+            const pc=peers[uid];
+            if(!pc || pc.connectionState==='closed') return;
+            if(pc.connectionState==='failed') restartPeer(uid);
+            else if(pc.connectionState==='connected'){
+                attachRemoteStream(uid);
+                sendSignal(uid,'media-sync-request',{requesterId:MY_USER_ID});
+            }
+        });
+        unlockRemoteAudio();
+    }
+
+    window.addEventListener('online', ()=>{ setTimeout(repairMeetingMedia,150); });
+    window.addEventListener('pageshow', ()=>{ setTimeout(repairMeetingMedia,150); });
+    document.addEventListener('visibilitychange', ()=>{
+        if(document.visibilityState==='visible'){
+            setTimeout(repairMeetingMedia,120);
+            if(isMicOn && !IS_MOBILE_BROWSER) startRecognition();
+        }else{
+            if(!IS_MOBILE_BROWSER) stopRecognition();
+        }
+    });
     document.addEventListener('pointerdown', unlockRemoteAudio, { passive:true });
     document.addEventListener('touchstart', unlockRemoteAudio, { passive:true });
     document.addEventListener('click', unlockRemoteAudio, { passive:true });
@@ -1602,8 +1772,8 @@
         await listenForSignals();
         scheduleAutoEnd();
 
-        [0, 500, 1500, 3500].forEach(delay=>setTimeout(()=>{ announceJoin(); connectToAll(); syncTracksToEveryPeer(); }, delay));
-        setInterval(()=>{ if(document.visibilityState==='visible'){ announceJoin(); connectToAll(); broadcastMyMicStatus(); broadcastMyCameraStatus(); } }, 8000);
+        [0,500,1500,3500].forEach(delay=>setTimeout(repairMeetingMedia,delay));
+        setInterval(repairMeetingMedia,7000);
     });
 </script>
 </body>
