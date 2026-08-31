@@ -682,7 +682,7 @@
 
     /* ---------- Known participants (id -> {name, initials, isOrganizer, hasJoined}) ---------- */
     const knownParticipants = {};
-    ALL_PARTICIPANTS.forEach(p => { knownParticipants[String(p.userId)] = { name: p.name, initials: p.initials, isOrganizer: false, hasJoined: Boolean(p.hasJoined) }; });
+    ALL_PARTICIPANTS.forEach(p => { knownParticipants[String(p.userId)] = { name: p.name, initials: p.initials, isOrganizer: false, hasJoined: false }; });
 
     /* ---------- Runtime state ---------- */
     const onlineUsers   = new Set([String(MY_USER_ID)]);
@@ -748,28 +748,20 @@
     }
 
     /* ---------- Online count / people list ---------- */
-    let largeMeetingWarned=false;
-    function updateOnlineCount(){
-        document.querySelectorAll('[data-online-count]').forEach(el=>el.textContent=onlineUsers.size);
-        // This is a full mesh (every browser connects directly to every other
-        // browser) — each extra person means every device sends/decodes one more
-        // audio+video stream. Phones on mobile data typically struggle past ~6-7
-        // people at once, showing up as choppy audio or stalled video. This is a
-        // one-time heads-up, not a hard limit — for bigger calls, an SFU/MCU
-        // media-server backend (e.g. mediasoup, LiveKit, Janus) is the real fix.
-        if(!largeMeetingWarned && onlineUsers.size>=7){
-            largeMeetingWarned=true;
-            showToast('👥 Large call: ask people who aren\'t speaking to turn off their camera for clearer audio.');
-        }
-    }
+    function updateOnlineCount(){ document.querySelectorAll('[data-online-count]').forEach(el=>el.textContent=onlineUsers.size); }
     function markOnline(uid){ uid=String(uid); onlineUsers.add(uid); if(knownParticipants[uid]) knownParticipants[uid].hasJoined=true; updateOnlineCount(); renderPersonRow(uid); }
-    function markOffline(uid){ uid=String(uid); onlineUsers.delete(uid); if(knownParticipants[uid]) knownParticipants[uid].hasJoined=false; updateOnlineCount(); renderPersonRow(uid); }
+    function markOffline(uid){
+        uid=String(uid);
+        onlineUsers.delete(uid);
+        if(knownParticipants[uid]) knownParticipants[uid].hasJoined=false;
+        updateOnlineCount();
+        document.getElementById('person-row-'+uid)?.remove();
+    }
 
     function renderPeopleList(){
         const body=document.getElementById('people-body'); if(!body) return;
         body.innerHTML='';
-        const ids=[String(MY_USER_ID), ...ALL_PARTICIPANTS.map(p=>String(p.userId))];
-        ids.forEach(uid=>renderPersonRow(uid));
+        [...onlineUsers].forEach(uid=>renderPersonRow(String(uid)));
     }
     function renderPersonRow(uid){
         uid=String(uid);
@@ -979,40 +971,23 @@
     const TURN_CREDENTIAL = @json(config('services.turn.credential'));
     const iceServers = [{ urls: ['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302'] }];
     if(TURN_HOST && TURN_USERNAME && TURN_CREDENTIAL){
-        // 3478 udp/tcp for normal networks, PLUS TURN-over-TLS on 5349 so mobile
-        // carrier networks / offices that block raw UDP or port 3478 can still
-        // relay media. Two participants who are both on mobile data behind
-        // symmetric/carrier-grade NAT can only ever reach each other through a
-        // relay like this — this is the #1 reason "organizer hears everyone but
-        // participants can't hear each other" on phones.
         iceServers.push({
             urls:[
                 `turn:${TURN_HOST}:3478?transport=udp`,
-                `turn:${TURN_HOST}:3478?transport=tcp`,
-                `turns:${TURN_HOST}:5349?transport=tcp`
+                `turn:${TURN_HOST}:3478?transport=tcp`
             ],
             username:TURN_USERNAME, credential:TURN_CREDENTIAL
         });
     } else {
-        // No custom TURN configured (services.turn.host/username/credential in .env).
-        // Without ANY relay, only STUN-reachable pairs connect directly; two mobile
-        // participants behind symmetric NAT simply cannot reach each other. Add a
-        // temporary public relay as a safety net so calls still work, but this is
-        // rate-limited/shared — configure a dedicated TURN server (coturn, Twilio,
-        // Cloudflare Calls, etc.) in .env as soon as possible for reliable calls.
-        console.warn('[SmartMeet] Custom TURN is not configured — using a public fallback relay. Configure services.turn.host/username/credential in .env for reliable participant-to-participant audio/video.');
-        iceServers.push(
-            { urls:'turn:openrelay.metered.ca:80', username:'openrelayproject', credential:'openrelayproject' },
-            { urls:'turn:openrelay.metered.ca:443', username:'openrelayproject', credential:'openrelayproject' },
-            { urls:'turn:openrelay.metered.ca:443?transport=tcp', username:'openrelayproject', credential:'openrelayproject' }
-        );
+        console.warn('[SmartMeet] Custom TURN is not configured.');
     }
-    // relayOnly=true forces every candidate through TURN — used as an escalation
-    // when normal (host/srflx) ICE candidates keep failing between two peers.
-    function buildIceConfig(relayOnly=false){
-        return { iceServers, iceCandidatePoolSize:10, bundlePolicy:'max-bundle', rtcpMuxPolicy:'require', iceTransportPolicy: relayOnly?'relay':'all' };
-    }
-    const iceConfig = buildIceConfig(false);
+    const iceConfig = {
+        iceServers,
+        iceCandidatePoolSize:10,
+        bundlePolicy:'max-bundle',
+        rtcpMuxPolicy:'require',
+        iceTransportPolicy:'all'
+    };
     console.log('[SmartMeet] ICE servers configured:', iceServers.map(s=>s.urls));
 
     function isPolite(otherUserId){
@@ -1083,6 +1058,14 @@
         const txs=pc.getTransceivers();
         pc.__audioTx=txs.find(tx=>tx.receiver?.track?.kind==='audio' || tx.sender?.track?.kind==='audio') || pc.__audioTx || null;
         pc.__videoTx=txs.find(tx=>tx.receiver?.track?.kind==='video' || tx.sender?.track?.kind==='video') || pc.__videoTx || null;
+
+        // Remote-offer-created transceivers can remain recvonly on Chrome.
+        // replaceTrack() does not change SDP direction by itself.
+        // Force both media m-lines to sendrecv for true many-to-many media.
+        [pc.__audioTx, pc.__videoTx].forEach(tx=>{
+            if(!tx || tx.stopped) return;
+            try{ if(tx.direction!=='sendrecv') tx.direction='sendrecv'; }catch(e){}
+        });
     }
 
     function ensureOfferTransceivers(pc){
@@ -1090,17 +1073,17 @@
         bindPeerTransceivers(pc);
         if(!pc.__audioTx) pc.__audioTx=pc.addTransceiver('audio',{direction:'sendrecv'});
         if(!pc.__videoTx) pc.__videoTx=pc.addTransceiver('video',{direction:'sendrecv'});
+        bindPeerTransceivers(pc);
     }
 
-    function createPeerConnection(uid, forceRelay=false){
+    function createPeerConnection(uid){
         uid=String(uid);
         if(uid===String(MY_USER_ID) || leftUsers.has(uid)) return null;
         let pc=peers[uid];
-        if(pc && pc.signalingState!=='closed' && pc.connectionState!=='closed' && (!forceRelay || pc.__forcedRelay)) return pc;
+        if(pc && pc.signalingState!=='closed' && pc.connectionState!=='closed') return pc;
         if(pc){ try{ pc.close(); }catch(e){} }
 
-        pc=new RTCPeerConnection(forceRelay ? buildIceConfig(true) : iceConfig);
-        pc.__forcedRelay=Boolean(forceRelay);
+        pc=new RTCPeerConnection(iceConfig);
         peers[uid]=pc;
         pc.__createdAt=Date.now();
         pc.__lastOfferAt=0;
@@ -1121,18 +1104,14 @@
         pc.onicecandidate = (e)=>{
             if(e.candidate) sendSignal(uid,'ice-candidate',{ candidate:e.candidate.toJSON() });
         };
-        pc.__iceErrLog={};
         pc.onicecandidateerror = (e)=>{
-            // Chrome can fire the SAME benign candidate-gathering error (e.g. 701
-            // "address not associated with the desired network interface", which
-            // just means one local network adapter — a VPN/virtual adapter etc. —
-            // couldn't be used, not that the whole connection failed) dozens of
-            // times per second on some machines. Log each distinct error once per
-            // 15s per peer instead of flooding the console.
-            const key=(e?.errorCode||'')+'|'+(e?.errorText||'');
-            const now=Date.now();
-            if((now-(pc.__iceErrLog[key]||0))<15000) return;
-            pc.__iceErrLog[key]=now;
+            const connected = pc.connectionState==='connected' ||
+                pc.iceConnectionState==='connected' ||
+                pc.iceConnectionState==='completed';
+            if(connected && Number(e?.errorCode)===701){
+                console.debug('[SmartMeet] ignored ICE candidate path error', uid, e?.errorText||'');
+                return;
+            }
             console.warn('[SmartMeet] ICE candidate error', uid, e?.errorCode||'', e?.errorText||'');
         };
 
@@ -1192,6 +1171,7 @@
                 pc.__connectedOnce=true;
                 clearTimeout(pc.__disconnectTimer);
                 ensureTileVisible(uid);
+                awaitSyncPeerMedia(uid);
                 attachRemoteStream(uid);
                 unlockRemoteAudio();
                 pc.__restartAttempts=0;
@@ -1244,25 +1224,6 @@
             if(pc.iceConnectionState==='connected' || pc.iceConnectionState==='completed'){ pc.__restartAttempts=0; return; }
             pc.__lastRestartAt=Date.now();
             pc.__restartAttempts++;
-
-            // Plain ICE restarts keep retrying the same direct (host/srflx) candidate
-            // paths. If both sides sit behind symmetric/carrier-grade NAT (the classic
-            // mobile participant-to-participant case) those paths were never going to
-            // work, so repeating them just loops forever. After a few failed attempts,
-            // stop hoping and force the connection through the TURN relay instead.
-            if(pc.__restartAttempts>=3 && !pc.__forcedRelay){
-                console.warn('[SmartMeet] forcing TURN relay for', uid, 'after repeated ICE failures');
-                const attemptsSoFar=pc.__restartAttempts;
-                createPeerConnection(uid, true);
-                const fresh=peers[uid];
-                if(fresh){
-                    fresh.__restartAttempts=attemptsSoFar;
-                    fresh.__lastRestartAt=Date.now();
-                    if(shouldInitiate(uid)) await negotiatePeer(uid,false);
-                }
-                return;
-            }
-
             try{
                 // createOffer({iceRestart:true}) already generates fresh ICE credentials —
                 // calling pc.restartIce() as well fired a SECOND, overlapping negotiation
@@ -1283,6 +1244,11 @@
         removeDeadLocalTracks();
         bindPeerTransceivers(pc);
 
+        [pc.__audioTx, pc.__videoTx].forEach(tx=>{
+            if(!tx || tx.stopped) return;
+            try{ if(tx.direction!=='sendrecv') tx.direction='sendrecv'; }catch(e){}
+        });
+
         const audioTrack=liveLocalTrack('audio');
         const videoTrack=liveLocalTrack('video');
 
@@ -1302,6 +1268,13 @@
     }
 
     async function syncTracksToEveryPeer(){ await Promise.allSettled(Object.keys(peers).map(uid=>syncLocalTracksToPeer(uid))); }
+
+    async function awaitSyncPeerMedia(uid){
+        await syncLocalTracksToPeer(uid);
+        setTimeout(()=>syncLocalTracksToPeer(uid),250);
+        setTimeout(()=>syncLocalTracksToPeer(uid),900);
+    }
+
 
     function sameTrackSet(stream, tracks){
         const a=(stream?.getTracks?.()||[]).map(t=>t.id).sort().join('|');
@@ -1406,7 +1379,10 @@
             if(avatar) avatar.style.display=show?'none':'flex';
 
             if(show){
-                video.play().catch(()=>{});
+                const playVideo=()=>video.play().catch(()=>{});
+                playVideo();
+                setTimeout(playVideo,120);
+                setTimeout(playVideo,600);
                 if(!video.__smartMeetPlayBound){
                     video.__smartMeetPlayBound=true;
                     video.addEventListener('loadedmetadata',()=>video.play().catch(()=>{}));
@@ -1460,6 +1436,11 @@
             if(pendingCandidates[from]?.length){ for(const c of pendingCandidates[from]) await pc.addIceCandidate(c).catch(()=>{}); delete pendingCandidates[from]; }
             const answer=await pc.createAnswer();
             await pc.setLocalDescription(answer);
+            // Mobile Chrome may expose the remote-created transceiver sender only
+            // after the answer is applied. Sync once more so our mic/camera are
+            // definitely attached to this participant-to-participant connection.
+            bindPeerTransceivers(pc);
+            await syncLocalTracksToPeer(from);
             console.log('[SmartMeet] sending answer ->', from);
             sendSignal(from,'answer',{ type:pc.localDescription.type, sdp:btoa(unescape(encodeURIComponent(pc.localDescription.sdp))) });
         }catch(err){ console.warn('[SmartMeet] offer handling failed', from, err); }
@@ -1572,6 +1553,10 @@
                 pc.iceConnectionState==='connected' ||
                 pc.iceConnectionState==='completed'
             );
+            if(pc){
+                bindPeerTransceivers(pc);
+                setTimeout(()=>syncLocalTracksToPeer(uid),40);
+            }
             if(shouldInitiate(uid) && pc && !connected && pc.signalingState==='stable'){
                 setTimeout(()=>negotiatePeer(uid,false),80);
             }
@@ -1600,6 +1585,8 @@
             removeParticipantTile(from, true);
             if(peers[from]){ peers[from].close(); delete peers[from]; }
             delete pendingCandidates[from];
+            delete remoteStreams[from];
+            document.getElementById('audio-'+from)?.remove();
             return;
         }
         if(data.type==='chat'){
@@ -1991,15 +1978,10 @@
     /* ---------- Transcript (Web Speech API) ---------- */
     let recognition=null, recognitionRunning=false, recognitionStopping=false, recognitionRestartTimer=null;
     function startTranscript(){
-        // CONFIRMED REGRESSION (2026-08-31 field test): enabling this on mobile
-        // Chrome causes Chrome to fight WebRTC for exclusive mic access ("Speech
-        // Recognition and Synthesis from Google cannot record now as Chrome is
-        // recording audio"), which destabilizes the whole peer connection — not
-        // just outgoing captions, but incoming audio/video from other people
-        // stopped arriving on the phone too. Live call quality matters far more
-        // than local captions, so mobile stays off. Mobile still receives other
-        // people's captions via the signaling channel (handleRemoteTranscript).
         if(IS_MOBILE_BROWSER) return;
+        // Chrome Android can block Web Speech while WebRTC owns the microphone.
+        // Keep meeting audio/video stable there; mobile still receives everyone else's
+        // broadcast transcripts. Desktop Chrome/Edge can produce local captions.
         const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
         if(!SR){ showToast('⚠️ Live captions require Chrome or Edge.'); return; }
         if(recognition) return;
@@ -2235,7 +2217,7 @@
         Object.keys(knownParticipants).forEach(uid=>{
             uid=String(uid);
             if(uid===String(MY_USER_ID) || leftUsers.has(uid)) return;
-            if(!(knownParticipants[uid]?.hasJoined || onlineUsers.has(uid))) return;
+            if(!onlineUsers.has(uid)) return;
 
             const pc=createPeerConnection(uid);
             if(!pc) return;
@@ -2309,6 +2291,13 @@
         setTimeout(()=>recoverMobileLocalMedia(),300);
         setTimeout(()=>unlockRemoteMedia(),450);
     });
+    document.addEventListener('visibilitychange',()=>{
+        if(document.visibilityState==='visible'){
+            setTimeout(()=>syncTracksToEveryPeer(),180);
+            setTimeout(()=>unlockRemoteMedia(),320);
+            setTimeout(()=>Object.keys(peers).forEach(uid=>attachRemoteStream(uid)),450);
+        }
+    });
     document.addEventListener('visibilitychange', ()=>{
         if(document.visibilityState==='visible'){
             setTimeout(()=>repairMeetingMedia(true),120);
@@ -2330,14 +2319,8 @@
         setupPanelResize();
         renderPeopleList();
 
-        // Do NOT trust the server's stale "hasJoined" snapshot to show someone as
-        // online/joined — that flag can remain true in the database long after a
-        // person's browser tab is actually closed/disconnected, creating a
-        // permanent "ghost" tile that never gets real audio/video. Real presence
-        // is proven only by an actual signal: every genuinely-connected browser
-        // broadcasts 'user-joined' the moment it loads (see announceJoin() below),
-        // which registerJoinedUser() picks up and uses to create the tile + peer
-        // connection. That happens within ~1 second of load — no need to guess here.
+        // Live roster comes only from current Reverb presence.
+        // Historical database join flags must not create ghost tiles/people.
         renderPeopleList();
         refreshEmptyStage();
 
@@ -2360,36 +2343,6 @@
             unlockRemoteAudio();
         },2500);
 
-        // Stalled-media watchdog: ICE can report "connected" while the actual
-        // media path is dead (e.g. a flaky TURN relay drops packets after the
-        // handshake). That shows up as a frozen/black remote video or silent
-        // remote audio that never recovers on its own. Detect it by checking
-        // whether the received video frame / audio timestamp is actually
-        // advancing, and force an ICE restart if it's been stuck too long.
-        const __stallTracker={};
-        setInterval(()=>{
-            if(document.visibilityState!=='visible') return;
-            Object.keys(peers).forEach(uid=>{
-                const pc=peers[uid];
-                if(!pc || pc.connectionState!=='connected' || leftUsers.has(String(uid))) return;
-                const video=document.getElementById('rvideo-'+uid);
-                const audio=document.getElementById('audio-'+uid);
-                const vTime=video && video.style.display!=='none' ? video.currentTime : null;
-                const aTime=audio ? audio.currentTime : null;
-                const prev=__stallTracker[uid] || {};
-                const now=Date.now();
-                const vStuck = vTime!=null && prev.vTime===vTime;
-                const aStuck = aTime!=null && prev.aTime===aTime;
-                const firstSeenStuckAt = (vStuck || aStuck) ? (prev.stuckSince || now) : null;
-                __stallTracker[uid]={ vTime, aTime, stuckSince: firstSeenStuckAt };
-                if(firstSeenStuckAt && (now-firstSeenStuckAt)>7000){
-                    console.warn('[SmartMeet] media appears stalled for', uid, '- forcing reconnect');
-                    __stallTracker[uid]={ vTime:null, aTime:null, stuckSince:null };
-                    if(shouldInitiate(uid)) restartPeer(uid); else requestPresence(true);
-                }
-            });
-        },3000);
-
         if(IS_MOBILE_BROWSER){
             setInterval(()=>recoverMobileLocalMedia(),3500);
             setInterval(()=>unlockRemoteMedia(),1800);
@@ -2409,8 +2362,10 @@
                 console.log('[SmartMeet] media health', uid, {
                     audioSend:Boolean(aSend && aSend.readyState==='live'),
                     audioEnabled:Boolean(aSend?.enabled),
+                    audioDirection:pc.__audioTx?.direction,
                     videoSend:Boolean(vSend && vSend.readyState==='live'),
                     videoEnabled:Boolean(vSend?.enabled),
+                    videoDirection:pc.__videoTx?.direction,
                     receivers:recv
                 });
             });
