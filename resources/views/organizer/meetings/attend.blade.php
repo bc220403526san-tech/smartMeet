@@ -594,9 +594,13 @@
     <div class="header-center"><i class="fa fa-clock"></i><span id="timer">00:00:00</span></div>
     <div class="header-right">
         <div class="participants-count"><i class="fa fa-circle" style="color:var(--green);font-size:8px;"></i><span data-online-count>1</span> online</div>
+        <button class="btn-cancel" onclick="cancelMeeting()"><i class="fa fa-ban"></i><span>Cancel</span></button>
         <button class="btn-leave" onclick="leaveMeeting()"><i class="fa fa-phone-slash"></i><span>Leave</span></button>
     </div>
 </div>
+<form id="cancel-form" action="{{ route('organizer.meetings.cancel', $meeting) }}" method="POST" style="display:none;">
+    @csrf
+</form>
 
 <div class="main">
     <div class="video-area">
@@ -648,6 +652,7 @@
     <div class="ctrl-btn" onclick="toggleSidePanel('chat')"><div class="ctrl-icon" id="ctrl-chat"><i class="fa fa-comment"></i><span id="chat-badge">0</span></div><span class="ctrl-label">Chat</span></div>
     <div class="ctrl-btn" onclick="toggleSidePanel('people')"><div class="ctrl-icon" id="ctrl-people"><i class="fa fa-users"></i></div><span class="ctrl-label">People</span></div>
     <div class="ctrl-divider"></div>
+    <div class="ctrl-btn"><button class="btn-end" style="background:linear-gradient(135deg,#7f1d1d,#450a0a);" onclick="cancelMeeting()" title="Cancel meeting for everyone"><i class="fa fa-ban"></i></button><span class="ctrl-label" style="color:var(--red);">Cancel</span></div>
     <div class="ctrl-btn"><button class="btn-end" onclick="leaveMeeting()"><i class="fa fa-phone-slash"></i></button><span class="ctrl-label" style="color:var(--red);">Leave</span></div>
 </div>
 
@@ -657,21 +662,18 @@
     /* ============================================================
        SMARTMEET — PARTICIPANT ROOM (clean single implementation)
        ============================================================ */
-    const IS_ORGANIZER   = false;
+    const IS_ORGANIZER   = true;
     const MEETING_ID      = "{{ $meeting->id }}";
     const MY_USER_ID      = "{{ auth()->id() }}";
     const MY_NAME         = @json(auth()->user()->name);
     const MY_INITIALS     = @json($userInitials);
-    const SIGNAL_URL      = @json(route('participant.meetings.signal', $meeting));
-    const TRANSCRIPT_URL  = @json(route('participant.meetings.transcript', $meeting));
-    const MARK_LEFT_URL   = @json(route('participant.meetings.markLeft', $meeting));
-    const LEAVE_URL       = @json(route('participant.meetings.index'));
+    const SIGNAL_URL      = @json(route('organizer.meetings.signal', $meeting));
+    const TRANSCRIPT_URL  = @json(route('organizer.meetings.transcript', $meeting));
+    const MARK_LEFT_URL   = @json(route('organizer.meetings.markLeft', $meeting));
+    const LEAVE_URL       = @json(route('organizer.meetings.index'));
+    const CANCEL_URL      = @json(route('organizer.meetings.cancel', $meeting));
     const CSRF            = @json(csrf_token());
     const ALL_PARTICIPANTS = @json($allParticipants);
-    const ORGANIZER_ID    = "{{ $organizer->id }}";
-    const ORGANIZER_NAME  = @json($organizer->name);
-    const ORGANIZER_INITIALS = @json($orgInitials);
-    const ORGANIZER_JOINED   = @json($organizerJoined ?? false);
     const MEETING_END_TIME   = @json($meetingEnd);
     const ACTUAL_START = @json($meeting->actual_start ? \Carbon\Carbon::parse($meeting->actual_start)->utc()->toIso8601String() : now()->utc()->toIso8601String());
     const COLORS = ['#3b82f6,#06b6d4','#8b5cf6,#ec4899','#22c55e,#06b6d4','#f59e0b,#ef4444','#64748b,#334155','#ec4899,#f59e0b'];
@@ -679,7 +681,6 @@
 
     /* ---------- Known participants (id -> {name, initials, isOrganizer, hasJoined}) ---------- */
     const knownParticipants = {};
-    knownParticipants[ORGANIZER_ID] = { name: ORGANIZER_NAME, initials: ORGANIZER_INITIALS, isOrganizer: true, hasJoined: Boolean(ORGANIZER_JOINED) };
     ALL_PARTICIPANTS.forEach(p => { knownParticipants[String(p.userId)] = { name: p.name, initials: p.initials, isOrganizer: false, hasJoined: Boolean(p.hasJoined) }; });
 
     /* ---------- Runtime state ---------- */
@@ -753,27 +754,35 @@
     function renderPeopleList(){
         const body=document.getElementById('people-body'); if(!body) return;
         body.innerHTML='';
-        const ids=[String(MY_USER_ID), ORGANIZER_ID, ...ALL_PARTICIPANTS.map(p=>String(p.userId))];
+        const ids=[String(MY_USER_ID), ...ALL_PARTICIPANTS.map(p=>String(p.userId))];
         ids.forEach(uid=>renderPersonRow(uid));
     }
     function renderPersonRow(uid){
         uid=String(uid);
         const body=document.getElementById('people-body'); if(!body) return;
         const isMe = uid===String(MY_USER_ID);
-        const info = isMe ? { name: MY_NAME, initials: MY_INITIALS, isOrganizer: false } : knownParticipants[uid];
+        const info = isMe ? { name: MY_NAME, initials: MY_INITIALS, isOrganizer: true } : knownParticipants[uid];
         if(!info) return;
         const isOnline = isMe || onlineUsers.has(uid);
         let row=document.getElementById('person-row-'+uid);
         if(!row){ row=document.createElement('div'); row.id='person-row-'+uid; body.appendChild(row); }
         row.className='person-row '+(isOnline?'joined':'pending');
         const color=colorFor(uid, info.isOrganizer);
+        const canMute = IS_ORGANIZER && !isMe && isOnline;
         row.innerHTML = `
         <div class="person-avatar" style="background:linear-gradient(135deg,${color})">${escapeHtml(info.initials||initialsOf(info.name))}</div>
         <div class="person-info">
             <div class="person-name">${escapeHtml(info.name)}${isMe?' <span style="color:var(--blue);font-weight:600;">(You)</span>':''}${info.isOrganizer?'<i class="fa fa-crown" style="color:#fbbf24;font-size:10px;"></i>':''}</div>
             <div class="person-status ${isOnline?'on':''}">${info.isOrganizer?'Organizer':'Participant'} • ${isOnline?'Joined':'Not joined yet'}</div>
         </div>
+        ${canMute ? `<button class="person-action" onclick="muteParticipant('${uid}')" title="Mute this participant"><i class="fa fa-microphone-slash"></i></button>` : ''}
         <span class="person-dot ${isOnline?'on':''}"></span>`;
+    }
+    function muteParticipant(uid){
+        uid=String(uid);
+        const info=knownParticipants[uid];
+        sendSignal(uid, 'mute', {});
+        showToast(`🎙️ ${escapeHtml(info?info.name:'Participant')}'s microphone has been muted.`);
     }
 
     function renderMyOwnTile(){
@@ -787,7 +796,7 @@
             <button class="tile-expand-btn" onclick="toggleMaximize('${MY_USER_ID}')"><i class="fa fa-expand" id="expand-icon-${MY_USER_ID}"></i></button>
         </div>
         <div class="tile-info">
-            <div class="tile-name">${escapeHtml(MY_NAME)}<span class="role-badge participant">You</span></div>
+            <div class="tile-name"><i class="fa fa-crown" style="color:#fbbf24;font-size:10px;"></i> ${escapeHtml(MY_NAME)}<span class="role-badge organizer">You</span></div>
             <div class="tile-icons">
                 <div class="speaking-indicator" id="speaking-${MY_USER_ID}" style="display:none;"><div class="speaking-bar"></div><div class="speaking-bar"></div><div class="speaking-bar"></div></div>
                 <div class="mic-off" id="micoff-${MY_USER_ID}" style="display:flex;"><i class="fa fa-microphone-slash"></i></div>
@@ -951,9 +960,9 @@
     /* ============================================================
        WEBRTC — perfect negotiation, single implementation
        ============================================================ */
-    const TURN_HOST = @json(config('services.turn.host')) || 'smartmeet.live';
-    const TURN_USERNAME = @json(config('services.turn.username')) || 'smartmeet';
-    const TURN_CREDENTIAL = @json(config('services.turn.credential')) || 'SAna09007@@';
+    const TURN_HOST = @json(config('services.turn.host'));
+    const TURN_USERNAME = @json(config('services.turn.username'));
+    const TURN_CREDENTIAL = @json(config('services.turn.credential'));
     const iceServers = [{ urls: ['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302'] }];
     if(TURN_HOST && TURN_USERNAME && TURN_CREDENTIAL){
         iceServers.push({
@@ -1176,6 +1185,11 @@
         if(!sameTrackSet(audio.srcObject,audioTracks)) audio.srcObject=new MediaStream(audioTracks);
         audio.muted=false;
         audio.volume=1;
+        if(!audio.__smartMeetUnlockBound){
+            audio.__smartMeetUnlockBound=true;
+            audio.addEventListener('canplay', ()=>audio.play().catch(()=>armAudioUnlock()));
+            audio.addEventListener('loadedmetadata', ()=>audio.play().catch(()=>armAudioUnlock()));
+        }
         if(audioTracks.length){
             audio.play().catch(()=>armAudioUnlock());
         }
@@ -1191,7 +1205,7 @@
             video.setAttribute('playsinline','');
 
             // Show an actual received track unless the sender explicitly reported camera OFF.
-            const show=videoTracks.some(t=>t.readyState==='live') && camStatus[uid]!==false;
+            const show=videoTracks.some(t=>t.readyState==='live') && camStatus[uid]===true;
             video.style.display=show?'block':'none';
             if(avatar) avatar.style.display=show?'none':'flex';
             if(show) video.play().catch(()=>{});
@@ -1317,15 +1331,26 @@
             setTimeout(()=>{ cleanup(); window.location.href=LEAVE_URL; },2200);
             return;
         }
+        if(data.type==='presence-request'){
+            const requester=String(data.data?.userId || from);
+            if(requester!==String(MY_USER_ID)) sendPresence(requester);
+            return;
+        }
+        if(data.type==='presence-response'){
+            const uid=String(data.data?.userId || from);
+            if(uid===String(MY_USER_ID)) return;
+            registerJoinedUser(uid, data.data?.name, data.data?.initials, Boolean(data.data?.isOrganizer));
+            camStatus[uid]=Boolean(data.data?.cameraOn);
+            updateRemoteCameraStatus(uid, camStatus[uid]);
+            updateRemoteMicStatus(uid, !Boolean(data.data?.micOn));
+            if(shouldInitiate(uid)) setTimeout(()=>negotiatePeer(uid,false),80);
+            return;
+        }
         if(data.type==='user-joined'){
             const uid=String(data.data.userId); if(uid===String(MY_USER_ID)) return;
             const wasOnline=onlineUsers.has(uid);
             leftUsers.delete(uid);
-            if(!knownParticipants[uid]) knownParticipants[uid]={ name:data.data.name, initials:data.data.initials, isOrganizer:uid===ORGANIZER_ID, hasJoined:true };
-            else knownParticipants[uid].hasJoined=true;
-            addParticipantTile(uid, data.data.name, data.data.initials, uid===ORGANIZER_ID);
-            markOnline(uid);
-            createPeerConnection(uid);
+            registerJoinedUser(uid, data.data.name, data.data.initials, Boolean(data.data?.isOrganizer || uid===String(ORGANIZER_ID)));
             if(shouldInitiate(uid)) setTimeout(()=>negotiatePeer(uid,false),60);
             if(!wasOnline) showToast(`✅ ${escapeHtml(data.data.name)} has joined the meeting.`);
             sendSignal(uid,'mic-status',{ userId:MY_USER_ID, muted:!isMicOn });
@@ -1382,6 +1407,10 @@
     /* ---------- Media ---------- */
     const audioConstraints = { echoCancellation:true, noiseSuppression:true, autoGainControl:true, channelCount:1, sampleRate:48000, sampleSize:16 };
     async function startAudio(){
+        if(!window.isSecureContext || !navigator.mediaDevices?.getUserMedia){
+            showToast('⚠️ Mic/Camera needs HTTPS and browser media permission.');
+            return;
+        }
         const liveAudio = localStream?.getAudioTracks?.().find(t=>t.readyState==='live');
         if(liveAudio) return;
         try{
@@ -1624,6 +1653,21 @@
         rec.onerror=()=>btn.classList.remove('listening');
     }
 
+    /* ---------- Cancel meeting (organizer only) ---------- */
+    let cancelling=false;
+    async function cancelMeeting(){
+        if(cancelling) return;
+        if(!window.confirm('Cancel this meeting for everyone? This cannot be undone.')) return;
+        cancelling=true; leftNotified=true;
+        if(autoEndTimer) clearTimeout(autoEndTimer);
+        try{
+            await sendSignal('all','meeting-cancelled',{ message:'Meeting has been cancelled by the organizer.' });
+        }catch(e){}
+        showToast('🚫 Meeting cancelled for everyone.');
+        cleanup();
+        setTimeout(()=>{ document.getElementById('cancel-form')?.submit(); }, 250);
+    }
+
     /* ---------- Leave / cleanup ---------- */
     async function leaveMeeting(){
         if(leftNotified) return; leftNotified=true;
@@ -1650,6 +1694,30 @@
     }
 
     /* ---------- Presence / reconnection ---------- */
+    function registerJoinedUser(uid, name, initials, isOrganizer=false){
+        uid=String(uid);
+        if(uid===String(MY_USER_ID)) return;
+        leftUsers.delete(uid);
+        const old=knownParticipants[uid] || {};
+        knownParticipants[uid]={
+            ...old,
+            name:name || old.name || ('User '+uid),
+            initials:initials || old.initials || ((name||old.name||'U').trim().charAt(0).toUpperCase()),
+            isOrganizer:Boolean(isOrganizer || old.isOrganizer || uid===String(ORGANIZER_ID)),
+            hasJoined:true
+        };
+        addParticipantTile(uid, knownParticipants[uid].name, knownParticipants[uid].initials, knownParticipants[uid].isOrganizer);
+        markOnline(uid);
+        renderPeopleList();
+        createPeerConnection(uid);
+    }
+    function sendPresence(to='all'){
+        return sendSignal(to,'presence-response',{
+            userId:MY_USER_ID, name:MY_NAME, initials:MY_INITIALS,
+            isOrganizer:String(MY_USER_ID)===String(ORGANIZER_ID),
+            micOn:Boolean(isMicOn), cameraOn:Boolean(isCameraOn)
+        });
+    }
     function connectToAll(){
         Object.keys(knownParticipants).forEach(uid=>{
             uid=String(uid);
@@ -1671,7 +1739,10 @@
             }
         });
     }
-    function announceJoin(){ sendSignal('all','user-joined',{ userId:MY_USER_ID, name:MY_NAME, initials:MY_INITIALS }); }
+    function announceJoin(){
+        sendSignal('all','user-joined',{ userId:MY_USER_ID, name:MY_NAME, initials:MY_INITIALS, isOrganizer:String(MY_USER_ID)===String(ORGANIZER_ID) });
+        sendSignal('all','presence-request',{ userId:MY_USER_ID });
+    }
 
     function repairMeetingMedia(){
         if(document.visibilityState!=='visible') return;
@@ -1711,10 +1782,11 @@
         setupPanelResize();
         renderPeopleList();
 
-        if(ORGANIZER_JOINED){ addParticipantTile(ORGANIZER_ID, ORGANIZER_NAME, ORGANIZER_INITIALS, true); markOnline(ORGANIZER_ID); }
         ALL_PARTICIPANTS.forEach(p=>{ if(p.hasJoined){ addParticipantTile(p.userId, p.name, p.initials, false); markOnline(p.userId); } });
+        renderPeopleList();
         refreshEmptyStage();
 
+        await startAudio();
         await listenForSignals();
         scheduleAutoEnd();
 
