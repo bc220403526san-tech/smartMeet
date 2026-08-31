@@ -997,10 +997,11 @@
         uid=String(uid);
         const pc=peers[uid];
         if(!pc || pc.signalingState==='closed' || leftUsers.has(uid)) return false;
+        if(!iceRestart && (pc.connectionState==='connected' || pc.iceConnectionState==='connected' || pc.iceConnectionState==='completed')) return false;
         if(makingOffer[uid] || pc.signalingState!=='stable') return false;
         // onnegotiationneeded + presence repair can fire almost together.
         // Do not create a second normal offer while the first negotiation is settling.
-        if(!iceRestart && pc.__lastOfferAt && (Date.now()-pc.__lastOfferAt)<2000) return false;
+        if(!iceRestart && pc.__lastOfferAt && (Date.now()-pc.__lastOfferAt)<4500) return false;
         try{
             makingOffer[uid]=true;
             await syncLocalTracksToPeer(uid);
@@ -1041,7 +1042,9 @@
         // Only one side proactively initiates. The other side answers.
         // This avoids offer glare on mobile while still keeping perfect-negotiation handling.
         pc.onnegotiationneeded = async () => {
-            if(shouldInitiate(uid)) await negotiatePeer(uid,false);
+            if(!shouldInitiate(uid)) return;
+            if(pc.connectionState==='connected' || pc.iceConnectionState==='connected' || pc.iceConnectionState==='completed') return;
+            await negotiatePeer(uid,false);
         };
 
         pc.onicecandidate = (e)=>{
@@ -1057,10 +1060,8 @@
             if(info){ info.hasJoined=true; addParticipantTile(uid, info.name, info.initials, Boolean(info.isOrganizer)); markOnline(uid); }
 
             const stream=getOrCreateRemoteStream(uid);
-            const incomingTracks = event.streams?.[0]?.getTracks?.() || [event.track];
-            incomingTracks.forEach(track=>{
-                if(track && !stream.getTracks().some(t=>t.id===track.id)) stream.addTrack(track);
-            });
+            const track=event.track;
+            if(track && !stream.getTracks().some(t=>t.id===track.id)) stream.addTrack(track);
 
             attachRemoteStream(uid);
 
@@ -1068,11 +1069,16 @@
                 attachRemoteStream(uid);
                 unlockRemoteAudio();
             };
+            event.track.onmute = ()=>{
+                // Temporary receiver mute is common during Wi-Fi/mobile handover.
+                // Keep the track attached; it can resume without renegotiating.
+                setTimeout(()=>attachRemoteStream(uid),180);
+            };
             event.track.onended = ()=>{
                 const s=remoteStreams[uid];
                 const existing=s?.getTracks().find(t=>t.id===event.track.id);
                 if(existing) s.removeTrack(existing);
-                attachRemoteStream(uid);
+                setTimeout(()=>attachRemoteStream(uid),80);
             };
         };
 
@@ -1086,7 +1092,8 @@
                 unlockRemoteAudio();
             }else if(state==='failed'){
                 console.warn('[SmartMeet] ICE FAILED for', uid, '- attempting recovery');
-                restartPeer(uid);
+                if(shouldInitiate(uid)) restartPeer(uid);
+                else requestPresence(true);
             }
         };
         pc.onconnectionstatechange = ()=>{
@@ -1101,10 +1108,14 @@
             }else if(pc.connectionState==='disconnected'){
                 clearTimeout(pc.__disconnectTimer);
                 pc.__disconnectTimer=setTimeout(()=>{
-                    if(pc.connectionState==='disconnected') restartPeer(uid);
-                },2500);
+                    if(pc.connectionState==='disconnected'){
+                        if(shouldInitiate(uid)) restartPeer(uid);
+                        else requestPresence(true);
+                    }
+                },8000);
             }else if(pc.connectionState==='failed'){
-                restartPeer(uid);
+                if(shouldInitiate(uid)) restartPeer(uid);
+                else requestPresence(true);
             }
         };
         pc.onicegatheringstatechange = ()=>{ console.log('[SmartMeet] ICE gathering', uid, '->', pc.iceGatheringState); };
@@ -1172,6 +1183,23 @@
         const source=getOrCreateRemoteStream(uid);
         const localIds=new Set((localStream?.getTracks?.()||[]).map(t=>t.id));
 
+        // Reconcile cached media with CURRENT receiver tracks. This keeps voice/video
+        // alive if the browser replaces a receiver track during network recovery.
+        const pc=peers[uid];
+        if(pc){
+            const currentReceiverTracks=pc.getReceivers()
+                .map(r=>r.track)
+                .filter(t=>t && t.readyState!=='ended' && !localIds.has(t.id));
+            currentReceiverTracks.forEach(track=>{
+                if(!source.getTracks().some(t=>t.id===track.id)) source.addTrack(track);
+            });
+            source.getTracks().forEach(track=>{
+                if(track.readyState==='ended' || localIds.has(track.id)){
+                    try{ source.removeTrack(track); }catch(e){}
+                }
+            });
+        }
+
         const audioTracks=source.getAudioTracks().filter(t=>t.readyState!=='ended' && !localIds.has(t.id));
         let audio=document.getElementById('audio-'+uid);
         if(!audio){
@@ -1185,14 +1213,24 @@
         }
         if(!sameTrackSet(audio.srcObject,audioTracks)) audio.srcObject=new MediaStream(audioTracks);
         audio.muted=false;
+        audio.defaultMuted=false;
         audio.volume=1;
+        audio.preload='auto';
         if(!audio.__smartMeetUnlockBound){
             audio.__smartMeetUnlockBound=true;
             audio.addEventListener('canplay', ()=>audio.play().catch(()=>armAudioUnlock()));
             audio.addEventListener('loadedmetadata', ()=>audio.play().catch(()=>armAudioUnlock()));
         }
         if(audioTracks.length){
-            audio.play().catch(()=>armAudioUnlock());
+            const tryPlay=()=>audio.play().catch(()=>armAudioUnlock());
+            tryPlay();
+            if(!audio.__smartMeetResumeBound){
+                audio.__smartMeetResumeBound=true;
+                audio.addEventListener('pause', ()=>{
+                    const live=(audio.srcObject?.getAudioTracks?.()||[]).some(t=>t.readyState==='live');
+                    if(live && document.visibilityState==='visible') setTimeout(tryPlay,150);
+                });
+            }
         }
 
         const videoTracks=source.getVideoTracks().filter(t=>t.readyState!=='ended' && !localIds.has(t.id));
@@ -1206,10 +1244,17 @@
             video.setAttribute('playsinline','');
 
             // Show an actual received track unless the sender explicitly reported camera OFF.
-            const show=videoTracks.some(t=>t.readyState==='live') && camStatus[uid]===true;
+            const show=videoTracks.some(t=>t.readyState==='live') && camStatus[uid]!==false;
             video.style.display=show?'block':'none';
             if(avatar) avatar.style.display=show?'none':'flex';
-            if(show) video.play().catch(()=>{});
+            if(show){
+                video.play().catch(()=>{});
+                if(!video.__smartMeetPlayBound){
+                    video.__smartMeetPlayBound=true;
+                    video.addEventListener('loadedmetadata', ()=>video.play().catch(()=>{}));
+                    video.addEventListener('canplay', ()=>video.play().catch(()=>{}));
+                }
+            }
         }
     }
     let audioUnlockArmed=false;
@@ -1341,10 +1386,24 @@
             const uid=String(data.data?.userId || from);
             if(uid===String(MY_USER_ID)) return;
             registerJoinedUser(uid, data.data?.name, data.data?.initials, Boolean(data.data?.isOrganizer));
+
+            // Update remote state directly. The previous helper calls were undefined
+            // and could abort this handler before WebRTC negotiation was scheduled.
             camStatus[uid]=Boolean(data.data?.cameraOn);
-            updateRemoteCameraStatus(uid, camStatus[uid]);
-            updateRemoteMicStatus(uid, !Boolean(data.data?.micOn));
-            if(shouldInitiate(uid)) setTimeout(()=>negotiatePeer(uid,false),80);
+            micStatus[uid]=!Boolean(data.data?.micOn);
+            const micEl=document.getElementById('micoff-'+uid);
+            if(micEl) micEl.style.display=micStatus[uid] ? 'flex' : 'none';
+            attachRemoteStream(uid);
+
+            const pc=peers[uid];
+            const connected=pc && (
+                pc.connectionState==='connected' ||
+                pc.iceConnectionState==='connected' ||
+                pc.iceConnectionState==='completed'
+            );
+            if(shouldInitiate(uid) && pc && !connected && pc.signalingState==='stable'){
+                setTimeout(()=>negotiatePeer(uid,false),80);
+            }
             return;
         }
         if(data.type==='user-joined'){
@@ -1352,7 +1411,12 @@
             const wasOnline=onlineUsers.has(uid);
             leftUsers.delete(uid);
             registerJoinedUser(uid, data.data.name, data.data.initials, Boolean(data.data?.isOrganizer || uid===String(ORGANIZER_ID)));
-            if(shouldInitiate(uid)) setTimeout(()=>negotiatePeer(uid,false),60);
+            const pc=peers[uid];
+            if(shouldInitiate(uid) && pc && pc.signalingState==='stable' &&
+                !['connected'].includes(pc.connectionState) &&
+                !['connected','completed'].includes(pc.iceConnectionState)){
+                setTimeout(()=>negotiatePeer(uid,false),60);
+            }
             if(!wasOnline) showToast(`✅ ${escapeHtml(data.data.name)} has joined the meeting.`);
             sendSignal(uid,'mic-status',{ userId:MY_USER_ID, muted:!isMicOn });
             sendSignal(uid,'camera-status',{ userId:MY_USER_ID, cameraOn:isCameraOn });
@@ -1417,7 +1481,26 @@
         try{
             const stream=await navigator.mediaDevices.getUserMedia({ audio:audioConstraints, video:false });
             if(!localStream) localStream=new MediaStream();
-            stream.getAudioTracks().forEach(t=>{ t.enabled=false; localStream.addTrack(t); });
+            stream.getAudioTracks().forEach(t=>{
+                t.enabled=false;
+                localStream.addTrack(t);
+                t.onended=async ()=>{
+                    const wasOn=isMicOn;
+                    try{ localStream?.removeTrack(t); }catch(e){}
+                    if(!wasOn) return;
+                    isMicOn=false;
+                    setMicButton(false);
+                    await startAudio();
+                    const replacement=localStream?.getAudioTracks?.().find(x=>x.readyState==='live');
+                    if(replacement){
+                        replacement.enabled=true;
+                        isMicOn=true;
+                        setMicButton(true);
+                        await syncTracksToEveryPeer();
+                        broadcastMyMicStatus();
+                    }
+                };
+            });
             isMicOn=false;
             const localVideo=document.getElementById('localVideo');
             if(localVideo){ localVideo.srcObject=localStream; localVideo.play().catch(()=>{}); }
@@ -1457,6 +1540,8 @@
         }
         await syncTracksToEveryPeer();
         broadcastMyMicStatus();
+        Object.keys(peers).forEach(uid=>attachRemoteStream(uid));
+        unlockRemoteAudio();
     }
     async function toggleCamera(){
         // Camera is intentionally independent from microphone permission.
@@ -1732,42 +1817,61 @@
             // If signaling was missed while a phone/laptop slept or changed network,
             // deterministic initiator re-sends a fresh offer.
             const age=Date.now()-(pc.__lastOfferAt||pc.__createdAt||0);
-            if(shouldInitiate(uid) &&
+            const alreadyConnected=(
+                pc.connectionState==='connected' ||
+                pc.iceConnectionState==='connected' ||
+                pc.iceConnectionState==='completed'
+            );
+            if(!alreadyConnected &&
+                shouldInitiate(uid) &&
                 ['new','connecting','disconnected'].includes(pc.connectionState) &&
                 pc.signalingState==='stable' &&
-                age>3500){
+                age>5000){
                 negotiatePeer(uid,pc.connectionState==='disconnected');
             }
         });
     }
-    function announceJoin(){
-        sendSignal('all','user-joined',{ userId:MY_USER_ID, name:MY_NAME, initials:MY_INITIALS, isOrganizer:String(MY_USER_ID)===String(ORGANIZER_ID) });
+    let joinAnnounced=false;
+    let lastPresenceRequestAt=0;
+    function requestPresence(force=false){
+        const now=Date.now();
+        if(!force && now-lastPresenceRequestAt<5000) return;
+        lastPresenceRequestAt=now;
         sendSignal('all','presence-request',{ userId:MY_USER_ID });
     }
+    function announceJoin(force=false){
+        if(!force && joinAnnounced) return;
+        joinAnnounced=true;
+        sendSignal('all','user-joined',{ userId:MY_USER_ID, name:MY_NAME, initials:MY_INITIALS, isOrganizer:String(MY_USER_ID)===String(ORGANIZER_ID) });
+        requestPresence(true);
+    }
 
-    function repairMeetingMedia(){
+    function repairMeetingMedia(forcePresence=false){
         if(document.visibilityState!=='visible') return;
-        announceJoin();
         connectToAll();
         syncTracksToEveryPeer();
         broadcastMyMicStatus();
         broadcastMyCameraStatus();
+
+        let hasConnectedPeer=false;
         Object.keys(peers).forEach(uid=>{
             const pc=peers[uid];
             if(!pc || pc.connectionState==='closed') return;
             if(pc.connectionState==='failed') restartPeer(uid);
-            else if(pc.connectionState==='connected'){
+            else if(pc.connectionState==='connected' || pc.iceConnectionState==='connected' || pc.iceConnectionState==='completed'){
+                hasConnectedPeer=true;
                 attachRemoteStream(uid);
             }
         });
+        if(forcePresence || !hasConnectedPeer) requestPresence(forcePresence);
         unlockRemoteAudio();
     }
 
-    window.addEventListener('online', ()=>{ setTimeout(repairMeetingMedia,150); });
-    window.addEventListener('pageshow', ()=>{ setTimeout(repairMeetingMedia,150); });
+    window.addEventListener('online', ()=>{ setTimeout(()=>repairMeetingMedia(true),150); });
+    window.addEventListener('pageshow', ()=>{ setTimeout(()=>repairMeetingMedia(true),150); });
     document.addEventListener('visibilitychange', ()=>{
         if(document.visibilityState==='visible'){
-            setTimeout(repairMeetingMedia,120);
+            setTimeout(()=>repairMeetingMedia(true),120);
             if(isMicOn && !IS_MOBILE_BROWSER) startRecognition();
         }else{
             if(!IS_MOBILE_BROWSER) stopRecognition();
@@ -1789,10 +1893,21 @@
 
         await startAudio();
         await listenForSignals();
+        announceJoin(true);
         scheduleAutoEnd();
 
-        [0,500,1500,3500].forEach(delay=>setTimeout(repairMeetingMedia,delay));
-        setInterval(repairMeetingMedia,7000);
+        [150,700,1800].forEach(delay=>setTimeout(()=>repairMeetingMedia(false),delay));
+        setInterval(()=>repairMeetingMedia(false),10000);
+
+        setInterval(()=>{
+            if(document.visibilityState!=='visible') return;
+            Object.keys(peers).forEach(uid=>{
+                const pc=peers[uid];
+                if(!pc || pc.connectionState==='closed' || leftUsers.has(String(uid))) return;
+                attachRemoteStream(uid);
+            });
+            unlockRemoteAudio();
+        },2500);
     });
 </script>
 </body>
