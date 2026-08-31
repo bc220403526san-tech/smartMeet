@@ -549,6 +549,11 @@
             .ctrl-label{font-size:8px}
             #side-panel{bottom:66px}
         }
+
+        @media (max-width:640px){
+            #transcript-btn,#transcriptBtn,[data-panel="transcript"],[data-tab="transcript"],
+            button[aria-label*="transcript" i],button[title*="transcript" i]{display:none!important}
+        }
     </style>
 </head>
 @php
@@ -1251,6 +1256,18 @@
 
         const audioTrack=liveLocalTrack('audio');
         const videoTrack=liveLocalTrack('video');
+        try{
+            if(audioTrack){
+                if('contentHint' in audioTrack) audioTrack.contentHint='speech';
+                audioTrack.applyConstraints?.({
+                    echoCancellation:true,
+                    noiseSuppression:true,
+                    autoGainControl:true,
+                    channelCount:1
+                }).catch(()=>{});
+            }
+        }catch(e){}
+        try{ if(videoTrack && 'contentHint' in videoTrack) videoTrack.contentHint='motion'; }catch(e){}
 
         try{
             if(pc.__audioTx?.sender){
@@ -1396,11 +1413,14 @@
 
     let audioUnlockArmed=false;
     async function unlockRemoteAudio(){
-        const audios=[...document.querySelectorAll('audio[id^="audio-"]')];
+        const seen=new Set();
+        const audios=[...document.querySelectorAll('audio[id^="audio-"]')].filter(a=>{
+            if(!a.id || seen.has(a.id)) return false;
+            seen.add(a.id);
+            return true;
+        });
         await Promise.allSettled(audios.map(a=>{
-            a.muted=false;
-            a.defaultMuted=false;
-            a.volume=1;
+            a.muted=false; a.defaultMuted=false; a.volume=1;
             return a.play();
         }));
     }
@@ -1975,6 +1995,15 @@
         });
     }
 
+    function hideMobileTranscriptUI(){
+        if(!IS_MOBILE_BROWSER) return;
+        ['#transcript-btn','#transcriptBtn','[data-panel="transcript"]','[data-tab="transcript"]',
+            'button[aria-label*="transcript" i]','button[title*="transcript" i]']
+            .forEach(sel=>document.querySelectorAll(sel).forEach(el=>el.style.setProperty('display','none','important')));
+    }
+    if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',hideMobileTranscriptUI,{once:true});
+    else hideMobileTranscriptUI();
+
     /* ---------- Transcript (Web Speech API) ---------- */
     let recognition=null, recognitionRunning=false, recognitionStopping=false, recognitionRestartTimer=null;
     function startTranscript(){
@@ -2347,6 +2376,14 @@
             setInterval(()=>recoverMobileLocalMedia(),3500);
             setInterval(()=>unlockRemoteMedia(),1800);
         }
+
+        setInterval(()=>{
+            Object.entries(peers).forEach(([uid,pc])=>{
+                if(pc && (pc.connectionState==='connected' || pc.iceConnectionState==='connected')){
+                    attachRemoteStream(uid);
+                }
+            });
+        },4000);
 
         setInterval(()=>{
             Object.keys(peers).forEach(uid=>{
