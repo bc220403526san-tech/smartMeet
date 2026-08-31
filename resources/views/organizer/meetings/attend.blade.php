@@ -1979,14 +1979,18 @@
 
     /* ---------- Transcript (Web Speech API) ---------- */
     let recognition=null, recognitionRunning=false, recognitionStopping=false, recognitionRestartTimer=null;
-    let mobileRecognitionFailCount=0;
     function startTranscript(){
-        // Attempt live captions on every supported browser, including mobile.
-        // Some Android/iOS browsers can briefly conflict with WebRTC over mic
-        // access; recognition.onerror below already backs off safely for that
-        // case ('audio-capture') without ever touching the live call audio.
+        // CONFIRMED REGRESSION (2026-08-31 field test): enabling this on mobile
+        // Chrome causes Chrome to fight WebRTC for exclusive mic access ("Speech
+        // Recognition and Synthesis from Google cannot record now as Chrome is
+        // recording audio"), which destabilizes the whole peer connection — not
+        // just outgoing captions, but incoming audio/video from other people
+        // stopped arriving on the phone too. Live call quality matters far more
+        // than local captions, so mobile stays off. Mobile still receives other
+        // people's captions via the signaling channel (handleRemoteTranscript).
+        if(IS_MOBILE_BROWSER) return;
         const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-        if(!SR){ if(!IS_MOBILE_BROWSER) showToast('⚠️ Live captions require Chrome or Edge.'); return; }
+        if(!SR){ showToast('⚠️ Live captions require Chrome or Edge.'); return; }
         if(recognition) return;
         recognition=new SR();
         recognition.continuous=true; recognition.interimResults=true; recognition.maxAlternatives=1; recognition.lang='en-US';
@@ -2011,15 +2015,6 @@
             }
             if(e.error==='audio-capture'){
                 console.warn('[SmartMeet] SpeechRecognition audio capture unavailable; WebRTC audio stays active.');
-                if(IS_MOBILE_BROWSER){
-                    mobileRecognitionFailCount++;
-                    // Stop hammering the mic on phones that genuinely can't share it
-                    // between WebRTC and Web Speech — the call audio itself is fine either way.
-                    if(mobileRecognitionFailCount>=4){
-                        showToast("📝 Captions for your own voice aren't supported on this phone's browser — call audio isn't affected.");
-                        return;
-                    }
-                }
                 scheduleRecognitionRestart(IS_MOBILE_BROWSER?2500:900);
                 return;
             }
@@ -2033,6 +2028,7 @@
         recognitionRestartTimer=setTimeout(()=>{ recognitionRestartTimer=null; startRecognition(); }, delay);
     }
     function startRecognition(){
+        if(IS_MOBILE_BROWSER) return;
         if(!recognition || recognitionRunning || recognitionStopping || !isMicOn || document.visibilityState!=='visible') return;
         const mic=liveLocalTrack('audio');
         if(!mic || !mic.enabled || mic.readyState!=='live') return;
@@ -2345,6 +2341,36 @@
             });
             unlockRemoteAudio();
         },2500);
+
+        // Stalled-media watchdog: ICE can report "connected" while the actual
+        // media path is dead (e.g. a flaky TURN relay drops packets after the
+        // handshake). That shows up as a frozen/black remote video or silent
+        // remote audio that never recovers on its own. Detect it by checking
+        // whether the received video frame / audio timestamp is actually
+        // advancing, and force an ICE restart if it's been stuck too long.
+        const __stallTracker={};
+        setInterval(()=>{
+            if(document.visibilityState!=='visible') return;
+            Object.keys(peers).forEach(uid=>{
+                const pc=peers[uid];
+                if(!pc || pc.connectionState!=='connected' || leftUsers.has(String(uid))) return;
+                const video=document.getElementById('rvideo-'+uid);
+                const audio=document.getElementById('audio-'+uid);
+                const vTime=video && video.style.display!=='none' ? video.currentTime : null;
+                const aTime=audio ? audio.currentTime : null;
+                const prev=__stallTracker[uid] || {};
+                const now=Date.now();
+                const vStuck = vTime!=null && prev.vTime===vTime;
+                const aStuck = aTime!=null && prev.aTime===aTime;
+                const firstSeenStuckAt = (vStuck || aStuck) ? (prev.stuckSince || now) : null;
+                __stallTracker[uid]={ vTime, aTime, stuckSince: firstSeenStuckAt };
+                if(firstSeenStuckAt && (now-firstSeenStuckAt)>7000){
+                    console.warn('[SmartMeet] media appears stalled for', uid, '- forcing reconnect');
+                    __stallTracker[uid]={ vTime:null, aTime:null, stuckSince:null };
+                    if(shouldInitiate(uid)) restartPeer(uid); else requestPresence(true);
+                }
+            });
+        },3000);
 
         if(IS_MOBILE_BROWSER){
             setInterval(()=>recoverMobileLocalMedia(),3500);
