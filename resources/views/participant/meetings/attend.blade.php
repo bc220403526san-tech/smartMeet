@@ -554,6 +554,14 @@
             #transcript-btn,#transcriptBtn,[data-panel="transcript"],[data-tab="transcript"],
             button[aria-label*="transcript" i],button[title*="transcript" i]{display:none!important}
         }
+
+        @media (max-width:640px){
+            .ctrl-btn[onclick*="transcript"],
+            .panel-tabbtn[data-tab="transcript"],
+            #tab-transcript{
+                display:none !important;
+            }
+        }
     </style>
 </head>
 @php
@@ -758,13 +766,23 @@
         onlineUsers.delete(uid);
         if(knownParticipants[uid]) knownParticipants[uid].hasJoined=false;
         updateOnlineCount();
-        document.getElementById('person-row-'+uid)?.remove();
+        renderPersonRow(uid);
     }
 
     function renderPeopleList(){
         const body=document.getElementById('people-body'); if(!body) return;
         body.innerHTML='';
-        [...onlineUsers].forEach(uid=>renderPersonRow(String(uid)));
+        const ids=Object.keys(knownParticipants);
+        if(!ids.includes(String(MY_USER_ID))) ids.unshift(String(MY_USER_ID));
+        ids.sort((a,b)=>{
+            if(a===String(MY_USER_ID)) return -1;
+            if(b===String(MY_USER_ID)) return 1;
+            const ao=onlineUsers.has(String(a)) ? 0 : 1;
+            const bo=onlineUsers.has(String(b)) ? 0 : 1;
+            if(ao!==bo) return ao-bo;
+            return String(knownParticipants[a]?.name||'').localeCompare(String(knownParticipants[b]?.name||''));
+        });
+        ids.forEach(uid=>renderPersonRow(String(uid)));
     }
     function renderPersonRow(uid){
         uid=String(uid);
@@ -1043,7 +1061,10 @@
                     connection:pc.connectionState
                 });
                 if(shouldInitiate(uid)) restartPeer(uid);
-                else requestPresence(true);
+                else{
+                    sendSignal(uid,'reconnect-request',{reason:'ice-failed'});
+                    requestPresence(true);
+                }
             }
         },10000);
     }
@@ -1152,7 +1173,10 @@
                 clearTimeout(pc.__connectWatchdog);
                 console.warn('[SmartMeet] ICE FAILED for', uid, '- attempting recovery');
                 if(shouldInitiate(uid)) restartPeer(uid);
-                else requestPresence(true);
+                else{
+                    sendSignal(uid,'reconnect-request',{reason:'ice-failed'});
+                    requestPresence(true);
+                }
             }else if(state==='closed'){
                 clearTimeout(pc.__connectWatchdog);
             }
@@ -1176,7 +1200,10 @@
                 pc.__disconnectTimer=setTimeout(()=>{
                     if(pc.connectionState==='disconnected'){
                         if(shouldInitiate(uid)) restartPeer(uid);
-                        else requestPresence(true);
+                        else{
+                            sendSignal(uid,'reconnect-request',{reason:'disconnected'});
+                            requestPresence(true);
+                        }
                     }
                 },8000);
             }else if(pc.connectionState==='failed'){
@@ -1622,6 +1649,17 @@
         if(!data.data) return;
         if(leftUsers.has(from) && ['offer','ice-candidate'].includes(data.type)) return;
 
+        if(data.type==='reconnect-request'){
+            if(shouldInitiate(from)){
+                const pc=peers[String(from)] || createPeerConnection(String(from));
+                if(pc){
+                    pc.__restartAttempts=0;
+                    pc.__lastRestartAt=0;
+                    restartPeer(String(from));
+                }
+            }
+            return;
+        }
         if(data.type==='offer') return handleOffer(from, data.data);
         if(data.type==='answer') return handleAnswer(from, data.data);
         if(data.type==='ice-candidate') return handleIceCandidate(from, data.data);
@@ -1988,6 +2026,7 @@
     function hideMobileTranscriptUI(){
         if(!IS_MOBILE_BROWSER) return;
         ['#transcript-btn','#transcriptBtn','[data-panel="transcript"]','[data-tab="transcript"]',
+            '.ctrl-btn[onclick*="transcript"]','#tab-transcript',
             'button[aria-label*="transcript" i]','button[title*="transcript" i]']
             .forEach(sel=>document.querySelectorAll(sel).forEach(el=>el.style.setProperty('display','none','important')));
     }
