@@ -1023,6 +1023,24 @@
         }
     }
 
+    function armPeerWatchdog(uid, pc){
+        if(!pc || pc.signalingState==='closed') return;
+        clearTimeout(pc.__connectWatchdog);
+        pc.__connectWatchdog=setTimeout(()=>{
+            if(!peers[uid] || peers[uid]!==pc || pc.signalingState==='closed') return;
+            const stuckIce=['checking','new'].includes(pc.iceConnectionState);
+            const stuckConn=['connecting','new'].includes(pc.connectionState);
+            if(stuckIce || stuckConn){
+                console.warn('[SmartMeet] peer stuck while connecting', uid, {
+                    ice:pc.iceConnectionState,
+                    connection:pc.connectionState
+                });
+                if(shouldInitiate(uid)) restartPeer(uid);
+                else requestPresence(true);
+            }
+        },10000);
+    }
+
     function createPeerConnection(uid){
         uid=String(uid);
         if(uid===String(MY_USER_ID) || leftUsers.has(uid)) return null;
@@ -1083,20 +1101,29 @@
         pc.oniceconnectionstatechange = ()=>{
             const state=pc.iceConnectionState;
             console.log('[SmartMeet] ICE state', uid, '->', state);
-            if(state==='connected' || state==='completed'){
+            if(state==='checking' || state==='new'){
+                armPeerWatchdog(uid,pc);
+            }else if(state==='connected' || state==='completed'){
+                clearTimeout(pc.__connectWatchdog);
                 pc.__connectedOnce=true;
                 ensureTileVisible(uid);
                 attachRemoteStream(uid);
                 unlockRemoteAudio();
             }else if(state==='failed'){
+                clearTimeout(pc.__connectWatchdog);
                 console.warn('[SmartMeet] ICE FAILED for', uid, '- attempting recovery');
                 if(shouldInitiate(uid)) restartPeer(uid);
                 else requestPresence(true);
+            }else if(state==='closed'){
+                clearTimeout(pc.__connectWatchdog);
             }
         };
         pc.onconnectionstatechange = ()=>{
             console.log('[SmartMeet] connection state', uid, '->', pc.connectionState);
-            if(pc.connectionState==='connected'){
+            if(pc.connectionState==='connecting' || pc.connectionState==='new'){
+                armPeerWatchdog(uid,pc);
+            }else if(pc.connectionState==='connected'){
+                clearTimeout(pc.__connectWatchdog);
                 pc.__connectedOnce=true;
                 clearTimeout(pc.__disconnectTimer);
                 ensureTileVisible(uid);
@@ -1104,6 +1131,7 @@
                 unlockRemoteAudio();
                 pc.__restartAttempts=0;
             }else if(pc.connectionState==='disconnected'){
+                clearTimeout(pc.__connectWatchdog);
                 clearTimeout(pc.__disconnectTimer);
                 pc.__disconnectTimer=setTimeout(()=>{
                     if(pc.connectionState==='disconnected'){
@@ -1112,8 +1140,11 @@
                     }
                 },8000);
             }else if(pc.connectionState==='failed'){
+                clearTimeout(pc.__connectWatchdog);
                 if(shouldInitiate(uid)) restartPeer(uid);
                 else requestPresence(true);
+            }else if(pc.connectionState==='closed'){
+                clearTimeout(pc.__connectWatchdog);
             }
         };
         pc.onicegatheringstatechange = ()=>{ console.log('[SmartMeet] ICE gathering', uid, '->', pc.iceGatheringState); };
@@ -1141,6 +1172,7 @@
         const sinceLast = Date.now() - (pc.__lastRestartAt || 0);
         if(pc.__lastRestartAt && sinceLast < backoff) return;
 
+        clearTimeout(pc.__connectWatchdog);
         clearTimeout(pc.__restartTimer);
         pc.__restartTimer=setTimeout(async ()=>{
             if(!peers[uid] || peers[uid]!==pc || pc.signalingState==='closed' || leftUsers.has(uid)) return;
@@ -1381,8 +1413,14 @@
             let done=false; const finish=v=>{ if(!done){ done=true; resolve(v); } };
             channel.listen('.signal', handleSignal);
             channel.listen('.transcript', handleRemoteTranscript);
-            if(typeof channel.subscribed==='function') channel.subscribed(()=>finish(true));
-            if(typeof channel.error==='function') channel.error(err=>{ console.error('channel error', err); finish(false); });
+            if(typeof channel.subscribed==='function') channel.subscribed(()=>{
+                console.log('[SmartMeet] Reverb channel subscribed');
+                finish(true);
+            });
+            if(typeof channel.error==='function') channel.error(err=>{
+                console.error('[SmartMeet] Reverb channel error', err);
+                finish(false);
+            });
             setTimeout(()=>finish(true), 1200);
         });
     }
@@ -1908,17 +1946,22 @@
         broadcastMyMicStatus();
         broadcastMyCameraStatus();
 
-        let hasConnectedPeer=false;
         Object.keys(peers).forEach(uid=>{
             const pc=peers[uid];
             if(!pc || pc.connectionState==='closed') return;
-            if(pc.connectionState==='failed') restartPeer(uid);
-            else if(pc.connectionState==='connected' || pc.iceConnectionState==='connected' || pc.iceConnectionState==='completed'){
-                hasConnectedPeer=true;
+            if(pc.connectionState==='failed'){
+                if(shouldInitiate(uid)) restartPeer(uid);
+                else requestPresence(true);
+            }else if(pc.connectionState==='connected' || pc.iceConnectionState==='connected' || pc.iceConnectionState==='completed'){
                 attachRemoteStream(uid);
+            }else if(pc.connectionState==='connecting' || pc.iceConnectionState==='checking'){
+                armPeerWatchdog(uid,pc);
             }
         });
-        if(forcePresence || !hasConnectedPeer) requestPresence(forcePresence);
+
+        // Always request the current roster. requestPresence() is throttled,
+        // so late joiners are discovered without refresh and without flooding.
+        requestPresence(forcePresence);
         unlockRemoteAudio();
     }
 
