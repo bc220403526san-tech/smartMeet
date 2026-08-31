@@ -45,5 +45,10 @@ return [
         'client_secret' => env('FACEBOOK_CLIENT_SECRET'),
         'redirect'      => env('FACEBOOK_REDIRECT'),
     ],
+    'turn' => [
+        'host' => env('TURN_HOST'),
+        'username' => env('TURN_USERNAME'),
+        'credential' => env('TURN_CREDENTIAL'),
+    ],
 
 ];
