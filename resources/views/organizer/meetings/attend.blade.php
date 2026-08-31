@@ -1338,6 +1338,17 @@
         if(bestVideo && !bestVideo.muted) camStatus[uid]=true;
     }
 
+    let audioUnlockArmed=false;
+    async function unlockRemoteAudio(){
+        const audios=[...document.querySelectorAll('audio[id^="audio-"]')];
+        await Promise.allSettled(audios.map(a=>{
+            a.muted=false;
+            a.defaultMuted=false;
+            a.volume=1;
+            return a.play();
+        }));
+    }
+
     function armAudioUnlock(){
         if(audioUnlockArmed) return;
         audioUnlockArmed=true;
