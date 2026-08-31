@@ -1057,12 +1057,10 @@
 
             event.track.onunmute = ()=>{
                 attachRemoteStream(uid);
-                unlockRemoteAudio();
+                if(event.track.kind==='audio') unlockRemoteAudio();
             };
             event.track.onmute = ()=>{
-                // Temporary receiver mute is common during Wi-Fi/mobile handover.
-                // Keep the track attached; it can resume without renegotiating.
-                setTimeout(()=>attachRemoteStream(uid),180);
+                setTimeout(()=>attachRemoteStream(uid),250);
             };
             event.track.onended = ()=>{
                 const s=remoteStreams[uid];
@@ -1153,12 +1151,34 @@
         },250);
     }
 
+    function getLiveLocalTrack(kind){
+        if(!localStream) return null;
+        const tracks=kind==='audio' ? localStream.getAudioTracks() : localStream.getVideoTracks();
+        return tracks.find(t=>t.readyState==='live') || null;
+    }
+    function pruneEndedLocalTracks(){
+        if(!localStream) return;
+        localStream.getTracks().forEach(t=>{
+            if(t.readyState==='ended'){
+                try{ localStream.removeTrack(t); }catch(e){}
+            }
+        });
+    }
     async function syncLocalTracksToPeer(uid){
         const pc=peers[uid]; if(!pc || pc.signalingState==='closed') return;
-        const audioTrack = localStream?.getAudioTracks?.()[0] || null;
-        const videoTrack = localStream?.getVideoTracks?.()[0] || null;
-        try{ if(pc.__audioTx?.sender) await pc.__audioTx.sender.replaceTrack(audioTrack); }catch(e){}
-        try{ if(pc.__videoTx?.sender) await pc.__videoTx.sender.replaceTrack(videoTrack); }catch(e){}
+        pruneEndedLocalTracks();
+        const audioTrack=getLiveLocalTrack('audio');
+        const videoTrack=getLiveLocalTrack('video');
+        try{
+            if(pc.__audioTx?.sender && pc.__audioTx.sender.track!==audioTrack){
+                await pc.__audioTx.sender.replaceTrack(audioTrack);
+            }
+        }catch(e){ console.warn('[SmartMeet] audio replaceTrack failed', uid, e); }
+        try{
+            if(pc.__videoTx?.sender && pc.__videoTx.sender.track!==videoTrack){
+                await pc.__videoTx.sender.replaceTrack(videoTrack);
+            }
+        }catch(e){ console.warn('[SmartMeet] video replaceTrack failed', uid, e); }
     }
     async function syncTracksToEveryPeer(){ await Promise.allSettled(Object.keys(peers).map(uid=>syncLocalTracksToPeer(uid))); }
 
@@ -1180,11 +1200,12 @@
             const currentReceiverTracks=pc.getReceivers()
                 .map(r=>r.track)
                 .filter(t=>t && t.readyState!=='ended' && !localIds.has(t.id));
+            const currentIds=new Set(currentReceiverTracks.map(t=>t.id));
             currentReceiverTracks.forEach(track=>{
                 if(!source.getTracks().some(t=>t.id===track.id)) source.addTrack(track);
             });
             source.getTracks().forEach(track=>{
-                if(track.readyState==='ended' || localIds.has(track.id)){
+                if(track.readyState==='ended' || localIds.has(track.id) || !currentIds.has(track.id)){
                     try{ source.removeTrack(track); }catch(e){}
                 }
             });
@@ -1201,7 +1222,11 @@
             audio.style.display='none';
             document.body.appendChild(audio);
         }
-        if(!sameTrackSet(audio.srcObject,audioTracks)) audio.srcObject=new MediaStream(audioTracks);
+        if(!sameTrackSet(audio.srcObject,audioTracks)){
+            const audioStream=new MediaStream();
+            audioTracks.forEach(t=>audioStream.addTrack(t));
+            audio.srcObject=audioStream;
+        }
         audio.muted=false;
         audio.defaultMuted=false;
         audio.volume=1;
@@ -1234,7 +1259,9 @@
             video.setAttribute('playsinline','');
 
             // Show an actual received track unless the sender explicitly reported camera OFF.
-            const show=videoTracks.some(t=>t.readyState==='live') && camStatus[uid]!==false;
+            const liveVideoTrack=videoTracks.find(t=>t.readyState==='live') || null;
+            const hasUsableVideo=Boolean(liveVideoTrack && !liveVideoTrack.muted);
+            const show=hasUsableVideo && camStatus[uid]!==false;
             video.style.display=show?'block':'none';
             if(avatar) avatar.style.display=show?'none':'flex';
             if(show){
@@ -1471,6 +1498,11 @@
         try{
             const stream=await navigator.mediaDevices.getUserMedia({ audio:audioConstraints, video:false });
             if(!localStream) localStream=new MediaStream();
+            localStream.getAudioTracks().forEach(old=>{
+                if(old.readyState==='ended'){
+                    try{ localStream.removeTrack(old); }catch(e){}
+                }
+            });
             stream.getAudioTracks().forEach(t=>{
                 t.enabled=false;
                 localStream.addTrack(t);
@@ -1537,12 +1569,35 @@
         // Camera is intentionally independent from microphone permission.
         // Keep the same camera constraints/settings; only ensure a MediaStream exists.
         if(!localStream) localStream=new MediaStream();
-        let videoTrack=localStream.getVideoTracks()[0]||null;
-        if(!videoTrack || videoTrack.readyState==='ended'){
+        localStream.getVideoTracks().forEach(old=>{
+            if(old.readyState==='ended'){
+                try{ localStream.removeTrack(old); }catch(e){}
+            }
+        });
+        let videoTrack=getLiveLocalTrack('video');
+        if(!videoTrack){
             try{
-                const camStream=await navigator.mediaDevices.getUserMedia({ audio:false, video:{ width:{ideal:1280}, height:{ideal:720}, frameRate:{ideal:24,max:30}, facingMode:'user' } });
-                videoTrack=camStream.getVideoTracks()[0];
+                const camStream=await navigator.mediaDevices.getUserMedia({
+                    audio:false,
+                    video:{ width:{ideal:1280}, height:{ideal:720}, frameRate:{ideal:24,max:30}, facingMode:'user' }
+                });
+                videoTrack=camStream.getVideoTracks().find(t=>t.readyState==='live') || null;
+                if(!videoTrack) throw new Error('No live camera track returned');
                 localStream.addTrack(videoTrack);
+                videoTrack.onended=async ()=>{
+                    try{ localStream?.removeTrack(videoTrack); }catch(e){}
+                    if(isCameraOn){
+                        isCameraOn=false;
+                        const btn=document.getElementById('ctrl-camera');
+                        if(btn){
+                            btn.innerHTML='<i class="fa fa-video-slash"></i>';
+                            btn.classList.add('off');
+                            btn.classList.remove('active');
+                        }
+                        await syncTracksToEveryPeer();
+                        broadcastMyCameraStatus();
+                    }
+                };
                 const localVideo=document.getElementById('localVideo');
                 if(localVideo){ localVideo.srcObject=localStream; localVideo.play().catch(()=>{}); }
             }catch(err){ console.error('camera error', err); showToast('📷 Camera could not start — check browser permissions.'); return; }
@@ -1684,7 +1739,7 @@
                 if(res.ok) return true;
                 console.error('transcript save failed',res.status);
             }catch(e){
-                console.error('transcript save error',e);
+                if(e?.name!=='AbortError') console.error('transcript save error',e);
             }
             await new Promise(r=>setTimeout(r,350));
         }
@@ -1880,10 +1935,32 @@
             Object.keys(peers).forEach(uid=>{
                 const pc=peers[uid];
                 if(!pc || pc.connectionState==='closed' || leftUsers.has(String(uid))) return;
+                syncLocalTracksToPeer(uid);
                 attachRemoteStream(uid);
             });
             unlockRemoteAudio();
         },2500);
+
+        setInterval(()=>{
+            Object.keys(peers).forEach(uid=>{
+                const pc=peers[uid];
+                if(!pc || pc.connectionState!=='connected') return;
+                const aSend=pc.__audioTx?.sender?.track;
+                const vSend=pc.__videoTx?.sender?.track;
+                const recv=pc.getReceivers().map(r=>({
+                    kind:r.track?.kind,
+                    state:r.track?.readyState,
+                    muted:r.track?.muted
+                }));
+                console.log('[SmartMeet] media health', uid, {
+                    audioSend:Boolean(aSend && aSend.readyState==='live'),
+                    audioEnabled:Boolean(aSend?.enabled),
+                    videoSend:Boolean(vSend && vSend.readyState==='live'),
+                    videoEnabled:Boolean(vSend?.enabled),
+                    receivers:recv
+                });
+            });
+        },12000);
     });
 </script>
 </body>
