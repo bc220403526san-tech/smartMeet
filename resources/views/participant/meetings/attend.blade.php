@@ -1183,33 +1183,35 @@
         },250);
     }
 
-    async function syncLocalTracksToPeer(uid){
-        const pc=peers[uid];
-        if(!pc || pc.signalingState==='closed') return;
-
-        removeDeadLocalTracks();
-        const audioTrack=liveLocalTrack('audio');
-        const videoTrack=liveLocalTrack('video');
-
-        try{
-            if(pc.__audioTx?.sender){
-                if(pc.__audioTx.sender.track!==audioTrack){
-                    await pc.__audioTx.sender.replaceTrack(audioTrack);
-                }
-                if(audioTrack) audioTrack.enabled=Boolean(isMicOn);
-            }
-        }catch(e){ console.warn('[SmartMeet] audio sender sync failed',uid,e); }
-
-        try{
-            if(pc.__videoTx?.sender){
-                if(pc.__videoTx.sender.track!==videoTrack){
-                    await pc.__videoTx.sender.replaceTrack(videoTrack);
-                }
-                if(videoTrack) videoTrack.enabled=Boolean(isCameraOn);
-            }
-        }catch(e){ console.warn('[SmartMeet] video sender sync failed',uid,e); }
+    function getLiveLocalTrack(kind){
+        if(!localStream) return null;
+        const tracks=kind==='audio' ? localStream.getAudioTracks() : localStream.getVideoTracks();
+        return tracks.find(t=>t.readyState==='live') || null;
     }
-
+    function pruneEndedLocalTracks(){
+        if(!localStream) return;
+        localStream.getTracks().forEach(t=>{
+            if(t.readyState==='ended'){
+                try{ localStream.removeTrack(t); }catch(e){}
+            }
+        });
+    }
+    async function syncLocalTracksToPeer(uid){
+        const pc=peers[uid]; if(!pc || pc.signalingState==='closed') return;
+        pruneEndedLocalTracks();
+        const audioTrack=getLiveLocalTrack('audio');
+        const videoTrack=getLiveLocalTrack('video');
+        try{
+            if(pc.__audioTx?.sender && pc.__audioTx.sender.track!==audioTrack){
+                await pc.__audioTx.sender.replaceTrack(audioTrack);
+            }
+        }catch(e){ console.warn('[SmartMeet] audio replaceTrack failed', uid, e); }
+        try{
+            if(pc.__videoTx?.sender && pc.__videoTx.sender.track!==videoTrack){
+                await pc.__videoTx.sender.replaceTrack(videoTrack);
+            }
+        }catch(e){ console.warn('[SmartMeet] video replaceTrack failed', uid, e); }
+    }
     async function syncTracksToEveryPeer(){ await Promise.allSettled(Object.keys(peers).map(uid=>syncLocalTracksToPeer(uid))); }
 
     function sameTrackSet(stream, tracks){
@@ -1396,20 +1398,42 @@
     /* ---------- Realtime channel ---------- */
     function listenForSignals(){
         return new Promise(resolve=>{
-            if(typeof window.Echo==='undefined'){ console.error('Echo not initialized'); resolve(false); return; }
+            if(typeof window.Echo==='undefined'){
+                console.error('[SmartMeet] Echo not initialized — check app.js/bootstrap.js and Vite Reverb env vars.');
+                showToast('⚠️ Realtime meeting connection failed. Audio/video cannot start until Reverb connects.');
+                resolve(false);
+                return;
+            }
+
             const channel=window.Echo.channel('meeting.'+MEETING_ID);
-            let done=false; const finish=v=>{ if(!done){ done=true; resolve(v); } };
+            let done=false;
+            const finish=v=>{ if(!done){ done=true; resolve(v); } };
+
             channel.listen('.signal', handleSignal);
             channel.listen('.transcript', handleRemoteTranscript);
-            if(typeof channel.subscribed==='function') channel.subscribed(()=>{
-                console.log('[SmartMeet] Reverb channel subscribed');
+
+            if(typeof channel.subscribed==='function'){
+                channel.subscribed(()=>{
+                    console.log('[SmartMeet] Reverb channel subscribed');
+                    finish(true);
+                });
+            }
+
+            if(typeof channel.error==='function'){
+                channel.error(err=>{
+                    console.error('[SmartMeet] Reverb channel error', err);
+                    showToast('⚠️ Realtime connection error — reconnecting meeting signaling.');
+                    finish(false);
+                });
+            }
+
+            setTimeout(()=>{
+                if(!done){
+                    console.warn('[SmartMeet] Reverb subscribe confirmation timed out after 1.2s.');
+                    showToast('⚠️ Meeting server connection is slow. Realtime media may be delayed.');
+                }
                 finish(true);
-            });
-            if(typeof channel.error==='function') channel.error(err=>{
-                console.error('[SmartMeet] Reverb channel error', err);
-                finish(false);
-            });
-            setTimeout(()=>finish(true), 1200);
+            },1200);
         });
     }
 
@@ -1523,234 +1547,138 @@
     }
 
     /* ---------- Media ---------- */
-    const audioConstraints = {
-        echoCancellation:true,
-        noiseSuppression:true,
-        autoGainControl:true,
-        channelCount:1
-    };
-
-    function liveLocalTrack(kind){
-        if(!localStream) return null;
-        const list = kind==='audio' ? localStream.getAudioTracks() : localStream.getVideoTracks();
-        return list.find(t=>t.readyState==='live') || null;
-    }
-
-    function removeDeadLocalTracks(kind=null){
-        if(!localStream) return;
-        localStream.getTracks().forEach(t=>{
-            if((!kind || t.kind===kind) && t.readyState==='ended'){
-                try{ localStream.removeTrack(t); }catch(e){}
-            }
-        });
-    }
-
-    async function ensureAudioTrack(enableNow=false){
+    const audioConstraints = { echoCancellation:true, noiseSuppression:true, autoGainControl:true, channelCount:1, sampleRate:48000, sampleSize:16 };
+    async function startAudio(){
         if(!window.isSecureContext || !navigator.mediaDevices?.getUserMedia){
-            showToast('⚠️ Mic/Camera needs HTTPS and browser permission.');
-            return null;
+            showToast('⚠️ Mic/Camera needs HTTPS and browser media permission.');
+            return;
         }
-
-        removeDeadLocalTracks('audio');
-        let track=liveLocalTrack('audio');
-
-        if(!track){
-            try{
-                const s=await navigator.mediaDevices.getUserMedia({audio:audioConstraints,video:false});
-                track=s.getAudioTracks().find(t=>t.readyState==='live') || null;
-                if(!track) throw new Error('No live microphone track returned');
-                if(!localStream) localStream=new MediaStream();
-                // Keep one microphone track only.
-                localStream.getAudioTracks().forEach(old=>{
-                    if(old!==track){
-                        try{ localStream.removeTrack(old); }catch(e){}
-                        try{ old.stop(); }catch(e){}
-                    }
-                });
-                localStream.addTrack(track);
-
-                track.onended=async ()=>{
-                    try{ localStream?.removeTrack(track); }catch(e){}
-                    const shouldRecover=isMicOn;
-                    if(!shouldRecover) return;
+        const liveAudio = localStream?.getAudioTracks?.().find(t=>t.readyState==='live');
+        if(liveAudio) return;
+        try{
+            const stream=await navigator.mediaDevices.getUserMedia({ audio:audioConstraints, video:false });
+            if(!localStream) localStream=new MediaStream();
+            localStream.getAudioTracks().forEach(old=>{
+                if(old.readyState==='ended'){
+                    try{ localStream.removeTrack(old); }catch(e){}
+                }
+            });
+            stream.getAudioTracks().forEach(t=>{
+                t.enabled=false;
+                localStream.addTrack(t);
+                t.onended=async ()=>{
+                    const wasOn=isMicOn;
+                    try{ localStream?.removeTrack(t); }catch(e){}
+                    if(!wasOn) return;
                     isMicOn=false;
                     setMicButton(false);
-                    const replacement=await ensureAudioTrack(true);
+                    await startAudio();
+                    const replacement=localStream?.getAudioTracks?.().find(x=>x.readyState==='live');
                     if(replacement){
+                        replacement.enabled=true;
                         isMicOn=true;
                         setMicButton(true);
                         await syncTracksToEveryPeer();
                         broadcastMyMicStatus();
-                        startTranscript();
-                        startRecognition();
                     }
                 };
-            }catch(err){
-                console.error('[SmartMeet] microphone error',err);
-                if(err?.name==='NotAllowedError') showToast('🎙️ Allow microphone permission in browser settings.');
-                else if(err?.name==='NotFoundError') showToast('🎙️ No microphone found.');
-                else showToast('🎙️ Could not start microphone.');
-                return null;
-            }
+            });
+            isMicOn=false;
+            const localVideo=document.getElementById('localVideo');
+            if(localVideo){ localVideo.srcObject=localStream; localVideo.play().catch(()=>{}); }
+            setMicButton(false);
+            await syncTracksToEveryPeer();
+            if(!IS_MOBILE_BROWSER) startTranscript();
+            broadcastMyMicStatus();
+        }catch(err){
+            console.error('mic error', err);
+            if(err.name==='NotAllowedError') showToast('🎙️ Microphone blocked — allow it in browser settings then reload.');
+            else if(err.name==='NotFoundError') showToast('🎙️ No microphone was found on this device.');
+            else showToast('🎙️ Could not start meeting audio.');
         }
-
-        track.enabled=Boolean(enableNow);
-        return track;
     }
-
-    async function startAudio(){
-        const track=await ensureAudioTrack(false);
-        if(!track) return;
-        isMicOn=false;
-        setMicButton(false);
-        await syncTracksToEveryPeer();
-        broadcastMyMicStatus();
-
-        const localVideo=document.getElementById('localVideo');
-        if(localVideo && localStream){
-            localVideo.srcObject=localStream;
-            localVideo.playsInline=true;
-        }
-
-        // Prepare SpeechRecognition on every supported browser, including mobile.
-        startTranscript();
-    }
-
     function setMicButton(on){
-        const btn=document.getElementById('ctrl-mic');
-        const off=document.getElementById('micoff-'+MY_USER_ID);
-        if(btn){
-            btn.innerHTML=on?'<i class="fa fa-microphone"></i>':'<i class="fa fa-microphone-slash"></i>';
-            btn.classList.toggle('off',!on);
-            btn.classList.toggle('active',on);
-        }
-        if(off) off.style.display=on?'none':'flex';
+        const btn=document.getElementById('ctrl-mic'); const off=document.getElementById('micoff-'+MY_USER_ID);
+        if(btn){ btn.innerHTML = on ? '<i class="fa fa-microphone"></i>' : '<i class="fa fa-microphone-slash"></i>'; btn.classList.toggle('off', !on); btn.classList.toggle('active', on); }
+        if(off) off.style.display = on ? 'none' : 'flex';
     }
-
     async function toggleMic(){
-        const targetOn=!isMicOn;
-        const track=await ensureAudioTrack(targetOn);
-        if(!track) return;
-
-        // Set state explicitly instead of toggling after an async permission request.
-        isMicOn=targetOn;
-        track.enabled=targetOn;
-        setMicButton(targetOn);
-
-        await syncTracksToEveryPeer();
-        // A second replaceTrack after the sender has settled fixes slower Android browsers.
-        setTimeout(()=>syncTracksToEveryPeer(),180);
-        setTimeout(()=>syncTracksToEveryPeer(),700);
-
-        broadcastMyMicStatus();
-
-        if(targetOn){
+        // localStream may already exist because the camera was opened first.
+        // In that case the old code skipped startAudio() and the Mic button did nothing.
+        const liveAudio=localStream?.getAudioTracks?.().find(t=>t.readyState==='live');
+        if(!liveAudio) await startAudio();
+        if(!localStream || !localStream.getAudioTracks().some(t=>t.readyState==='live')) return;
+        isMicOn=!isMicOn;
+        localStream.getAudioTracks().forEach(t=>t.enabled=isMicOn);
+        setMicButton(isMicOn);
+        if(isMicOn){
+            if(!IS_MOBILE_BROWSER) startRecognition();
+            else stopRecognition();
             unlockRemoteAudio();
-            startTranscript();
-            startRecognition();
         }else{
             stopRecognition();
             const sp=document.getElementById('speaking-'+MY_USER_ID);
             if(sp) sp.style.display='none';
         }
-    }
-
-    async function ensureVideoTrack(enableNow=false){
-        if(!window.isSecureContext || !navigator.mediaDevices?.getUserMedia){
-            showToast('⚠️ Mic/Camera needs HTTPS and browser permission.');
-            return null;
-        }
-
-        removeDeadLocalTracks('video');
-        let track=liveLocalTrack('video');
-        if(!track){
-            try{
-                const s=await navigator.mediaDevices.getUserMedia({
-                    audio:false,
-                    video:{
-                        width:{ideal:1280},
-                        height:{ideal:720},
-                        frameRate:{ideal:24,max:30},
-                        facingMode:'user'
-                    }
-                });
-                track=s.getVideoTracks().find(t=>t.readyState==='live') || null;
-                if(!track) throw new Error('No live camera track returned');
-
-                if(!localStream) localStream=new MediaStream();
-                localStream.getVideoTracks().forEach(old=>{
-                    if(old!==track){
-                        try{ localStream.removeTrack(old); }catch(e){}
-                        try{ old.stop(); }catch(e){}
-                    }
-                });
-                localStream.addTrack(track);
-
-                track.onended=async ()=>{
-                    try{ localStream?.removeTrack(track); }catch(e){}
-                    if(!isCameraOn) return;
-                    isCameraOn=false;
-                    setCameraButton(false);
-                    await syncTracksToEveryPeer();
-                    broadcastMyCameraStatus();
-                };
-            }catch(err){
-                console.error('[SmartMeet] camera error',err);
-                if(err?.name==='NotAllowedError') showToast('📷 Allow camera permission in browser settings.');
-                else if(err?.name==='NotFoundError') showToast('📷 No camera found.');
-                else showToast('📷 Camera could not start.');
-                return null;
-            }
-        }
-        track.enabled=Boolean(enableNow);
-        return track;
-    }
-
-    function setCameraButton(on){
-        const btn=document.getElementById('ctrl-camera');
-        const localVideo=document.getElementById('localVideo');
-        const avatar=document.getElementById('avatar-'+MY_USER_ID);
-        if(btn){
-            btn.innerHTML=on?'<i class="fa fa-video"></i>':'<i class="fa fa-video-slash"></i>';
-            btn.classList.toggle('off',!on);
-            btn.classList.toggle('active',on);
-        }
-        if(localVideo) localVideo.style.display=on?'block':'none';
-        if(avatar) avatar.style.display=on?'none':'flex';
-    }
-
-    async function toggleCamera(){
-        const targetOn=!isCameraOn;
-        const track=await ensureVideoTrack(targetOn);
-        if(!track) return;
-
-        isCameraOn=targetOn;
-        track.enabled=targetOn;
-        setCameraButton(targetOn);
-
-        const localVideo=document.getElementById('localVideo');
-        if(localVideo && localStream){
-            localVideo.srcObject=localStream;
-            localVideo.muted=true;
-            localVideo.autoplay=true;
-            localVideo.playsInline=true;
-            localVideo.setAttribute('playsinline','');
-            if(targetOn) localVideo.play().catch(()=>{});
-        }
-
         await syncTracksToEveryPeer();
-        setTimeout(()=>syncTracksToEveryPeer(),180);
-        setTimeout(()=>syncTracksToEveryPeer(),700);
-        setTimeout(()=>syncTracksToEveryPeer(),1600);
+        broadcastMyMicStatus();
+        Object.keys(peers).forEach(uid=>attachRemoteStream(uid));
+        unlockRemoteAudio();
+    }
+    async function toggleCamera(){
+        // Camera is intentionally independent from microphone permission.
+        // Keep the same camera constraints/settings; only ensure a MediaStream exists.
+        if(!localStream) localStream=new MediaStream();
+        localStream.getVideoTracks().forEach(old=>{
+            if(old.readyState==='ended'){
+                try{ localStream.removeTrack(old); }catch(e){}
+            }
+        });
+        let videoTrack=getLiveLocalTrack('video');
+        if(!videoTrack){
+            try{
+                const camStream=await navigator.mediaDevices.getUserMedia({
+                    audio:false,
+                    video:{ width:{ideal:1280}, height:{ideal:720}, frameRate:{ideal:24,max:30}, facingMode:'user' }
+                });
+                videoTrack=camStream.getVideoTracks().find(t=>t.readyState==='live') || null;
+                if(!videoTrack) throw new Error('No live camera track returned');
+                localStream.addTrack(videoTrack);
+                videoTrack.onended=async ()=>{
+                    try{ localStream?.removeTrack(videoTrack); }catch(e){}
+                    if(isCameraOn){
+                        isCameraOn=false;
+                        const btn=document.getElementById('ctrl-camera');
+                        if(btn){
+                            btn.innerHTML='<i class="fa fa-video-slash"></i>';
+                            btn.classList.add('off');
+                            btn.classList.remove('active');
+                        }
+                        await syncTracksToEveryPeer();
+                        broadcastMyCameraStatus();
+                    }
+                };
+                const localVideo=document.getElementById('localVideo');
+                if(localVideo){ localVideo.srcObject=localStream; localVideo.play().catch(()=>{}); }
+            }catch(err){ console.error('camera error', err); showToast('📷 Camera could not start — check browser permissions.'); return; }
+        }
+        isCameraOn=!isCameraOn;
+        videoTrack.enabled=isCameraOn;
+        const btn=document.getElementById('ctrl-camera'); const localVideo=document.getElementById('localVideo'); const avatar=document.getElementById('avatar-'+MY_USER_ID);
+        if(btn){ btn.innerHTML = isCameraOn ? '<i class="fa fa-video"></i>' : '<i class="fa fa-video-slash"></i>'; btn.classList.toggle('off', !isCameraOn); btn.classList.toggle('active', isCameraOn); }
+        if(localVideo) localVideo.style.display = isCameraOn ? 'block' : 'none';
+        if(avatar) avatar.style.display = isCameraOn ? 'none' : 'flex';
+        await syncTracksToEveryPeer();
         broadcastMyCameraStatus();
+        if(isCameraOn){
+            // Re-sync after the camera track has had time to become live on slower phones.
+            setTimeout(()=>{ syncTracksToEveryPeer(); broadcastMyCameraStatus(); },250);
+            setTimeout(()=>{ syncTracksToEveryPeer(); broadcastMyCameraStatus(); },900);
+            setTimeout(()=>{ syncTracksToEveryPeer(); broadcastMyCameraStatus(); },1800);
+        }
     }
-
-    function broadcastMyMicStatus(){
-        sendSignal('all','mic-status',{userId:MY_USER_ID,muted:!isMicOn});
-    }
-    function broadcastMyCameraStatus(){
-        sendSignal('all','camera-status',{userId:MY_USER_ID,cameraOn:isCameraOn});
-    }
+    function broadcastMyMicStatus(){ sendSignal('all','mic-status',{ userId:MY_USER_ID, muted:!isMicOn }); }
+    function broadcastMyCameraStatus(){ sendSignal('all','camera-status',{ userId:MY_USER_ID, cameraOn:isCameraOn }); }
 
     /* ---------- Transcript (Web Speech API) ---------- */
     let recognition=null, recognitionRunning=false, recognitionStopping=false, recognitionRestartTimer=null;
@@ -1758,9 +1686,9 @@
         // Chrome Android can block Web Speech while WebRTC owns the microphone.
         // Keep meeting audio/video stable there; mobile still receives everyone else's
         // broadcast transcripts. Desktop Chrome/Edge can produce local captions.
+        if(IS_MOBILE_BROWSER) return;
         const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
         if(!SR){ showToast('⚠️ Live captions require Chrome or Edge.'); return; }
-        if(recognition) return;
         recognition=new SR();
         recognition.continuous=true; recognition.interimResults=true; recognition.maxAlternatives=1; recognition.lang='en-US';
         recognition.onstart=()=>{ recognitionRunning=true; const ind=document.getElementById('listening-indicator'); if(ind) ind.style.display='flex'; };
@@ -1796,6 +1724,7 @@
         recognitionRestartTimer=setTimeout(()=>{ recognitionRestartTimer=null; startRecognition(); }, delay);
     }
     function startRecognition(){
+        if(IS_MOBILE_BROWSER) return;
         if(!recognition || recognitionRunning || recognitionStopping || !isMicOn || document.visibilityState!=='visible') return;
         try{ recognition.start(); recognitionRunning=true; }catch(e){ recognitionRunning=false; }
     }
@@ -2046,7 +1975,6 @@
     document.addEventListener('pointerdown', unlockRemoteAudio, { passive:true });
     document.addEventListener('touchstart', unlockRemoteAudio, { passive:true });
     document.addEventListener('click', unlockRemoteAudio, { passive:true });
-    document.addEventListener('keydown', unlockRemoteAudio, { passive:true });
 
     /* ---------- Boot ---------- */
     window.addEventListener('load', async () => {
@@ -2097,7 +2025,7 @@
                     receivers:recv
                 });
             });
-        },30000);
+        },12000);
     });
 </script>
 </body>
