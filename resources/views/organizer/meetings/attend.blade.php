@@ -660,11 +660,12 @@
 
 <script>
     /* ============================================================
-       SMARTMEET — PARTICIPANT ROOM (clean single implementation)
+       SMARTMEET — ORGANIZER ROOM (clean single implementation)
        ============================================================ */
     const IS_ORGANIZER   = true;
     const MEETING_ID      = "{{ $meeting->id }}";
     const MY_USER_ID      = "{{ auth()->id() }}";
+    const ORGANIZER_ID    = String(MY_USER_ID);
     const MY_NAME         = @json(auth()->user()->name);
     const MY_INITIALS     = @json($userInitials);
     const SIGNAL_URL      = @json(route('organizer.meetings.signal', $meeting));
