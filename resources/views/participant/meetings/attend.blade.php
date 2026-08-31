@@ -1111,7 +1111,18 @@
         pc.onicecandidate = (e)=>{
             if(e.candidate) sendSignal(uid,'ice-candidate',{ candidate:e.candidate.toJSON() });
         };
+        pc.__iceErrLog={};
         pc.onicecandidateerror = (e)=>{
+            // Chrome can fire the SAME benign candidate-gathering error (e.g. 701
+            // "address not associated with the desired network interface", which
+            // just means one local network adapter — a VPN/virtual adapter etc. —
+            // couldn't be used, not that the whole connection failed) dozens of
+            // times per second on some machines. Log each distinct error once per
+            // 15s per peer instead of flooding the console.
+            const key=(e?.errorCode||'')+'|'+(e?.errorText||'');
+            const now=Date.now();
+            if((now-(pc.__iceErrLog[key]||0))<15000) return;
+            pc.__iceErrLog[key]=now;
             console.warn('[SmartMeet] ICE candidate error', uid, e?.errorCode||'', e?.errorText||'');
         };
 
@@ -2294,8 +2305,17 @@
         setupPanelResize();
         renderPeopleList();
 
-        if(ORGANIZER_JOINED){ addParticipantTile(ORGANIZER_ID, ORGANIZER_NAME, ORGANIZER_INITIALS, true); markOnline(ORGANIZER_ID); }
-        ALL_PARTICIPANTS.forEach(p=>{ if(p.hasJoined){ addParticipantTile(p.userId, p.name, p.initials, false); markOnline(p.userId); } });
+        // Same reasoning as above: don't trust a stale ORGANIZER_JOINED flag from
+        // the server. If the organizer is genuinely in the meeting, their browser
+        // announces itself via 'user-joined'/'presence-response' within ~1 second.
+        // Do NOT trust the server's stale "hasJoined" snapshot to show someone as
+        // online/joined — that flag can remain true in the database long after a
+        // person's browser tab is actually closed/disconnected, creating a
+        // permanent "ghost" tile that never gets real audio/video. Real presence
+        // is proven only by an actual signal: every genuinely-connected browser
+        // broadcasts 'user-joined' the moment it loads (see announceJoin() below),
+        // which registerJoinedUser() picks up and uses to create the tile + peer
+        // connection. That happens within ~1 second of load — no need to guess here.
         renderPeopleList();
         refreshEmptyStage();
 
