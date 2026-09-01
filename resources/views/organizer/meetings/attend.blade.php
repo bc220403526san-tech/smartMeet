@@ -1544,6 +1544,94 @@
         return a===b;
     }
 
+    // ---------- Clear/loud remote meeting audio ----------
+    // HTMLMediaElement.volume cannot go above 1. Web Audio gives quiet remote
+    // microphones a controlled boost while a compressor prevents clipping.
+    let meetingAudioContext=null;
+    const remoteAudioNodes={};
+
+    function getMeetingAudioContext(){
+        if(meetingAudioContext) return meetingAudioContext;
+        const AC=window.AudioContext || window.webkitAudioContext;
+        if(!AC) return null;
+        try{
+            meetingAudioContext=new AC({latencyHint:'interactive'});
+        }catch(e){
+            try{ meetingAudioContext=new AC(); }catch(_){ meetingAudioContext=null; }
+        }
+        return meetingAudioContext;
+    }
+
+    function disposeRemoteAudioBoost(uid){
+        const node=remoteAudioNodes[String(uid)];
+        if(!node) return;
+        try{ node.source.disconnect(); }catch(e){}
+        try{ node.compressor.disconnect(); }catch(e){}
+        try{ node.gain.disconnect(); }catch(e){}
+        delete remoteAudioNodes[String(uid)];
+    }
+
+    function attachBoostedRemoteAudio(uid, track, audioEl){
+        uid=String(uid);
+        if(!track || track.readyState==='ended' || !audioEl) return false;
+
+        const ctx=getMeetingAudioContext();
+        if(!ctx) return false;
+
+        const existing=remoteAudioNodes[uid];
+        if(existing?.trackId===track.id){
+            try{
+                existing.gain.gain.setTargetAtTime(1.65,ctx.currentTime,0.03);
+            }catch(e){}
+            audioEl.muted=true;
+            return true;
+        }
+
+        disposeRemoteAudioBoost(uid);
+
+        try{
+            const stream=new MediaStream([track]);
+            const source=ctx.createMediaStreamSource(stream);
+            const compressor=ctx.createDynamicsCompressor();
+            const gain=ctx.createGain();
+
+            // Lift quiet speech, then gently control peaks so voices stay clear.
+            compressor.threshold.value=-26;
+            compressor.knee.value=18;
+            compressor.ratio.value=3.5;
+            compressor.attack.value=0.003;
+            compressor.release.value=0.22;
+            gain.gain.value=1.65;
+
+            source.connect(compressor);
+            compressor.connect(gain);
+            gain.connect(ctx.destination);
+
+            remoteAudioNodes[uid]={source,compressor,gain,trackId:track.id,stream};
+
+            // Prevent double playback: Web Audio owns playback when active.
+            audioEl.muted=true;
+            audioEl.defaultMuted=true;
+
+            track.addEventListener('ended',()=>disposeRemoteAudioBoost(uid),{once:true});
+            return true;
+        }catch(e){
+            console.warn('[SmartMeet] audio boost unavailable for',uid,e);
+            disposeRemoteAudioBoost(uid);
+            audioEl.muted=false;
+            audioEl.defaultMuted=false;
+            audioEl.volume=1;
+            return false;
+        }
+    }
+
+    async function resumeMeetingAudioContext(){
+        const ctx=getMeetingAudioContext();
+        if(ctx && ctx.state==='suspended'){
+            try{ await ctx.resume(); }catch(e){}
+        }
+    }
+
     function attachRemoteStream(uid){
         uid=String(uid);
         const localIds=new Set((localStream?.getTracks?.()||[]).map(t=>t.id));
@@ -1629,27 +1717,48 @@
         if(!sameTrackSet(audio.srcObject,wantedAudio)){
             audio.srcObject=new MediaStream(wantedAudio);
         }
-        audio.muted=false;
-        audio.defaultMuted=false;
         audio.volume=1;
         audio.preload='auto';
 
         if(!audio.__smartMeetUnlockBound){
             audio.__smartMeetUnlockBound=true;
-            audio.addEventListener('canplay',()=>audio.play().catch(()=>armAudioUnlock()));
-            audio.addEventListener('loadedmetadata',()=>audio.play().catch(()=>armAudioUnlock()));
+            audio.addEventListener('canplay',()=>{
+                resumeMeetingAudioContext();
+                if(!audio.muted) audio.play().catch(()=>armAudioUnlock());
+            });
+            audio.addEventListener('loadedmetadata',()=>{
+                resumeMeetingAudioContext();
+                if(!audio.muted) audio.play().catch(()=>armAudioUnlock());
+            });
         }
+
         if(bestAudio){
             try{ if('contentHint' in bestAudio) bestAudio.contentHint='speech'; }catch(e){}
-            const tryPlay=()=>audio.play().catch(()=>armAudioUnlock());
-            tryPlay();
-            if(!audio.__smartMeetResumeBound){
-                audio.__smartMeetResumeBound=true;
-                audio.addEventListener('pause',()=>{
-                    const live=(audio.srcObject?.getAudioTracks?.()||[]).some(t=>t.readyState==='live');
-                    if(live && document.visibilityState==='visible') setTimeout(tryPlay,120);
-                });
+
+            const boosted=attachBoostedRemoteAudio(uid,bestAudio,audio);
+
+            if(boosted){
+                // The Web Audio graph provides louder, compressed playback.
+                resumeMeetingAudioContext().catch(()=>{});
+            }else{
+                // Safe fallback for browsers that do not expose Web Audio.
+                audio.muted=false;
+                audio.defaultMuted=false;
+                audio.volume=1;
+                const tryPlay=()=>audio.play().catch(()=>armAudioUnlock());
+                tryPlay();
+                if(!audio.__smartMeetResumeBound){
+                    audio.__smartMeetResumeBound=true;
+                    audio.addEventListener('pause',()=>{
+                        const live=(audio.srcObject?.getAudioTracks?.()||[]).some(t=>t.readyState==='live');
+                        if(live && document.visibilityState==='visible') setTimeout(tryPlay,120);
+                    });
+                }
             }
+        }else{
+            disposeRemoteAudioBoost(uid);
+            audio.muted=false;
+            audio.defaultMuted=false;
         }
 
         // -------- Remote video --------
@@ -1693,14 +1802,29 @@
 
     let audioUnlockArmed=false;
     async function unlockRemoteAudio(){
+        await resumeMeetingAudioContext();
+
         const seen=new Set();
         const audios=[...document.querySelectorAll('audio[id^="audio-"]')].filter(a=>{
             if(!a.id || seen.has(a.id)) return false;
             seen.add(a.id);
             return true;
         });
+
         await Promise.allSettled(audios.map(a=>{
-            a.muted=false; a.defaultMuted=false; a.volume=1;
+            const uid=String(a.id).replace(/^audio-/,'');
+            const boosted=Boolean(remoteAudioNodes[uid]);
+            a.volume=1;
+
+            if(boosted){
+                // Keep HTML audio muted to avoid hearing the same remote user twice.
+                a.muted=true;
+                a.defaultMuted=true;
+                return Promise.resolve();
+            }
+
+            a.muted=false;
+            a.defaultMuted=false;
             return a.play();
         }));
     }
@@ -2043,9 +2167,9 @@
 
             if(Array.isArray(params.encodings) && params.encodings.length){
                 params.encodings.forEach(enc=>{
-                    // 96 kbps mono Opus keeps speech clear while still leaving
-                    // enough room for unstable mobile/Wi-Fi connections.
-                    enc.maxBitrate=96000;
+                    // Give Opus enough headroom for clean speech on laptop/mobile.
+                    // Audio is still mono and small compared with video bandwidth.
+                    enc.maxBitrate=128000;
 
                     // These are supported by Chromium where available.
                     try{ enc.priority='high'; }catch(e){}
@@ -2628,6 +2752,9 @@
     function cleanup(){
         if(autoEndTimer){ clearTimeout(autoEndTimer); autoEndTimer=null; }
         Object.values(peers).forEach(pc=>{ try{ pc.close(); }catch(e){} });
+        Object.keys(remoteAudioNodes).forEach(disposeRemoteAudioBoost);
+        try{ meetingAudioContext?.close?.(); }catch(e){}
+        meetingAudioContext=null;
         localStream?.getTracks().forEach(t=>t.stop());
         stopRecognition();
     }
@@ -2829,5 +2956,3 @@
 </script>
 </body>
 </html>
-
-
