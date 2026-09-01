@@ -19,6 +19,15 @@ class MeetingController extends Controller
         // Keep Upcoming -> Active -> Completed synchronized from server time.
         $this->syncParticipantMeetingStatuses($userId);
 
+        /*
+         * Lightweight live-status endpoint using the EXISTING participant
+         * meetings index route. This avoids depending on a second route and
+         * mirrors the organizer dashboard's server-time synchronization.
+         */
+        if ($request->boolean('status_sync')) {
+            return $this->participantStatusSyncResponse($request, $userId, $today);
+        }
+
         $query = Meeting::with(['organizer', 'participants'])
             ->whereHas('participants', function ($q) use ($userId) {
                 $q->where('user_id', $userId);
@@ -223,6 +232,54 @@ class MeetingController extends Controller
         $meeting->load(['participants.user', 'organizer']);
 
         return view('participant.meetings.attend', compact('meeting', 'isOrganizer'));
+    }
+
+    /**
+     * Return only the state needed by the participant meetings dashboard.
+     * Called through the normal index route with ?status_sync=1, so no extra
+     * route is required for live Upcoming -> Active -> Completed transitions.
+     */
+    private function participantStatusSyncResponse(
+        Request $request,
+        int|string $userId,
+        string $today
+    ) {
+        $ids = array_values(array_filter(
+            explode(',', (string) $request->query('ids', ''))
+        ));
+
+        $meetings = Meeting::query()
+            ->whereHas('participants', function ($q) use ($userId) {
+                $q->where('user_id', $userId);
+            })
+            ->when(!empty($ids), fn ($q) => $q->whereIn('id', $ids))
+            ->get(['id', 'status']);
+
+        $participantMeetings = Meeting::whereHas(
+            'participants',
+            fn ($q) => $q->where('user_id', $userId)
+        );
+
+        return response()->json([
+            'meetings' => $meetings->keyBy('id')->map->status,
+            'stats' => [
+                'upcomingToday' => (clone $participantMeetings)
+                    ->whereDate('date', $today)
+                    ->where('status', 'upcoming')
+                    ->count(),
+                'total' => (clone $participantMeetings)->count(),
+                'completed' => (clone $participantMeetings)
+                    ->where('status', 'completed')
+                    ->count(),
+            ],
+            'server_now_ms' => now('UTC')->valueOf(),
+            'next_transition_ms' => $this
+                ->getNextParticipantMeetingTransition($userId)?->valueOf(),
+        ])->withHeaders([
+            'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+            'Pragma' => 'no-cache',
+            'Expires' => '0',
+        ]);
     }
 
     // ── STATUS CHECK ──

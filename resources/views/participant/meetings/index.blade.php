@@ -277,6 +277,11 @@
        Logic / polling / routes unchanged.
     ================================================================ */
 
+    /* Filter visibility must win over responsive display:grid !important rules. */
+    .participant-meetings-responsive .meeting-row.meeting-filter-hidden {
+        display: none !important;
+    }
+
     /* Prevent any horizontal page overflow */
     html, body {
         max-width: 100%;
@@ -699,7 +704,8 @@
         function applyMeetingFilter(status) {
             document.querySelectorAll('[data-meeting-id]').forEach(row => {
                 const current = String(row.dataset.currentStatus || '').toLowerCase();
-                row.style.display = (status === 'all' || current === status) ? '' : 'none';
+                const shouldHide = status !== 'all' && current !== status;
+                row.classList.toggle('meeting-filter-hidden', shouldHide);
             });
         }
 
@@ -832,14 +838,12 @@
             requestRunning = true;
 
             try {
-                const statusUrl = new URL(window.location.href);
-                statusUrl.search = '';
-                statusUrl.hash = '';
-                statusUrl.pathname = statusUrl.pathname.replace(/\/$/, '') + '/status-check';
-                statusUrl.searchParams.set('ids', meetingIds.join(','));
-                statusUrl.searchParams.set('_', Date.now().toString());
+                const syncUrl = new URL(@json(route('participant.meetings.index')), window.location.origin);
+                syncUrl.searchParams.set('status_sync', '1');
+                syncUrl.searchParams.set('ids', meetingIds.join(','));
+                syncUrl.searchParams.set('_', Date.now().toString());
 
-                const url = statusUrl.toString();
+                const url = syncUrl.toString();
 
                 const res = await fetch(url, {
                     method: 'GET',
