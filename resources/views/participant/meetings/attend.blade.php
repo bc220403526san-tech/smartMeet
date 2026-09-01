@@ -868,6 +868,15 @@
         renderPersonRow(uid);
     }
 
+    function markUserLeft(uid){
+        uid=String(uid);
+        leftUsers.add(uid);
+        onlineUsers.delete(uid);
+        if(knownParticipants[uid]) knownParticipants[uid].hasJoined=false;
+        updateOnlineCount();
+        renderPersonRow(uid);
+    }
+
     function renderPeopleList(){
         const body=document.getElementById('people-body'); if(!body) return;
         body.innerHTML='';
@@ -889,18 +898,20 @@
         const isMe = uid===String(MY_USER_ID);
         const info = isMe ? { name: MY_NAME, initials: MY_INITIALS, avatarUrl: MY_AVATAR_URL, isOrganizer: false } : knownParticipants[uid];
         if(!info) return;
-        const isOnline = isMe || onlineUsers.has(uid);
+        const isLeft = !isMe && leftUsers.has(uid);
+        const isOnline = !isLeft && (isMe || onlineUsers.has(uid));
         let row=document.getElementById('person-row-'+uid);
         if(!row){ row=document.createElement('div'); row.id='person-row-'+uid; body.appendChild(row); }
         row.className='person-row '+(isOnline?'joined':'pending');
         const color=colorFor(uid, info.isOrganizer);
+        const presenceLabel = isLeft ? 'Left' : (isOnline ? 'Joined' : 'Not joined yet');
         row.innerHTML = `
         <div class="person-avatar" style="background:linear-gradient(135deg,${color})">${avatarContent(info.avatarUrl,info.initials||initialsOf(info.name))}</div>
         <div class="person-info">
             <div class="person-name">${escapeHtml(info.name)}${isMe?' <span style="color:var(--blue);font-weight:600;">(You)</span>':''}${info.isOrganizer?'<i class="fa fa-crown" style="color:#fbbf24;font-size:10px;"></i>':''}</div>
-            <div class="person-status ${isOnline?'on':''}">${info.isOrganizer?'Organizer':'Participant'} • ${isOnline?'Joined':'Not joined yet'}</div>
+            <div class="person-status ${isOnline?'on':''}" ${isLeft?'style="color:#fca5a5"':''}>${info.isOrganizer?'Organizer':'Participant'} • ${presenceLabel}</div>
         </div>
-        <span class="person-dot ${isOnline?'on':''}"></span>`;
+        <span class="person-dot ${isOnline?'on':''}" ${isLeft?'style="background:#ef4444"':''}></span>`;
     }
 
     function renderMyOwnTile(){
@@ -1290,7 +1301,11 @@
         pc.__connectedOnce=false;
         pc.__audioTx=null;
         pc.__videoTx=null;
-        if(shouldInitiate(uid)) ensureOfferTransceivers(pc);
+        // Create stable sendrecv audio/video transceivers on BOTH peers.
+        // Only the deterministic initiator sends the first offer, but the answering
+        // browser already has a real audio sender slot. This prevents one-way audio
+        // where the answerer receives sound but its microphone never gets attached.
+        ensureOfferTransceivers(pc);
         syncLocalTracksToPeer(uid);
 
         // Only one side proactively initiates. The other side answers.
@@ -1347,7 +1362,11 @@
 
             const track=event.track;
             if(track){
-                if(track.kind==='audio') pc.__preferredRemoteAudioTrack=track;
+                if(track.kind==='audio'){
+                    pc.__preferredRemoteAudioTrack=track;
+                    scheduleRemoteAttach(uid,0);
+                    unlockRemoteAudio();
+                }
                 if(track.kind==='video') pc.__preferredRemoteVideoTrack=track;
 
                 if(track.kind==='video' && track.readyState==='live'){
@@ -1435,8 +1454,8 @@
                 unlockRemoteAudio();
                 sendSignal(uid,'mic-status',{userId:MY_USER_ID,muted:!isMicOn});
                 sendSignal(uid,'camera-status',{userId:MY_USER_ID,cameraOn:isCameraOn});
-                setTimeout(()=>ensureOutboundMediaNegotiated(uid),180);
-                setTimeout(()=>ensureOutboundMediaNegotiated(uid),850);
+                setTimeout(()=>ensureOutboundMediaNegotiated(uid),120);
+                setTimeout(()=>ensureOutboundMediaNegotiated(uid),900);
                 pc.__restartAttempts=0;
             }else if(pc.connectionState==='disconnected'){
                 clearTimeout(pc.__connectWatchdog);
@@ -1572,15 +1591,38 @@
         const pc=peers[uid];
         if(!pc || pc.signalingState==='closed' || leftUsers.has(uid)) return false;
 
+        // First attach the current local tracks. replaceTrack() does not need a new
+        // offer when the already-negotiated sendrecv m-line is healthy.
+        ensureOfferTransceivers(pc);
+        await syncLocalTracksToPeer(uid);
         bindPeerTransceivers(pc);
 
         const audioTrack=liveLocalTrack('audio');
         const videoTrack=liveLocalTrack('video');
         const audioDirection=String(pc.__audioTx?.currentDirection||'');
         const videoDirection=String(pc.__videoTx?.currentDirection||'');
+        const audioSenderTrack=pc.__audioTx?.sender?.track || null;
+        const videoSenderTrack=pc.__videoTx?.sender?.track || null;
 
-        const audioNeedsSend=Boolean(isMicOn && audioTrack && (!pc.__audioTx || !audioDirection.includes('send')));
-        const videoNeedsSend=Boolean(isCameraOn && videoTrack && (!pc.__videoTx || !videoDirection.includes('send')));
+        const audioNeedsSend=Boolean(
+            isMicOn &&
+            audioTrack &&
+            (
+                !pc.__audioTx ||
+                audioSenderTrack?.id!==audioTrack.id ||
+                !audioDirection.includes('send')
+            )
+        );
+
+        const videoNeedsSend=Boolean(
+            isCameraOn &&
+            videoTrack &&
+            (
+                !pc.__videoTx ||
+                videoSenderTrack?.id!==videoTrack.id ||
+                !videoDirection.includes('send')
+            )
+        );
 
         if(!audioNeedsSend && !videoNeedsSend) return true;
         if(makingOffer[uid] || pc.signalingState!=='stable') return false;
@@ -2105,6 +2147,11 @@
         if(data.type==='presence-response'){
             const uid=String(data.data?.userId || from);
             if(uid===String(MY_USER_ID)) return;
+
+            // Ignore stale presence packets that arrive after user-left.
+            // A real rejoin always emits a fresh user-joined event first.
+            if(leftUsers.has(uid)) return;
+
             registerJoinedUser(uid, data.data?.name, data.data?.initials, Boolean(data.data?.isOrganizer), data.data?.avatarUrl || null);
 
             // Update remote state directly. The previous helper calls were undefined
@@ -2150,12 +2197,28 @@
 
         if(data.type==='user-left'){
             if(isSelf) return;
-            leftUsers.add(from);
+
+            // Remove from the video stage immediately, but keep the People row
+            // visible with an explicit LEFT status.
+            markUserLeft(from);
             removeParticipantTile(from, true);
-            if(peers[from]){ peers[from].close(); delete peers[from]; }
+
+            if(peers[from]){
+                try{
+                    clearTimeout(peers[from].__connectWatchdog);
+                    clearTimeout(peers[from].__disconnectTimer);
+                    clearTimeout(peers[from].__restartTimer);
+                    clearTimeout(peers[from].__dtlsWatchdog);
+                    clearTimeout(peers[from].__attachTimer);
+                }catch(e){}
+                try{ peers[from].close(); }catch(e){}
+                delete peers[from];
+            }
+
             delete pendingCandidates[from];
             delete remoteStreams[from];
             document.getElementById('audio-'+from)?.remove();
+            renderPersonRow(from);
             return;
         }
         if(data.type==='chat'){
@@ -2404,7 +2467,13 @@
             // One sender update is enough. Avoid repeated replaceTrack/renegotiation
             // bursts that can freeze Chromium on multi-peer rooms.
             await syncTracksToEveryPeer();
-            ensureOutboundMediaForAll();
+
+            // Verify every peer really owns the live microphone track. This is a
+            // one-shot repair, not a repeating loop.
+            await Promise.allSettled(
+                Object.keys(peers).map(uid=>ensureOutboundMediaNegotiated(uid))
+            );
+
             broadcastMyMicStatus();
             unlockRemoteMedia();
             startTranscript();

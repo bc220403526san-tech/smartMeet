@@ -1,23 +1,21 @@
 @props(['meeting' => null])
-{{-- $meeting prop is optional — modal is fully generic, meetingId is passed via JS --}}
 
-{{-- ============================================================
-     SHARED EMAIL MODAL
-     Used by both show.blade.php and meeting-setting.blade.php.
-     To trigger from any button, call:
-     openEmailModal({{ $meeting->id }}, '{{ addslashes($meeting->title) }}')
-============================================================ --}}
-<div id="emailModal" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-    <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
+<div id="emailModal"
+     class="hidden fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+     role="dialog"
+     aria-modal="true"
+     aria-labelledby="email-modal-title">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl">
         <div class="flex justify-between items-center mb-3">
-            <h3 class="font-semibold text-gray-800">Send Email</h3>
-            <button type="button" onclick="closeEmailModal()" class="text-gray-400 hover:text-gray-600">
+            <h3 id="email-modal-title" class="font-semibold text-gray-800">Send Email</h3>
+            <button type="button" onclick="closeEmailModal()"
+                    class="text-gray-400 hover:text-gray-600" aria-label="Close">
                 <i class="fa-solid fa-xmark"></i>
             </button>
         </div>
+
         <p class="text-xs text-gray-500 mb-3">
-            Send email invitation for <strong id="email-meeting-title"></strong> —
-            new emails will be auto-invited, existing participants will receive an update.
+            Send email invitation for <strong id="email-meeting-title"></strong>.
         </p>
 
         <form id="email-form" onsubmit="sendEmail(event)">
@@ -28,14 +26,13 @@
                 <textarea id="email-emails-input" rows="2"
                           class="h-20 w-full border border-gray-200 rounded-lg p-2 text-sm"
                           placeholder="email1@example.com, email2@example.com"></textarea>
-                <p class="text-[11px] text-gray-400 mt-1">Separate emails with commas. Existing participants will be auto-filled.</p>
+                <p class="text-[11px] text-gray-400 mt-1">Separate emails with commas.</p>
             </div>
 
             <div class="mb-3">
                 <label class="block text-xs font-medium text-gray-600 mb-1">Subject</label>
                 <input type="text" id="email-subject"
-                       class="w-full border border-gray-200 rounded-lg p-2 text-sm"
-                       placeholder="You're invited: meeting title">
+                       class="w-full border border-gray-200 rounded-lg p-2 text-sm">
             </div>
 
             <div class="mb-3">
@@ -52,10 +49,11 @@
                         class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg transition">
                     Cancel
                 </button>
-                <button type="submit"
-                        class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition flex items-center gap-2">
+
+                <button type="submit" id="email-send-btn"
+                        class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm rounded-lg transition flex items-center gap-2">
                     <i class="fa-regular fa-envelope"></i>
-                    Send
+                    <span>Send</span>
                 </button>
             </div>
         </form>
@@ -63,68 +61,122 @@
 </div>
 
 <script>
-    // ============================================================
-    // SHARED EMAIL MODAL LOGIC — Single place for both pages
-    // ============================================================
-    function openEmailModal(meetingId, meetingTitle, participantEmails = '') {
-        document.getElementById('email-meeting-id').value = meetingId;
-        document.getElementById('email-meeting-title').textContent = meetingTitle;
-        document.getElementById('email-subject').value = `You're invited: ${meetingTitle}`;
-        document.getElementById('email-message').value = '';
-        document.getElementById('email-emails-input').value = participantEmails;
-        document.getElementById('email-msg').classList.add('hidden');
-        document.getElementById('emailModal').classList.remove('hidden');
-    }
+    (() => {
+        let emailInviteSending = false;
 
-    function closeEmailModal() {
-        document.getElementById('emailModal').classList.add('hidden');
-        document.getElementById('email-form').reset();
-        document.getElementById('email-msg').classList.add('hidden');
-    }
+        function setEmailMessage(message = '', type = '') {
+            const box = document.getElementById('email-msg');
+            if (!box) return;
 
-    function sendEmail(event) {
-        event.preventDefault();
+            box.textContent = message;
+            box.className = 'text-xs mb-3';
 
-        const meetingId = document.getElementById('email-meeting-id').value;
-        const emails = document.getElementById('email-emails-input').value.trim();
-        const subject = document.getElementById('email-subject').value.trim();
-        const message = document.getElementById('email-message').value.trim();
-        const msgBox = document.getElementById('email-msg');
+            if (!message) {
+                box.classList.add('hidden');
+                return;
+            }
 
-        if (!emails) {
-            msgBox.textContent = 'At least one email is required.';
-            msgBox.className = 'text-xs mb-3 text-red-600';
-            msgBox.classList.remove('hidden');
-            return;
+            if (type === 'success') box.classList.add('text-green-600');
+            else if (type === 'info') box.classList.add('text-blue-600');
+            else box.classList.add('text-red-600');
         }
 
-        const tokenTag = document.querySelector('meta[name="csrf-token"]');
-        if (!tokenTag) {
-            msgBox.textContent = 'CSRF token missing from page head.';
-            msgBox.className = 'text-xs mb-3 text-red-600';
-            msgBox.classList.remove('hidden');
-            return;
-        }
+        window.openEmailModal = function(meetingId, meetingTitle, participantEmails = '') {
+            if (emailInviteSending) return;
 
-        fetch(`/organizer/meetings/${meetingId}/send-invite`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': tokenTag.content
-            },
-            body: JSON.stringify({ emails, subject, message })
-        })
-            .then(res => res.json())
-            .then(data => {
-                msgBox.textContent = data.message || 'Sent successfully!';
-                msgBox.className = 'text-xs mb-3 text-green-600';
-                msgBox.classList.remove('hidden');
-                setTimeout(closeEmailModal, 1500);
-            })
-            .catch(() => {
-                msgBox.textContent = 'Failed to send. Please try again.';
-                msgBox.className = 'text-xs mb-3 text-red-600';
-                msgBox.classList.remove('hidden');
-            });
-    }
+            document.getElementById('email-meeting-id').value = meetingId;
+            document.getElementById('email-meeting-title').textContent = meetingTitle;
+            document.getElementById('email-subject').value = `You're invited: ${meetingTitle}`;
+            document.getElementById('email-message').value = '';
+            document.getElementById('email-emails-input').value = participantEmails || '';
+            setEmailMessage('');
+            document.getElementById('emailModal').classList.remove('hidden');
+            setTimeout(() => document.getElementById('email-emails-input')?.focus(), 30);
+        };
+
+        window.closeEmailModal = function() {
+            if (emailInviteSending) return;
+            document.getElementById('emailModal').classList.add('hidden');
+            document.getElementById('email-form').reset();
+            setEmailMessage('');
+        };
+
+        window.sendEmail = async function(event) {
+            event.preventDefault();
+            if (emailInviteSending) return;
+
+            const meetingId = document.getElementById('email-meeting-id').value;
+            const emails = document.getElementById('email-emails-input').value.trim();
+            const subject = document.getElementById('email-subject').value.trim();
+            const message = document.getElementById('email-message').value.trim();
+            const sendBtn = document.getElementById('email-send-btn');
+            const tokenTag = document.querySelector('meta[name="csrf-token"]');
+
+            if (!emails) {
+                setEmailMessage('At least one email is required.', 'error');
+                return;
+            }
+
+            if (!tokenTag) {
+                setEmailMessage('CSRF token missing from page head.', 'error');
+                return;
+            }
+
+            emailInviteSending = true;
+
+            if (sendBtn) {
+                sendBtn.disabled = true;
+                sendBtn.dataset.originalHtml = sendBtn.innerHTML;
+                sendBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Sending...</span>';
+            }
+
+            // Immediate visual feedback. Real success is shown only after Laravel confirms it.
+            setEmailMessage('Sending invitation…', 'info');
+
+            try {
+                const response = await fetch(`/organizer/meetings/${encodeURIComponent(meetingId)}/send-invite`, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': tokenTag.content
+                    },
+                    body: JSON.stringify({ emails, subject, message })
+                });
+
+                let data = {};
+                try { data = await response.json(); } catch (_) {}
+
+                if (!response.ok) {
+                    throw new Error(data.message || `Failed to send invitation (HTTP ${response.status}).`);
+                }
+
+                setEmailMessage(data.message || 'Invitation sent successfully!', 'success');
+
+                setTimeout(() => {
+                    emailInviteSending = false;
+                    if (sendBtn) {
+                        sendBtn.disabled = false;
+                        sendBtn.innerHTML = sendBtn.dataset.originalHtml || '<i class="fa-regular fa-envelope"></i><span>Send</span>';
+                    }
+                    window.closeEmailModal();
+                }, 900);
+
+                return;
+            } catch (error) {
+                console.error('[SmartMeet] email invitation failed', error);
+                setEmailMessage(error?.message || 'Failed to send. Please try again.', 'error');
+            } finally {
+                if (emailInviteSending) {
+                    emailInviteSending = false;
+                    if (sendBtn) {
+                        sendBtn.disabled = false;
+                        sendBtn.innerHTML = sendBtn.dataset.originalHtml || '<i class="fa-regular fa-envelope"></i><span>Send</span>';
+                    }
+                }
+            }
+        };
+    })();
 </script>
