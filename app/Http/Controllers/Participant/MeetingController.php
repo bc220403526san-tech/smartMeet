@@ -9,17 +9,45 @@ use Illuminate\Http\Request;
 
 class MeetingController extends Controller
 {
+    // ── INDEX ──
     public function index(Request $request)
     {
         $userId = auth()->id();
         $timezone = config('app.timezone', 'Asia/Karachi');
-        $today = Carbon::now($timezone)->toDateString();
+        $now = Carbon::now($timezone);
+        $today = $now->toDateString();
+
+        /*
+        |--------------------------------------------------------------------------
+        | IMPORTANT:
+        | If scheduled meeting time has arrived, change only
+        | UPCOMING -> ACTIVE automatically.
+        |--------------------------------------------------------------------------
+        */
+        $participantUpcomingMeetings = Meeting::whereHas('participants', function ($q) use ($userId) {
+            $q->where('user_id', $userId);
+        })
+            ->where('status', 'upcoming')
+            ->get();
+
+        foreach ($participantUpcomingMeetings as $meeting) {
+            $startTime = Carbon::parse(
+                $meeting->date . ' ' . $meeting->time,
+                $timezone
+            );
+
+            if ($now->greaterThanOrEqualTo($startTime)) {
+                $meeting->status = 'active';
+                $meeting->save();
+            }
+        }
 
         $query = Meeting::with(['organizer', 'participants'])
             ->whereHas('participants', function ($q) use ($userId) {
                 $q->where('user_id', $userId);
             });
 
+        // Optional dashboard filters.
         switch ($request->query('filter')) {
             case 'today':
                 $query->whereDate('date', $today);
@@ -38,6 +66,7 @@ class MeetingController extends Controller
                 break;
         }
 
+        // Active first, then upcoming, then history.
         $meetings = $query
             ->orderByRaw("CASE status
                 WHEN 'active' THEN 1
@@ -75,11 +104,37 @@ class MeetingController extends Controller
         ));
     }
 
+    // ── TODAY ──
     public function today()
     {
         $userId = auth()->id();
         $timezone = config('app.timezone', 'Asia/Karachi');
-        $today = Carbon::now($timezone)->toDateString();
+        $now = Carbon::now($timezone);
+        $today = $now->toDateString();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Same automatic UPCOMING -> ACTIVE sync for Today page
+        |--------------------------------------------------------------------------
+        */
+        $participantUpcomingMeetings = Meeting::whereHas('participants', function ($q) use ($userId) {
+            $q->where('user_id', $userId);
+        })
+            ->whereDate('date', $today)
+            ->where('status', 'upcoming')
+            ->get();
+
+        foreach ($participantUpcomingMeetings as $meeting) {
+            $startTime = Carbon::parse(
+                $meeting->date . ' ' . $meeting->time,
+                $timezone
+            );
+
+            if ($now->greaterThanOrEqualTo($startTime)) {
+                $meeting->status = 'active';
+                $meeting->save();
+            }
+        }
 
         $todayMeetings = Meeting::with(['organizer', 'participants.user'])
             ->whereHas('participants', function ($q) use ($userId) {
@@ -147,6 +202,7 @@ class MeetingController extends Controller
         return view('participant.meetings.today', compact('todayMeetings'));
     }
 
+    // ── SHOW ──
     public function show(Meeting $meeting)
     {
         $isParticipant = $meeting->participants()
@@ -157,15 +213,35 @@ class MeetingController extends Controller
             abort(403, 'You are not invited to this meeting.');
         }
 
+        $timezone = config('app.timezone', 'Asia/Karachi');
+        $now = Carbon::now($timezone);
+
+        /*
+        |--------------------------------------------------------------------------
+        | If time arrived while opening details, activate it too.
+        |--------------------------------------------------------------------------
+        */
+        if ($meeting->status === 'upcoming') {
+            $startTimeCheck = Carbon::parse(
+                $meeting->date . ' ' . $meeting->time,
+                $timezone
+            );
+
+            if ($now->greaterThanOrEqualTo($startTimeCheck)) {
+                $meeting->status = 'active';
+                $meeting->save();
+            }
+        }
+
         $meeting->load(['organizer', 'participants.user']);
 
-        $timezone = config('app.timezone', 'Asia/Karachi');
         $startTime = Carbon::parse($meeting->date . ' ' . $meeting->time, $timezone);
         $endTime = $startTime->copy()->addMinutes((int) $meeting->duration);
 
         return view('participant.meetings.show', compact('meeting', 'startTime', 'endTime'));
     }
 
+    // ── ATTEND ──
     public function attend(Meeting $meeting)
     {
         $isParticipant = $meeting->participants()
@@ -176,10 +252,32 @@ class MeetingController extends Controller
             abort(403, 'You are not invited to this meeting.');
         }
 
+        $timezone = config('app.timezone', 'Asia/Karachi');
+        $now = Carbon::now($timezone);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Safety check:
+        | If scheduled time has arrived but DB still says upcoming,
+        | activate before checking access.
+        |--------------------------------------------------------------------------
+        */
+        if ($meeting->status === 'upcoming') {
+            $startTime = Carbon::parse(
+                $meeting->date . ' ' . $meeting->time,
+                $timezone
+            );
+
+            if ($now->greaterThanOrEqualTo($startTime)) {
+                $meeting->status = 'active';
+                $meeting->save();
+            }
+        }
+
         if ($meeting->status !== 'active') {
             return redirect()
                 ->route('participant.meetings.index')
-                ->with('info', "This meeting isn't active right now. You'll be able to join once the organizer starts it.");
+                ->with('info', "This meeting isn't active right now. You'll be able to join when its scheduled time arrives.");
         }
 
         $isOrganizer = false;
@@ -188,6 +286,7 @@ class MeetingController extends Controller
         return view('participant.meetings.attend', compact('meeting', 'isOrganizer'));
     }
 
+    // ── STATUS CHECK ──
     public function statusCheck(Request $request)
     {
         $userId = auth()->id();
@@ -195,42 +294,40 @@ class MeetingController extends Controller
         $now = Carbon::now($timezone);
         $today = $now->toDateString();
 
-        $ids = array_filter(explode(',', (string) $request->query('ids', '')));
+        $ids = array_values(array_filter(
+            explode(',', (string) $request->query('ids', ''))
+        ));
 
-        $meetingsToCheck = Meeting::whereIn('id', $ids)
-            ->whereHas('participants', function ($q) use ($userId) {
-                $q->where('user_id', $userId);
-            })
-            ->get();
+        /*
+        |--------------------------------------------------------------------------
+        | LIVE AUTO STATUS
+        |
+        | This endpoint is called repeatedly by the participant Blade.
+        | As soon as scheduled time arrives:
+        |
+        | UPCOMING -> ACTIVE
+        |
+        | Nothing else is auto-changed here.
+        |--------------------------------------------------------------------------
+        */
+        if (!empty($ids)) {
+            $meetingsToCheck = Meeting::whereIn('id', $ids)
+                ->whereHas('participants', function ($q) use ($userId) {
+                    $q->where('user_id', $userId);
+                })
+                ->where('status', 'upcoming')
+                ->get();
 
-        foreach ($meetingsToCheck as $meeting) {
-            if (in_array($meeting->status, ['cancelled', 'flagged'], true)) {
-                continue;
-            }
+            foreach ($meetingsToCheck as $meeting) {
+                $startTime = Carbon::parse(
+                    $meeting->date . ' ' . $meeting->time,
+                    $timezone
+                );
 
-            $startTime = Carbon::parse(
-                $meeting->date . ' ' . $meeting->time,
-                $timezone
-            );
-
-            $endTime = $startTime->copy()
-                ->addMinutes((int) $meeting->duration);
-
-            if (
-                $meeting->status === 'upcoming' &&
-                $now->greaterThanOrEqualTo($startTime) &&
-                $now->lessThan($endTime)
-            ) {
-                $meeting->status = 'active';
-                $meeting->save();
-            }
-
-            if (
-                in_array($meeting->status, ['upcoming', 'active'], true) &&
-                $now->greaterThanOrEqualTo($endTime)
-            ) {
-                $meeting->status = 'completed';
-                $meeting->save();
+                if ($now->greaterThanOrEqualTo($startTime)) {
+                    $meeting->status = 'active';
+                    $meeting->save();
+                }
             }
         }
 
@@ -252,7 +349,9 @@ class MeetingController extends Controller
                     ->whereDate('date', $today)
                     ->where('status', 'upcoming')
                     ->count(),
+
                 'total' => (clone $participantMeetings)->count(),
+
                 'completed' => (clone $participantMeetings)
                     ->where('status', 'completed')
                     ->count(),
