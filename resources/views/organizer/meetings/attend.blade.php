@@ -992,24 +992,30 @@
     const TURN_HOST = @json(config('services.turn.host'));
     const TURN_USERNAME = @json(config('services.turn.username'));
     const TURN_CREDENTIAL = @json(config('services.turn.credential'));
-    const iceServers = [{ urls: ['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302'] }];
-    if(TURN_HOST && TURN_USERNAME && TURN_CREDENTIAL){
+    const HAS_TURN = Boolean(TURN_HOST && TURN_USERNAME && TURN_CREDENTIAL);
+    const iceServers = [];
+    if(HAS_TURN){
+        // The TURN relay has been externally verified. Use it as the single
+        // media path so every peer gets the same NAT-safe behaviour.
         iceServers.push({
             urls:[
                 `turn:${TURN_HOST}:3478?transport=udp`,
                 `turn:${TURN_HOST}:3478?transport=tcp`
             ],
-            username:TURN_USERNAME, credential:TURN_CREDENTIAL
+            username:TURN_USERNAME,
+            credential:TURN_CREDENTIAL
         });
     } else {
-        console.warn('[SmartMeet] Custom TURN is not configured.');
+        // Safe fallback only when TURN is genuinely unavailable.
+        iceServers.push({ urls:['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302'] });
+        console.warn('[SmartMeet] Custom TURN is not configured; using STUN fallback.');
     }
     const iceConfig = {
         iceServers,
         iceCandidatePoolSize:0,
         bundlePolicy:'max-bundle',
         rtcpMuxPolicy:'require',
-        iceTransportPolicy:'all'
+        iceTransportPolicy:HAS_TURN ? 'relay' : 'all'
     };
     console.log('[SmartMeet] ICE servers configured:', iceServers.map(s=>s.urls));
 
@@ -1025,6 +1031,39 @@
         const a=Number(MY_USER_ID), b=Number(uid);
         if(!Number.isNaN(a) && !Number.isNaN(b)) return a<b;
         return String(MY_USER_ID)<String(uid);
+    }
+
+    function waitForIceGatheringComplete(pc, timeoutMs=5000){
+        if(!pc || pc.signalingState==='closed' || pc.iceGatheringState==='complete') return Promise.resolve();
+        return new Promise(resolve=>{
+            let done=false;
+            const finish=()=>{
+                if(done) return;
+                done=true;
+                clearTimeout(timer);
+                try{ pc.removeEventListener('icegatheringstatechange', onState); }catch(e){}
+                resolve();
+            };
+            const onState=()=>{ if(pc.iceGatheringState==='complete') finish(); };
+            const timer=setTimeout(finish,timeoutMs);
+            pc.addEventListener('icegatheringstatechange',onState);
+        });
+    }
+
+    async function resendPendingOffer(uid){
+        uid=String(uid);
+        const pc=peers[uid];
+        if(!pc || pc.signalingState==='closed' || leftUsers.has(uid)) return false;
+        if(pc.signalingState!=='have-local-offer' || pc.localDescription?.type!=='offer') return false;
+        await waitForIceGatheringComplete(pc);
+        if(!pc.localDescription?.sdp) return false;
+        pc.__lastOfferAt=Date.now();
+        console.log('[SmartMeet] re-sending pending offer ->',uid);
+        return sendSignal(uid,'offer',{
+            type:'offer',
+            sdp:btoa(unescape(encodeURIComponent(pc.localDescription.sdp))),
+            resend:true
+        });
     }
 
     async function negotiatePeer(uid, iceRestart=false){
@@ -1043,6 +1082,10 @@
             const offer=await pc.createOffer(iceRestart ? {iceRestart:true} : undefined);
             if(pc.signalingState!=='stable') return false;
             await pc.setLocalDescription(offer);
+            // Send SDP only after relay gathering has completed (or timed out).
+            // This embeds TURN candidates in the SDP, so media does not depend
+            // on every individual trickle-candidate POST arriving in order.
+            await waitForIceGatheringComplete(pc);
             pc.__lastOfferAt=Date.now();
             console.log('[SmartMeet] sending offer ->', uid, iceRestart?'(ICE restart)':'');
             return await sendSignal(uid,'offer',{
@@ -1070,8 +1113,10 @@
                     ice:pc.iceConnectionState,
                     connection:pc.connectionState
                 });
-                if(shouldInitiate(uid)) restartPeer(uid);
-                else{
+                if(shouldInitiate(uid)){
+                    if(pc.signalingState==='have-local-offer') resendPendingOffer(uid);
+                    else restartPeer(uid);
+                }else{
                     sendSignal(uid,'reconnect-request',{reason:'ice-failed'});
                     requestPresence(true);
                 }
@@ -1128,16 +1173,15 @@
         };
 
         pc.onicecandidate = (e)=>{
-            if(e.candidate) sendSignal(uid,'ice-candidate',{ candidate:e.candidate.toJSON() });
+            // We use complete-SDP (non-trickle) signaling. Candidates are
+            // embedded in localDescription after ICE gathering completes.
+            if(e.candidate?.type==='relay') console.log('[SmartMeet] relay candidate ready ->',uid);
         };
         pc.onicecandidateerror = (e)=>{
-            // A 701 can be emitted for an unusable STUN/DNS path even when a
-            // working TURN relay candidate is available. It is not fatal and
-            // should not trigger recovery or flood the console.
-            if(Number(e?.errorCode)===701){
-                console.debug('[SmartMeet] ignored non-fatal ICE path error', uid, e?.errorText||'');
-                return;
-            }
+            // Chromium may report 701 for one local network interface even when
+            // another interface successfully gathers a TURN relay candidate.
+            // It is non-fatal and must not trigger a reconnect loop.
+            if(Number(e?.errorCode)===701) return;
             console.warn('[SmartMeet] ICE candidate error', uid, e?.errorCode||'', e?.errorText||'');
         };
 
@@ -1209,8 +1253,10 @@
                 clearTimeout(pc.__disconnectTimer);
                 pc.__disconnectTimer=setTimeout(()=>{
                     if(pc.connectionState==='disconnected'){
-                        if(shouldInitiate(uid)) restartPeer(uid);
-                        else{
+                        if(shouldInitiate(uid)){
+                            if(pc.signalingState==='have-local-offer') resendPendingOffer(uid);
+                            else restartPeer(uid);
+                        }else{
                             sendSignal(uid,'reconnect-request',{reason:'disconnected'});
                             requestPresence(true);
                         }
@@ -1218,8 +1264,10 @@
                 },8000);
             }else if(pc.connectionState==='failed'){
                 clearTimeout(pc.__connectWatchdog);
-                if(shouldInitiate(uid)) restartPeer(uid);
-                else requestPresence(true);
+                if(shouldInitiate(uid)){
+                    if(pc.signalingState==='have-local-offer') resendPendingOffer(uid);
+                    else restartPeer(uid);
+                }else requestPresence(true);
             }else if(pc.connectionState==='closed'){
                 clearTimeout(pc.__connectWatchdog);
             }
@@ -1240,6 +1288,14 @@
         if(leftUsers.has(uid) || uid===String(MY_USER_ID)) return;
         const pc=peers[uid];
         if(!pc || pc.signalingState==='closed') return;
+        // If the first offer was posted before the remote Reverb subscription
+        // became live, do not try to create a second offer while signaling is
+        // have-local-offer. Re-send the already valid full SDP instead.
+        if(pc.signalingState==='have-local-offer'){
+            await resendPendingOffer(uid);
+            return;
+        }
+        if(pc.signalingState!=='stable') return;
 
         // Backoff + cap: without this, a persistently broken relay path (e.g. bad
         // TURN credentials) causes an endless offer/answer loop that hammers the
@@ -1483,6 +1539,8 @@
             if(pendingCandidates[from]?.length){ for(const c of pendingCandidates[from]) await pc.addIceCandidate(c).catch(()=>{}); delete pendingCandidates[from]; }
             const answer=await pc.createAnswer();
             await pc.setLocalDescription(answer);
+            // Include gathered TURN relay candidates in the answer SDP as well.
+            await waitForIceGatheringComplete(pc);
             // Mobile Chrome may expose the remote-created transceiver sender only
             // after the answer is applied. Sync once more so our mic/camera are
             // definitely attached to this participant-to-participant connection.
@@ -1597,7 +1655,10 @@
                 console.error('[SmartMeet] Reverb channel error', err);
                 finish(false);
             });
-            setTimeout(()=>finish(true), 1200);
+            // Do not start offer/presence traffic before the realtime channel
+            // has had a realistic chance to subscribe. The old 1.2s optimistic
+            // success could make the first offer invisible to the other browser.
+            setTimeout(()=>finish(false), 7000);
         });
     }
 
