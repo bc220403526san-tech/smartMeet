@@ -1038,6 +1038,8 @@
         setTimeout(()=>el.remove(),3600);
     }
 
+    installAudioPlaybackUnlock();
+
     if(document.readyState==='loading'){
         document.addEventListener('DOMContentLoaded', initRoomInviteUI, {once:true});
     }else{
@@ -1475,12 +1477,16 @@
                 let n=0;
                 const currentDirection=String(tx.currentDirection||'');
                 const desiredDirection=String(tx.direction||'');
-                if(tx.mid!==null && tx.mid!==undefined) n+=20;
-                if(currentDirection.includes('send')) n+=100;
-                if(currentDirection.includes('recv')) n+=20;
-                if(tx.sender?.track?.readyState==='live') n+=80;
-                if(desiredDirection==='sendrecv') n+=30;
-                if(tx===current) n+=5;
+
+                // A negotiated MID is the strongest signal that this is the real
+                // remote m-line, not an old/unassociated transceiver.
+                if(tx.mid!==null && tx.mid!==undefined) n+=300;
+                if(currentDirection.includes('send')) n+=140;
+                if(currentDirection.includes('recv')) n+=80;
+                if(tx.sender?.track?.readyState==='live') n+=120;
+                if(tx.receiver?.track?.readyState==='live') n+=40;
+                if(desiredDirection==='sendrecv') n+=25;
+                if(tx===current) n+=10;
                 return n;
             };
 
@@ -1518,11 +1524,11 @@
         pc.__connectedOnce=false;
         pc.__audioTx=null;
         pc.__videoTx=null;
-        // Create stable sendrecv audio/video transceivers on BOTH peers.
-        // Only the deterministic initiator sends the first offer, but the answering
-        // browser already has a real audio sender slot. This prevents one-way audio
-        // where the answerer receives sound but its microphone never gets attached.
-        ensureOfferTransceivers(pc);
+        // Only the deterministic initiator creates the initial media m-lines.
+        // The answering browser receives matching transceivers from setRemoteDescription().
+        // Pre-creating them on both sides can produce duplicate/unassociated m-lines on
+        // some Chromium builds and is a common cause of one-way audio.
+        if(shouldInitiate(uid)) ensureOfferTransceivers(pc);
         syncLocalTracksToPeer(uid);
 
         // Only one side proactively initiates. The other side answers.
@@ -1672,7 +1678,7 @@
                 sendSignal(uid,'mic-status',{userId:MY_USER_ID,muted:!isMicOn});
                 sendSignal(uid,'camera-status',{userId:MY_USER_ID,cameraOn:isCameraOn});
                 setTimeout(()=>ensureOutboundMediaNegotiated(uid),120);
-                setTimeout(()=>ensureOutboundMediaNegotiated(uid),900);
+                if(isMicOn) setTimeout(()=>verifyPeerAudioOutbound(uid),700);
                 pc.__restartAttempts=0;
             }else if(pc.connectionState==='disconnected'){
                 clearTimeout(pc.__connectWatchdog);
@@ -1770,16 +1776,24 @@
 
         const audioTrack=liveLocalTrack('audio');
         const videoTrack=liveLocalTrack('video');
+
         if(audioTrack){
-            optimizeVoiceTrack(audioTrack);
+            await optimizeVoiceTrack(audioTrack);
+            audioTrack.enabled=Boolean(isMicOn);
         }
         try{ if(videoTrack && 'contentHint' in videoTrack) videoTrack.contentHint='motion'; }catch(e){}
 
         try{
+            // On the answering side the transceiver may appear only after the
+            // remote offer/answer is applied, so bind again immediately before sync.
+            bindPeerTransceivers(pc);
+
             if(pc.__audioTx?.sender){
-                if(pc.__audioTx.sender.track!==audioTrack) await pc.__audioTx.sender.replaceTrack(audioTrack);
+                if(pc.__audioTx.sender.track!==audioTrack){
+                    await pc.__audioTx.sender.replaceTrack(audioTrack || null);
+                }
                 if(audioTrack) audioTrack.enabled=Boolean(isMicOn);
-                if(audioTrack) optimizeAudioSender(pc.__audioTx.sender);
+                await optimizeAudioSender(pc.__audioTx.sender);
             }
         }catch(e){ console.warn('[SmartMeet] audio sender sync failed',uid,e); }
 
@@ -1842,6 +1856,18 @@
         );
 
         if(!audioNeedsSend && !videoNeedsSend) return true;
+
+        // Only the deterministic initiator is allowed to renegotiate media m-lines.
+        // The other side asks it to repair, preventing offer glare with 5–6 peers.
+        if(!shouldInitiate(uid)){
+            sendSignal(uid,'reconnect-request',{
+                reason:'media-sender-needs-renegotiation',
+                audioNeedsSend,
+                videoNeedsSend
+            });
+            return false;
+        }
+
         if(makingOffer[uid] || pc.signalingState!=='stable') return false;
 
         try{
@@ -2139,6 +2165,22 @@
         }));
     }
 
+
+    let audioPlaybackUnlockInstalled=false;
+    function installAudioPlaybackUnlock(){
+        if(audioPlaybackUnlockInstalled) return;
+        audioPlaybackUnlockInstalled=true;
+
+        const unlock=()=>{
+            if(document.visibilityState!=='visible') return;
+            unlockRemoteAudio().catch(()=>{});
+        };
+
+        // pointerdown preserves the browser user-activation window on phone/tablet.
+        document.addEventListener('pointerdown',unlock,{passive:true});
+        document.addEventListener('keydown',unlock,{passive:true});
+    }
+
     function armAudioUnlock(){
         if(audioUnlockArmed) return;
         audioUnlockArmed=true;
@@ -2185,9 +2227,9 @@
             // after the answer is applied. Sync once more so our mic/camera are
             // definitely attached to this participant-to-participant connection.
             bindPeerTransceivers(pc);
-            await awaitSyncPeerMedia(from);
-            setTimeout(()=>ensureOutboundMediaNegotiated(from),180);
-            setTimeout(()=>ensureOutboundMediaNegotiated(from),900);
+            await syncLocalTracksToPeer(from);
+            setTimeout(()=>ensureOutboundMediaNegotiated(from),160);
+            if(isMicOn) setTimeout(()=>verifyPeerAudioOutbound(from),850);
         }catch(err){ console.warn('[SmartMeet] offer handling failed', from, err); }
     }
     async function handleAnswer(from, data){
@@ -2208,10 +2250,10 @@
                 for(const c of pendingCandidates[from]) await pc.addIceCandidate(c).catch(()=>{});
                 delete pendingCandidates[from];
             }
-            await awaitSyncPeerMedia(from);
+            await syncLocalTracksToPeer(from);
             attachRemoteStream(from);
-            setTimeout(()=>ensureOutboundMediaNegotiated(from),180);
-            setTimeout(()=>ensureOutboundMediaNegotiated(from),900);
+            setTimeout(()=>ensureOutboundMediaNegotiated(from),160);
+            if(isMicOn) setTimeout(()=>verifyPeerAudioOutbound(from),850);
         }catch(err){ console.warn('[SmartMeet] answer handling failed', from, err); }
     }
     async function handleIceCandidate(from, data){
@@ -2653,6 +2695,104 @@
         if(off) off.style.display=on?'none':'flex';
     }
 
+
+    async function getOutboundAudioBytes(sender){
+        if(!sender?.getStats) return null;
+        try{
+            const stats=await sender.getStats();
+            let bytes=0;
+            stats.forEach(report=>{
+                if(report.type==='outbound-rtp' && report.kind==='audio' && !report.isRemote){
+                    bytes+=Number(report.bytesSent||0);
+                }
+            });
+            return bytes;
+        }catch(e){
+            return null;
+        }
+    }
+
+    async function verifyPeerAudioOutbound(uid, forceRepair=false){
+        uid=String(uid);
+        const pc=peers[uid];
+        const track=liveLocalTrack('audio');
+
+        if(
+            !isMicOn ||
+            !track ||
+            track.readyState!=='live' ||
+            !track.enabled ||
+            !pc ||
+            pc.signalingState==='closed' ||
+            leftUsers.has(uid)
+        ) return true;
+
+        bindPeerTransceivers(pc);
+
+        const sender=pc.__audioTx?.sender;
+        if(!sender){
+            // Answering side may not have bound its negotiated audio m-line yet.
+            await syncLocalTracksToPeer(uid);
+            bindPeerTransceivers(pc);
+        }
+
+        const activeSender=pc.__audioTx?.sender;
+        if(!activeSender) return false;
+
+        if(activeSender.track?.id!==track.id){
+            try{ await activeSender.replaceTrack(track); }catch(e){}
+        }
+
+        await optimizeAudioSender(activeSender);
+
+        const before=await getOutboundAudioBytes(activeSender);
+        if(before===null) return true; // stats unsupported; sender attachment is our fallback check.
+
+        await new Promise(resolve=>setTimeout(resolve,900));
+
+        if(!isMicOn || !track.enabled || track.readyState!=='live') return true;
+
+        const after=await getOutboundAudioBytes(activeSender);
+        if(after===null || after>before) return true;
+
+        // Zero RTP growth means this peer has a real sender object but no outgoing
+        // audio packets. Perform ONE bounded repair; never run an endless watchdog.
+        const now=Date.now();
+        if(!forceRepair && pc.__lastAudioRepairAt && (now-pc.__lastAudioRepairAt)<10000){
+            return false;
+        }
+        pc.__lastAudioRepairAt=now;
+
+        console.warn('[SmartMeet] outbound audio stalled ->',uid);
+
+        try{
+            await activeSender.replaceTrack(null);
+            await new Promise(resolve=>setTimeout(resolve,40));
+            await activeSender.replaceTrack(track);
+            track.enabled=true;
+            await optimizeAudioSender(activeSender);
+        }catch(e){
+            console.warn('[SmartMeet] audio replaceTrack repair failed',uid,e);
+        }
+
+        // If the negotiated direction itself is wrong, repair from one side only.
+        const direction=String(pc.__audioTx?.currentDirection||'');
+        if(!direction.includes('send')){
+            if(shouldInitiate(uid)){
+                await ensureOutboundMediaNegotiated(uid);
+            }else{
+                sendSignal(uid,'reconnect-request',{reason:'outbound-audio-stalled'});
+            }
+        }
+
+        return false;
+    }
+
+    function verifyAudioForAllPeers(){
+        const ids=Object.keys(peers).filter(uid=>onlineUsers.has(String(uid)) && !leftUsers.has(String(uid)));
+        return Promise.allSettled(ids.map(uid=>verifyPeerAudioOutbound(uid)));
+    }
+
     async function toggleMic(){
         if(toggleMic.busy) return;
         toggleMic.busy=true;
@@ -2661,16 +2801,19 @@
 
             if(!targetOn){
                 isMicOn=false;
+
+                // Keep the already-negotiated microphone track attached and only
+                // disable samples. Removing/stopping it on every mute forced sender
+                // replacement across all peers and caused one-way audio after unmute.
                 const old=liveLocalTrack('audio');
-                if(old){
-                    try{ localStream?.removeTrack(old); }catch(e){}
-                    try{ old.stop(); }catch(e){}
-                }
+                if(old) old.enabled=false;
+
                 setMicButton(false);
                 stopRecognition();
                 const sp=document.getElementById('speaking-'+MY_USER_ID);
                 if(sp) sp.style.display='none';
-                await syncTracksToEveryPeer();
+
+                // No renegotiation is needed for mute; senders keep the same track.
                 broadcastMyMicStatus();
                 return;
             }
@@ -2681,18 +2824,19 @@
             track.enabled=true;
             setMicButton(true);
 
-            // One sender update is enough. Avoid repeated replaceTrack/renegotiation
-            // bursts that can freeze Chromium on multi-peer rooms.
+            // Attach the microphone to every current peer in parallel.
             await syncTracksToEveryPeer();
 
-            // Verify every peer really owns the live microphone track. This is a
-            // one-shot repair, not a repeating loop.
+            // The first click also satisfies mobile autoplay policy for remote audio.
+            unlockRemoteMedia();
+
+            // Verify negotiated sender direction once, then verify real outbound RTP.
             await Promise.allSettled(
                 Object.keys(peers).map(uid=>ensureOutboundMediaNegotiated(uid))
             );
+            setTimeout(()=>verifyAudioForAllPeers(),350);
 
             broadcastMyMicStatus();
-            unlockRemoteMedia();
             startTranscript();
             startRecognition();
         }finally{
