@@ -210,6 +210,28 @@
         .person-action{border:1px solid var(--line); background:rgba(255,255,255,.04); color:var(--muted); font-size:10px; padding:5px 9px; border-radius:8px; cursor:pointer; flex-shrink:0}
         .person-action:hover{background:rgba(239,68,68,.16); color:#fecaca; border-color:rgba(239,68,68,.3)}
 
+
+        /* ---------- IN-ROOM INVITE (isolated; existing responsive layout untouched) ---------- */
+        .room-invite-card{
+            flex-shrink:0; margin:12px 12px 4px; padding:11px; border-radius:13px;
+            border:1px solid rgba(59,130,246,.24); background:rgba(59,130,246,.07);
+        }
+        .room-invite-title{display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:800;color:#dbeafe}
+        .room-invite-note{margin-top:4px;font-size:9.5px;line-height:1.45;color:var(--muted)}
+        .room-invite-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
+        .room-invite-btn{
+            min-width:0; flex:1 1 112px; display:flex;align-items:center;justify-content:center;gap:6px;
+            border-radius:9px;padding:7px 9px;border:1px solid var(--line);cursor:pointer;
+            background:rgba(255,255,255,.045);color:#e2e8f0;font-size:10px;font-weight:700;
+        }
+        .room-invite-btn:hover{background:rgba(59,130,246,.16);border-color:rgba(96,165,250,.35)}
+        .room-invite-btn.primary{background:linear-gradient(135deg,#2563eb,#0891b2);border-color:transparent;color:#fff}
+        .room-invite-link{
+            margin-top:8px; padding:7px 8px; border-radius:8px; background:rgba(2,6,23,.42);
+            border:1px solid var(--line); color:var(--muted); font-size:9px; white-space:nowrap;
+            overflow:hidden; text-overflow:ellipsis; user-select:all;
+        }
+
         /* ---------- CONTROLS ---------- */
         .controls{
             flex-shrink:0; display:flex; align-items:center; justify-content:center; gap:8px;
@@ -669,7 +691,20 @@
                     <button class="btn-send" onclick="sendChat()"><i class="fa fa-paper-plane"></i></button>
                 </div>
             </div>
-            <div id="tab-people" style="display:none; flex:1; overflow:hidden;">
+            <div id="tab-people" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
+                <div class="room-invite-card">
+                    <div class="room-invite-title"><i class="fa-solid fa-user-plus"></i> Invite people</div>
+                    <div class="room-invite-note">Invite someone without leaving the live meeting. Copy the link for WhatsApp/SMS, or send it by email.</div>
+                    <div class="room-invite-actions">
+                        <button type="button" class="room-invite-btn primary" onclick="copyMeetingInviteLink()">
+                            <i class="fa-solid fa-link"></i> Copy link
+                        </button>
+                        <button type="button" class="room-invite-btn" onclick="openRoomEmailInvite()">
+                            <i class="fa-regular fa-envelope"></i> Email invite
+                        </button>
+                    </div>
+                    <div class="room-invite-link" id="room-invite-link-preview" title="Meeting invite link"></div>
+                </div>
                 <div class="people-body" id="people-body"></div>
             </div>
         </div>
@@ -690,12 +725,16 @@
 
 <div id="toast-stack"></div>
 
+<x-email-invite-modal :meeting="$meeting" />
+
 <script>
     /* ============================================================
        SMARTMEET — ORGANIZER ROOM (clean single implementation)
        ============================================================ */
     const IS_ORGANIZER   = true;
     const MEETING_ID      = "{{ $meeting->id }}";
+    const MEETING_TITLE   = @json($meeting->title);
+    const INVITE_LINK     = @json(route('meetings.join.link', $meeting->unique_code));
     const MY_USER_ID      = "{{ auth()->id() }}";
     const ORGANIZER_ID    = String(MY_USER_ID);
     const MY_NAME         = @json(auth()->user()->name);
@@ -746,6 +785,45 @@
             onerror="const p=this.parentElement; this.remove(); if(p && !p.textContent.trim()) p.textContent='${safeInitials}'">`;
     }
 
+
+    /* ---------- In-room invite ---------- */
+    async function copyMeetingInviteLink(){
+        const link=String(INVITE_LINK||'').trim();
+        if(!link){ showToast('Invite link is unavailable.'); return; }
+
+        try{
+            if(navigator.clipboard?.writeText){
+                await navigator.clipboard.writeText(link);
+            }else{
+                const input=document.createElement('textarea');
+                input.value=link;
+                input.setAttribute('readonly','');
+                input.style.position='fixed';
+                input.style.opacity='0';
+                document.body.appendChild(input);
+                input.select();
+                document.execCommand('copy');
+                input.remove();
+            }
+            showToast('🔗 Invite link copied.');
+        }catch(e){
+            showToast('Could not copy automatically. Select the link from People panel.');
+        }
+    }
+
+    function initRoomInviteUI(){
+        const preview=document.getElementById('room-invite-link-preview');
+        if(preview) preview.textContent=INVITE_LINK;
+    }
+
+    function openRoomEmailInvite(){
+        if(typeof window.openEmailModal==='function'){
+            window.openEmailModal(MEETING_ID, MEETING_TITLE, '');
+            return;
+        }
+        showToast('Email invite dialog is unavailable.');
+    }
+
     /* ---------- Toast ---------- */
     const recentToasts = new Set();
     function showToast(msg){
@@ -764,6 +842,12 @@
         requestAnimationFrame(()=>el.classList.add('show'));
         setTimeout(()=>el.classList.remove('show'),3200);
         setTimeout(()=>el.remove(),3600);
+    }
+
+    if(document.readyState==='loading'){
+        document.addEventListener('DOMContentLoaded', initRoomInviteUI, {once:true});
+    }else{
+        initRoomInviteUI();
     }
 
     /* ---------- Timer ---------- */
@@ -1310,16 +1394,15 @@
 
                 track.onunmute = ()=>{
                     if(track.kind==='video') camStatus[uid]=true;
-                    attachRemoteStream(uid);
-                    setTimeout(()=>attachRemoteStream(uid),120);
+                    scheduleRemoteAttach(uid,60);
                     if(track.kind==='audio') unlockRemoteAudio();
                 };
-                track.onmute = ()=>setTimeout(()=>attachRemoteStream(uid),250);
+                track.onmute = ()=>scheduleRemoteAttach(uid,180);
                 track.onended = ()=>{
                     const s=remoteStreams[uid];
                     const existing=s?.getTracks().find(t=>t.id===track.id);
                     if(existing) s.removeTrack(existing);
-                    setTimeout(()=>attachRemoteStream(uid),80);
+                    scheduleRemoteAttach(uid,60);
                 };
             }
         };
@@ -1394,10 +1477,14 @@
                 },8000);
             }else if(pc.connectionState==='failed'){
                 clearTimeout(pc.__connectWatchdog);
+                clearTimeout(pc.__disconnectTimer);
                 if(shouldInitiate(uid)){
                     if(pc.signalingState==='have-local-offer') resendPendingOffer(uid);
                     else restartPeer(uid);
-                }else requestPresence(true);
+                }else{
+                    sendSignal(uid,'reconnect-request',{reason:'connection-failed'});
+                    requestPresence(true);
+                }
             }else if(pc.connectionState==='closed'){
                 clearTimeout(pc.__connectWatchdog);
                 clearTimeout(pc.__dtlsWatchdog);
@@ -1592,6 +1679,20 @@
     }
 
     async function resumeMeetingAudioContext(){ return; }
+
+
+    function scheduleRemoteAttach(uid, delay=90){
+        uid=String(uid);
+        const pc=peers[uid];
+        if(!pc || pc.signalingState==='closed') return;
+
+        clearTimeout(pc.__attachTimer);
+        pc.__attachTimer=setTimeout(()=>{
+            pc.__attachTimer=null;
+            if(!peers[uid] || peers[uid]!==pc || pc.signalingState==='closed') return;
+            attachRemoteStream(uid);
+        }, Math.max(0, Number(delay)||0));
+    }
 
     function attachRemoteStream(uid){
         uid=String(uid);
@@ -2767,12 +2868,32 @@
         setTimeout(()=>{ window.location.href=LEAVE_URL; },350);
     }
     function notifyDisconnectBeacon(){
-        if(leftNotified) return; leftNotified=true;
+        if(leftNotified) return;
+        leftNotified=true;
         const payload=JSON.stringify({});
-        try{ fetch(MARK_LEFT_URL,{ method:'POST', headers:{ 'Content-Type':'application/json','X-CSRF-TOKEN':CSRF }, body:payload, keepalive:true }); }catch(e){}
-        try{ navigator.sendBeacon(MARK_LEFT_URL, new Blob([payload],{ type:'application/json' })); }catch(e){}
+
+        // One keepalive request is enough. Sending both fetch() and sendBeacon()
+        // could mark the same user left twice and cause unnecessary peer churn.
+        try{
+            fetch(MARK_LEFT_URL,{
+                method:'POST',
+                headers:{
+                    'Content-Type':'application/json',
+                    'X-CSRF-TOKEN':CSRF
+                },
+                body:payload,
+                keepalive:true
+            });
+        }catch(e){}
     }
-    window.addEventListener('pagehide', ()=>{ notifyDisconnectBeacon(); cleanup(); });
+
+    window.addEventListener('pagehide', (event)=>{
+        // When the browser keeps the page in back/forward cache (common on mobile),
+        // do not mark the user left or destroy working media connections.
+        if(event.persisted) return;
+        notifyDisconnectBeacon();
+        cleanup();
+    });
     window.addEventListener('beforeunload', notifyDisconnectBeacon);
     function cleanup(){
         if(autoEndTimer){ clearTimeout(autoEndTimer); autoEndTimer=null; }
@@ -2783,6 +2904,7 @@
             try{ if(pc.__disconnectTimer) clearTimeout(pc.__disconnectTimer); }catch(e){}
             try{ if(pc.__restartTimer) clearTimeout(pc.__restartTimer); }catch(e){}
             try{ if(pc.__dtlsWatchdog) clearTimeout(pc.__dtlsWatchdog); }catch(e){}
+            try{ if(pc.__attachTimer) clearTimeout(pc.__attachTimer); }catch(e){}
             try{ pc.ontrack=null; pc.onicecandidate=null; pc.onconnectionstatechange=null; pc.oniceconnectionstatechange=null; }catch(e){}
             try{ pc.close(); }catch(e){}
         });
