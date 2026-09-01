@@ -144,7 +144,6 @@
                         focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400
                         transition">
                             <option selected disabled>Select a role</option>
-                            <option value="admin">Admin</option>
                             <option value="organizer">Organizer</option>
                             <option value="participant">Participant</option>
                         </select>
