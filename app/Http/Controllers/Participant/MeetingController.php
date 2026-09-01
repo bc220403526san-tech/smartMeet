@@ -9,7 +9,6 @@ use Illuminate\Http\Request;
 
 class MeetingController extends Controller
 {
-    // ── INDEX ──
     public function index(Request $request)
     {
         $userId = auth()->id();
@@ -21,7 +20,6 @@ class MeetingController extends Controller
                 $q->where('user_id', $userId);
             });
 
-        // Optional dashboard filters.
         switch ($request->query('filter')) {
             case 'today':
                 $query->whereDate('date', $today);
@@ -40,7 +38,6 @@ class MeetingController extends Controller
                 break;
         }
 
-        // Active first, then upcoming, then history.
         $meetings = $query
             ->orderByRaw("CASE status
                 WHEN 'active' THEN 1
@@ -78,7 +75,6 @@ class MeetingController extends Controller
         ));
     }
 
-    // ── TODAY ──
     public function today()
     {
         $userId = auth()->id();
@@ -151,7 +147,6 @@ class MeetingController extends Controller
         return view('participant.meetings.today', compact('todayMeetings'));
     }
 
-    // ── SHOW ──
     public function show(Meeting $meeting)
     {
         $isParticipant = $meeting->participants()
@@ -171,7 +166,6 @@ class MeetingController extends Controller
         return view('participant.meetings.show', compact('meeting', 'startTime', 'endTime'));
     }
 
-    // ── ATTEND ──
     public function attend(Meeting $meeting)
     {
         $isParticipant = $meeting->participants()
@@ -182,7 +176,6 @@ class MeetingController extends Controller
             abort(403, 'You are not invited to this meeting.');
         }
 
-        // Direct URL access is also blocked until organizer makes meeting active.
         if ($meeting->status !== 'active') {
             return redirect()
                 ->route('participant.meetings.index')
@@ -195,13 +188,51 @@ class MeetingController extends Controller
         return view('participant.meetings.attend', compact('meeting', 'isOrganizer'));
     }
 
-    // ── STATUS CHECK ──
     public function statusCheck(Request $request)
     {
         $userId = auth()->id();
         $timezone = config('app.timezone', 'Asia/Karachi');
-        $today = Carbon::now($timezone)->toDateString();
+        $now = Carbon::now($timezone);
+        $today = $now->toDateString();
+
         $ids = array_filter(explode(',', (string) $request->query('ids', '')));
+
+        $meetingsToCheck = Meeting::whereIn('id', $ids)
+            ->whereHas('participants', function ($q) use ($userId) {
+                $q->where('user_id', $userId);
+            })
+            ->get();
+
+        foreach ($meetingsToCheck as $meeting) {
+            if (in_array($meeting->status, ['cancelled', 'flagged'], true)) {
+                continue;
+            }
+
+            $startTime = Carbon::parse(
+                $meeting->date . ' ' . $meeting->time,
+                $timezone
+            );
+
+            $endTime = $startTime->copy()
+                ->addMinutes((int) $meeting->duration);
+
+            if (
+                $meeting->status === 'upcoming' &&
+                $now->greaterThanOrEqualTo($startTime) &&
+                $now->lessThan($endTime)
+            ) {
+                $meeting->status = 'active';
+                $meeting->save();
+            }
+
+            if (
+                in_array($meeting->status, ['upcoming', 'active'], true) &&
+                $now->greaterThanOrEqualTo($endTime)
+            ) {
+                $meeting->status = 'completed';
+                $meeting->save();
+            }
+        }
 
         $meetings = Meeting::whereIn('id', $ids)
             ->whereHas('participants', function ($q) use ($userId) {
@@ -209,16 +240,20 @@ class MeetingController extends Controller
             })
             ->get(['id', 'status']);
 
+        $participantMeetings = Meeting::whereHas(
+            'participants',
+            fn ($q) => $q->where('user_id', $userId)
+        );
+
         return response()->json([
             'meetings' => $meetings->keyBy('id')->map->status,
             'stats' => [
-                'upcomingToday' => Meeting::whereHas('participants', fn ($q) => $q->where('user_id', $userId))
+                'upcomingToday' => (clone $participantMeetings)
                     ->whereDate('date', $today)
                     ->where('status', 'upcoming')
                     ->count(),
-                'total' => Meeting::whereHas('participants', fn ($q) => $q->where('user_id', $userId))
-                    ->count(),
-                'completed' => Meeting::whereHas('participants', fn ($q) => $q->where('user_id', $userId))
+                'total' => (clone $participantMeetings)->count(),
+                'completed' => (clone $participantMeetings)
                     ->where('status', 'completed')
                     ->count(),
             ],
