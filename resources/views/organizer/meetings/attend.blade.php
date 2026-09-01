@@ -631,6 +631,7 @@
 </div>
 <form id="cancel-form" action="{{ route('organizer.meetings.cancel', $meeting) }}" method="POST" style="display:none;">
     @csrf
+    @method('PATCH')
 </form>
 
 <div class="main">
@@ -1016,9 +1017,9 @@
     /* ============================================================
        WEBRTC — perfect negotiation, single implementation
        ============================================================ */
-    const TURN_HOST = '13.203.230.232';
-    const TURN_USERNAME = 'smartmeet';
-    const TURN_CREDENTIAL = 'SAna09007@@';
+    const TURN_HOST = @json(config('services.turn.host'));
+    const TURN_USERNAME = @json(config('services.turn.username'));
+    const TURN_CREDENTIAL = @json(config('services.turn.credential'));
     const HAS_TURN = Boolean(TURN_HOST && TURN_USERNAME && TURN_CREDENTIAL);
 
     // Always keep direct/STUN candidates available. TURN is added as a relay
