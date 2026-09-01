@@ -108,6 +108,9 @@ class MeetingController extends Controller
             'timezone' => 'nullable|string|max:100',
             'participants' => 'nullable|array',
             'participants.*' => 'exists:users,id',
+            'invite_emails' => 'nullable|string|max:5000',
+            'invite_subject' => 'nullable|string|max:255',
+            'invite_message' => 'nullable|string|max:1500',
             'agenda_title' => 'nullable|array',
             'agenda_title.*' => 'nullable|string|max:255',
             'agenda_description' => 'nullable|array',
@@ -158,16 +161,46 @@ class MeetingController extends Controller
         ]);
 
         foreach ($request->participants ?? [] as $userId) {
-            MeetingParticipant::create([
-                'meeting_id' => $meeting->id,
-                'user_id' => $userId,
-                'status' => 'invited',
-            ]);
+            MeetingParticipant::firstOrCreate(
+                [
+                    'meeting_id' => $meeting->id,
+                    'user_id' => $userId,
+                ],
+                [
+                    'status' => 'invited',
+                ]
+            );
+        }
+
+        $inviteEmails = $this->parseInviteEmails($request->invite_emails);
+
+        $inviteResult = [
+            'sent' => 0,
+            'failed' => [],
+        ];
+
+        if (!empty($inviteEmails)) {
+            $inviteResult = $this->sendMeetingInvites(
+                $meeting,
+                $inviteEmails,
+                $request->invite_subject ?: null,
+                $request->invite_message ?: null
+            );
+        }
+
+        $successMessage = 'Meeting created successfully!';
+
+        if ($inviteResult['sent'] > 0) {
+            $successMessage .= ' ' . $inviteResult['sent'] . ' email invitation(s) sent.';
+        }
+
+        if (!empty($inviteResult['failed'])) {
+            $successMessage .= ' ' . count($inviteResult['failed']) . ' invitation(s) could not be sent.';
         }
 
         return redirect()
             ->route('organizer.meetings.index')
-            ->with('success', 'Meeting created successfully!');
+            ->with('success', $successMessage);
     }
 
     public function show(Meeting $meeting)
@@ -388,23 +421,78 @@ class MeetingController extends Controller
         $this->authorizeOrganizer($meeting);
 
         $request->validate([
-            'emails' => 'required|string',
+            'emails' => 'required|string|max:5000',
             'subject' => 'nullable|string|max:255',
-            'message' => 'nullable|string',
+            'message' => 'nullable|string|max:1500',
         ]);
 
-        $emails = array_filter(
-            array_map('trim', explode(',', $request->emails))
+        $emails = $this->parseInviteEmails($request->emails);
+
+        if (empty($emails)) {
+            return response()->json([
+                'message' => 'Please enter at least one valid email address.',
+                'failed' => [],
+            ], 422);
+        }
+
+        $result = $this->sendMeetingInvites(
+            $meeting,
+            $emails,
+            $request->subject ?: null,
+            $request->message ?: null
         );
 
+        if ($result['sent'] === 0) {
+            return response()->json([
+                'message' => 'No emails could be sent. Please check mail configuration.',
+                'failed' => $result['failed'],
+            ], 500);
+        }
+
+        return response()->json([
+            'message' => "{$result['sent']} email(s) sent successfully!" .
+                (!empty($result['failed'])
+                    ? ' (' . count($result['failed']) . ' failed, check logs)'
+                    : ''),
+            'failed' => $result['failed'],
+        ]);
+    }
+
+    /**
+     * Convert a comma/semicolon/new-line separated email string into a clean,
+     * unique list of valid email addresses.
+     */
+    private function parseInviteEmails(?string $value): array
+    {
+        if ($value === null || trim($value) === '') {
+            return [];
+        }
+
+        $emails = preg_split('/[;,\r\n]+/', $value) ?: [];
+
+        return collect($emails)
+            ->map(fn ($email) => strtolower(trim((string) $email)))
+            ->filter(fn ($email) => filter_var($email, FILTER_VALIDATE_EMAIL))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Send meeting invitations without making meeting creation depend on
+     * successful mail delivery. Existing SmartMeet users are attached to the
+     * meeting; new users receive a tokenized registration link.
+     */
+    private function sendMeetingInvites(
+        Meeting $meeting,
+        array $emails,
+        ?string $subject = null,
+        ?string $message = null
+    ): array {
         $sentCount = 0;
         $failedEmails = [];
 
         foreach ($emails as $email) {
-            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                continue;
-            }
-
             try {
                 $existingUser = User::where('email', $email)->first();
 
@@ -424,8 +512,8 @@ class MeetingController extends Controller
                             $meeting,
                             $link,
                             false,
-                            $request->subject ?: null,
-                            $request->message ?: null
+                            $subject,
+                            $message
                         )
                     );
 
@@ -459,8 +547,8 @@ class MeetingController extends Controller
                             $meeting,
                             $link,
                             true,
-                            $request->subject ?: null,
-                            $request->message ?: null
+                            $subject,
+                            $message
                         )
                     );
                 }
@@ -478,20 +566,10 @@ class MeetingController extends Controller
             }
         }
 
-        if ($sentCount === 0) {
-            return response()->json([
-                'message' => 'No emails could be sent. Please check mail configuration.',
-                'failed' => $failedEmails,
-            ], 500);
-        }
-
-        return response()->json([
-            'message' => "{$sentCount} email(s) sent successfully!" .
-                (!empty($failedEmails)
-                    ? ' (' . count($failedEmails) . ' failed, check logs)'
-                    : ''),
+        return [
+            'sent' => $sentCount,
             'failed' => $failedEmails,
-        ]);
+        ];
     }
 
     private function syncMeetingStatuses(int|string $organizerId): void

@@ -160,6 +160,77 @@
                             </div>
                             <div id="hidden-inputs"></div>
                         </div>
+
+                        <!-- EMAIL INVITES -->
+                        <div class="mb-5">
+                            <div class="flex items-start justify-between gap-3 mb-2">
+                                <div>
+                                    <label for="invite_emails" class="text-xs font-semibold text-gray-600 uppercase tracking-wider flex items-center gap-1.5">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5 text-blue-500">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5A2.25 2.25 0 0 1 19.5 19.5h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0-8.69 5.793a2 2 0 0 1-2.12 0L2.25 6.75" />
+                                        </svg>
+                                        Invite by Email
+                                        <span class="normal-case tracking-normal font-medium text-gray-400">(Optional)</span>
+                                    </label>
+                                    <p class="text-xs text-gray-400 mt-1">
+                                        Invite registered users or new guests when this meeting is created.
+                                    </p>
+                                </div>
+                                <span id="invite-email-count"
+                                      class="hidden shrink-0 px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 text-[11px] font-semibold">
+                                    0 emails
+                                </span>
+                            </div>
+
+                            <textarea id="invite_emails"
+                                      name="invite_emails"
+                                      rows="2"
+                                      placeholder="e.g. ali@example.com, sara@example.com"
+                                      class="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm border border-gray-200
+                                             focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white
+                                             transition-all duration-200 resize-none placeholder:text-gray-400">{{ old('invite_emails') }}</textarea>
+
+                            <div class="mt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                <p class="text-[11px] text-gray-400">
+                                    Separate multiple email addresses with commas, semicolons, or new lines.
+                                </p>
+                                <button type="button" id="toggle-invite-options"
+                                        class="text-xs font-medium text-blue-600 hover:text-blue-700 transition self-start sm:self-auto">
+                                    + Add custom message
+                                </button>
+                            </div>
+
+                            <div id="invite-options"
+                                 class="hidden mt-3 p-4 rounded-xl border border-gray-200 bg-gray-50/70 space-y-3">
+                                <div>
+                                    <label for="invite_subject" class="text-xs font-semibold text-gray-600">
+                                        Email Subject <span class="font-normal text-gray-400">(Optional)</span>
+                                    </label>
+                                    <input id="invite_subject"
+                                           type="text"
+                                           name="invite_subject"
+                                           maxlength="255"
+                                           value="{{ old('invite_subject') }}"
+                                           placeholder="Meeting invitation"
+                                           class="w-full mt-1.5 px-3.5 py-2.5 bg-white rounded-lg text-sm border border-gray-200
+                                                  focus:outline-none focus:ring-2 focus:ring-blue-400 transition">
+                                </div>
+
+                                <div>
+                                    <label for="invite_message" class="text-xs font-semibold text-gray-600">
+                                        Personal Message <span class="font-normal text-gray-400">(Optional)</span>
+                                    </label>
+                                    <textarea id="invite_message"
+                                              name="invite_message"
+                                              rows="2"
+                                              maxlength="1500"
+                                              placeholder="Add a short note for your invitees..."
+                                              class="w-full mt-1.5 px-3.5 py-2.5 bg-white rounded-lg text-sm border border-gray-200
+                                                     focus:outline-none focus:ring-2 focus:ring-blue-400 transition resize-none">{{ old('invite_message') }}</textarea>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- AGENDA — Sirf Title -->
                         <div class="mb-6">
                             <div class="flex items-center justify-between mb-3">
@@ -299,6 +370,43 @@
                 }
             }
         });
+        // ── Email Invites ────────────────────────────────────────────
+        const inviteEmailsInput  = document.getElementById('invite_emails');
+        const inviteEmailCount   = document.getElementById('invite-email-count');
+        const inviteOptions      = document.getElementById('invite-options');
+        const toggleInviteButton = document.getElementById('toggle-invite-options');
+
+        function parsedInviteEmails() {
+            if (!inviteEmailsInput) return [];
+
+            return [...new Set(
+                inviteEmailsInput.value
+                    .split(/[;,\n]+/)
+                    .map(email => email.trim())
+                    .filter(Boolean)
+            )];
+        }
+
+        function refreshInviteEmailCount() {
+            if (!inviteEmailCount) return;
+
+            const count = parsedInviteEmails().length;
+            inviteEmailCount.textContent = `${count} email${count === 1 ? '' : 's'}`;
+            inviteEmailCount.classList.toggle('hidden', count === 0);
+        }
+
+        inviteEmailsInput?.addEventListener('input', refreshInviteEmailCount);
+
+        toggleInviteButton?.addEventListener('click', () => {
+            const willOpen = inviteOptions.classList.contains('hidden');
+            inviteOptions.classList.toggle('hidden');
+            toggleInviteButton.textContent = willOpen
+                ? '− Hide custom message'
+                : '+ Add custom message';
+        });
+
+        refreshInviteEmailCount();
+
         // ── Agenda ───────────────────────────────────────────────────
         const addAgendaBtn  = document.getElementById('addAgendaBtn');
         const agendaWrapper = document.getElementById('agendaWrapper');
