@@ -996,7 +996,7 @@
     }
     const iceConfig = {
         iceServers,
-        iceCandidatePoolSize:10,
+        iceCandidatePoolSize:0,
         bundlePolicy:'max-bundle',
         rtcpMuxPolicy:'require',
         iceTransportPolicy:'all'
@@ -1121,11 +1121,11 @@
             if(e.candidate) sendSignal(uid,'ice-candidate',{ candidate:e.candidate.toJSON() });
         };
         pc.onicecandidateerror = (e)=>{
-            const connected = pc.connectionState==='connected' ||
-                pc.iceConnectionState==='connected' ||
-                pc.iceConnectionState==='completed';
-            if(connected && Number(e?.errorCode)===701){
-                console.debug('[SmartMeet] ignored ICE candidate path error', uid, e?.errorText||'');
+            // A 701 can be emitted for an unusable STUN/DNS path even when a
+            // working TURN relay candidate is available. It is not fatal and
+            // should not trigger recovery or flood the console.
+            if(Number(e?.errorCode)===701){
+                console.debug('[SmartMeet] ignored non-fatal ICE path error', uid, e?.errorText||'');
                 return;
             }
             console.warn('[SmartMeet] ICE candidate error', uid, e?.errorCode||'', e?.errorText||'');
@@ -1510,23 +1510,65 @@
         try{ await pc.addIceCandidate(candidate); }catch(err){ if(!ignoreOffer[from]) console.warn('[SmartMeet] ICE candidate error', from, err); }
     }
 
-    /* ---------- Signal transport (idempotent + retried) ---------- */
+    /* ---------- Signal transport (idempotent + load-safe) ---------- */
     function makeSignalId(type){ return `${MY_USER_ID}:${type}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`; }
-    async function postSignal(toUserId, type, payload, attempts=3){
-        for(let i=0;i<attempts;i++){
-            const ctrl=new AbortController(); const timeout=setTimeout(()=>ctrl.abort(),6500);
+
+    // Presence/device-state messages are snapshots. If the same snapshot is
+    // already being posted, re-use that request instead of creating parallel
+    // POSTs every time the media repair loop runs.
+    const signalInFlight=new Map();
+    const COALESCED_SIGNAL_TYPES=new Set(['mic-status','camera-status','presence-request','presence-response']);
+
+    async function postSignal(toUserId, type, payload, attempts=1){
+        const maxAttempts=Math.max(1,Math.min(Number(attempts)||1,2));
+        for(let i=0;i<maxAttempts;i++){
             try{
-                const res=await fetch(SIGNAL_URL,{ method:'POST', headers:{ 'Content-Type':'application/json', 'X-CSRF-TOKEN':CSRF }, body:JSON.stringify({ to_user_id:toUserId, type, data:payload }), signal:ctrl.signal });
+                const res=await fetch(SIGNAL_URL,{
+                    method:'POST',
+                    headers:{
+                        'Content-Type':'application/json',
+                        'Accept':'application/json',
+                        'X-CSRF-TOKEN':CSRF
+                    },
+                    credentials:'same-origin',
+                    cache:'no-store',
+                    body:JSON.stringify({ to_user_id:toUserId, type, data:payload })
+                });
                 if(res.ok) return true;
-            }catch(e){}
-            finally{ clearTimeout(timeout); }
-            if(i<attempts-1) await new Promise(r=>setTimeout(r,400*(i+1)));
+
+                // 4xx responses are application/auth errors; retrying them only
+                // adds load and cannot repair the request.
+                if(res.status>=400 && res.status<500) return false;
+            }catch(e){
+                // Network failures are returned to the caller as false. Do not
+                // create an unhandled AbortError in the meeting room.
+                if(i===maxAttempts-1) return false;
+            }
+            if(i<maxAttempts-1) await new Promise(r=>setTimeout(r,300*(i+1)));
         }
         return false;
     }
-    async function sendSignal(toUserId, type, data){
+
+    function sendSignal(toUserId, type, data){
+        const key=`${String(toUserId)}:${type}`;
+        if(COALESCED_SIGNAL_TYPES.has(type) && signalInFlight.has(key)){
+            return signalInFlight.get(key);
+        }
+
         const payload={ ...(data||{}), _signalId: data?._signalId || makeSignalId(type) };
-        return postSignal(toUserId, type, payload, 3);
+
+        // SDP/chat/control messages get one cautious retry. ICE and state
+        // snapshots are intentionally single-shot to prevent retry storms.
+        const attempts=['offer','answer','chat','meeting-cancelled','meeting-ended','user-left'].includes(type) ? 2 : 1;
+        const request=postSignal(toUserId,type,payload,attempts);
+
+        if(!COALESCED_SIGNAL_TYPES.has(type)) return request;
+
+        signalInFlight.set(key,request);
+        request.finally(()=>{
+            if(signalInFlight.get(key)===request) signalInFlight.delete(key);
+        });
+        return request;
     }
 
     /* ---------- Realtime channel ---------- */
@@ -1913,10 +1955,10 @@
     }
 
     function broadcastMyMicStatus(){
-        sendSignal('all','mic-status',{userId:MY_USER_ID,muted:!isMicOn});
+        void sendSignal('all','mic-status',{userId:MY_USER_ID,muted:!isMicOn}).catch(()=>{});
     }
     function broadcastMyCameraStatus(){
-        sendSignal('all','camera-status',{userId:MY_USER_ID,cameraOn:isCameraOn});
+        void sendSignal('all','camera-status',{userId:MY_USER_ID,cameraOn:isCameraOn}).catch(()=>{});
     }
 
     /* ---------- Mobile media recovery ---------- */
@@ -2302,9 +2344,10 @@
         if(document.visibilityState!=='visible') return;
         connectToAll();
         syncTracksToEveryPeer();
-        broadcastMyMicStatus();
-        broadcastMyCameraStatus();
 
+        // Do not rebroadcast mic/camera state on every repair tick. State is
+        // already sent when it changes and is included in presence responses.
+        // Removing these duplicate POSTs prevents signaling request storms.
         Object.keys(peers).forEach(uid=>{
             const pc=peers[uid];
             if(!pc || pc.connectionState==='closed') return;
@@ -2426,3 +2469,4 @@
 </script>
 </body>
 </html>
+
