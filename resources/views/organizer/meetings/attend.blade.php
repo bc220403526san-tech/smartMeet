@@ -232,6 +232,55 @@
             overflow:hidden; text-overflow:ellipsis; user-select:all;
         }
 
+
+        /* ---------- IN-ROOM EMAIL INVITE MODAL (self-contained) ---------- */
+        .room-email-overlay{
+            position:fixed; inset:0; z-index:10000; display:none;
+            align-items:center; justify-content:center; padding:16px;
+            background:rgba(0,0,0,.62); backdrop-filter:blur(5px);
+        }
+        .room-email-overlay.open{display:flex}
+        .room-email-dialog{
+            width:min(440px,100%); max-height:min(86dvh,680px); overflow-y:auto;
+            border-radius:18px; border:1px solid var(--line-strong);
+            background:linear-gradient(160deg,rgba(13,22,42,.99),rgba(7,13,27,.99));
+            color:var(--text); box-shadow:0 24px 70px rgba(0,0,0,.55);
+            padding:18px;
+        }
+        .room-email-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+        .room-email-title{font-size:15px;font-weight:800}
+        .room-email-close{
+            width:34px;height:34px;display:flex;align-items:center;justify-content:center;
+            border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.04);
+            color:#cbd5e1;cursor:pointer;flex-shrink:0;
+        }
+        .room-email-close:hover{background:rgba(239,68,68,.14);color:#fecaca}
+        .room-email-help{font-size:10.5px;line-height:1.5;color:var(--muted);margin:0 0 14px}
+        .room-email-field{margin-bottom:12px}
+        .room-email-label{display:block;font-size:10.5px;font-weight:700;color:#cbd5e1;margin-bottom:5px}
+        .room-email-input,.room-email-textarea{
+            width:100%;border-radius:10px;border:1px solid var(--line);
+            background:rgba(255,255,255,.045);color:var(--text);
+            font:inherit;font-size:12px;outline:none;padding:9px 10px;
+        }
+        .room-email-textarea{resize:vertical;min-height:76px}
+        .room-email-input:focus,.room-email-textarea:focus{
+            border-color:rgba(96,165,250,.55);box-shadow:0 0 0 3px rgba(59,130,246,.09)
+        }
+        .room-email-hint{font-size:9.5px;color:var(--muted-2);margin-top:5px}
+        .room-email-msg{display:none;font-size:10.5px;line-height:1.45;margin:4px 0 10px}
+        .room-email-msg.show{display:block}
+        .room-email-msg.error{color:#fca5a5}
+        .room-email-msg.success{color:#86efac}
+        .room-email-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+        .room-email-action{
+            border-radius:10px;padding:8px 13px;border:1px solid var(--line);
+            font-size:11px;font-weight:700;cursor:pointer;color:#e2e8f0;
+            background:rgba(255,255,255,.04);
+        }
+        .room-email-action.primary{border:none;color:#fff;background:linear-gradient(135deg,#2563eb,#0891b2)}
+        .room-email-action:disabled{opacity:.55;cursor:not-allowed}
+
         /* ---------- CONTROLS ---------- */
         .controls{
             flex-shrink:0; display:flex; align-items:center; justify-content:center; gap:8px;
@@ -723,9 +772,54 @@
     <div class="ctrl-btn"><button class="btn-end" onclick="leaveMeeting()"><i class="fa fa-phone-slash"></i></button><span class="ctrl-label" style="color:var(--red);">Leave</span></div>
 </div>
 
+
+<div id="room-email-overlay" class="room-email-overlay" aria-hidden="true">
+    <div class="room-email-dialog" role="dialog" aria-modal="true" aria-labelledby="room-email-title">
+        <div class="room-email-head">
+            <div class="room-email-title" id="room-email-title">Send email invitation</div>
+            <button type="button" class="room-email-close" onclick="closeRoomEmailInvite()" aria-label="Close">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <p class="room-email-help">
+            Send an invitation without leaving the live meeting.
+            Existing users can join this meeting; new users can register first.
+        </p>
+
+        <form id="room-email-form" onsubmit="sendRoomEmailInvite(event)">
+            <div class="room-email-field">
+                <label class="room-email-label" for="room-email-emails">Emails</label>
+                <textarea id="room-email-emails" class="room-email-textarea" rows="2"
+                          placeholder="email1@example.com, email2@example.com"></textarea>
+                <div class="room-email-hint">Separate multiple email addresses with commas.</div>
+            </div>
+
+            <div class="room-email-field">
+                <label class="room-email-label" for="room-email-subject">Subject</label>
+                <input id="room-email-subject" class="room-email-input" type="text">
+            </div>
+
+            <div class="room-email-field">
+                <label class="room-email-label" for="room-email-message">Message (optional)</label>
+                <textarea id="room-email-message" class="room-email-textarea" rows="3"
+                          placeholder="Hello, please join our meeting..."></textarea>
+            </div>
+
+            <div id="room-email-msg" class="room-email-msg"></div>
+
+            <div class="room-email-actions">
+                <button type="button" class="room-email-action" onclick="closeRoomEmailInvite()">Cancel</button>
+                <button type="submit" class="room-email-action primary" id="room-email-send-btn">
+                    <i class="fa-regular fa-envelope"></i> Send
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div id="toast-stack"></div>
 
-<x-email-invite-modal :meeting="$meeting" />
 
 <script>
     /* ============================================================
@@ -816,13 +910,100 @@
         if(preview) preview.textContent=INVITE_LINK;
     }
 
+    function setRoomEmailMessage(message='', type=''){
+        const box=document.getElementById('room-email-msg');
+        if(!box) return;
+        box.textContent=message;
+        box.className='room-email-msg';
+        if(message){
+            box.classList.add('show');
+            if(type) box.classList.add(type);
+        }
+    }
+
     function openRoomEmailInvite(){
-        if(typeof window.openEmailModal==='function'){
-            window.openEmailModal(MEETING_ID, MEETING_TITLE, '');
+        const overlay=document.getElementById('room-email-overlay');
+        const subject=document.getElementById('room-email-subject');
+        const message=document.getElementById('room-email-message');
+        const emails=document.getElementById('room-email-emails');
+
+        if(!overlay) return;
+        if(subject) subject.value=`You're invited: ${MEETING_TITLE}`;
+        if(message) message.value='';
+        if(emails) emails.value='';
+        setRoomEmailMessage('');
+        overlay.classList.add('open');
+        overlay.setAttribute('aria-hidden','false');
+        setTimeout(()=>emails?.focus(),30);
+    }
+
+    function closeRoomEmailInvite(){
+        const overlay=document.getElementById('room-email-overlay');
+        const form=document.getElementById('room-email-form');
+        overlay?.classList.remove('open');
+        overlay?.setAttribute('aria-hidden','true');
+        form?.reset();
+        setRoomEmailMessage('');
+    }
+
+    async function sendRoomEmailInvite(event){
+        event.preventDefault();
+
+        const emails=document.getElementById('room-email-emails')?.value.trim() || '';
+        const subject=document.getElementById('room-email-subject')?.value.trim() || '';
+        const message=document.getElementById('room-email-message')?.value.trim() || '';
+        const sendBtn=document.getElementById('room-email-send-btn');
+
+        if(!emails){
+            setRoomEmailMessage('At least one email is required.','error');
             return;
         }
-        showToast('Email invite dialog is unavailable.');
+
+        if(sendBtn) sendBtn.disabled=true;
+        setRoomEmailMessage('');
+
+        try{
+            const response=await fetch(`/organizer/meetings/${encodeURIComponent(MEETING_ID)}/send-invite`,{
+                method:'POST',
+                credentials:'same-origin',
+                headers:{
+                    'Content-Type':'application/json',
+                    'Accept':'application/json',
+                    'X-Requested-With':'XMLHttpRequest',
+                    'X-CSRF-TOKEN':CSRF
+                },
+                body:JSON.stringify({emails,subject,message})
+            });
+
+            let data={};
+            try{ data=await response.json(); }catch(e){}
+
+            if(!response.ok){
+                throw new Error(data.message || `Email invite failed (HTTP ${response.status})`);
+            }
+
+            setRoomEmailMessage(data.message || 'Invitation sent successfully.','success');
+            showToast('✉️ Invitation sent.');
+            setTimeout(closeRoomEmailInvite,1200);
+        }catch(error){
+            console.error('[SmartMeet] email invite failed',error);
+            setRoomEmailMessage(error?.message || 'Failed to send invitation. Please try again.','error');
+        }finally{
+            if(sendBtn) sendBtn.disabled=false;
+        }
     }
+
+    document.addEventListener('click',(event)=>{
+        const overlay=document.getElementById('room-email-overlay');
+        if(overlay && event.target===overlay) closeRoomEmailInvite();
+    });
+
+    document.addEventListener('keydown',(event)=>{
+        if(event.key==='Escape'){
+            const overlay=document.getElementById('room-email-overlay');
+            if(overlay?.classList.contains('open')) closeRoomEmailInvite();
+        }
+    });
 
     /* ---------- Toast ---------- */
     const recentToasts = new Set();
