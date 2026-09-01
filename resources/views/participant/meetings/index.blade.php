@@ -762,8 +762,19 @@
 
         async function poll() {
             try {
-                const url = `{{ route('participant.meetings.status-check') }}?ids=${meetingIds.join(',')}`;
-                const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                // Cache-busting timestamp + no-store ensure browser never reuses an old
+                // "upcoming" response. This keeps Upcoming -> Active live without refresh.
+                const url = `{{ route('participant.meetings.status-check') }}?ids=${meetingIds.join(',')}&_=${Date.now()}`;
+                const res = await fetch(url, {
+                    method: 'GET',
+                    cache: 'no-store',
+                    credentials: 'same-origin',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json',
+                        'Cache-Control': 'no-cache'
+                    }
+                });
                 if (!res.ok) return;
                 const data = await res.json();
 
@@ -796,6 +807,8 @@
             }
         }
 
-        setInterval(poll, 5000);
+        // Check immediately when page loads, then keep checking every 2 seconds.
+        poll();
+        setInterval(poll, 2000);
     })();
 </script>
