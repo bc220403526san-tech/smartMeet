@@ -455,15 +455,23 @@
                     <!-- Action -->
                     <div class="text-right">
 
-                        <a
-                            href="{{ route('participant.meetings.attend', $meeting->id) }}"
-                            class="inline-block px-5 py-2 rounded-lg text-xs font-semibold transition {{ $isLive
-                                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-sm hover:shadow'
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                            }}"
-                        >
-                            {{ $isLive ? 'Join Session' : 'Attend Meeting' }}
-                        </a>
+                        @if($isLive)
+                            <a
+                                href="{{ route('participant.meetings.attend', $meeting->id) }}"
+                                class="inline-block px-5 py-2 rounded-lg text-xs font-semibold transition
+                   bg-gradient-to-r from-blue-600 to-indigo-600 text-white
+                   hover:from-blue-700 hover:to-indigo-700 shadow-sm hover:shadow"
+                            >
+                                Join Session
+                            </a>
+                        @else
+                            <span
+                                class="inline-block px-5 py-2 rounded-lg text-xs font-semibold
+                   bg-gray-100 text-gray-600 cursor-not-allowed"
+                            >
+            Attend Meeting
+        </span>
+                        @endif
 
                     </div>
 
