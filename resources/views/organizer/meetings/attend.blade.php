@@ -697,7 +697,7 @@
     <div class="header-right">
         <div class="participants-count"><i class="fa fa-circle" style="color:var(--green);font-size:8px;"></i><span data-online-count>1</span> online</div>
         <button class="btn-cancel" onclick="cancelMeeting()"><i class="fa fa-ban"></i><span>Cancel</span></button>
-        <button class="btn-leave" onclick="leaveMeeting()"><i class="fa fa-phone-slash"></i><span>Leave</span></button>
+        <button class="btn-leave" onclick="safeLeaveMeeting()"><i class="fa fa-phone-slash"></i><span>Leave</span></button>
     </div>
 </div>
 <form id="cancel-form" action="{{ route('organizer.meetings.cancel', $meeting) }}" method="POST" style="display:none;">
@@ -761,15 +761,15 @@
 </div>
 
 <div class="controls">
-    <div class="ctrl-btn" onclick="toggleMic()"><div class="ctrl-icon off" id="ctrl-mic"><i class="fa fa-microphone-slash"></i></div><span class="ctrl-label">Mic</span></div>
-    <div class="ctrl-btn" onclick="toggleCamera()"><div class="ctrl-icon off" id="ctrl-camera"><i class="fa fa-video-slash"></i></div><span class="ctrl-label">Camera</span></div>
+    <div class="ctrl-btn" onclick="safeToggleMic()"><div class="ctrl-icon off" id="ctrl-mic"><i class="fa fa-microphone-slash"></i></div><span class="ctrl-label">Mic</span></div>
+    <div class="ctrl-btn" onclick="safeToggleCamera()"><div class="ctrl-icon off" id="ctrl-camera"><i class="fa fa-video-slash"></i></div><span class="ctrl-label">Camera</span></div>
     <div class="ctrl-divider"></div>
     <div class="ctrl-btn" onclick="toggleSidePanel('transcript')"><div class="ctrl-icon" id="ctrl-transcript"><i class="fa fa-closed-captioning"></i></div><span class="ctrl-label">Captions</span></div>
     <div class="ctrl-btn" onclick="toggleSidePanel('chat')"><div class="ctrl-icon" id="ctrl-chat"><i class="fa fa-comment"></i><span id="chat-badge">0</span></div><span class="ctrl-label">Chat</span></div>
     <div class="ctrl-btn" onclick="toggleSidePanel('people')"><div class="ctrl-icon" id="ctrl-people"><i class="fa fa-users"></i></div><span class="ctrl-label">People</span></div>
     <div class="ctrl-divider"></div>
     <div class="ctrl-btn"><button class="btn-end" style="background:linear-gradient(135deg,#7f1d1d,#450a0a);" onclick="cancelMeeting()" title="Cancel meeting for everyone"><i class="fa fa-ban"></i></button><span class="ctrl-label" style="color:var(--red);">Cancel</span></div>
-    <div class="ctrl-btn"><button class="btn-end" onclick="leaveMeeting()"><i class="fa fa-phone-slash"></i></button><span class="ctrl-label" style="color:var(--red);">Leave</span></div>
+    <div class="ctrl-btn"><button class="btn-end" onclick="safeLeaveMeeting()"><i class="fa fa-phone-slash"></i></button><span class="ctrl-label" style="color:var(--red);">Leave</span></div>
 </div>
 
 
@@ -1045,6 +1045,11 @@
     }else{
         initRoomInviteUI();
     }
+
+
+    window.addEventListener('unhandledrejection',(event)=>{
+        console.error('[SmartMeet] unhandled promise rejection',event.reason);
+    });
 
     /* ---------- Timer ---------- */
     let seconds = Math.max(0, Math.floor((Date.now()-new Date(ACTUAL_START).getTime())/1000));
@@ -2166,7 +2171,7 @@
     }
 
 
-    let audioPlaybackUnlockInstalled=false;
+    var audioPlaybackUnlockInstalled=false;
     function installAudioPlaybackUnlock(){
         if(audioPlaybackUnlockInstalled) return;
         audioPlaybackUnlockInstalled=true;
@@ -2269,8 +2274,13 @@
     // Presence/device-state messages are snapshots. If the same snapshot is
     // already being posted, re-use that request instead of creating parallel
     // POSTs every time the media repair loop runs.
-    const signalInFlight=new Map();
-    const COALESCED_SIGNAL_TYPES=new Set(['mic-status','camera-status','presence-request','presence-response']);
+    var signalInFlight = signalInFlight || new Map();
+    var COALESCED_SIGNAL_TYPES = COALESCED_SIGNAL_TYPES || new Set([
+        'mic-status',
+        'camera-status',
+        'presence-request',
+        'presence-response'
+    ]);
 
     async function postSignal(toUserId, type, payload, attempts=1){
         const maxAttempts=Math.max(1,Math.min(Number(attempts)||1,2));
@@ -2309,6 +2319,16 @@
     }
 
     function sendSignal(toUserId, type, data){
+        if(!(signalInFlight instanceof Map)) signalInFlight=new Map();
+        if(!(COALESCED_SIGNAL_TYPES instanceof Set)){
+            COALESCED_SIGNAL_TYPES=new Set([
+                'mic-status',
+                'camera-status',
+                'presence-request',
+                'presence-response'
+            ]);
+        }
+
         const key=`${String(toUserId)}:${type}`;
         if(COALESCED_SIGNAL_TYPES.has(type) && signalInFlight.has(key)){
             return signalInFlight.get(key);
@@ -3264,15 +3284,73 @@
         setTimeout(()=>{ document.getElementById('cancel-form')?.submit(); }, 250);
     }
 
+
+    async function safeToggleMic(){
+        try{
+            await toggleMic();
+        }catch(e){
+            console.error('[SmartMeet] microphone toggle failed',e);
+            showToast('🎙️ Microphone action failed. Please try again.');
+        }
+    }
+
+    async function safeToggleCamera(){
+        try{
+            await toggleCamera();
+        }catch(e){
+            console.error('[SmartMeet] camera toggle failed',e);
+            showToast('📷 Camera action failed. Please try again.');
+        }
+    }
+
+    async function safeLeaveMeeting(){
+        try{
+            await leaveMeeting();
+        }catch(e){
+            console.error('[SmartMeet] leave action failed',e);
+            try{ cleanup(); }catch(_){}
+            window.location.href=LEAVE_URL;
+        }
+    }
+
     /* ---------- Leave / cleanup ---------- */
     async function leaveMeeting(){
-        if(leftNotified) return; leftNotified=true;
+        if(leftNotified) return;
+        leftNotified=true;
+
         if(autoEndTimer) clearTimeout(autoEndTimer);
         showToast('👋 You have left the meeting.');
-        await sendSignal('all','user-left',{ userId:MY_USER_ID, name:MY_NAME });
-        try{ await fetch(MARK_LEFT_URL,{ method:'POST', headers:{ 'Content-Type':'application/json','X-CSRF-TOKEN':CSRF }, body:JSON.stringify({}), keepalive:true }); }catch(e){}
-        cleanup();
-        setTimeout(()=>{ window.location.href=LEAVE_URL; },350);
+
+        // Never let signaling failure trap the user inside the meeting room.
+        try{
+            await Promise.race([
+                Promise.resolve(sendSignal('all','user-left',{
+                    userId:MY_USER_ID,
+                    name:MY_NAME
+                })),
+                new Promise(resolve=>setTimeout(resolve,650))
+            ]);
+        }catch(e){
+            console.warn('[SmartMeet] user-left signal failed',e);
+        }
+
+        try{
+            await Promise.race([
+                fetch(MARK_LEFT_URL,{
+                    method:'POST',
+                    headers:{
+                        'Content-Type':'application/json',
+                        'X-CSRF-TOKEN':CSRF
+                    },
+                    body:JSON.stringify({}),
+                    keepalive:true
+                }),
+                new Promise(resolve=>setTimeout(resolve,650))
+            ]);
+        }catch(e){}
+
+        try{ cleanup(); }catch(e){}
+        window.location.href=LEAVE_URL;
     }
     function notifyDisconnectBeacon(){
         if(leftNotified) return;
