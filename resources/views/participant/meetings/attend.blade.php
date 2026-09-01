@@ -1477,6 +1477,16 @@
             if(pc.__videoTx?.sender){
                 if(pc.__videoTx.sender.track!==videoTrack) await pc.__videoTx.sender.replaceTrack(videoTrack);
                 if(videoTrack) videoTrack.enabled=Boolean(isCameraOn);
+                if(videoTrack){
+                    try{
+                        const sender=pc.__videoTx.sender;
+                        const params=sender.getParameters();
+                        if(!params.encodings || !params.encodings.length) params.encodings=[{}];
+                        params.encodings[0].maxBitrate=IS_MOBILE_BROWSER ? 250000 : 400000;
+                        params.encodings[0].maxFramerate=15;
+                        await sender.setParameters(params);
+                    }catch(e){}
+                }
             }
         }catch(e){ console.warn('[SmartMeet] video sender sync failed',uid,e); }
     }
@@ -1555,102 +1565,23 @@
     let meetingAudioContext=null;
     const remoteAudioNodes={};
 
-    function getMeetingAudioContext(){
-        if(meetingAudioContext) return meetingAudioContext;
-        const AC=window.AudioContext || window.webkitAudioContext;
-        if(!AC) return null;
-        try{
-            meetingAudioContext=new AC({latencyHint:'interactive'});
-        }catch(e){
-            try{ meetingAudioContext=new AC(); }catch(_){ meetingAudioContext=null; }
-        }
-        return meetingAudioContext;
-    }
+    function getMeetingAudioContext(){ return null; }
 
     function disposeRemoteAudioBoost(uid){
-        const node=remoteAudioNodes[String(uid)];
-        if(!node) return;
-        try{ node.source.disconnect(); }catch(e){}
-        try{ node.compressor.disconnect(); }catch(e){}
-        try{ node.gain.disconnect(); }catch(e){}
         delete remoteAudioNodes[String(uid)];
     }
 
     function attachBoostedRemoteAudio(uid, track, audioEl){
-        uid=String(uid);
-        if(!track || track.readyState==='ended' || !audioEl) return false;
-
-        const ctx=getMeetingAudioContext();
-        if(!ctx) return false;
-
-        // Mobile Chrome/Safari can create an AudioContext in "suspended" state.
-        // In that case DO NOT mute the normal <audio> element, otherwise the
-        // participant becomes completely silent until another user gesture.
-        if(ctx.state!=='running'){
+        // CPU-safe mode: use the browser's native audio playback path.
+        if(audioEl){
             audioEl.muted=false;
             audioEl.defaultMuted=false;
             audioEl.volume=1;
-            return false;
         }
-
-        const existing=remoteAudioNodes[uid];
-        if(existing?.trackId===track.id){
-            try{
-                existing.gain.gain.setTargetAtTime(1.65,ctx.currentTime,0.03);
-            }catch(e){}
-            audioEl.muted=true;
-            return true;
-        }
-
-        disposeRemoteAudioBoost(uid);
-
-        try{
-            const stream=new MediaStream([track]);
-            const source=ctx.createMediaStreamSource(stream);
-            const compressor=ctx.createDynamicsCompressor();
-            const gain=ctx.createGain();
-
-            // Lift quiet speech, then gently control peaks so voices stay clear.
-            compressor.threshold.value=-26;
-            compressor.knee.value=18;
-            compressor.ratio.value=3.5;
-            compressor.attack.value=0.003;
-            compressor.release.value=0.22;
-            gain.gain.value=1.65;
-
-            source.connect(compressor);
-            compressor.connect(gain);
-            gain.connect(ctx.destination);
-
-            remoteAudioNodes[uid]={source,compressor,gain,trackId:track.id,stream};
-
-            // Prevent double playback: Web Audio owns playback when active.
-            audioEl.muted=true;
-            audioEl.defaultMuted=true;
-
-            track.addEventListener('ended',()=>disposeRemoteAudioBoost(uid),{once:true});
-            return true;
-        }catch(e){
-            console.warn('[SmartMeet] audio boost unavailable for',uid,e);
-            disposeRemoteAudioBoost(uid);
-            audioEl.muted=false;
-            audioEl.defaultMuted=false;
-            audioEl.volume=1;
-            return false;
-        }
+        return false;
     }
 
-    async function resumeMeetingAudioContext(){
-        const ctx=getMeetingAudioContext();
-        if(ctx && ctx.state==='suspended'){
-            try{ await ctx.resume(); }catch(e){}
-        }
-        if(ctx?.state==='running'){
-            Object.keys(peers).forEach(uid=>{
-                try{ attachRemoteStream(uid); }catch(e){}
-            });
-        }
-    }
+    async function resumeMeetingAudioContext(){ return; }
 
     function attachRemoteStream(uid){
         uid=String(uid);
@@ -2325,21 +2256,22 @@
     }
 
     async function startAudio(){
-        const track=await ensureAudioTrack(false);
-        if(!track) return;
+        // Start with ZERO capture devices open. Mic/camera are acquired only after
+        // the user presses a control. This avoids background capture/encoding load
+        // on every device as soon as the meeting page opens.
+        if(!localStream) localStream=new MediaStream();
         isMicOn=false;
+        isCameraOn=false;
         setMicButton(false);
-        await syncTracksToEveryPeer();
-        broadcastMyMicStatus();
+        setCameraButton(false);
 
         const localVideo=document.getElementById('localVideo');
-        if(localVideo && localStream){
+        if(localVideo){
             localVideo.srcObject=localStream;
+            localVideo.muted=true;
             localVideo.playsInline=true;
+            localVideo.style.display='none';
         }
-
-        // Prepare SpeechRecognition on every supported browser, including mobile.
-        startTranscript();
     }
 
     function setMicButton(on){
@@ -2354,38 +2286,43 @@
     }
 
     async function toggleMic(){
-        const targetOn=!isMicOn;
-        const track=await ensureAudioTrack(targetOn);
-        if(!track) return;
+        if(toggleMic.busy) return;
+        toggleMic.busy=true;
+        try{
+            const targetOn=!isMicOn;
 
-        // Set state explicitly instead of toggling after an async permission request.
-        isMicOn=targetOn;
-        track.enabled=targetOn;
-        setMicButton(targetOn);
+            if(!targetOn){
+                isMicOn=false;
+                const old=liveLocalTrack('audio');
+                if(old){
+                    try{ localStream?.removeTrack(old); }catch(e){}
+                    try{ old.stop(); }catch(e){}
+                }
+                setMicButton(false);
+                stopRecognition();
+                const sp=document.getElementById('speaking-'+MY_USER_ID);
+                if(sp) sp.style.display='none';
+                await syncTracksToEveryPeer();
+                broadcastMyMicStatus();
+                return;
+            }
 
-        await syncTracksToEveryPeer();
-        // A second replaceTrack after the sender has settled fixes slower Android browsers.
-        setTimeout(()=>syncTracksToEveryPeer(),180);
-        setTimeout(()=>syncTracksToEveryPeer(),700);
-        if(targetOn){
-            setTimeout(()=>ensureOutboundMediaForAll(),220);
-            setTimeout(()=>ensureOutboundMediaForAll(),900);
-        }
+            const track=await ensureAudioTrack(true);
+            if(!track) return;
+            isMicOn=true;
+            track.enabled=true;
+            setMicButton(true);
 
-        broadcastMyMicStatus();
-
-        if(targetOn){
+            // One sender update is enough. Avoid repeated replaceTrack/renegotiation
+            // bursts that can freeze Chromium on multi-peer rooms.
+            await syncTracksToEveryPeer();
+            ensureOutboundMediaForAll();
+            broadcastMyMicStatus();
             unlockRemoteMedia();
             startTranscript();
             startRecognition();
-            if(IS_MOBILE_BROWSER){
-                setTimeout(()=>recoverMobileLocalMedia(),350);
-                setTimeout(()=>recoverMobileLocalMedia(),1200);
-            }
-        }else{
-            stopRecognition();
-            const sp=document.getElementById('speaking-'+MY_USER_ID);
-            if(sp) sp.style.display='none';
+        }finally{
+            toggleMic.busy=false;
         }
     }
 
@@ -2401,15 +2338,10 @@
             try{
                 const s=await navigator.mediaDevices.getUserMedia({
                     audio:false,
-                    video: IS_MOBILE_BROWSER ? {
-                        width:{ideal:640,max:1280},
-                        height:{ideal:480,max:720},
-                        frameRate:{ideal:20,max:24},
-                        facingMode:'user'
-                    } : {
-                        width:{ideal:1280},
-                        height:{ideal:720},
-                        frameRate:{ideal:24,max:30},
+                    video:{
+                        width:{ideal:640,max:640},
+                        height:{ideal:360,max:480},
+                        frameRate:{ideal:15,max:15},
                         facingMode:'user'
                     }
                 });
@@ -2459,37 +2391,49 @@
     }
 
     async function toggleCamera(){
-        const targetOn=!isCameraOn;
-        const track=await ensureVideoTrack(targetOn);
-        if(!track) return;
+        if(toggleCamera.busy) return;
+        toggleCamera.busy=true;
+        try{
+            const targetOn=!isCameraOn;
 
-        isCameraOn=targetOn;
-        track.enabled=targetOn;
-        setCameraButton(targetOn);
+            if(!targetOn){
+                isCameraOn=false;
+                const old=liveLocalTrack('video');
+                if(old){
+                    try{ localStream?.removeTrack(old); }catch(e){}
+                    try{ old.stop(); }catch(e){}
+                }
+                setCameraButton(false);
+                const localVideo=document.getElementById('localVideo');
+                if(localVideo) localVideo.srcObject=localStream || new MediaStream();
+                await syncTracksToEveryPeer();
+                broadcastMyCameraStatus();
+                return;
+            }
 
-        const localVideo=document.getElementById('localVideo');
-        if(localVideo && localStream){
-            localVideo.srcObject=localStream;
-            localVideo.muted=true;
-            localVideo.autoplay=true;
-            localVideo.playsInline=true;
-            localVideo.setAttribute('playsinline','');
-            if(targetOn) localVideo.play().catch(()=>{});
-        }
+            const track=await ensureVideoTrack(true);
+            if(!track) return;
+            isCameraOn=true;
+            track.enabled=true;
+            setCameraButton(true);
 
-        await syncTracksToEveryPeer();
-        setTimeout(()=>syncTracksToEveryPeer(),180);
-        setTimeout(()=>syncTracksToEveryPeer(),700);
-        setTimeout(()=>syncTracksToEveryPeer(),1600);
-        if(targetOn){
-            setTimeout(()=>ensureOutboundMediaForAll(),220);
-            setTimeout(()=>ensureOutboundMediaForAll(),900);
-        }
-        broadcastMyCameraStatus();
-        unlockRemoteMedia();
-        if(IS_MOBILE_BROWSER){
-            setTimeout(()=>recoverMobileLocalMedia(),350);
-            setTimeout(()=>recoverMobileLocalMedia(),1200);
+            const localVideo=document.getElementById('localVideo');
+            if(localVideo && localStream){
+                localVideo.srcObject=localStream;
+                localVideo.muted=true;
+                localVideo.autoplay=true;
+                localVideo.playsInline=true;
+                localVideo.setAttribute('playsinline','');
+                localVideo.play().catch(()=>{});
+            }
+
+            // One sender update + at most one negotiation pass.
+            await syncTracksToEveryPeer();
+            ensureOutboundMediaForAll();
+            broadcastMyCameraStatus();
+            unlockRemoteMedia();
+        }finally{
+            toggleCamera.busy=false;
         }
     }
 
@@ -2911,7 +2855,6 @@
 
         try{
             connectToAll();
-            syncTracksToEveryPeer();
 
             Object.keys(peers).forEach(uid=>{
                 const pc=peers[uid];
@@ -2961,21 +2904,21 @@
             stopRecognition();
         }
     });
+    let mediaDeviceChangeTimer=null;
     if(navigator.mediaDevices?.addEventListener){
         navigator.mediaDevices.addEventListener('devicechange',()=>{
-            if(document.visibilityState!=='visible') return;
-            setTimeout(async ()=>{
-                await recoverMobileLocalMedia();
-                syncTracksToEveryPeer();
-                repairMeetingMedia(true);
-            },300);
+            clearTimeout(mediaDeviceChangeTimer);
+            mediaDeviceChangeTimer=setTimeout(()=>{
+                if(document.visibilityState!=='visible') return;
+                if((isMicOn && !liveLocalTrack('audio')) || (isCameraOn && !liveLocalTrack('video'))){
+                    repairMeetingMedia(true);
+                }
+            },1200);
         });
     }
 
-    document.addEventListener('pointerdown', unlockRemoteMedia, { passive:true });
-    document.addEventListener('touchstart', unlockRemoteMedia, { passive:true });
-    document.addEventListener('click', unlockRemoteMedia, { passive:true });
-    document.addEventListener('keydown', unlockRemoteMedia, { passive:true });
+    // Autoplay recovery is armed only when playback actually fails (armAudioUnlock).
+    // Do not run media-unlock work on every click/touch/key event.
 
     /* ---------- Boot ---------- */
     window.addEventListener('load', async () => {
@@ -2996,12 +2939,10 @@
 
         // Bounded startup recovery only. Do not continuously resync tracks,
         // renegotiate peers, reacquire media, or reattach streams on timers.
-        setTimeout(()=>repairMeetingMedia(false),200);
-        setTimeout(()=>repairMeetingMedia(false),1400);
+        setTimeout(()=>repairMeetingMedia(false),500);
 
         if(!realtimeReady){
-            setTimeout(()=>announceJoin(true),1200);
-            setTimeout(()=>repairMeetingMedia(true),2200);
+            setTimeout(()=>announceJoin(true),1500);
         }
 
         // Lightweight roster heartbeat only. WebRTC repair itself is driven by
