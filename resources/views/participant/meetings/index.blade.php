@@ -689,185 +689,126 @@
 
 
 {{-- ================================================================
-     PARTICIPANT LIVE MEETING SYNC
-     - Newly invited meetings appear without browser refresh
-     - Upcoming -> Active updates automatically
-     - Cancelled/completed/status changes appear automatically
-     - Stats + pagination refresh too
+     LIVE STATUS POLLING (bina refresh ke Upcoming → Attend switch)
 ================================================================ --}}
 <script>
+    /* Client-side status filters: no page refresh required. */
     (function () {
-        let requestRunning = false;
-        let pendingRefresh = false;
-        let activeFilter = 'all';
+        const buttons = Array.from(document.querySelectorAll('[data-status-filter]'));
 
-        function applyMeetingFilter() {
-            const buttons = Array.from(
-                document.querySelectorAll('[data-status-filter]')
-            );
-
-            buttons.forEach(button => {
-                button.classList.toggle(
-                    'is-active',
-                    (button.dataset.statusFilter || 'all') === activeFilter
-                );
+        function applyMeetingFilter(status) {
+            document.querySelectorAll('[data-meeting-id]').forEach(row => {
+                const current = String(row.dataset.currentStatus || '').toLowerCase();
+                row.style.display = (status === 'all' || current === status) ? '' : 'none';
             });
-
-            document
-                .querySelectorAll('[data-meeting-id]')
-                .forEach(row => {
-                    const status = String(
-                        row.dataset.currentStatus || ''
-                    ).toLowerCase();
-
-                    row.style.display =
-                        activeFilter === 'all' || status === activeFilter
-                            ? ''
-                            : 'none';
-                });
         }
 
-        document.addEventListener('click', function (event) {
-            const button = event.target.closest('[data-status-filter]');
-
-            if (!button) {
-                return;
-            }
-
-            activeFilter =
-                button.dataset.statusFilter || 'all';
-
-            applyMeetingFilter();
+        buttons.forEach(button => {
+            button.addEventListener('click', function () {
+                buttons.forEach(btn => btn.classList.remove('is-active'));
+                this.classList.add('is-active');
+                applyMeetingFilter(this.dataset.statusFilter || 'all');
+            });
         });
 
-        async function refreshParticipantMeetings(reason = 'live') {
-            if (requestRunning) {
-                pendingRefresh = true;
-                return;
+        /* Expose for live polling so current filter remains correct
+           when Upcoming changes to Active without refresh. */
+        window.smartMeetApplyMeetingFilter = function () {
+            const active = document.querySelector('[data-status-filter].is-active');
+            applyMeetingFilter(active?.dataset.statusFilter || 'all');
+        };
+    })();
+</script>
+
+<script>
+    (function () {
+        const rows = Array.from(document.querySelectorAll('[data-meeting-id]'));
+        if (rows.length === 0) return;
+
+        const meetingIds = [...new Set(rows.map(el => el.dataset.meetingId))];
+
+        function statusBadgeHtml(status) {
+            const map = {
+                upcoming:  'bg-blue-50 text-blue-700 border-blue-200',
+                active:    'bg-orange-50 text-orange-600 border-orange-200',
+                completed: 'bg-emerald-50 text-emerald-600 border-emerald-200',
+                cancelled: 'bg-red-50 text-red-500 border-red-200',
+                flagged:   'bg-yellow-50 text-yellow-600 border-yellow-200',
+            };
+            const dotMap = {
+                upcoming:  'bg-blue-500',
+                active:    'bg-orange-500 animate-pulse',
+                completed: 'bg-emerald-500',
+                cancelled: 'bg-red-500',
+                flagged:   'bg-yellow-500',
+            };
+            const cls = map[status] || 'bg-gray-100 text-gray-500 border-gray-200';
+            const dot = dotMap[status] || 'bg-gray-400';
+            return `<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${cls}">
+                <span class="w-1.5 h-1.5 rounded-full ${dot}"></span>
+                ${status.toUpperCase()}
+            </span>`;
+        }
+
+        function attendHtml(status, id) {
+            if (status === 'active') {
+                return `<a href="/participant/meetings/${id}/attend" class="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-semibold transition shadow-sm hover:shadow"><i class="fa-solid fa-video text-[11px]"></i> Attend</a>`;
             }
+            if (status === 'upcoming') {
+                return `<span title="Meeting hasn't started yet" class="flex items-center gap-2 bg-gray-100 text-gray-400 px-4 py-2 rounded-xl text-xs font-semibold cursor-not-allowed border border-gray-200"><i class="fa-solid fa-clock text-[11px]"></i> Upcoming</span>`;
+            }
+            return `<span class="flex items-center gap-2 bg-gray-100 text-gray-400 px-4 py-2 rounded-xl text-xs font-semibold cursor-not-allowed border border-gray-200"><i class="fa-solid fa-video text-[11px]"></i> Attend</span>`;
+        }
 
-            requestRunning = true;
-
+        async function poll() {
             try {
-                /*
-                 * Important:
-                 * We request the COMPLETE participant meeting index, not only the
-                 * meeting IDs that existed when the page first loaded.
-                 *
-                 * Therefore, if an organizer adds this participant to a new
-                 * meeting, that new row can appear without browser refresh.
-                 */
-                const url = new URL(
-                    '{{ route('participant.meetings.index') }}',
-                    window.location.origin
-                );
-
-                url.searchParams.set('_live', Date.now());
-
-                const response = await fetch(url.toString(), {
+                // Cache-busting timestamp + no-store ensure browser never reuses an old
+                // "upcoming" response. This keeps Upcoming -> Active live without refresh.
+                const url = `{{ route('participant.meetings.status-check') }}?ids=${meetingIds.join(',')}&_=${Date.now()}`;
+                const res = await fetch(url, {
                     method: 'GET',
                     cache: 'no-store',
                     credentials: 'same-origin',
                     headers: {
                         'X-Requested-With': 'XMLHttpRequest',
-                        'Accept': 'text/html',
+                        'Accept': 'application/json',
                         'Cache-Control': 'no-cache'
                     }
                 });
+                if (!res.ok) return;
+                const data = await res.json();
 
-                if (!response.ok) {
-                    throw new Error(
-                        `HTTP ${response.status}`
-                    );
+                const s = data.stats || {};
+                const setStat = (id, val) => {
+                    const el = document.getElementById(id);
+                    if (el && val !== undefined) el.textContent = String(val).padStart(2, '0');
+                };
+                setStat('stat-upcoming-today', s.upcomingToday);
+                setStat('stat-total', s.total);
+                setStat('stat-completed', s.completed);
+
+                Object.entries(data.meetings || {}).forEach(([id, status]) => {
+                    const row = document.querySelector(`[data-meeting-id="${id}"]`);
+                    if (!row || row.dataset.currentStatus === status) return;
+                    row.dataset.currentStatus = status;
+
+                    const badge = document.getElementById('status-badge-' + id);
+                    if (badge) badge.innerHTML = statusBadgeHtml(status);
+
+                    const attend = document.getElementById('attend-col-' + id);
+                    if (attend) attend.innerHTML = attendHtml(status, id);
+                });
+
+                if (typeof window.smartMeetApplyMeetingFilter === 'function') {
+                    window.smartMeetApplyMeetingFilter();
                 }
-
-                const html = await response.text();
-
-                const parser = new DOMParser();
-                const freshDocument =
-                    parser.parseFromString(html, 'text/html');
-
-                /*
-                 * Update the 3 participant statistics.
-                 */
-                const freshStats =
-                    freshDocument.querySelector('.stats-grid');
-
-                const currentStats =
-                    document.querySelector('.stats-grid');
-
-                if (freshStats && currentStats) {
-                    currentStats.innerHTML =
-                        freshStats.innerHTML;
-                }
-
-                /*
-                 * Replace the entire meeting shell.
-                 * This handles:
-                 * - brand new invitation
-                 * - status change
-                 * - Attend button
-                 * - organizer information
-                 * - pagination
-                 * - empty/non-empty state
-                 */
-                const freshShell =
-                    freshDocument.querySelector('.meetings-shell');
-
-                const currentShell =
-                    document.querySelector('.meetings-shell');
-
-                if (
-                    freshShell &&
-                    currentShell &&
-                    freshShell.innerHTML.trim() !==
-                    currentShell.innerHTML.trim()
-                ) {
-                    currentShell.innerHTML =
-                        freshShell.innerHTML;
-                }
-
-                applyMeetingFilter();
-
-            } catch (error) {
-                console.error(
-                    `Participant live meeting refresh failed (${reason}):`,
-                    error
-                );
-            } finally {
-                requestRunning = false;
-
-                if (pendingRefresh) {
-                    pendingRefresh = false;
-                    refreshParticipantMeetings('queued');
-                }
+            } catch (e) {
+                console.error('Participant meeting poll failed:', e);
             }
         }
 
-        /*
-         * Run immediately, then every 2 seconds.
-         * This is background AJAX only — the browser page is not reloaded.
-         */
-        refreshParticipantMeetings('initial');
-
-        setInterval(() => {
-            refreshParticipantMeetings('interval');
-        }, 2000);
-
-        document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) {
-                refreshParticipantMeetings('visible');
-            }
-        });
-
-        window.addEventListener('focus', () => {
-            refreshParticipantMeetings('focus');
-        });
-
-        window.addEventListener('online', () => {
-            refreshParticipantMeetings('online');
-        });
-
-        applyMeetingFilter();
+        // Check immediately when page loads, then keep checking every 2 seconds.
+        poll();
+        setInterval(poll, 2000);
     })();
 </script>

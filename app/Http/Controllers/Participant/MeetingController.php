@@ -31,14 +31,12 @@ class MeetingController extends Controller
             ->get();
 
         foreach ($participantUpcomingMeetings as $meeting) {
-            $meetingTimezone = $meeting->timezone ?: $timezone;
-
             $startTime = Carbon::parse(
                 $meeting->date . ' ' . $meeting->time,
-                $meetingTimezone
+                $timezone
             );
 
-            if (Carbon::now($meetingTimezone)->greaterThanOrEqualTo($startTime)) {
+            if ($now->greaterThanOrEqualTo($startTime)) {
                 $meeting->status = 'active';
                 $meeting->save();
             }
@@ -312,23 +310,24 @@ class MeetingController extends Controller
         | Nothing else is auto-changed here.
         |--------------------------------------------------------------------------
         */
-        $meetingsToCheck = Meeting::whereHas('participants', function ($q) use ($userId) {
-            $q->where('user_id', $userId);
-        })
-            ->where('status', 'upcoming')
-            ->get();
+        if (!empty($ids)) {
+            $meetingsToCheck = Meeting::whereIn('id', $ids)
+                ->whereHas('participants', function ($q) use ($userId) {
+                    $q->where('user_id', $userId);
+                })
+                ->where('status', 'upcoming')
+                ->get();
 
-        foreach ($meetingsToCheck as $meeting) {
-            $meetingTimezone = $meeting->timezone ?: $timezone;
+            foreach ($meetingsToCheck as $meeting) {
+                $startTime = Carbon::parse(
+                    $meeting->date . ' ' . $meeting->time,
+                    $timezone
+                );
 
-            $startTime = Carbon::parse(
-                $meeting->date . ' ' . $meeting->time,
-                $meetingTimezone
-            );
-
-            if (Carbon::now($meetingTimezone)->greaterThanOrEqualTo($startTime)) {
-                $meeting->status = 'active';
-                $meeting->save();
+                if ($now->greaterThanOrEqualTo($startTime)) {
+                    $meeting->status = 'active';
+                    $meeting->save();
+                }
             }
         }
 
