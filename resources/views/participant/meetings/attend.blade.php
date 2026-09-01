@@ -198,7 +198,9 @@
         .person-row{display:flex; align-items:center; gap:10px; padding:10px; border-radius:13px; border:1px solid var(--line); background:rgba(255,255,255,.02); transition:opacity .2s, filter .2s, background .2s, border-color .2s}
         .person-row.joined{opacity:1; filter:none; background:rgba(34,197,94,.07); border-color:rgba(34,197,94,.22)}
         .person-row.pending{opacity:.5; filter:grayscale(.5) saturate(.4)}
-        .person-avatar{width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; color:#fff; flex-shrink:0}
+        .person-avatar{width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; color:#fff; flex-shrink:0; overflow:hidden}
+        .avatar-circle{overflow:hidden}
+        .avatar-circle img,.person-avatar img{width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block}
         .person-info{flex:1; min-width:0}
         .person-name{font-size:12.5px; font-weight:700; display:flex; align-items:center; gap:5px}
         .person-status{font-size:10px; color:var(--muted)}
@@ -213,10 +215,10 @@
             flex-shrink:0; display:flex; align-items:center; justify-content:center; gap:8px;
             margin:0 12px 12px; padding:9px 14px; border-radius:18px; border:1px solid var(--line);
             background:rgba(6,11,22,.92); box-shadow:0 -6px 26px rgba(0,0,0,.2), var(--shadow-lg);
-            backdrop-filter:blur(18px); overflow-x:auto; scrollbar-width:none;
+            backdrop-filter:blur(18px); overflow:hidden; scrollbar-width:none; min-width:0;
         }
         .controls::-webkit-scrollbar{display:none}
-        .ctrl-btn{display:flex; flex-direction:column; align-items:center; gap:4px; min-width:52px; padding:4px 6px; border-radius:12px; cursor:pointer; user-select:none}
+        .ctrl-btn{display:flex; flex-direction:column; align-items:center; gap:4px; min-width:0; width:52px; flex:0 1 52px; padding:4px 4px; border-radius:12px; cursor:pointer; user-select:none}
         .ctrl-btn:hover{background:rgba(255,255,255,.05)}
         .ctrl-icon{
             width:38px; height:38px; border-radius:12px; display:flex; align-items:center; justify-content:center;
@@ -512,7 +514,7 @@
                 padding:7px 8px;
                 margin:0 6px 6px;
             }
-            .ctrl-btn{min-width:44px}
+            .ctrl-btn{min-width:0;width:42px;flex-basis:42px;padding:3px 2px}
 
             #side-panel{
                 bottom:70px;
@@ -543,11 +545,27 @@
             .avatar-circle{width:58px; height:58px; font-size:20px}
             .tile-name{font-size:11px}
             .role-badge{font-size:7px}
-            .controls{padding:6px 4px; gap:0}
-            .ctrl-btn{min-width:42px; padding:3px 4px}
-            .ctrl-icon{width:36px; height:36px}
-            .ctrl-label{font-size:8px}
+            .controls{padding:6px 3px; gap:0;margin-left:4px;margin-right:4px}
+            .ctrl-btn{min-width:0;width:38px;flex-basis:38px;padding:2px 1px;gap:3px}
+            .ctrl-icon,.btn-end{width:32px;height:32px;border-radius:10px;font-size:12px}
+            .ctrl-label{font-size:7.5px;white-space:nowrap}
             #side-panel{bottom:66px}
+        }
+
+
+        @media (max-width:900px){
+            .controls{gap:2px;padding:7px 5px}
+            .ctrl-btn{width:44px;flex-basis:44px;padding-left:2px;padding-right:2px}
+            .ctrl-icon,.btn-end{width:34px;height:34px}
+            .ctrl-label{font-size:8px}
+            .ctrl-divider{margin:0 1px}
+        }
+        @media (max-width:520px){
+            .controls{gap:0;padding:5px 2px}
+            .ctrl-btn{width:36px;flex-basis:36px;padding:2px 0}
+            .ctrl-icon,.btn-end{width:30px;height:30px;border-radius:9px}
+            .ctrl-label{font-size:7px}
+            .ctrl-divider{height:25px;margin:0}
         }
 
         @media (max-width:640px){
@@ -675,6 +693,7 @@
     const MY_USER_ID      = "{{ auth()->id() }}";
     const MY_NAME         = @json(auth()->user()->name);
     const MY_INITIALS     = @json($userInitials);
+    const MY_AVATAR_URL   = @json($myAvatarUrl ?? null);
     const SIGNAL_URL      = @json(route('participant.meetings.signal', $meeting));
     const TRANSCRIPT_URL  = @json(route('participant.meetings.transcript', $meeting));
     const MARK_LEFT_URL   = @json(route('participant.meetings.markLeft', $meeting));
@@ -684,6 +703,7 @@
     const ORGANIZER_ID    = "{{ $organizer->id }}";
     const ORGANIZER_NAME  = @json($organizer->name);
     const ORGANIZER_INITIALS = @json($orgInitials);
+    const ORGANIZER_AVATAR_URL = @json($organizerAvatarUrl ?? null);
     const ORGANIZER_JOINED   = @json($organizerJoined ?? false);
     const MEETING_END_TIME   = @json($meetingEnd);
     const ACTUAL_START = @json($meeting->actual_start ? \Carbon\Carbon::parse($meeting->actual_start)->utc()->toIso8601String() : now()->utc()->toIso8601String());
@@ -692,8 +712,8 @@
 
     /* ---------- Known participants (id -> {name, initials, isOrganizer, hasJoined}) ---------- */
     const knownParticipants = {};
-    knownParticipants[ORGANIZER_ID] = { name: ORGANIZER_NAME, initials: ORGANIZER_INITIALS, isOrganizer: true, hasJoined: Boolean(ORGANIZER_JOINED) };
-    ALL_PARTICIPANTS.forEach(p => { knownParticipants[String(p.userId)] = { name: p.name, initials: p.initials, isOrganizer: false, hasJoined: false }; });
+    knownParticipants[ORGANIZER_ID] = { name: ORGANIZER_NAME, initials: ORGANIZER_INITIALS, avatarUrl: ORGANIZER_AVATAR_URL || null, isOrganizer: true, hasJoined: Boolean(ORGANIZER_JOINED) };
+    ALL_PARTICIPANTS.forEach(p => { knownParticipants[String(p.userId)] = { name: p.name, initials: p.initials, avatarUrl: p.avatarUrl || null, isOrganizer: false, hasJoined: Boolean(p.hasJoined) }; });
 
     /* ---------- Runtime state ---------- */
     const onlineUsers   = new Set([String(MY_USER_ID)]);
@@ -715,6 +735,14 @@
     function colorFor(uid, isOrganizer){ if(isOrganizer) return COLORS[0]; let h=0; for(const c of String(uid)) h=(h*31+c.charCodeAt(0))>>>0; return COLORS[1+(h%(COLORS.length-1))]; }
     function escapeHtml(t){ const d=document.createElement('div'); d.textContent=String(t??''); return d.innerHTML; }
     function initialsOf(name){ const parts=String(name||'').trim().split(/\s+/); if(!parts.length) return '?'; return (parts[0][0]+(parts.length>1?parts[parts.length-1][0]:'')).toUpperCase(); }
+
+    function avatarContent(avatarUrl, initials){
+        const safeInitials=escapeHtml(initials||'?');
+        if(!avatarUrl) return safeInitials;
+        const safeUrl=escapeHtml(String(avatarUrl));
+        return `<img src="${safeUrl}" alt="" loading="eager"
+            onerror="const p=this.parentElement; this.remove(); if(p && !p.textContent.trim()) p.textContent='${safeInitials}'">`;
+    }
 
     /* ---------- Toast ---------- */
     const recentToasts = new Set();
@@ -788,7 +816,7 @@
         uid=String(uid);
         const body=document.getElementById('people-body'); if(!body) return;
         const isMe = uid===String(MY_USER_ID);
-        const info = isMe ? { name: MY_NAME, initials: MY_INITIALS, isOrganizer: false } : knownParticipants[uid];
+        const info = isMe ? { name: MY_NAME, initials: MY_INITIALS, avatarUrl: MY_AVATAR_URL, isOrganizer: false } : knownParticipants[uid];
         if(!info) return;
         const isOnline = isMe || onlineUsers.has(uid);
         let row=document.getElementById('person-row-'+uid);
@@ -796,7 +824,7 @@
         row.className='person-row '+(isOnline?'joined':'pending');
         const color=colorFor(uid, info.isOrganizer);
         row.innerHTML = `
-        <div class="person-avatar" style="background:linear-gradient(135deg,${color})">${escapeHtml(info.initials||initialsOf(info.name))}</div>
+        <div class="person-avatar" style="background:linear-gradient(135deg,${color})">${avatarContent(info.avatarUrl,info.initials||initialsOf(info.name))}</div>
         <div class="person-info">
             <div class="person-name">${escapeHtml(info.name)}${isMe?' <span style="color:var(--blue);font-weight:600;">(You)</span>':''}${info.isOrganizer?'<i class="fa fa-crown" style="color:#fbbf24;font-size:10px;"></i>':''}</div>
             <div class="person-status ${isOnline?'on':''}">${info.isOrganizer?'Organizer':'Participant'} • ${isOnline?'Joined':'Not joined yet'}</div>
@@ -811,7 +839,7 @@
         tile.innerHTML = `
         <div class="video-placeholder">
             <video id="localVideo" autoplay muted playsinline class="mirrored" style="display:none;"></video>
-            <div class="avatar-circle" id="avatar-${MY_USER_ID}" style="background:linear-gradient(135deg,${COLORS[1]})">${escapeHtml(MY_INITIALS)}</div>
+            <div class="avatar-circle" id="avatar-${MY_USER_ID}" style="background:linear-gradient(135deg,${COLORS[1]})">${avatarContent(MY_AVATAR_URL,MY_INITIALS)}</div>
             <button class="tile-expand-btn" onclick="toggleMaximize('${MY_USER_ID}')"><i class="fa fa-expand" id="expand-icon-${MY_USER_ID}"></i></button>
         </div>
         <div class="tile-info">
@@ -840,7 +868,7 @@
         tile.innerHTML = `
         <div class="video-placeholder">
             <video id="rvideo-${uid}" autoplay playsinline style="display:${cameraOn?'block':'none'};"></video>
-            <div class="avatar-circle" id="avatar-${uid}" style="background:linear-gradient(135deg,${color});display:${cameraOn?'none':'flex'};">${escapeHtml(initials)}</div>
+            <div class="avatar-circle" id="avatar-${uid}" style="background:linear-gradient(135deg,${color});display:${cameraOn?'none':'flex'};">${avatarContent(knownParticipants[uid]?.avatarUrl,initials)}</div>
             <button class="tile-expand-btn" onclick="toggleMaximize('${uid}')"><i class="fa fa-expand" id="expand-icon-${uid}"></i></button>
         </div>
         <div class="tile-info">
@@ -1005,7 +1033,7 @@
         iceCandidatePoolSize:0,
         bundlePolicy:'max-bundle',
         rtcpMuxPolicy:'require',
-        iceTransportPolicy:HAS_TURN ? 'relay' : 'all'
+        iceTransportPolicy:'all'
     };
     console.log('[SmartMeet] ICE servers configured:', iceServers.map(s=>s.urls));
 
@@ -1240,7 +1268,27 @@
 
             const track=event.track;
             if(track){
+                if(track.kind==='video' && track.readyState==='live'){
+                    camStatus[uid]=true;
+                    const remoteVideo=document.getElementById('rvideo-'+uid);
+                    const avatar=document.getElementById('avatar-'+uid);
+                    if(remoteVideo){
+                        const directStream=(event.streams && event.streams[0])
+                            ? event.streams[0]
+                            : new MediaStream([track]);
+                        remoteVideo.srcObject=directStream;
+                        remoteVideo.muted=true;
+                        remoteVideo.autoplay=true;
+                        remoteVideo.playsInline=true;
+                        remoteVideo.setAttribute('playsinline','');
+                        remoteVideo.style.display='block';
+                        remoteVideo.play().catch(()=>{});
+                    }
+                    if(avatar) avatar.style.display='none';
+                }
+
                 track.onunmute = ()=>{
+                    if(track.kind==='video') camStatus[uid]=true;
                     attachRemoteStream(uid);
                     setTimeout(()=>attachRemoteStream(uid),120);
                     if(track.kind==='audio') unlockRemoteAudio();
@@ -1617,7 +1665,7 @@
 
             // Actual received frames are the source of truth.
             // A stale camera-status signal must not hide a real unmuted track.
-            const show=Boolean(bestVideo && bestVideo.readyState==='live');
+            const show=Boolean(bestVideo && bestVideo.readyState==='live' && !bestVideo.muted);
             video.style.display=show?'block':'none';
             if(avatar) avatar.style.display=show?'none':'flex';
 
@@ -1634,7 +1682,10 @@
             }
         }
 
-        if(bestVideo && bestVideo.readyState==='live') camStatus[uid]=true;
+        if(bestVideo && bestVideo.readyState==='live'){
+            if(!bestVideo.muted) camStatus[uid]=true;
+            else setTimeout(()=>attachRemoteStream(uid),180);
+        }
     }
 
     let audioUnlockArmed=false;
@@ -1837,11 +1888,12 @@
         if(data.type==='presence-response'){
             const uid=String(data.data?.userId || from);
             if(uid===String(MY_USER_ID)) return;
-            registerJoinedUser(uid, data.data?.name, data.data?.initials, Boolean(data.data?.isOrganizer));
+            registerJoinedUser(uid, data.data?.name, data.data?.initials, Boolean(data.data?.isOrganizer), data.data?.avatarUrl || null);
 
             // Update remote state directly. The previous helper calls were undefined
             // and could abort this handler before WebRTC negotiation was scheduled.
-            camStatus[uid]=Boolean(data.data?.cameraOn);
+            if(Boolean(data.data?.cameraOn)) camStatus[uid]=true;
+            else if(!(remoteStreams[uid]?.getVideoTracks?.()||[]).some(t=>t.readyState==='live')) camStatus[uid]=false;
             micStatus[uid]=!Boolean(data.data?.micOn);
             const micEl=document.getElementById('micoff-'+uid);
             if(micEl) micEl.style.display=micStatus[uid] ? 'flex' : 'none';
@@ -1866,7 +1918,7 @@
             const uid=String(data.data.userId); if(uid===String(MY_USER_ID)) return;
             const wasOnline=onlineUsers.has(uid);
             leftUsers.delete(uid);
-            registerJoinedUser(uid, data.data.name, data.data.initials, Boolean(data.data?.isOrganizer || uid===String(ORGANIZER_ID)));
+            registerJoinedUser(uid, data.data.name, data.data.initials, Boolean(data.data?.isOrganizer || uid===String(ORGANIZER_ID)), data.data?.avatarUrl || null);
             const pc=peers[uid];
             if(shouldInitiate(uid) && pc && pc.signalingState==='stable' &&
                 !['connected'].includes(pc.connectionState) &&
@@ -1904,7 +1956,8 @@
         }
         if(data.type==='camera-status'){
             const uid=String(data.data.userId||from); if(uid===String(MY_USER_ID)) return;
-            camStatus[uid]=Boolean(data.data.cameraOn);
+            if(Boolean(data.data.cameraOn)) camStatus[uid]=true;
+            else if(!(remoteStreams[uid]?.getVideoTracks?.()||[]).some(t=>t.readyState==='live')) camStatus[uid]=false;
             attachRemoteStream(uid);
             return;
         }
@@ -2503,7 +2556,7 @@
     }
 
     /* ---------- Presence / reconnection ---------- */
-    function registerJoinedUser(uid, name, initials, isOrganizer=false){
+    function registerJoinedUser(uid, name, initials, isOrganizer=false, avatarUrl=null){
         uid=String(uid);
         if(uid===String(MY_USER_ID)) return;
         leftUsers.delete(uid);
@@ -2512,6 +2565,7 @@
             ...old,
             name:name || old.name || ('User '+uid),
             initials:initials || old.initials || ((name||old.name||'U').trim().charAt(0).toUpperCase()),
+            avatarUrl:avatarUrl || old.avatarUrl || null,
             isOrganizer:Boolean(isOrganizer || old.isOrganizer || uid===String(ORGANIZER_ID)),
             hasJoined:true
         };
@@ -2522,7 +2576,7 @@
     }
     function sendPresence(to='all'){
         return sendSignal(to,'presence-response',{
-            userId:MY_USER_ID, name:MY_NAME, initials:MY_INITIALS,
+            userId:MY_USER_ID, name:MY_NAME, initials:MY_INITIALS, avatarUrl:MY_AVATAR_URL,
             isOrganizer:String(MY_USER_ID)===String(ORGANIZER_ID),
             micOn:Boolean(isMicOn), cameraOn:Boolean(isCameraOn)
         });
@@ -2565,7 +2619,7 @@
     function announceJoin(force=false){
         if(!force && joinAnnounced) return;
         joinAnnounced=true;
-        sendSignal('all','user-joined',{ userId:MY_USER_ID, name:MY_NAME, initials:MY_INITIALS, isOrganizer:String(MY_USER_ID)===String(ORGANIZER_ID) });
+        sendSignal('all','user-joined',{ userId:MY_USER_ID, name:MY_NAME, initials:MY_INITIALS, avatarUrl:MY_AVATAR_URL, isOrganizer:String(MY_USER_ID)===String(ORGANIZER_ID) });
         requestPresence(true);
     }
 

@@ -38,6 +38,7 @@ class MeetingAttendController extends Controller
                 'userId' => (string) $user->id,
                 'name' => $user->name,
                 'initials' => $this->initials($user->name),
+                'avatarUrl' => $this->avatarUrl($user),
                 'isOrganizer' => false,
             ]
         );
@@ -65,6 +66,7 @@ class MeetingAttendController extends Controller
                 'userId' => (string) $participant->user->id,
                 'name' => $participant->user->name,
                 'initials' => $this->initials($participant->user->name),
+                'avatarUrl' => $this->avatarUrl($participant->user),
             ])
             ->values();
 
@@ -77,18 +79,23 @@ class MeetingAttendController extends Controller
                 'userId' => (string) $participant->user->id,
                 'name' => $participant->user->name,
                 'initials' => $this->initials($participant->user->name),
+                'avatarUrl' => $this->avatarUrl($participant->user),
                 'hasJoined' => $this->participantIsCurrentlyJoined($participant),
             ])
             ->values();
 
         $organizerJoined = $this->organizerIsCurrentlyJoined($meeting);
+        $myAvatarUrl = $this->avatarUrl($user);
+        $organizerAvatarUrl = $this->avatarUrl($meeting->organizer);
 
         return view('participant.meetings.attend', compact(
             'meeting',
             'allUserIds',
             'alreadyJoined',
             'allParticipants',
-            'organizerJoined'
+            'organizerJoined',
+            'myAvatarUrl',
+            'organizerAvatarUrl'
         ));
     }
 
@@ -290,6 +297,42 @@ class MeetingAttendController extends Controller
             type: $type,
             data: $data
         ))->toOthers();
+    }
+
+    private function avatarUrl($user): ?string
+    {
+        if ($user === null) {
+            return null;
+        }
+
+        $path = null;
+
+        foreach (['avatar', 'avatar_path', 'profile_image', 'profile_photo', 'image'] as $field) {
+            $value = data_get($user, $field);
+
+            if (is_string($value) && trim($value) !== '') {
+                $path = trim($value);
+                break;
+            }
+        }
+
+        if ($path === null) {
+            return null;
+        }
+
+        if (preg_match('#^https?://#i', $path)) {
+            return $path;
+        }
+
+        if (str_starts_with($path, '/storage/')) {
+            return url($path);
+        }
+
+        if (str_starts_with($path, 'storage/')) {
+            return asset($path);
+        }
+
+        return asset('storage/' . ltrim($path, '/'));
     }
 
     private function initials(string $name): string
