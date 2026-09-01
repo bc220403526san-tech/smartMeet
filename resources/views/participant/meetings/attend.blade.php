@@ -1011,10 +1011,19 @@
     const TURN_USERNAME = @json(config('services.turn.username'));
     const TURN_CREDENTIAL = @json(config('services.turn.credential'));
     const HAS_TURN = Boolean(TURN_HOST && TURN_USERNAME && TURN_CREDENTIAL);
-    const iceServers = [];
+
+    // Always keep direct/STUN candidates available. TURN is added as a relay
+    // fallback instead of replacing STUN completely, so laptop/mobile peers can
+    // still connect even when one TURN transport is temporarily unavailable.
+    const iceServers = [
+        { urls:[
+                'stun:stun.l.google.com:19302',
+                'stun:stun1.l.google.com:19302',
+                'stun:stun.cloudflare.com:3478'
+            ]}
+    ];
+
     if(HAS_TURN){
-        // The TURN relay has been externally verified. Use it as the single
-        // media path so every peer gets the same NAT-safe behaviour.
         iceServers.push({
             urls:[
                 `turn:${TURN_HOST}:3478?transport=udp`,
@@ -1023,14 +1032,13 @@
             username:TURN_USERNAME,
             credential:TURN_CREDENTIAL
         });
-    } else {
-        // Safe fallback only when TURN is genuinely unavailable.
-        iceServers.push({ urls:['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302'] });
-        console.warn('[SmartMeet] Custom TURN is not configured; using STUN fallback.');
+    }else{
+        console.warn('[SmartMeet] Custom TURN is not configured; direct/STUN connectivity only.');
     }
+
     const iceConfig = {
         iceServers,
-        iceCandidatePoolSize:0,
+        iceCandidatePoolSize:4,
         bundlePolicy:'max-bundle',
         rtcpMuxPolicy:'require',
         iceTransportPolicy:'all'
@@ -1268,6 +1276,9 @@
 
             const track=event.track;
             if(track){
+                if(track.kind==='audio') pc.__preferredRemoteAudioTrack=track;
+                if(track.kind==='video') pc.__preferredRemoteVideoTrack=track;
+
                 if(track.kind==='video' && track.readyState==='live'){
                     camStatus[uid]=true;
                     const remoteVideo=document.getElementById('rvideo-'+uid);
@@ -1352,7 +1363,10 @@
                 awaitSyncPeerMedia(uid);
                 attachRemoteStream(uid);
                 unlockRemoteAudio();
+                sendSignal(uid,'mic-status',{userId:MY_USER_ID,muted:!isMicOn});
+                sendSignal(uid,'camera-status',{userId:MY_USER_ID,cameraOn:isCameraOn});
                 setTimeout(()=>ensureOutboundMediaNegotiated(uid),180);
+                setTimeout(()=>ensureOutboundMediaNegotiated(uid),850);
                 pc.__restartAttempts=0;
             }else if(pc.connectionState==='disconnected'){
                 clearTimeout(pc.__connectWatchdog);
@@ -1569,6 +1583,16 @@
         const ctx=getMeetingAudioContext();
         if(!ctx) return false;
 
+        // Mobile Chrome/Safari can create an AudioContext in "suspended" state.
+        // In that case DO NOT mute the normal <audio> element, otherwise the
+        // participant becomes completely silent until another user gesture.
+        if(ctx.state!=='running'){
+            audioEl.muted=false;
+            audioEl.defaultMuted=false;
+            audioEl.volume=1;
+            return false;
+        }
+
         const existing=remoteAudioNodes[uid];
         if(existing?.trackId===track.id){
             try{
@@ -1621,6 +1645,11 @@
         if(ctx && ctx.state==='suspended'){
             try{ await ctx.resume(); }catch(e){}
         }
+        if(ctx?.state==='running'){
+            Object.keys(peers).forEach(uid=>{
+                try{ attachRemoteStream(uid); }catch(e){}
+            });
+        }
     }
 
     function attachRemoteStream(uid){
@@ -1651,6 +1680,16 @@
 
         const pickBest=(kind)=>{
             const candidates=[];
+
+            const preferred = kind==='audio'
+                ? pc?.__preferredRemoteAudioTrack
+                : pc?.__preferredRemoteVideoTrack;
+            if(preferred && preferred.readyState!=='ended' && !localIds.has(preferred.id)){
+                let score=1000;
+                if(!preferred.muted) score+=200;
+                candidates.push({track:preferred,score});
+            }
+
             transceiverTracks
                 .filter(x=>x.track.kind===kind)
                 .forEach(x=>{
@@ -1866,7 +1905,9 @@
             // after the answer is applied. Sync once more so our mic/camera are
             // definitely attached to this participant-to-participant connection.
             bindPeerTransceivers(pc);
-            await syncLocalTracksToPeer(from);
+            await awaitSyncPeerMedia(from);
+            setTimeout(()=>ensureOutboundMediaNegotiated(from),180);
+            setTimeout(()=>ensureOutboundMediaNegotiated(from),900);
         }catch(err){ console.warn('[SmartMeet] offer handling failed', from, err); }
     }
     async function handleAnswer(from, data){
@@ -1887,7 +1928,10 @@
                 for(const c of pendingCandidates[from]) await pc.addIceCandidate(c).catch(()=>{});
                 delete pendingCandidates[from];
             }
+            await awaitSyncPeerMedia(from);
             attachRemoteStream(from);
+            setTimeout(()=>ensureOutboundMediaNegotiated(from),180);
+            setTimeout(()=>ensureOutboundMediaNegotiated(from),900);
         }catch(err){ console.warn('[SmartMeet] answer handling failed', from, err); }
     }
     async function handleIceCandidate(from, data){
@@ -2765,7 +2809,8 @@
         Object.keys(knownParticipants).forEach(uid=>{
             uid=String(uid);
             if(uid===String(MY_USER_ID) || leftUsers.has(uid)) return;
-            if(!onlineUsers.has(uid)) return;
+            const info=knownParticipants[uid];
+            if(!onlineUsers.has(uid) && !info?.hasJoined) return;
 
             const pc=createPeerConnection(uid);
             if(!pc) return;
