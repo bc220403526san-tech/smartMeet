@@ -1045,7 +1045,6 @@
         const pc=peers[uid];
         if(!pc || pc.signalingState==='closed' || leftUsers.has(uid)) return false;
         if(pc.signalingState!=='have-local-offer' || pc.localDescription?.type!=='offer') return false;
-        await waitForIceGatheringComplete(pc);
         if(!pc.localDescription?.sdp) return false;
         pc.__lastOfferAt=Date.now();
         console.log('[SmartMeet] re-sending pending offer ->',uid);
@@ -1072,10 +1071,10 @@
             const offer=await pc.createOffer(iceRestart ? {iceRestart:true} : undefined);
             if(pc.signalingState!=='stable') return false;
             await pc.setLocalDescription(offer);
-            // Send SDP only after relay gathering has completed (or timed out).
-            // This embeds TURN candidates in the SDP, so media does not depend
-            // on every individual trickle-candidate POST arriving in order.
-            await waitForIceGatheringComplete(pc);
+            // Send the SDP immediately and trickle TURN candidates as they arrive.
+            // Waiting for ICE gathering to finish delayed cross-device answers by
+            // several seconds and could fire the connection watchdog before DTLS
+            // had a chance to finish.
             pc.__lastOfferAt=Date.now();
             console.log('[SmartMeet] sending offer ->', uid, iceRestart?'(ICE restart)':'');
             return await sendSignal(uid,'offer',{
@@ -1096,6 +1095,14 @@
         clearTimeout(pc.__connectWatchdog);
         pc.__connectWatchdog=setTimeout(()=>{
             if(!peers[uid] || peers[uid]!==pc || pc.signalingState==='closed') return;
+
+            // ICE connected/completed means the network path is already valid.
+            // Do not restart a healthy relay merely because DTLS/media takes a
+            // little longer on a different phone/network. The old watchdog did
+            // exactly that and could break an otherwise successful call.
+            const iceReady=['connected','completed'].includes(pc.iceConnectionState);
+            if(iceReady) return;
+
             const stuckIce=['checking','new'].includes(pc.iceConnectionState);
             const stuckConn=['connecting','new'].includes(pc.connectionState);
             if(stuckIce || stuckConn){
@@ -1111,7 +1118,7 @@
                     requestPresence(true);
                 }
             }
-        },10000);
+        },30000);
     }
 
     function bindPeerTransceivers(pc){
@@ -1188,9 +1195,21 @@
         };
 
         pc.onicecandidate = (e)=>{
-            // We use complete-SDP (non-trickle) signaling. Candidates are
-            // embedded in localDescription after ICE gathering completes.
-            if(e.candidate?.type==='relay') console.log('[SmartMeet] relay candidate ready ->',uid);
+            if(!e.candidate) return;
+            if(e.candidate.type==='relay') console.log('[SmartMeet] relay candidate ready ->',uid);
+
+            // Trickle ICE makes different-device / different-network joins much
+            // faster and avoids waiting for the full TURN gathering cycle before
+            // the remote browser can start connectivity checks.
+            const candidate = typeof e.candidate.toJSON==='function'
+                ? e.candidate.toJSON()
+                : {
+                    candidate:e.candidate.candidate,
+                    sdpMid:e.candidate.sdpMid,
+                    sdpMLineIndex:e.candidate.sdpMLineIndex,
+                    usernameFragment:e.candidate.usernameFragment
+                };
+            sendSignal(uid,'ice-candidate',{candidate});
         };
         pc.onicecandidateerror = (e)=>{
             // Chromium may report 701 for one local network interface even when
@@ -1247,6 +1266,19 @@
                 ensureTileVisible(uid);
                 attachRemoteStream(uid);
                 unlockRemoteAudio();
+
+                // Give DTLS/media plenty of time after ICE succeeds. Only if it
+                // is STILL connecting much later do a single controlled recovery.
+                clearTimeout(pc.__dtlsWatchdog);
+                pc.__dtlsWatchdog=setTimeout(()=>{
+                    if(!peers[uid] || peers[uid]!==pc || pc.signalingState==='closed') return;
+                    const iceOk=['connected','completed'].includes(pc.iceConnectionState);
+                    if(iceOk && pc.connectionState==='connecting'){
+                        console.warn('[SmartMeet] DTLS/media still connecting ->',uid);
+                        if(shouldInitiate(uid)) restartPeer(uid);
+                        else sendSignal(uid,'reconnect-request',{reason:'dtls-stuck'});
+                    }
+                },25000);
             }else if(state==='failed'){
                 clearTimeout(pc.__connectWatchdog);
                 console.warn('[SmartMeet] ICE FAILED for', uid, '- attempting recovery');
@@ -1265,6 +1297,7 @@
                 armPeerWatchdog(uid,pc);
             }else if(pc.connectionState==='connected'){
                 clearTimeout(pc.__connectWatchdog);
+                clearTimeout(pc.__dtlsWatchdog);
                 pc.__connectedOnce=true;
                 clearTimeout(pc.__disconnectTimer);
                 ensureTileVisible(uid);
@@ -1295,6 +1328,7 @@
                 }else requestPresence(true);
             }else if(pc.connectionState==='closed'){
                 clearTimeout(pc.__connectWatchdog);
+                clearTimeout(pc.__dtlsWatchdog);
             }
         };
         pc.onicegatheringstatechange = ()=>{ console.log('[SmartMeet] ICE gathering', uid, '->', pc.iceGatheringState); };
@@ -1420,7 +1454,6 @@
             const offer=await pc.createOffer();
             if(pc.signalingState!=='stable') return false;
             await pc.setLocalDescription(offer);
-            await waitForIceGatheringComplete(pc);
 
             console.log('[SmartMeet] media renegotiation ->',uid,{
                 audioNeedsSend,
@@ -1649,15 +1682,22 @@
             if(pendingCandidates[from]?.length){ for(const c of pendingCandidates[from]) await pc.addIceCandidate(c).catch(()=>{}); delete pendingCandidates[from]; }
             const answer=await pc.createAnswer();
             await pc.setLocalDescription(answer);
-            // Include gathered TURN relay candidates in the answer SDP as well.
-            await waitForIceGatheringComplete(pc);
+
+            // Send the answer immediately; TURN candidates are trickled by
+            // onicecandidate. This removes the multi-second cross-device delay
+            // that previously left ICE connected while connectionState was still
+            // stuck on connecting.
+            console.log('[SmartMeet] sending answer ->', from);
+            await sendSignal(from,'answer',{
+                type:pc.localDescription.type,
+                sdp:btoa(unescape(encodeURIComponent(pc.localDescription.sdp)))
+            });
+
             // Mobile Chrome may expose the remote-created transceiver sender only
             // after the answer is applied. Sync once more so our mic/camera are
             // definitely attached to this participant-to-participant connection.
             bindPeerTransceivers(pc);
             await syncLocalTracksToPeer(from);
-            console.log('[SmartMeet] sending answer ->', from);
-            sendSignal(from,'answer',{ type:pc.localDescription.type, sdp:btoa(unescape(encodeURIComponent(pc.localDescription.sdp))) });
         }catch(err){ console.warn('[SmartMeet] offer handling failed', from, err); }
     }
     async function handleAnswer(from, data){
@@ -2659,5 +2699,6 @@
 </script>
 </body>
 </html>
+
 
 
