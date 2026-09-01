@@ -22,10 +22,6 @@ class MeetingAttendController extends Controller
         $user = auth()->user();
         $now = now();
 
-        /*
-         * This participant is now really inside the room.
-         * Keep joined_at as the latest real join time and clear left_at.
-         */
         $meeting->participants()
             ->where('user_id', $user->id)
             ->update([
@@ -105,7 +101,7 @@ class MeetingAttendController extends Controller
             'type' => [
                 'required',
                 'string',
-                'in:offer,answer,ice-candidate,chat,mute,unmute,mic-status,camera-status,transcript,user-joined,user-left,meeting-cancelled,meeting-ended',
+                'in:offer,answer,ice-candidate,reconnect-request,presence-request,presence-response,chat,mute,unmute,mic-status,camera-status,transcript,user-joined,user-left,meeting-cancelled,meeting-ended',
             ],
             'data' => ['required', 'array'],
         ]);
@@ -118,6 +114,7 @@ class MeetingAttendController extends Controller
             'chat',
             'mic-status',
             'camera-status',
+            'presence-request',
             'user-joined',
             'user-left',
             'meeting-cancelled',
@@ -141,7 +138,7 @@ class MeetingAttendController extends Controller
         $toUserId = trim((string) ($validated['to_user_id'] ?? ''));
 
         abort_if(
-            $toUserId === '',
+            $toUserId === '' || $toUserId === 'all',
             422,
             'A target user is required for direct signaling.'
         );
@@ -204,10 +201,6 @@ class MeetingAttendController extends Controller
         $user = auth()->user();
         $now = now();
 
-        /*
-         * Keep joined_at for correct ordering/history.
-         * left_at marks the participant offline because left_at >= joined_at.
-         */
         $meeting->participants()
             ->where('user_id', $user->id)
             ->update([

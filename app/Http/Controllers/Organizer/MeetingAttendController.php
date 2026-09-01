@@ -9,7 +9,6 @@ use App\Models\Meeting;
 use App\Models\MeetingTranscript;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -39,10 +38,6 @@ class MeetingAttendController extends Controller
 
         $meeting->refresh();
 
-        /*
-         * The organizer is now really inside the room.
-         * Notify clients that already have this meeting open.
-         */
         $this->broadcastSignal(
             meeting: $meeting,
             fromUserId: (string) $user->id,
@@ -89,10 +84,6 @@ class MeetingAttendController extends Controller
             ])
             ->values();
 
-        /*
-         * We just set organizer_joined_at and cleared organizer_left_at,
-         * so the organizer is definitely online for this render.
-         */
         $organizerJoined = true;
 
         return view('organizer.meetings.attend', compact(
@@ -113,25 +104,25 @@ class MeetingAttendController extends Controller
             'type' => [
                 'required',
                 'string',
-                'in:offer,answer,ice-candidate,chat,mute,unmute,mic-status,camera-status,transcript,user-joined,user-left,meeting-cancelled,meeting-ended',
+                'in:offer,answer,ice-candidate,reconnect-request,presence-request,presence-response,chat,mute,unmute,mic-status,camera-status,transcript,user-joined,user-left,meeting-cancelled,meeting-ended',
             ],
             'data' => ['required', 'array'],
         ]);
 
         $fromUserId = (string) auth()->id();
+        $type = $validated['type'];
+        $data = $validated['data'];
 
         $broadcastTypes = [
             'chat',
             'mic-status',
             'camera-status',
+            'presence-request',
             'user-joined',
             'user-left',
             'meeting-cancelled',
             'meeting-ended',
         ];
-
-        $type = $validated['type'];
-        $data = $validated['data'];
 
         if (in_array($type, $broadcastTypes, true)) {
             $this->broadcastSignal(
@@ -150,7 +141,7 @@ class MeetingAttendController extends Controller
         $toUserId = trim((string) ($validated['to_user_id'] ?? ''));
 
         abort_if(
-            $toUserId === '',
+            $toUserId === '' || $toUserId === 'all',
             422,
             'A target user is required for direct signaling.'
         );
