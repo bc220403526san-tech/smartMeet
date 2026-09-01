@@ -7,9 +7,7 @@
     <x-success />
     <x-error />
 
-    <div class="participant-meetings-responsive p-4 bg-gray-50 rounded-2xl m-2 mt-0 space-y-4 overflow-y-auto min-h-screen"
-         data-server-now-ms="{{ $serverNowMs }}"
-         data-next-transition-ms="{{ $nextTransitionMs ?? '' }}">
+    <div class="participant-meetings-responsive p-4 bg-gray-50 rounded-2xl m-2 mt-0 space-y-4 overflow-y-auto min-h-screen">
 
         {{-- PAGE HEADER --}}
         <div class="dashboard-header flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
@@ -691,53 +689,42 @@
 
 
 {{-- ================================================================
-     LIVE MEETING SYNC
-     - New organizer invitation appears without page refresh
-     - Upcoming -> Active at exact scheduled time
-     - Organizer status changes appear without page refresh
-     - Stats and pagination update automatically
+     PARTICIPANT LIVE MEETING SYNC
+     - Newly invited meetings appear without browser refresh
+     - Upcoming -> Active updates automatically
+     - Cancelled/completed/status changes appear automatically
+     - Stats + pagination refresh too
 ================================================================ --}}
 <script>
     (function () {
-        const indexUrl = @json(route('participant.meetings.index'));
-
-        let currentFilter = 'all';
         let requestRunning = false;
         let pendingRefresh = false;
-        let exactTransitionTimer = null;
-
-        const root = document.querySelector('.participant-meetings-responsive');
-
-        let serverClockOffsetMs =
-            Number(root?.dataset.serverNowMs || Date.now()) - Date.now();
-
-        let nextTransitionMs =
-            root?.dataset.nextTransitionMs
-                ? Number(root.dataset.nextTransitionMs)
-                : null;
-
-        function currentServerTimeMs() {
-            return Date.now() + serverClockOffsetMs;
-        }
+        let activeFilter = 'all';
 
         function applyMeetingFilter() {
-            document.querySelectorAll('[data-status-filter]').forEach(button => {
+            const buttons = Array.from(
+                document.querySelectorAll('[data-status-filter]')
+            );
+
+            buttons.forEach(button => {
                 button.classList.toggle(
                     'is-active',
-                    (button.dataset.statusFilter || 'all') === currentFilter
+                    (button.dataset.statusFilter || 'all') === activeFilter
                 );
             });
 
-            document.querySelectorAll('[data-meeting-id]').forEach(row => {
-                const status = String(
-                    row.dataset.currentStatus || ''
-                ).toLowerCase();
+            document
+                .querySelectorAll('[data-meeting-id]')
+                .forEach(row => {
+                    const status = String(
+                        row.dataset.currentStatus || ''
+                    ).toLowerCase();
 
-                row.style.display =
-                    currentFilter === 'all' || status === currentFilter
-                        ? ''
-                        : 'none';
-            });
+                    row.style.display =
+                        activeFilter === 'all' || status === activeFilter
+                            ? ''
+                            : 'none';
+                });
         }
 
         document.addEventListener('click', function (event) {
@@ -747,72 +734,13 @@
                 return;
             }
 
-            currentFilter = button.dataset.statusFilter || 'all';
+            activeFilter =
+                button.dataset.statusFilter || 'all';
+
             applyMeetingFilter();
         });
 
-        function updateServerTimingFromDocument(newDocument) {
-            const freshRoot =
-                newDocument.querySelector('.participant-meetings-responsive');
-
-            if (!freshRoot) {
-                return;
-            }
-
-            const freshServerNow =
-                Number(freshRoot.dataset.serverNowMs);
-
-            if (Number.isFinite(freshServerNow)) {
-                serverClockOffsetMs =
-                    freshServerNow - Date.now();
-            }
-
-            const freshTransition =
-                Number(freshRoot.dataset.nextTransitionMs);
-
-            nextTransitionMs =
-                Number.isFinite(freshTransition) && freshTransition > 0
-                    ? freshTransition
-                    : null;
-        }
-
-        function scheduleExactMeetingRefresh() {
-            if (exactTransitionTimer) {
-                clearTimeout(exactTransitionTimer);
-                exactTransitionTimer = null;
-            }
-
-            const transitionTimestamp =
-                Number(nextTransitionMs);
-
-            if (
-                !Number.isFinite(transitionTimestamp) ||
-                transitionTimestamp <= 0
-            ) {
-                return;
-            }
-
-            const delay = Math.max(
-                0,
-                transitionTimestamp - currentServerTimeMs() + 75
-            );
-
-            const maximumTimeout = 2_147_000_000;
-
-            if (delay > maximumTimeout) {
-                exactTransitionTimer = setTimeout(
-                    scheduleExactMeetingRefresh,
-                    maximumTimeout
-                );
-                return;
-            }
-
-            exactTransitionTimer = setTimeout(() => {
-                refreshMeetings('exact-meeting-time');
-            }, delay);
-        }
-
-        async function refreshMeetings(reason = 'live-check') {
+        async function refreshParticipantMeetings(reason = 'live') {
             if (requestRunning) {
                 pendingRefresh = true;
                 return;
@@ -821,14 +749,19 @@
             requestRunning = true;
 
             try {
+                /*
+                 * Important:
+                 * We request the COMPLETE participant meeting index, not only the
+                 * meeting IDs that existed when the page first loaded.
+                 *
+                 * Therefore, if an organizer adds this participant to a new
+                 * meeting, that new row can appear without browser refresh.
+                 */
                 const url = new URL(
-                    window.location.href,
+                    '{{ route('participant.meetings.index') }}',
                     window.location.origin
                 );
 
-                /*
-                 * Browser/proxy must never reuse an old participant dashboard.
-                 */
                 url.searchParams.set('_live', Date.now());
 
                 const response = await fetch(url.toString(), {
@@ -844,50 +777,61 @@
 
                 if (!response.ok) {
                     throw new Error(
-                        `Participant meeting refresh failed with HTTP ${response.status}`
+                        `HTTP ${response.status}`
                     );
                 }
 
                 const html = await response.text();
 
                 const parser = new DOMParser();
-                const newDocument =
+                const freshDocument =
                     parser.parseFromString(html, 'text/html');
 
-                const newStats =
-                    newDocument.querySelector('.stats-grid');
+                /*
+                 * Update the 3 participant statistics.
+                 */
+                const freshStats =
+                    freshDocument.querySelector('.stats-grid');
 
                 const currentStats =
                     document.querySelector('.stats-grid');
 
-                if (newStats && currentStats) {
+                if (freshStats && currentStats) {
                     currentStats.innerHTML =
-                        newStats.innerHTML;
+                        freshStats.innerHTML;
                 }
 
-                const newMeetingsShell =
-                    newDocument.querySelector('.meetings-shell');
+                /*
+                 * Replace the entire meeting shell.
+                 * This handles:
+                 * - brand new invitation
+                 * - status change
+                 * - Attend button
+                 * - organizer information
+                 * - pagination
+                 * - empty/non-empty state
+                 */
+                const freshShell =
+                    freshDocument.querySelector('.meetings-shell');
 
-                const currentMeetingsShell =
+                const currentShell =
                     document.querySelector('.meetings-shell');
 
                 if (
-                    newMeetingsShell &&
-                    currentMeetingsShell &&
-                    currentMeetingsShell.innerHTML.trim() !==
-                    newMeetingsShell.innerHTML.trim()
+                    freshShell &&
+                    currentShell &&
+                    freshShell.innerHTML.trim() !==
+                    currentShell.innerHTML.trim()
                 ) {
-                    currentMeetingsShell.innerHTML =
-                        newMeetingsShell.innerHTML;
+                    currentShell.innerHTML =
+                        freshShell.innerHTML;
                 }
 
-                updateServerTimingFromDocument(newDocument);
                 applyMeetingFilter();
-                scheduleExactMeetingRefresh();
 
             } catch (error) {
                 console.error(
-                    `Participant live meeting update failed (${reason}):`,
+                    `Participant live meeting refresh failed (${reason}):`,
                     error
                 );
             } finally {
@@ -895,42 +839,35 @@
 
                 if (pendingRefresh) {
                     pendingRefresh = false;
-                    refreshMeetings('queued-refresh');
+                    refreshParticipantMeetings('queued');
                 }
             }
         }
 
         /*
-         * Immediate sync handles a participant who was invited just before
-         * opening/focusing this page.
+         * Run immediately, then every 2 seconds.
+         * This is background AJAX only — the browser page is not reloaded.
          */
-        refreshMeetings('initial');
+        refreshParticipantMeetings('initial');
 
-        /*
-         * Fast backup check:
-         * - detects newly added meetings
-         * - detects cancelled/completed/other organizer-side status changes
-         * - does not reload the browser page
-         */
         setInterval(() => {
-            refreshMeetings('live-backup');
+            refreshParticipantMeetings('interval');
         }, 2000);
 
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden) {
-                refreshMeetings('page-visible');
+                refreshParticipantMeetings('visible');
             }
         });
 
         window.addEventListener('focus', () => {
-            refreshMeetings('window-focus');
+            refreshParticipantMeetings('focus');
         });
 
         window.addEventListener('online', () => {
-            refreshMeetings('network-online');
+            refreshParticipantMeetings('online');
         });
 
-        scheduleExactMeetingRefresh();
         applyMeetingFilter();
     })();
 </script>
