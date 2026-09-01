@@ -766,7 +766,7 @@
 
     /* ---------- Timer ---------- */
     let seconds = Math.max(0, Math.floor((Date.now()-new Date(ACTUAL_START).getTime())/1000));
-    setInterval(()=>{
+    const meetingClockInterval=setInterval(()=>{
         seconds++;
         const h=String(Math.floor(seconds/3600)).padStart(2,'0');
         const m=String(Math.floor((seconds%3600)/60)).padStart(2,'0');
@@ -1969,11 +1969,17 @@
 
                 // 4xx responses are application/auth errors; retrying them only
                 // adds load and cannot repair the request.
-                if(res.status>=400 && res.status<500) return false;
+                if(res.status>=400 && res.status<500){
+                    console.warn('[SmartMeet] signal rejected',type,'HTTP',res.status);
+                    return false;
+                }
             }catch(e){
-                // Network failures are returned to the caller as false. Do not
-                // create an unhandled AbortError in the meeting room.
-                if(i===maxAttempts-1) return false;
+                // A network/DNS transition can briefly break both HTTPS signaling
+                // and WSS. Retry once, then let the periodic repair/reconnect hook heal it.
+                if(i===maxAttempts-1){
+                    console.warn('[SmartMeet] signal network failure',type,e?.name||e);
+                    return false;
+                }
             }
             if(i<maxAttempts-1) await new Promise(r=>setTimeout(r,300*(i+1)));
         }
@@ -1988,9 +1994,15 @@
 
         const payload={ ...(data||{}), _signalId: data?._signalId || makeSignalId(type) };
 
-        // SDP/chat/control messages get one cautious retry. ICE and state
-        // snapshots are intentionally single-shot to prevent retry storms.
-        const attempts=['offer','answer','chat','meeting-cancelled','meeting-ended','user-left'].includes(type) ? 2 : 1;
+        // Critical signaling gets one cautious retry. The same _signalId is
+        // reused, so duplicate broadcasts are ignored by the receiver while transient
+        // DNS/Wi-Fi changes do not permanently lose an offer, TURN candidate or join.
+        const RETRYABLE_SIGNAL_TYPES=new Set([
+            'offer','answer','ice-candidate','user-joined','user-left',
+            'presence-request','presence-response','mic-status','camera-status',
+            'chat','meeting-cancelled','meeting-ended','reconnect-request'
+        ]);
+        const attempts=RETRYABLE_SIGNAL_TYPES.has(type) ? 2 : 1;
         const request=postSignal(toUserId,type,payload,attempts);
 
         if(!COALESCED_SIGNAL_TYPES.has(type)) return request;
@@ -2003,10 +2015,34 @@
     }
 
     /* ---------- Realtime channel ---------- */
+    let realtimeChannel=null;
+    let realtimeConnectionRecoveryBound=false;
+    let realtimeReconnectTimer=null;
+
+    function bindRealtimeConnectionRecovery(){
+        if(realtimeConnectionRecoveryBound) return;
+        const connection=window.Echo?.connector?.pusher?.connection;
+        if(!connection || typeof connection.bind!=='function') return;
+        realtimeConnectionRecoveryBound=true;
+
+        connection.bind('connected',()=>{
+            clearTimeout(realtimeReconnectTimer);
+            realtimeReconnectTimer=setTimeout(()=>{
+                console.log('[SmartMeet] Reverb reconnected -> repairing meeting media');
+                try{ announceJoin(true); }catch(e){}
+                try{ repairMeetingMedia(true); }catch(e){}
+                setTimeout(()=>{ try{ syncTracksToEveryPeer(); }catch(e){} },250);
+                setTimeout(()=>{ try{ Object.keys(peers).forEach(uid=>attachRemoteStream(uid)); }catch(e){} },500);
+            },180);
+        });
+    }
+
     function listenForSignals(){
         return new Promise(resolve=>{
             if(typeof window.Echo==='undefined'){ console.error('Echo not initialized'); resolve(false); return; }
             const channel=window.Echo.channel('meeting.'+MEETING_ID);
+            realtimeChannel=channel;
+            bindRealtimeConnectionRecovery();
             let done=false; const finish=v=>{ if(!done){ done=true; resolve(v); } };
             channel.listen('.signal', handleSignal);
             channel.listen('.transcript', handleRemoteTranscript);
@@ -2771,7 +2807,17 @@
     window.addEventListener('beforeunload', notifyDisconnectBeacon);
     function cleanup(){
         if(autoEndTimer){ clearTimeout(autoEndTimer); autoEndTimer=null; }
-        Object.values(peers).forEach(pc=>{ try{ pc.close(); }catch(e){} });
+        if(meetingClockInterval){ clearInterval(meetingClockInterval); }
+        if(presenceHeartbeatInterval){ clearInterval(presenceHeartbeatInterval); presenceHeartbeatInterval=null; }
+        Object.values(peers).forEach(pc=>{
+            try{ if(pc.__connectWatchdog) clearTimeout(pc.__connectWatchdog); }catch(e){}
+            try{ if(pc.__disconnectTimer) clearTimeout(pc.__disconnectTimer); }catch(e){}
+            try{ if(pc.__restartTimer) clearTimeout(pc.__restartTimer); }catch(e){}
+            try{ if(pc.__dtlsWatchdog) clearTimeout(pc.__dtlsWatchdog); }catch(e){}
+            try{ pc.ontrack=null; pc.onicecandidate=null; pc.onconnectionstatechange=null; pc.oniceconnectionstatechange=null; }catch(e){}
+            try{ pc.close(); }catch(e){}
+        });
+        Object.keys(peers).forEach(uid=>delete peers[uid]);
         Object.keys(remoteAudioNodes).forEach(disposeRemoteAudioBoost);
         try{ meetingAudioContext?.close?.(); }catch(e){}
         meetingAudioContext=null;
@@ -2848,61 +2894,84 @@
         requestPresence(true);
     }
 
-    function repairMeetingMedia(forcePresence=false){
+    let recoveryRunning=false;
+    let lastRecoveryAt=0;
+    let presenceHeartbeatInterval=null;
+
+    async function repairMeetingMedia(forcePresence=false){
         if(document.visibilityState!=='visible') return;
-        connectToAll();
-        syncTracksToEveryPeer();
 
-        // Do not rebroadcast mic/camera state on every repair tick. State is
-        // already sent when it changes and is included in presence responses.
-        // Removing these duplicate POSTs prevents signaling request storms.
-        Object.keys(peers).forEach(uid=>{
-            const pc=peers[uid];
-            if(!pc || pc.connectionState==='closed') return;
-            if(pc.connectionState==='failed'){
-                if(shouldInitiate(uid)) restartPeer(uid);
-                else requestPresence(true);
-            }else if(pc.connectionState==='connected' || pc.iceConnectionState==='connected' || pc.iceConnectionState==='completed'){
-                attachRemoteStream(uid);
-                ensureOutboundMediaNegotiated(uid);
-            }else if(pc.connectionState==='connecting' || pc.iceConnectionState==='checking'){
-                armPeerWatchdog(uid,pc);
-            }
-        });
+        // Recovery is event-driven. Prevent overlapping repair/renegotiation storms
+        // when online/pageshow/visibility/device events fire close together.
+        const now=Date.now();
+        if(recoveryRunning) return;
+        if(!forcePresence && now-lastRecoveryAt<1500) return;
+        recoveryRunning=true;
+        lastRecoveryAt=now;
 
-        // Always request the current roster. requestPresence() is throttled,
-        // so late joiners are discovered without refresh and without flooding.
-        requestPresence(forcePresence);
-        unlockRemoteAudio();
+        try{
+            connectToAll();
+            syncTracksToEveryPeer();
+
+            Object.keys(peers).forEach(uid=>{
+                const pc=peers[uid];
+                if(!pc || pc.connectionState==='closed' || leftUsers.has(String(uid))) return;
+
+                const connected=(
+                    pc.connectionState==='connected' ||
+                    pc.iceConnectionState==='connected' ||
+                    pc.iceConnectionState==='completed'
+                );
+
+                if(connected){
+                    attachRemoteStream(uid);
+                    return;
+                }
+
+                if(pc.connectionState==='failed' || pc.iceConnectionState==='failed'){
+                    if(shouldInitiate(uid)) restartPeer(uid);
+                    else requestPresence(false);
+                    return;
+                }
+
+                if(pc.connectionState==='connecting' || pc.iceConnectionState==='checking' || pc.connectionState==='disconnected'){
+                    armPeerWatchdog(uid,pc);
+                }
+            });
+
+            requestPresence(forcePresence);
+            unlockRemoteAudio();
+        }finally{
+            recoveryRunning=false;
+        }
     }
 
     window.addEventListener('online', ()=>{
-        setTimeout(()=>repairMeetingMedia(true),150);
-        setTimeout(()=>recoverMobileLocalMedia(),300);
-        setTimeout(()=>unlockRemoteMedia(),450);
+        setTimeout(()=>repairMeetingMedia(true),250);
     });
     window.addEventListener('pageshow', ()=>{
-        setTimeout(()=>repairMeetingMedia(true),150);
-        setTimeout(()=>recoverMobileLocalMedia(),300);
-        setTimeout(()=>unlockRemoteMedia(),450);
-    });
-    document.addEventListener('visibilitychange',()=>{
-        if(document.visibilityState==='visible'){
-            setTimeout(()=>syncTracksToEveryPeer(),180);
-            setTimeout(()=>unlockRemoteMedia(),320);
-            setTimeout(()=>Object.keys(peers).forEach(uid=>attachRemoteStream(uid)),450);
-        }
+        setTimeout(()=>repairMeetingMedia(true),300);
     });
     document.addEventListener('visibilitychange', ()=>{
         if(document.visibilityState==='visible'){
-            setTimeout(()=>repairMeetingMedia(true),120);
-            setTimeout(()=>recoverMobileLocalMedia(),220);
+            setTimeout(()=>repairMeetingMedia(true),250);
+            setTimeout(()=>unlockRemoteMedia(),450);
             if(isMicOn){ startTranscript(); startRecognition(); }
-            unlockRemoteMedia();
         }else{
             stopRecognition();
         }
     });
+    if(navigator.mediaDevices?.addEventListener){
+        navigator.mediaDevices.addEventListener('devicechange',()=>{
+            if(document.visibilityState!=='visible') return;
+            setTimeout(async ()=>{
+                await recoverMobileLocalMedia();
+                syncTracksToEveryPeer();
+                repairMeetingMedia(true);
+            },300);
+        });
+    }
+
     document.addEventListener('pointerdown', unlockRemoteMedia, { passive:true });
     document.addEventListener('touchstart', unlockRemoteMedia, { passive:true });
     document.addEventListener('click', unlockRemoteMedia, { passive:true });
@@ -2921,58 +2990,24 @@
         refreshEmptyStage();
 
         await startAudio();
-        await listenForSignals();
+        const realtimeReady=await listenForSignals();
         announceJoin(true);
         scheduleAutoEnd();
 
-        [150,700,1800].forEach(delay=>setTimeout(()=>repairMeetingMedia(false),delay));
-        setInterval(()=>repairMeetingMedia(false),10000);
+        // Bounded startup recovery only. Do not continuously resync tracks,
+        // renegotiate peers, reacquire media, or reattach streams on timers.
+        setTimeout(()=>repairMeetingMedia(false),200);
+        setTimeout(()=>repairMeetingMedia(false),1400);
 
-        setInterval(()=>{
-            if(document.visibilityState!=='visible') return;
-            Object.keys(peers).forEach(uid=>{
-                const pc=peers[uid];
-                if(!pc || pc.connectionState==='closed' || leftUsers.has(String(uid))) return;
-                syncLocalTracksToPeer(uid);
-                attachRemoteStream(uid);
-            });
-            unlockRemoteAudio();
-        },2500);
-
-        if(IS_MOBILE_BROWSER){
-            setInterval(()=>recoverMobileLocalMedia(),3500);
-            setInterval(()=>unlockRemoteMedia(),1800);
+        if(!realtimeReady){
+            setTimeout(()=>announceJoin(true),1200);
+            setTimeout(()=>repairMeetingMedia(true),2200);
         }
 
-        setInterval(()=>{
-            Object.entries(peers).forEach(([uid,pc])=>{
-                if(pc && (pc.connectionState==='connected' || pc.iceConnectionState==='connected')){
-                    attachRemoteStream(uid);
-                }
-            });
-        },4000);
-
-        setInterval(()=>{
-            Object.keys(peers).forEach(uid=>{
-                const pc=peers[uid];
-                if(!pc || pc.connectionState!=='connected') return;
-                const aSend=pc.__audioTx?.sender?.track;
-                const vSend=pc.__videoTx?.sender?.track;
-                const recv=pc.getReceivers().map(r=>({
-                    kind:r.track?.kind,
-                    state:r.track?.readyState,
-                    muted:r.track?.muted
-                }));
-                console.log('[SmartMeet] media health', uid, {
-                    audioSend:Boolean(aSend && aSend.readyState==='live'),
-                    audioEnabled:Boolean(aSend?.enabled),
-                    audioDirection:pc.__audioTx?.direction,
-                    videoSend:Boolean(vSend && vSend.readyState==='live'),
-                    videoEnabled:Boolean(vSend?.enabled),
-                    videoDirection:pc.__videoTx?.direction,
-                    receivers:recv
-                });
-            });
+        // Lightweight roster heartbeat only. WebRTC repair itself is driven by
+        // connection/network/device events and per-peer watchdogs.
+        presenceHeartbeatInterval=setInterval(()=>{
+            if(document.visibilityState==='visible') requestPresence(false);
         },30000);
     });
 </script>
