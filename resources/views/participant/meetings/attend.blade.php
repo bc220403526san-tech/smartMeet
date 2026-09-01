@@ -1756,8 +1756,10 @@
         }
 
         if(bestVideo && bestVideo.readyState==='live'){
+            // A muted remote track can stay muted indefinitely when the remote camera
+            // is OFF. Never poll attachRemoteStream() recursively here: that created
+            // an endless ~180ms DOM/media loop per peer and could freeze Chromium.
             if(!bestVideo.muted) camStatus[uid]=true;
-            else setTimeout(()=>attachRemoteStream(uid),180);
         }
     }
 
@@ -1962,8 +1964,6 @@
                 console.log('[SmartMeet] Reverb reconnected -> repairing meeting media');
                 try{ announceJoin(true); }catch(e){}
                 try{ repairMeetingMedia(true); }catch(e){}
-                setTimeout(()=>{ try{ syncTracksToEveryPeer(); }catch(e){} },250);
-                setTimeout(()=>{ try{ Object.keys(peers).forEach(uid=>attachRemoteStream(uid)); }catch(e){} },500);
             },180);
         });
     }
@@ -2799,8 +2799,10 @@
         Object.keys(knownParticipants).forEach(uid=>{
             uid=String(uid);
             if(uid===String(MY_USER_ID) || leftUsers.has(uid)) return;
-            const info=knownParticipants[uid];
-            if(!onlineUsers.has(uid) && !info?.hasJoined) return;
+            // Only create/repair WebRTC peers for users confirmed online in the
+            // current room. Historical hasJoined flags can be stale and previously
+            // created ghost peer connections that kept recovery/media work alive.
+            if(!onlineUsers.has(uid)) return;
 
             const pc=createPeerConnection(uid);
             if(!pc) return;
