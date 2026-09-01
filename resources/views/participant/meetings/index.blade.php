@@ -727,6 +727,29 @@
 
         const meetingIds = [...new Set(rows.map(el => el.dataset.meetingId))];
 
+        // Use server time, not the device clock, for exact meeting transitions.
+        let serverClockOffsetMs =
+            Number(@json($serverNowMs)) - Date.now();
+
+        let nextTransitionMs =
+            @json($nextTransitionMs);
+
+        let exactTransitionTimer = null;
+        let requestRunning = false;
+        let pendingRefresh = false;
+
+        function currentServerTimeMs() {
+            return Date.now() + serverClockOffsetMs;
+        }
+
+        function updateServerClock(serverNowMs) {
+            const timestamp = Number(serverNowMs);
+
+            if (Number.isFinite(timestamp)) {
+                serverClockOffsetMs = timestamp - Date.now();
+            }
+        }
+
         function statusBadgeHtml(status) {
             const map = {
                 upcoming:  'bg-blue-50 text-blue-700 border-blue-200',
@@ -744,6 +767,7 @@
             };
             const cls = map[status] || 'bg-gray-100 text-gray-500 border-gray-200';
             const dot = dotMap[status] || 'bg-gray-400';
+
             return `<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${cls}">
                 <span class="w-1.5 h-1.5 rounded-full ${dot}"></span>
                 ${status.toUpperCase()}
@@ -754,17 +778,62 @@
             if (status === 'active') {
                 return `<a href="/participant/meetings/${id}/attend" class="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-semibold transition shadow-sm hover:shadow"><i class="fa-solid fa-video text-[11px]"></i> Attend</a>`;
             }
+
             if (status === 'upcoming') {
                 return `<span title="Meeting hasn't started yet" class="flex items-center gap-2 bg-gray-100 text-gray-400 px-4 py-2 rounded-xl text-xs font-semibold cursor-not-allowed border border-gray-200"><i class="fa-solid fa-clock text-[11px]"></i> Upcoming</span>`;
             }
+
             return `<span class="flex items-center gap-2 bg-gray-100 text-gray-400 px-4 py-2 rounded-xl text-xs font-semibold cursor-not-allowed border border-gray-200"><i class="fa-solid fa-video text-[11px]"></i> Attend</span>`;
         }
 
-        async function poll() {
+        function scheduleExactStatusRefresh() {
+            if (exactTransitionTimer) {
+                clearTimeout(exactTransitionTimer);
+                exactTransitionTimer = null;
+            }
+
+            const transitionTimestamp = Number(nextTransitionMs);
+
+            if (
+                !Number.isFinite(transitionTimestamp) ||
+                transitionTimestamp <= 0
+            ) {
+                return;
+            }
+
+            // Ask Laravel just after the exact boundary so the new status is
+            // committed and returned in the same displayed second.
+            const delay = Math.max(
+                0,
+                transitionTimestamp - currentServerTimeMs() + 50
+            );
+
+            const maximumTimeout = 2_147_000_000;
+
+            if (delay > maximumTimeout) {
+                exactTransitionTimer = setTimeout(
+                    scheduleExactStatusRefresh,
+                    maximumTimeout
+                );
+                return;
+            }
+
+            exactTransitionTimer = setTimeout(() => {
+                poll('exact-meeting-time');
+            }, delay);
+        }
+
+        async function poll(reason = 'manual') {
+            if (requestRunning) {
+                pendingRefresh = true;
+                return;
+            }
+
+            requestRunning = true;
+
             try {
-                // Cache-busting timestamp + no-store ensure browser never reuses an old
-                // "upcoming" response. This keeps Upcoming -> Active live without refresh.
                 const url = `{{ route('participant.meetings.status-check') }}?ids=${meetingIds.join(',')}&_=${Date.now()}`;
+
                 const res = await fetch(url, {
                     method: 'GET',
                     cache: 'no-store',
@@ -775,40 +844,94 @@
                         'Cache-Control': 'no-cache'
                     }
                 });
-                if (!res.ok) return;
+
+                if (!res.ok) {
+                    throw new Error(
+                        `Participant meeting status refresh failed with HTTP ${res.status}`
+                    );
+                }
+
                 const data = await res.json();
+
+                updateServerClock(data.server_now_ms);
+                nextTransitionMs = data.next_transition_ms;
 
                 const s = data.stats || {};
                 const setStat = (id, val) => {
                     const el = document.getElementById(id);
-                    if (el && val !== undefined) el.textContent = String(val).padStart(2, '0');
+                    if (el && val !== undefined) {
+                        el.textContent = String(val).padStart(2, '0');
+                    }
                 };
+
                 setStat('stat-upcoming-today', s.upcomingToday);
                 setStat('stat-total', s.total);
                 setStat('stat-completed', s.completed);
 
                 Object.entries(data.meetings || {}).forEach(([id, status]) => {
-                    const row = document.querySelector(`[data-meeting-id="${id}"]`);
-                    if (!row || row.dataset.currentStatus === status) return;
+                    const row = document.querySelector(
+                        `[data-meeting-id="${id}"]`
+                    );
+
+                    if (!row || row.dataset.currentStatus === status) {
+                        return;
+                    }
+
                     row.dataset.currentStatus = status;
 
-                    const badge = document.getElementById('status-badge-' + id);
-                    if (badge) badge.innerHTML = statusBadgeHtml(status);
+                    const badge = document.getElementById(
+                        'status-badge-' + id
+                    );
 
-                    const attend = document.getElementById('attend-col-' + id);
-                    if (attend) attend.innerHTML = attendHtml(status, id);
+                    if (badge) {
+                        badge.innerHTML = statusBadgeHtml(status);
+                    }
+
+                    const attend = document.getElementById(
+                        'attend-col-' + id
+                    );
+
+                    if (attend) {
+                        attend.innerHTML = attendHtml(status, id);
+                    }
                 });
 
                 if (typeof window.smartMeetApplyMeetingFilter === 'function') {
                     window.smartMeetApplyMeetingFilter();
                 }
-            } catch (e) {
-                console.error('Participant meeting poll failed:', e);
+
+                scheduleExactStatusRefresh();
+            } catch (error) {
+                console.error(
+                    `Participant meeting status refresh failed (${reason}):`,
+                    error
+                );
+            } finally {
+                requestRunning = false;
+
+                if (pendingRefresh) {
+                    pendingRefresh = false;
+                    poll('queued-refresh');
+                }
             }
         }
 
-        // Check immediately when page loads, then keep checking every 2 seconds.
-        poll();
-        setInterval(poll, 2000);
+        // Initial sync, then exact server-time transitions.
+        poll('initial-load');
+
+        // Low-frequency safety backup only; exact transition uses setTimeout above.
+        setInterval(() => {
+            poll('backup-check');
+        }, 30_000);
+
+        window.addEventListener('focus', () => {
+            poll('window-focus');
+        });
+
+        window.addEventListener('online', () => {
+            poll('network-online');
+        });
+
+        scheduleExactStatusRefresh();
     })();
 </script>
