@@ -1446,23 +1446,16 @@
 
         const audioTrack=liveLocalTrack('audio');
         const videoTrack=liveLocalTrack('video');
-        try{
-            if(audioTrack){
-                if('contentHint' in audioTrack) audioTrack.contentHint='speech';
-                audioTrack.applyConstraints?.({
-                    echoCancellation:true,
-                    noiseSuppression:true,
-                    autoGainControl:true,
-                    channelCount:1
-                }).catch(()=>{});
-            }
-        }catch(e){}
+        if(audioTrack){
+            optimizeVoiceTrack(audioTrack);
+        }
         try{ if(videoTrack && 'contentHint' in videoTrack) videoTrack.contentHint='motion'; }catch(e){}
 
         try{
             if(pc.__audioTx?.sender){
                 if(pc.__audioTx.sender.track!==audioTrack) await pc.__audioTx.sender.replaceTrack(audioTrack);
                 if(audioTrack) audioTrack.enabled=Boolean(isMicOn);
+                if(audioTrack) optimizeAudioSender(pc.__audioTx.sender);
             }
         }catch(e){ console.warn('[SmartMeet] audio sender sync failed',uid,e); }
 
@@ -1638,6 +1631,7 @@
             audio.addEventListener('loadedmetadata',()=>audio.play().catch(()=>armAudioUnlock()));
         }
         if(bestAudio){
+            try{ if('contentHint' in bestAudio) bestAudio.contentHint='speech'; }catch(e){}
             const tryPlay=()=>audio.play().catch(()=>armAudioUnlock());
             tryPlay();
             if(!audio.__smartMeetResumeBound){
@@ -1992,12 +1986,70 @@
     }
 
     /* ---------- Media ---------- */
-    const audioConstraints = {
-        echoCancellation:true,
-        noiseSuppression:true,
-        autoGainControl:true,
-        channelCount:1
-    };
+    function buildVoiceAudioConstraints(){
+        const supported=navigator.mediaDevices?.getSupportedConstraints?.() || {};
+        const c={
+            echoCancellation:true,
+            noiseSuppression:true,
+            autoGainControl:true,
+            channelCount:1
+        };
+
+        // WebRTC audio is internally optimized around 48 kHz Opus.
+        // Ask for it only where the browser supports the constraint.
+        if(supported.sampleRate) c.sampleRate={ideal:48000};
+        if(supported.sampleSize) c.sampleSize={ideal:16};
+        if(supported.latency) c.latency={ideal:0.02,max:0.15};
+
+        // Chrome/Android may expose voiceIsolation on supported hardware.
+        // It is deliberately optional so older browsers keep working.
+        if(supported.voiceIsolation) c.voiceIsolation=true;
+
+        return c;
+    }
+
+    const audioConstraints = buildVoiceAudioConstraints();
+
+    async function optimizeVoiceTrack(track){
+        if(!track || track.kind!=='audio' || track.readyState==='ended') return;
+
+        try{
+            if('contentHint' in track) track.contentHint='speech';
+        }catch(e){}
+
+        try{
+            await track.applyConstraints?.(audioConstraints);
+        }catch(e){
+            // Never break an already-working microphone because one optional
+            // device/browser constraint is unavailable.
+        }
+    }
+
+    async function optimizeAudioSender(sender){
+        if(!sender) return;
+
+        try{
+            const params=sender.getParameters?.();
+            if(!params) return;
+
+            if(Array.isArray(params.encodings) && params.encodings.length){
+                params.encodings.forEach(enc=>{
+                    // 96 kbps mono Opus keeps speech clear while still leaving
+                    // enough room for unstable mobile/Wi-Fi connections.
+                    enc.maxBitrate=96000;
+
+                    // These are supported by Chromium where available.
+                    try{ enc.priority='high'; }catch(e){}
+                    try{ enc.networkPriority='high'; }catch(e){}
+                });
+
+                await sender.setParameters(params);
+            }
+        }catch(e){
+            // Some Safari/older Android builds reject optional RTP tuning.
+            // Their normal Opus defaults remain fully usable.
+        }
+    }
 
     function liveLocalTrack(kind){
         if(!localStream) return null;
@@ -2028,6 +2080,7 @@
                 const s=await navigator.mediaDevices.getUserMedia({audio:audioConstraints,video:false});
                 track=s.getAudioTracks().find(t=>t.readyState==='live') || null;
                 if(!track) throw new Error('No live microphone track returned');
+                await optimizeVoiceTrack(track);
                 if(!localStream) localStream=new MediaStream();
                 // Keep one microphone track only.
                 localStream.getAudioTracks().forEach(old=>{
@@ -2753,6 +2806,5 @@
 </script>
 </body>
 </html>
-
 
 
