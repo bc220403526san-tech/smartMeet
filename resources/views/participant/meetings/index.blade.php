@@ -7,7 +7,9 @@
     <x-success />
     <x-error />
 
-    <div class="participant-meetings-responsive p-4 bg-gray-50 rounded-2xl m-2 mt-0 space-y-4 overflow-y-auto min-h-screen">
+    <div class="participant-meetings-responsive p-4 bg-gray-50 rounded-2xl m-2 mt-0 space-y-4 overflow-y-auto min-h-screen"
+         data-server-now-ms="{{ $serverNowMs }}"
+         data-next-transition-ms="{{ $nextTransitionMs ?? '' }}">
 
         {{-- PAGE HEADER --}}
         <div class="dashboard-header flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
@@ -689,126 +691,246 @@
 
 
 {{-- ================================================================
-     LIVE STATUS POLLING (bina refresh ke Upcoming → Attend switch)
+     LIVE MEETING SYNC
+     - New organizer invitation appears without page refresh
+     - Upcoming -> Active at exact scheduled time
+     - Organizer status changes appear without page refresh
+     - Stats and pagination update automatically
 ================================================================ --}}
 <script>
-    /* Client-side status filters: no page refresh required. */
     (function () {
-        const buttons = Array.from(document.querySelectorAll('[data-status-filter]'));
+        const indexUrl = @json(route('participant.meetings.index'));
 
-        function applyMeetingFilter(status) {
+        let currentFilter = 'all';
+        let requestRunning = false;
+        let pendingRefresh = false;
+        let exactTransitionTimer = null;
+
+        const root = document.querySelector('.participant-meetings-responsive');
+
+        let serverClockOffsetMs =
+            Number(root?.dataset.serverNowMs || Date.now()) - Date.now();
+
+        let nextTransitionMs =
+            root?.dataset.nextTransitionMs
+                ? Number(root.dataset.nextTransitionMs)
+                : null;
+
+        function currentServerTimeMs() {
+            return Date.now() + serverClockOffsetMs;
+        }
+
+        function applyMeetingFilter() {
+            document.querySelectorAll('[data-status-filter]').forEach(button => {
+                button.classList.toggle(
+                    'is-active',
+                    (button.dataset.statusFilter || 'all') === currentFilter
+                );
+            });
+
             document.querySelectorAll('[data-meeting-id]').forEach(row => {
-                const current = String(row.dataset.currentStatus || '').toLowerCase();
-                row.style.display = (status === 'all' || current === status) ? '' : 'none';
+                const status = String(
+                    row.dataset.currentStatus || ''
+                ).toLowerCase();
+
+                row.style.display =
+                    currentFilter === 'all' || status === currentFilter
+                        ? ''
+                        : 'none';
             });
         }
 
-        buttons.forEach(button => {
-            button.addEventListener('click', function () {
-                buttons.forEach(btn => btn.classList.remove('is-active'));
-                this.classList.add('is-active');
-                applyMeetingFilter(this.dataset.statusFilter || 'all');
-            });
+        document.addEventListener('click', function (event) {
+            const button = event.target.closest('[data-status-filter]');
+
+            if (!button) {
+                return;
+            }
+
+            currentFilter = button.dataset.statusFilter || 'all';
+            applyMeetingFilter();
         });
 
-        /* Expose for live polling so current filter remains correct
-           when Upcoming changes to Active without refresh. */
-        window.smartMeetApplyMeetingFilter = function () {
-            const active = document.querySelector('[data-status-filter].is-active');
-            applyMeetingFilter(active?.dataset.statusFilter || 'all');
-        };
-    })();
-</script>
+        function updateServerTimingFromDocument(newDocument) {
+            const freshRoot =
+                newDocument.querySelector('.participant-meetings-responsive');
 
-<script>
-    (function () {
-        const rows = Array.from(document.querySelectorAll('[data-meeting-id]'));
-        if (rows.length === 0) return;
+            if (!freshRoot) {
+                return;
+            }
 
-        const meetingIds = [...new Set(rows.map(el => el.dataset.meetingId))];
+            const freshServerNow =
+                Number(freshRoot.dataset.serverNowMs);
 
-        function statusBadgeHtml(status) {
-            const map = {
-                upcoming:  'bg-blue-50 text-blue-700 border-blue-200',
-                active:    'bg-orange-50 text-orange-600 border-orange-200',
-                completed: 'bg-emerald-50 text-emerald-600 border-emerald-200',
-                cancelled: 'bg-red-50 text-red-500 border-red-200',
-                flagged:   'bg-yellow-50 text-yellow-600 border-yellow-200',
-            };
-            const dotMap = {
-                upcoming:  'bg-blue-500',
-                active:    'bg-orange-500 animate-pulse',
-                completed: 'bg-emerald-500',
-                cancelled: 'bg-red-500',
-                flagged:   'bg-yellow-500',
-            };
-            const cls = map[status] || 'bg-gray-100 text-gray-500 border-gray-200';
-            const dot = dotMap[status] || 'bg-gray-400';
-            return `<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${cls}">
-                <span class="w-1.5 h-1.5 rounded-full ${dot}"></span>
-                ${status.toUpperCase()}
-            </span>`;
+            if (Number.isFinite(freshServerNow)) {
+                serverClockOffsetMs =
+                    freshServerNow - Date.now();
+            }
+
+            const freshTransition =
+                Number(freshRoot.dataset.nextTransitionMs);
+
+            nextTransitionMs =
+                Number.isFinite(freshTransition) && freshTransition > 0
+                    ? freshTransition
+                    : null;
         }
 
-        function attendHtml(status, id) {
-            if (status === 'active') {
-                return `<a href="/participant/meetings/${id}/attend" class="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-semibold transition shadow-sm hover:shadow"><i class="fa-solid fa-video text-[11px]"></i> Attend</a>`;
+        function scheduleExactMeetingRefresh() {
+            if (exactTransitionTimer) {
+                clearTimeout(exactTransitionTimer);
+                exactTransitionTimer = null;
             }
-            if (status === 'upcoming') {
-                return `<span title="Meeting hasn't started yet" class="flex items-center gap-2 bg-gray-100 text-gray-400 px-4 py-2 rounded-xl text-xs font-semibold cursor-not-allowed border border-gray-200"><i class="fa-solid fa-clock text-[11px]"></i> Upcoming</span>`;
+
+            const transitionTimestamp =
+                Number(nextTransitionMs);
+
+            if (
+                !Number.isFinite(transitionTimestamp) ||
+                transitionTimestamp <= 0
+            ) {
+                return;
             }
-            return `<span class="flex items-center gap-2 bg-gray-100 text-gray-400 px-4 py-2 rounded-xl text-xs font-semibold cursor-not-allowed border border-gray-200"><i class="fa-solid fa-video text-[11px]"></i> Attend</span>`;
+
+            const delay = Math.max(
+                0,
+                transitionTimestamp - currentServerTimeMs() + 75
+            );
+
+            const maximumTimeout = 2_147_000_000;
+
+            if (delay > maximumTimeout) {
+                exactTransitionTimer = setTimeout(
+                    scheduleExactMeetingRefresh,
+                    maximumTimeout
+                );
+                return;
+            }
+
+            exactTransitionTimer = setTimeout(() => {
+                refreshMeetings('exact-meeting-time');
+            }, delay);
         }
 
-        async function poll() {
+        async function refreshMeetings(reason = 'live-check') {
+            if (requestRunning) {
+                pendingRefresh = true;
+                return;
+            }
+
+            requestRunning = true;
+
             try {
-                // Cache-busting timestamp + no-store ensure browser never reuses an old
-                // "upcoming" response. This keeps Upcoming -> Active live without refresh.
-                const url = `{{ route('participant.meetings.status-check') }}?ids=${meetingIds.join(',')}&_=${Date.now()}`;
-                const res = await fetch(url, {
+                const url = new URL(
+                    window.location.href,
+                    window.location.origin
+                );
+
+                /*
+                 * Browser/proxy must never reuse an old participant dashboard.
+                 */
+                url.searchParams.set('_live', Date.now());
+
+                const response = await fetch(url.toString(), {
                     method: 'GET',
                     cache: 'no-store',
                     credentials: 'same-origin',
                     headers: {
                         'X-Requested-With': 'XMLHttpRequest',
-                        'Accept': 'application/json',
+                        'Accept': 'text/html',
                         'Cache-Control': 'no-cache'
                     }
                 });
-                if (!res.ok) return;
-                const data = await res.json();
 
-                const s = data.stats || {};
-                const setStat = (id, val) => {
-                    const el = document.getElementById(id);
-                    if (el && val !== undefined) el.textContent = String(val).padStart(2, '0');
-                };
-                setStat('stat-upcoming-today', s.upcomingToday);
-                setStat('stat-total', s.total);
-                setStat('stat-completed', s.completed);
-
-                Object.entries(data.meetings || {}).forEach(([id, status]) => {
-                    const row = document.querySelector(`[data-meeting-id="${id}"]`);
-                    if (!row || row.dataset.currentStatus === status) return;
-                    row.dataset.currentStatus = status;
-
-                    const badge = document.getElementById('status-badge-' + id);
-                    if (badge) badge.innerHTML = statusBadgeHtml(status);
-
-                    const attend = document.getElementById('attend-col-' + id);
-                    if (attend) attend.innerHTML = attendHtml(status, id);
-                });
-
-                if (typeof window.smartMeetApplyMeetingFilter === 'function') {
-                    window.smartMeetApplyMeetingFilter();
+                if (!response.ok) {
+                    throw new Error(
+                        `Participant meeting refresh failed with HTTP ${response.status}`
+                    );
                 }
-            } catch (e) {
-                console.error('Participant meeting poll failed:', e);
+
+                const html = await response.text();
+
+                const parser = new DOMParser();
+                const newDocument =
+                    parser.parseFromString(html, 'text/html');
+
+                const newStats =
+                    newDocument.querySelector('.stats-grid');
+
+                const currentStats =
+                    document.querySelector('.stats-grid');
+
+                if (newStats && currentStats) {
+                    currentStats.innerHTML =
+                        newStats.innerHTML;
+                }
+
+                const newMeetingsShell =
+                    newDocument.querySelector('.meetings-shell');
+
+                const currentMeetingsShell =
+                    document.querySelector('.meetings-shell');
+
+                if (
+                    newMeetingsShell &&
+                    currentMeetingsShell &&
+                    currentMeetingsShell.innerHTML.trim() !==
+                    newMeetingsShell.innerHTML.trim()
+                ) {
+                    currentMeetingsShell.innerHTML =
+                        newMeetingsShell.innerHTML;
+                }
+
+                updateServerTimingFromDocument(newDocument);
+                applyMeetingFilter();
+                scheduleExactMeetingRefresh();
+
+            } catch (error) {
+                console.error(
+                    `Participant live meeting update failed (${reason}):`,
+                    error
+                );
+            } finally {
+                requestRunning = false;
+
+                if (pendingRefresh) {
+                    pendingRefresh = false;
+                    refreshMeetings('queued-refresh');
+                }
             }
         }
 
-        // Check immediately when page loads, then keep checking every 2 seconds.
-        poll();
-        setInterval(poll, 2000);
+        /*
+         * Immediate sync handles a participant who was invited just before
+         * opening/focusing this page.
+         */
+        refreshMeetings('initial');
+
+        /*
+         * Fast backup check:
+         * - detects newly added meetings
+         * - detects cancelled/completed/other organizer-side status changes
+         * - does not reload the browser page
+         */
+        setInterval(() => {
+            refreshMeetings('live-backup');
+        }, 2000);
+
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                refreshMeetings('page-visible');
+            }
+        });
+
+        window.addEventListener('focus', () => {
+            refreshMeetings('window-focus');
+        });
+
+        window.addEventListener('online', () => {
+            refreshMeetings('network-online');
+        });
+
+        scheduleExactMeetingRefresh();
+        applyMeetingFilter();
     })();
 </script>
