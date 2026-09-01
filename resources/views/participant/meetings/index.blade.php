@@ -832,7 +832,14 @@
             requestRunning = true;
 
             try {
-                const url = `{{ route('participant.meetings.status-check') }}?ids=${meetingIds.join(',')}&_=${Date.now()}`;
+                const statusUrl = new URL(window.location.href);
+                statusUrl.search = '';
+                statusUrl.hash = '';
+                statusUrl.pathname = statusUrl.pathname.replace(/\/$/, '') + '/status-check';
+                statusUrl.searchParams.set('ids', meetingIds.join(','));
+                statusUrl.searchParams.set('_', Date.now().toString());
+
+                const url = statusUrl.toString();
 
                 const res = await fetch(url, {
                     method: 'GET',
@@ -926,6 +933,12 @@
 
         window.addEventListener('focus', () => {
             poll('window-focus');
+        });
+
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                poll('tab-visible');
+            }
         });
 
         window.addEventListener('online', () => {
