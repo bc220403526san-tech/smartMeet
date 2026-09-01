@@ -1116,13 +1116,38 @@
 
     function bindPeerTransceivers(pc){
         if(!pc) return;
-        const txs=pc.getTransceivers();
-        pc.__audioTx=txs.find(tx=>tx.receiver?.track?.kind==='audio' || tx.sender?.track?.kind==='audio') || pc.__audioTx || null;
-        pc.__videoTx=txs.find(tx=>tx.receiver?.track?.kind==='video' || tx.sender?.track?.kind==='video') || pc.__videoTx || null;
 
-        // Remote-offer-created transceivers can remain recvonly on Chrome.
-        // replaceTrack() does not change SDP direction by itself.
-        // Force both media m-lines to sendrecv for true many-to-many media.
+        const txs=(pc.getTransceivers?.()||[]).filter(tx=>tx && !tx.stopped);
+
+        // Recovery/renegotiation can leave more than one audio/video transceiver.
+        // Always bind local media to the ACTIVE negotiated m-line, never blindly
+        // to the first receiver of that kind.
+        const choose=(kind,current)=>{
+            const candidates=txs.filter(tx=>
+                tx.receiver?.track?.kind===kind ||
+                tx.sender?.track?.kind===kind
+            );
+            if(!candidates.length) return current && !current.stopped ? current : null;
+
+            const score=tx=>{
+                let n=0;
+                const currentDirection=String(tx.currentDirection||'');
+                const desiredDirection=String(tx.direction||'');
+                if(tx.mid!==null && tx.mid!==undefined) n+=20;
+                if(currentDirection.includes('send')) n+=100;
+                if(currentDirection.includes('recv')) n+=20;
+                if(tx.sender?.track?.readyState==='live') n+=80;
+                if(desiredDirection==='sendrecv') n+=30;
+                if(tx===current) n+=5;
+                return n;
+            };
+
+            return candidates.sort((a,b)=>score(b)-score(a))[0] || null;
+        };
+
+        pc.__audioTx=choose('audio',pc.__audioTx);
+        pc.__videoTx=choose('video',pc.__videoTx);
+
         [pc.__audioTx, pc.__videoTx].forEach(tx=>{
             if(!tx || tx.stopped) return;
             try{ if(tx.direction!=='sendrecv') tx.direction='sendrecv'; }catch(e){}
@@ -1181,25 +1206,34 @@
             if(info){ info.hasJoined=true; addParticipantTile(uid, info.name, info.initials, Boolean(info.isOrganizer)); markOnline(uid); }
 
             const stream=getOrCreateRemoteStream(uid);
-            const track=event.track;
-            if(track && !stream.getTracks().some(t=>t.id===track.id)) stream.addTrack(track);
+            const incoming=(event.streams?.[0]?.getTracks?.()||[]);
+            const tracks=incoming.length ? incoming : [event.track].filter(Boolean);
+
+            // Keep the exact remote tracks delivered by ontrack. This is more reliable
+            // than reconstructing the stream only from receiver order after renegotiation.
+            tracks.forEach(track=>{
+                if(track && track.readyState!=='ended' && !stream.getTracks().some(t=>t.id===track.id)){
+                    try{ stream.addTrack(track); }catch(e){}
+                }
+            });
 
             attachRemoteStream(uid);
 
-            event.track.onunmute = ()=>{
-                attachRemoteStream(uid);
-                setTimeout(()=>attachRemoteStream(uid),120);
-                if(event.track.kind==='audio') unlockRemoteAudio();
-            };
-            event.track.onmute = ()=>{
-                setTimeout(()=>attachRemoteStream(uid),250);
-            };
-            event.track.onended = ()=>{
-                const s=remoteStreams[uid];
-                const existing=s?.getTracks().find(t=>t.id===event.track.id);
-                if(existing) s.removeTrack(existing);
-                setTimeout(()=>attachRemoteStream(uid),80);
-            };
+            const track=event.track;
+            if(track){
+                track.onunmute = ()=>{
+                    attachRemoteStream(uid);
+                    setTimeout(()=>attachRemoteStream(uid),120);
+                    if(track.kind==='audio') unlockRemoteAudio();
+                };
+                track.onmute = ()=>setTimeout(()=>attachRemoteStream(uid),250);
+                track.onended = ()=>{
+                    const s=remoteStreams[uid];
+                    const existing=s?.getTracks().find(t=>t.id===track.id);
+                    if(existing) s.removeTrack(existing);
+                    setTimeout(()=>attachRemoteStream(uid),80);
+                };
+            }
         };
 
         pc.oniceconnectionstatechange = ()=>{
@@ -1237,6 +1271,7 @@
                 awaitSyncPeerMedia(uid);
                 attachRemoteStream(uid);
                 unlockRemoteAudio();
+                setTimeout(()=>ensureOutboundMediaNegotiated(uid),180);
                 pc.__restartAttempts=0;
             }else if(pc.connectionState==='disconnected'){
                 clearTimeout(pc.__connectWatchdog);
@@ -1359,6 +1394,60 @@
 
     async function syncTracksToEveryPeer(){ await Promise.allSettled(Object.keys(peers).map(uid=>syncLocalTracksToPeer(uid))); }
 
+    async function ensureOutboundMediaNegotiated(uid){
+        uid=String(uid);
+        const pc=peers[uid];
+        if(!pc || pc.signalingState==='closed' || leftUsers.has(uid)) return false;
+
+        bindPeerTransceivers(pc);
+
+        const audioTrack=liveLocalTrack('audio');
+        const videoTrack=liveLocalTrack('video');
+        const audioDirection=String(pc.__audioTx?.currentDirection||'');
+        const videoDirection=String(pc.__videoTx?.currentDirection||'');
+
+        const audioNeedsSend=Boolean(isMicOn && audioTrack && (!pc.__audioTx || !audioDirection.includes('send')));
+        const videoNeedsSend=Boolean(isCameraOn && videoTrack && (!pc.__videoTx || !videoDirection.includes('send')));
+
+        if(!audioNeedsSend && !videoNeedsSend) return true;
+        if(makingOffer[uid] || pc.signalingState!=='stable') return false;
+
+        try{
+            makingOffer[uid]=true;
+            ensureOfferTransceivers(pc);
+            await syncLocalTracksToPeer(uid);
+
+            const offer=await pc.createOffer();
+            if(pc.signalingState!=='stable') return false;
+            await pc.setLocalDescription(offer);
+            await waitForIceGatheringComplete(pc);
+
+            console.log('[SmartMeet] media renegotiation ->',uid,{
+                audioNeedsSend,
+                videoNeedsSend
+            });
+
+            return await sendSignal(uid,'offer',{
+                type:pc.localDescription.type,
+                sdp:btoa(unescape(encodeURIComponent(pc.localDescription.sdp))),
+                mediaRenegotiation:true
+            });
+        }catch(err){
+            console.warn('[SmartMeet] media renegotiation failed',uid,err);
+            return false;
+        }finally{
+            makingOffer[uid]=false;
+        }
+    }
+
+    function ensureOutboundMediaForAll(){
+        Object.keys(peers).forEach(uid=>{
+            const pc=peers[uid];
+            if(!pc || pc.signalingState==='closed') return;
+            ensureOutboundMediaNegotiated(uid);
+        });
+    }
+
     async function awaitSyncPeerMedia(uid){
         await syncLocalTracksToPeer(uid);
         setTimeout(()=>syncLocalTracksToPeer(uid),250);
@@ -1377,30 +1466,61 @@
         const localIds=new Set((localStream?.getTracks?.()||[]).map(t=>t.id));
         const pc=peers[uid];
 
-        // After ICE recovery / renegotiation Chrome may temporarily expose
-        // duplicate receivers (e.g. 2 audio + 2 video). If all receiver tracks
-        // are bound to one media element, the browser can render the first stale
-        // muted video track and keep the tile blank even though another receiver
-        // is already live. Pick exactly one best track per media kind.
-        const receiverTracks=(pc?.getReceivers?.()||[])
-            .map(r=>r.track)
+        const source=getOrCreateRemoteStream(uid);
+
+        // Prefer receivers that belong to an ACTIVE negotiated recv m-line.
+        // Fall back to tracks already delivered by ontrack. This prevents a stale
+        // muted receiver created by an earlier negotiation from replacing the live
+        // participant camera/audio in the DOM.
+        const transceiverTracks=(pc?.getTransceivers?.()||[])
+            .filter(tx=>tx && !tx.stopped)
+            .map(tx=>({
+                tx,
+                track:tx.receiver?.track
+            }))
+            .filter(x=>
+                x.track &&
+                x.track.readyState!=='ended' &&
+                !localIds.has(x.track.id)
+            );
+
+        const cachedTracks=(source.getTracks?.()||[])
             .filter(t=>t && t.readyState!=='ended' && !localIds.has(t.id));
 
         const pickBest=(kind)=>{
-            const tracks=receiverTracks.filter(t=>t.kind===kind);
-            return tracks.find(t=>t.readyState==='live' && !t.muted)
-                || tracks.find(t=>t.readyState==='live')
-                || null;
+            const candidates=[];
+            transceiverTracks
+                .filter(x=>x.track.kind===kind)
+                .forEach(x=>{
+                    const d=String(x.tx.currentDirection||'');
+                    let score=0;
+                    if(d.includes('recv')) score+=100;
+                    if(x.tx.mid!==null && x.tx.mid!==undefined) score+=20;
+                    if(x.track.readyState==='live') score+=40;
+                    if(!x.track.muted) score+=80;
+                    candidates.push({track:x.track,score});
+                });
+
+            cachedTracks
+                .filter(t=>t.kind===kind)
+                .forEach(t=>{
+                    let score=10;
+                    if(t.readyState==='live') score+=40;
+                    if(!t.muted) score+=80;
+                    candidates.push({track:t,score});
+                });
+
+            candidates.sort((a,b)=>b.score-a.score);
+            return candidates[0]?.track || null;
         };
 
         const bestAudio=pickBest('audio');
         const bestVideo=pickBest('video');
 
-        // Keep cached remote stream canonical: at most one audio and one video.
-        const source=getOrCreateRemoteStream(uid);
+        // Keep one canonical live audio and video track for this remote user.
         const keepIds=new Set([bestAudio?.id,bestVideo?.id].filter(Boolean));
         source.getTracks().forEach(t=>{
-            if(!keepIds.has(t.id)){
+            if(t.readyState==='ended' || (keepIds.size && !keepIds.has(t.id))){
                 try{ source.removeTrack(t); }catch(e){}
             }
         });
@@ -1897,6 +2017,10 @@
         // A second replaceTrack after the sender has settled fixes slower Android browsers.
         setTimeout(()=>syncTracksToEveryPeer(),180);
         setTimeout(()=>syncTracksToEveryPeer(),700);
+        if(targetOn){
+            setTimeout(()=>ensureOutboundMediaForAll(),220);
+            setTimeout(()=>ensureOutboundMediaForAll(),900);
+        }
 
         broadcastMyMicStatus();
 
@@ -2007,6 +2131,10 @@
         setTimeout(()=>syncTracksToEveryPeer(),180);
         setTimeout(()=>syncTracksToEveryPeer(),700);
         setTimeout(()=>syncTracksToEveryPeer(),1600);
+        if(targetOn){
+            setTimeout(()=>ensureOutboundMediaForAll(),220);
+            setTimeout(()=>ensureOutboundMediaForAll(),900);
+        }
         broadcastMyCameraStatus();
         unlockRemoteMedia();
         if(IS_MOBILE_BROWSER){
@@ -2417,6 +2545,7 @@
                 else requestPresence(true);
             }else if(pc.connectionState==='connected' || pc.iceConnectionState==='connected' || pc.iceConnectionState==='completed'){
                 attachRemoteStream(uid);
+                ensureOutboundMediaNegotiated(uid);
             }else if(pc.connectionState==='connecting' || pc.iceConnectionState==='checking'){
                 armPeerWatchdog(uid,pc);
             }
@@ -2530,4 +2659,5 @@
 </script>
 </body>
 </html>
+
 
