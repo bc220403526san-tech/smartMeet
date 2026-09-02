@@ -2349,6 +2349,11 @@
         if(supported.sampleSize) c.sampleSize={ideal:16};
         if(supported.latency) c.latency={ideal:0.02,max:0.15};
 
+        // Mobile voice pickup: prefer browser voice processing without making
+        // any optional constraint mandatory. This keeps distant speech clearer
+        // while preserving compatibility with older Android/iOS browsers.
+        if(supported.volume) c.volume={ideal:1.0};
+
         // Chrome/Android may expose voiceIsolation on supported hardware.
         // It is deliberately optional so older browsers keep working.
         if(supported.voiceIsolation) c.voiceIsolation=true;
@@ -2385,6 +2390,9 @@
                     // Give Opus enough headroom for clean speech on laptop/mobile.
                     // Audio is still mono and small compared with video bandwidth.
                     enc.maxBitrate=128000;
+                    // Keep voice packets responsive on mobile networks. These
+                    // hints are optional and do not alter signaling/negotiation.
+                    try{ enc.bitratePriority=1.0; }catch(e){}
 
                     // These are supported by Chromium where available.
                     try{ enc.priority='high'; }catch(e){}
