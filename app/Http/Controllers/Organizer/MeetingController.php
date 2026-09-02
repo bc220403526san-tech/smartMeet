@@ -16,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Str;
 
 class MeetingController extends Controller
@@ -515,10 +516,11 @@ class MeetingController extends Controller
                 'organizer_id' => auth()->id(),
             ]);
 
-            validator(
-                [$fieldName => $value],
-                [$fieldName => 'required|string']
-            )->validate();
+            throw ValidationException::withMessages([
+                $fieldName => [
+                    'Please enter at least one email address.',
+                ],
+            ]);
         }
 
         foreach ($emails as $email) {
@@ -535,14 +537,11 @@ class MeetingController extends Controller
                     'organizer_id' => auth()->id(),
                 ]);
 
-                validator(
-                    [$fieldName => $email],
-                    [$fieldName => ['required', 'email:rfc,dns', new StrongEmail]],
-                    [
-                        $fieldName . '.email' =>
-                            'One or more invite email addresses are invalid.',
-                    ]
-                )->validate();
+                throw ValidationException::withMessages([
+                    $fieldName => [
+                        'One or more email addresses are invalid. Please check them and try again.',
+                    ],
+                ]);
             }
         }
     }
