@@ -194,7 +194,7 @@
         .btn-send{background:linear-gradient(135deg,#2563eb,#0891b2); border:none; color:#fff}
         .chat-voice-btn.listening{color:#ef4444; border-color:rgba(239,68,68,.5); background:rgba(239,68,68,.14)}
 
-        .people-body{flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:8px}
+        .people-body{flex:1; min-height:0; max-height:100%; overflow-y:auto; overscroll-behavior:contain; padding:12px; display:flex; flex-direction:column; gap:8px}
         .person-row{display:flex; align-items:center; gap:10px; padding:10px; border-radius:13px; border:1px solid var(--line); background:rgba(255,255,255,.02); transition:opacity .2s, filter .2s, background .2s, border-color .2s}
         .person-row.joined{opacity:1; filter:none; background:rgba(34,197,94,.07); border-color:rgba(34,197,94,.22)}
         .person-row.pending{opacity:.5; filter:grayscale(.5) saturate(.4)}
@@ -209,6 +209,8 @@
         .person-dot.on{background:var(--green)}
         .person-action{border:1px solid var(--line); background:rgba(255,255,255,.04); color:var(--muted); font-size:10px; padding:5px 9px; border-radius:8px; cursor:pointer; flex-shrink:0}
         .person-action:hover{background:rgba(239,68,68,.16); color:#fecaca; border-color:rgba(239,68,68,.3)}
+        .hand-raised{color:#fbbf24;font-size:13px;animation:handPulse 1.2s ease-in-out infinite}
+        @keyframes handPulse{50%{transform:translateY(-2px)}}
 
 
         /* ---------- IN-ROOM INVITE (isolated; existing responsive layout untouched) ---------- */
@@ -710,6 +712,7 @@
     <div class="ctrl-btn" onclick="toggleSidePanel('transcript')"><div class="ctrl-icon" id="ctrl-transcript"><i class="fa fa-closed-captioning"></i></div><span class="ctrl-label">Captions</span></div>
     <div class="ctrl-btn" onclick="toggleSidePanel('chat')"><div class="ctrl-icon" id="ctrl-chat"><i class="fa fa-comment"></i><span id="chat-badge">0</span></div><span class="ctrl-label">Chat</span></div>
     <div class="ctrl-btn" onclick="toggleSidePanel('people')"><div class="ctrl-icon" id="ctrl-people"><i class="fa fa-users"></i></div><span class="ctrl-label">People</span></div>
+    <div class="ctrl-btn" onclick="toggleRaiseHand()"><div class="ctrl-icon" id="ctrl-hand"><i class="fa-regular fa-hand"></i></div><span class="ctrl-label">Raise hand</span></div>
     <div class="ctrl-divider"></div>
     <div class="ctrl-btn"><button class="btn-end" onclick="safeLeaveMeeting()"><i class="fa fa-phone-slash"></i></button><span class="ctrl-label" style="color:var(--red);">Leave</span></div>
 </div>
@@ -746,6 +749,8 @@
 
     /* ---------- Known participants (id -> {name, initials, isOrganizer, hasJoined}) ---------- */
     const knownParticipants = {};
+    const raisedHands = new Set();
+    let myHandRaised=false;
     knownParticipants[ORGANIZER_ID] = { name: ORGANIZER_NAME, initials: ORGANIZER_INITIALS, avatarUrl: ORGANIZER_AVATAR_URL || null, isOrganizer: true, hasJoined: Boolean(ORGANIZER_JOINED) };
     ALL_PARTICIPANTS.forEach(p => { knownParticipants[String(p.userId)] = { name: p.name, initials: p.initials, avatarUrl: p.avatarUrl || null, isOrganizer: false, hasJoined: Boolean(p.hasJoined) }; });
 
@@ -757,6 +762,7 @@
     const negotiationTimers = {};
     const makingOffer   = {};
     const ignoreOffer   = {};
+    const offerHandling = {};
     const pendingCandidates = {};
     const micStatus     = {};
     const camStatus     = {};
@@ -918,6 +924,7 @@
             <div class="person-name">${escapeHtml(info.name)}${isMe?' <span style="color:var(--blue);font-weight:600;">(You)</span>':''}${info.isOrganizer?'<i class="fa fa-crown" style="color:#fbbf24;font-size:10px;"></i>':''}</div>
             <div class="person-status ${isOnline?'on':''}" ${isLeft?'style="color:#fca5a5"':''}>${info.isOrganizer?'Organizer':'Participant'} • ${presenceLabel}</div>
         </div>
+        ${raisedHands.has(uid) ? `<i class="fa-solid fa-hand hand-raised" title="Hand raised"></i>` : ''}
         <span class="person-dot ${isOnline?'on':''}" ${isLeft?'style="background:#ef4444"':''}></span>`;
     }
 
@@ -1081,7 +1088,7 @@
         document.querySelectorAll('.ctrl-icon').forEach(i=>i.classList.remove('active'));
         document.querySelectorAll('.panel-tabbtn').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
         const active=document.getElementById('tab-'+tab);
-        if(active) active.style.display = tab==='people' ? 'block' : 'flex';
+        if(active) active.style.display='flex';
         activeTab=tab;
         document.getElementById('ctrl-'+tab)?.classList.add('active');
         if(tab==='chat'){ unreadChat=0; updateChatBadge(); }
@@ -1987,38 +1994,90 @@
     function decodeSdp(sdp){ if(!sdp) return ''; try{ return decodeURIComponent(escape(atob(sdp))); }catch(e){ return sdp; } }
 
     async function handleOffer(from, data){
+        from=String(from);
+        if(offerHandling[from]){
+            console.log('[SmartMeet] duplicate/concurrent offer ignored while handling <-', from);
+            return;
+        }
+        offerHandling[from]=true;
         console.log('[SmartMeet] received offer <-', from);
-        const pc=createPeerConnection(from); if(!pc) return;
+        const pc=createPeerConnection(from);
+        if(!pc){ offerHandling[from]=false; return; }
+
         const polite=isPolite(from);
         const offerCollision = makingOffer[from] || pc.signalingState!=='stable';
         ignoreOffer[from] = !polite && offerCollision;
-        if(ignoreOffer[from]){ console.log('[SmartMeet] ignoring colliding offer from', from); return; }
+
+        if(ignoreOffer[from]){
+            console.log('[SmartMeet] ignoring colliding offer from', from);
+            offerHandling[from]=false;
+            return;
+        }
+
         try{
-            await pc.setRemoteDescription({ type:data.type||'offer', sdp:decodeSdp(data.sdp) });
+            // Perfect-negotiation collision handling. A polite peer rolls back
+            // its own unfinished offer before accepting the remote offer.
+            if(offerCollision && polite && pc.signalingState==='have-local-offer'){
+                await pc.setLocalDescription({type:'rollback'});
+            }
+
+            if(pc.signalingState!=='stable'){
+                console.log('[SmartMeet] offer deferred; peer not stable <-',from,pc.signalingState);
+                return;
+            }
+
+            await pc.setRemoteDescription({
+                type:data.type||'offer',
+                sdp:decodeSdp(data.sdp)
+            });
+
             bindPeerTransceivers(pc);
             await syncLocalTracksToPeer(from);
-            if(pendingCandidates[from]?.length){ for(const c of pendingCandidates[from]) await pc.addIceCandidate(c).catch(()=>{}); delete pendingCandidates[from]; }
+
+            if(pendingCandidates[from]?.length){
+                for(const c of pendingCandidates[from]){
+                    await pc.addIceCandidate(c).catch(()=>{});
+                }
+                delete pendingCandidates[from];
+            }
+
+            // Another async negotiation may already have resolved this offer.
+            // Never apply an answer unless the peer still owns a remote offer.
+            if(pc.signalingState!=='have-remote-offer'){
+                console.log('[SmartMeet] stale offer resolved before answer <-',from,pc.signalingState);
+                return;
+            }
+
             const answer=await pc.createAnswer();
+
+            if(pc.signalingState!=='have-remote-offer'){
+                console.log('[SmartMeet] answer no longer needed <-',from,pc.signalingState);
+                return;
+            }
+
             await pc.setLocalDescription(answer);
 
-            // Send the answer immediately; TURN candidates are trickled by
-            // onicecandidate. This removes the multi-second cross-device delay
-            // that previously left ICE connected while connectionState was still
-            // stuck on connecting.
             console.log('[SmartMeet] sending answer ->', from);
             await sendSignal(from,'answer',{
                 type:pc.localDescription.type,
                 sdp:btoa(unescape(encodeURIComponent(pc.localDescription.sdp)))
             });
 
-            // Mobile Chrome may expose the remote-created transceiver sender only
-            // after the answer is applied. Sync once more so our mic/camera are
-            // definitely attached to this participant-to-participant connection.
             bindPeerTransceivers(pc);
             await syncLocalTracksToPeer(from);
             setTimeout(()=>ensureOutboundMediaNegotiated(from),160);
             if(isMicOn) setTimeout(()=>verifyPeerAudioOutbound(from),850);
-        }catch(err){ console.warn('[SmartMeet] offer handling failed', from, err); }
+        }catch(err){
+            // InvalidStateError here is normally a stale duplicate negotiation.
+            // It is safe to ignore; bounded recovery will renegotiate if needed.
+            if(err?.name==='InvalidStateError'){
+                console.log('[SmartMeet] stale offer ignored <-',from,pc.signalingState);
+            }else{
+                console.warn('[SmartMeet] offer handling failed', from, err);
+            }
+        }finally{
+            offerHandling[from]=false;
+        }
     }
     async function handleAnswer(from, data){
         console.log('[SmartMeet] received answer <-', from);
@@ -2285,6 +2344,39 @@
         }
         if(data.type==='chat'){
             if(isSelf) return;
+
+            const control=String(data.data?.smartmeetControl||'');
+            const controlUser=String(data.data?.userId||from);
+
+            if(control==='raise-hand'){
+                raisedHands.add(controlUser);
+                renderPersonRow(controlUser);
+                return;
+            }
+            if(control==='lower-hand'){
+                raisedHands.delete(controlUser);
+                renderPersonRow(controlUser);
+                return;
+            }
+
+            // Only the real organizer may issue moderation controls.
+            if(String(from)===String(ORGANIZER_ID)){
+                if(control==='participant-removed' && controlUser===String(MY_USER_ID)){
+                    showModerationNotice('🚫 You were removed from this meeting by the organizer.');
+                    try{ cleanup(); }catch(e){}
+                    setTimeout(()=>{ window.location.href=LEAVE_URL; },900);
+                    return;
+                }
+                if(control==='request-mic' && controlUser===String(MY_USER_ID)){
+                    showModerationNotice('🎙️ Organizer requested your microphone. Tap Mic to turn it on.');
+                    return;
+                }
+                if(control==='request-camera' && controlUser===String(MY_USER_ID)){
+                    showModerationNotice('📷 Organizer requested your camera. Tap Camera to turn it on.');
+                    return;
+                }
+            }
+
             const text=data.data?.text||''; if(!text) return;
             addChatBubble(data.data?.name||'User', text, false);
             if(activeTab!=='chat'){ unreadChat++; updateChatBadge(); }
@@ -2347,11 +2439,11 @@
         // Ask for it only where the browser supports the constraint.
         if(supported.sampleRate) c.sampleRate={ideal:48000};
         if(supported.sampleSize) c.sampleSize={ideal:16};
+        if(supported.latency) c.latency={ideal:0.02,max:0.15};
 
-        // Keep browser/device buffering adaptive. Forcing ultra-low capture
-        // latency can create chopped audio on slower phones and Wi-Fi.
-        // Do not force voiceIsolation either: on some phones it suppresses
-        // a speaker who is farther away from the microphone.
+        // Chrome/Android may expose voiceIsolation on supported hardware.
+        // It is deliberately optional so older browsers keep working.
+        if(supported.voiceIsolation) c.voiceIsolation=true;
 
         return c;
     }
@@ -2382,10 +2474,9 @@
 
             if(Array.isArray(params.encodings) && params.encodings.length){
                 params.encodings.forEach(enc=>{
-                    // Stable cross-device speech profile. 64 kbps mono Opus is
-                    // high quality for voice while leaving headroom on weak mobile
-                    // networks so packets are less likely to arrive chopped.
-                    enc.maxBitrate=64000;
+                    // Give Opus enough headroom for clean speech on laptop/mobile.
+                    // Audio is still mono and small compared with video bandwidth.
+                    enc.maxBitrate=128000;
 
                     // These are supported by Chromium where available.
                     try{ enc.priority='high'; }catch(e){}
@@ -3013,6 +3104,30 @@
             await new Promise(r=>setTimeout(r,350));
         }
         return false;
+    }
+
+    async function toggleRaiseHand(){
+        myHandRaised=!myHandRaised;
+        const btn=document.getElementById('ctrl-hand');
+        if(btn){
+            btn.classList.toggle('active',myHandRaised);
+            btn.innerHTML=myHandRaised?'<i class="fa-solid fa-hand"></i>':'<i class="fa-regular fa-hand"></i>';
+        }
+        if(myHandRaised) raisedHands.add(String(MY_USER_ID));
+        else raisedHands.delete(String(MY_USER_ID));
+        renderPersonRow(String(MY_USER_ID));
+        const ok=await sendSignal('all','chat',{
+            smartmeetControl:myHandRaised?'raise-hand':'lower-hand',
+            userId:MY_USER_ID,
+            name:MY_NAME,
+            text:''
+        });
+        if(!ok){
+            myHandRaised=!myHandRaised;
+            showToast('Raise hand update could not be sent.');
+        }else{
+            showToast(myHandRaised?'✋ Hand raised.':'Hand lowered.');
+        }
     }
 
     /* ---------- Chat ---------- */
