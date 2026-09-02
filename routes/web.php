@@ -43,3 +43,10 @@ Route::middleware(['auth'])->group(function () {
 // Public route —
 Route::get('/meetings/join/{code}', [App\Http\Controllers\MeetingJoinController::class, 'handleJoinLink'])
     ->name('meetings.join.link');
+
+// ============================================================
+// SmartMeet Legal Pages - Meta/Facebook Login Requirements
+// ============================================================
+Route::view('/privacy-policy', 'legal.privacy')->name('privacy-policy');
+Route::view('/terms', 'legal.terms')->name('terms');
+Route::view('/data-deletion', 'legal.data-deletion')->name('data-deletion');
