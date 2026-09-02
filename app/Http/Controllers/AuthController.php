@@ -29,7 +29,7 @@ class AuthController extends Controller
             'terms' => 'accepted',
         ], [
             'email.email' => 'Please enter a valid email address, for example name@example.com.',
-            'email.regex' => 'Please enter a valid email address, for example name@example.com.',
+            'email.regex' => 'This email address is invalid. Please use a complete email address such as name@example.com.',
             'password.min' => 'Password must be at least 8 characters long.',
         ]);
 
@@ -64,7 +64,7 @@ class AuthController extends Controller
             'password' => 'required',
         ], [
             'email.email' => 'Please enter a valid email address, for example name@example.com.',
-            'email.regex' => 'Please enter a valid email address, for example name@example.com.',
+            'email.regex' => 'This email address is invalid. Please use a complete email address such as name@example.com.',
         ]);
 
         $email = strtolower(trim($request->email));
@@ -124,7 +124,7 @@ class AuthController extends Controller
             'email' => ['required', 'email:rfc', 'regex:/^.+@.+\..+$/', 'exists:users,email'],
         ], [
             'email.email' => 'Please enter a valid email address, for example name@example.com.',
-            'email.regex' => 'Please enter a valid email address, for example name@example.com.',
+            'email.regex' => 'This email address is invalid. Please use a complete email address such as name@example.com.',
             'email.exists' => 'No SmartMeet account was found with this email address.',
         ]);
 
@@ -181,7 +181,7 @@ class AuthController extends Controller
             ],
         ], [
             'email.email' => 'Please enter a valid email address, for example name@example.com.',
-            'email.regex' => 'Please enter a valid email address, for example name@example.com.',
+            'email.regex' => 'This email address is invalid. Please use a complete email address such as name@example.com.',
             'email.exists' => 'No SmartMeet account was found with this email address.',
             'password.min' => 'Password must be at least 8 characters long.',
         ]);

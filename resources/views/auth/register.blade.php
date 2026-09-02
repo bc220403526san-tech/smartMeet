@@ -69,10 +69,13 @@
                     <label class="text-xs text-gray-400 mb-1 block">Email address</label>
                     <input type="email" name="email" placeholder="Email" value="{{ old('email') }}"
                            class="w-full px-3 py-2 text-sm rounded-xl
-                   border border-gray-200 bg-gray-50
+                   border {{ $errors->has('email') ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50' }}
                    focus:ring-2 focus:ring-blue-100 focus:border-blue-400
                    outline-none transition"
                            required>
+                    @error('email')
+                    <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                    @enderror
                 </div>
                 <!-- PASSWORD + CONFIRM (side by side to save height) -->
                 <div class="grid grid-cols-2 gap-3">
