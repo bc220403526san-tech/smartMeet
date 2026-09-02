@@ -167,11 +167,7 @@
     </main>
 
     <footer class="border-t border-gray-200 bg-white">
-        <div class="max-w-5xl mx-auto px-4 sm:px-6 py-7 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div class="flex items-center gap-2">
-                <img src="{{ asset('images/s-logo.png') }}" alt="SmartMeet" class="w-7 h-7 object-contain">
-                <span class="text-sm font-bold text-gray-800">SmartMeet</span>
-            </div>
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 py-7">
             <p class="text-xs sm:text-sm text-gray-500 text-center">
                 &copy; {{ date('Y') }} SmartMeet. All rights reserved.
             </p>
