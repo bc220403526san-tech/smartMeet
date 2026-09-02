@@ -9,6 +9,7 @@ use App\Models\MeetingParticipant;
 use App\Models\Notification;
 use App\Models\RoleRequest;
 use App\Models\User;
+use App\Rules\StrongEmail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -68,6 +69,7 @@ class SettingsController extends Controller
             'email' => [
                 'required',
                 'email:rfc,dns',
+                new StrongEmail,
                 'max:255',
                 Rule::unique('users', 'email')->ignore($user->id),
             ],
@@ -264,7 +266,7 @@ class SettingsController extends Controller
         foreach ($admins as $admin) {
             $emailValidator = Validator::make(
                 ['email' => $admin->email],
-                ['email' => 'required|email:rfc,dns']
+                ['email' => ['required', 'email:rfc,dns', new StrongEmail]]
             );
 
             if ($emailValidator->fails()) {

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Rules\StrongEmail;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -18,7 +19,7 @@ class AuthController extends Controller
     {
         $request->validate([
             'name' => 'required',
-            'email' => 'required|email:rfc,dns|unique:users,email',
+            'email' => ['required', 'email:rfc,dns', new StrongEmail, 'unique:users,email'],
             'password' => [
                 'required',
                 'confirmed',
@@ -86,7 +87,7 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $request->validate([
-            'email' => 'required|email:rfc,dns',
+            'email' => ['required', 'email:rfc,dns', new StrongEmail],
             'password' => 'required',
         ], [
             'email.email' => 'Please enter a valid email address with a real mail domain.',
@@ -176,7 +177,7 @@ class AuthController extends Controller
     public function sendResetLink(Request $request)
     {
         $request->validate([
-            'email' => 'required|email:rfc,dns|exists:users,email',
+            'email' => ['required', 'email:rfc,dns', new StrongEmail, 'exists:users,email'],
         ], [
             'email.email' => 'Please enter a valid email address with a real mail domain.',
             'email.exists' => 'No SmartMeet account was found with this email address.',
@@ -245,7 +246,7 @@ class AuthController extends Controller
     {
         $request->validate([
             'token' => 'required',
-            'email' => 'required|email:rfc,dns|exists:users,email',
+            'email' => ['required', 'email:rfc,dns', new StrongEmail, 'exists:users,email'],
             'password' => [
                 'required',
                 'confirmed',

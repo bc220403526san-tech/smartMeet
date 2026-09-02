@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Mail\RoleRequestResolved;
 use App\Models\Notification;
 use App\Models\RoleRequest;
+use App\Rules\StrongEmail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -89,7 +90,7 @@ class RoleRequestController extends Controller
 
         $validator = Validator::make(
             ['email' => $email],
-            ['email' => 'required|email:rfc,dns']
+            ['email' => ['required', 'email:rfc,dns', new StrongEmail]]
         );
 
         if ($validator->fails()) {

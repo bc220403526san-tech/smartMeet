@@ -10,6 +10,7 @@ use App\Models\MeetingInvite;
 use App\Models\MeetingParticipant;
 use App\Models\Notification;
 use App\Models\User;
+use App\Rules\StrongEmail;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -499,7 +500,7 @@ class MeetingController extends Controller
      * Validate every invite address with Laravel's RFC + DNS checks.
      *
      * This is the multi-email equivalent of:
-     * $request->validate(['email' => 'required|email:rfc,dns']);
+     * $request->validate(['email' => ['required', 'email:rfc,dns', new StrongEmail]]);
      */
     private function validateInviteEmailList(
         string $value,
@@ -523,7 +524,7 @@ class MeetingController extends Controller
         foreach ($emails as $email) {
             $validator = Validator::make(
                 ['email' => $email],
-                ['email' => 'required|email:rfc,dns']
+                ['email' => ['required', 'email:rfc,dns', new StrongEmail]]
             );
 
             if ($validator->fails()) {
@@ -536,7 +537,7 @@ class MeetingController extends Controller
 
                 validator(
                     [$fieldName => $email],
-                    [$fieldName => 'required|email:rfc,dns'],
+                    [$fieldName => ['required', 'email:rfc,dns', new StrongEmail]],
                     [
                         $fieldName . '.email' =>
                             'One or more invite email addresses are invalid.',
