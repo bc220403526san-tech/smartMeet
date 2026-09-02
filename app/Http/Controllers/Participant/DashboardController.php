@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Participant;
 
 use App\Http\Controllers\Controller;
 use App\Models\Meeting;
-use App\Models\MeetingParticipant;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 
@@ -18,30 +17,30 @@ class DashboardController extends Controller
         $today = $now->toDateString();
         $scheduleEnd = $now->copy()->addHours(48);
 
-        $meetingIds = MeetingParticipant::where('user_id', $user->id)
-            ->pluck('meeting_id')
-            ->unique()
-            ->values();
+        /*
+         * Use the same participants relationship as My Meetings.
+         * This avoids stale/mismatched meeting-id lists after an invite-link join.
+         */
+        $participantMeetings = Meeting::query()
+            ->whereHas('participants', function ($query) use ($user) {
+                $query->where('user_id', $user->id);
+            });
 
-        $totalMeetings = Meeting::whereIn('id', $meetingIds)->count();
+        $totalMeetings = (clone $participantMeetings)->count();
 
-        $todayMeetings = Meeting::whereIn('id', $meetingIds)
+        $todayMeetings = (clone $participantMeetings)
             ->whereDate('date', $today)
             ->count();
 
-        $liveMeetings = Meeting::whereIn('id', $meetingIds)
+        $liveMeetings = (clone $participantMeetings)
             ->where('status', 'active')
             ->count();
 
-        $upcomingMeetings = Meeting::whereIn('id', $meetingIds)
+        $upcomingMeetings = (clone $participantMeetings)
             ->where('status', 'upcoming')
             ->count();
 
-        /*
-         * Active meetings for today remain visible even after their scheduled
-         * start time has passed. Upcoming meetings show from now through 48h.
-         */
-        $schedule = Meeting::whereIn('id', $meetingIds)
+        $schedule = (clone $participantMeetings)
             ->with(['organizer:id,name,email,image,avatar'])
             ->where(function ($query) use ($today, $now, $scheduleEnd) {
                 $query
