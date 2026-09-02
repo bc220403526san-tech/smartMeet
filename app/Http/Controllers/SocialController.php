@@ -17,7 +17,7 @@ class SocialController extends Controller
     {
         try {
             $socialUser = Socialite::driver($provider)->user();
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return redirect('/login')->with(
                 'error',
                 ucfirst($provider) . ' login failed. Try again.'
@@ -26,26 +26,26 @@ class SocialController extends Controller
 
         $email = $socialUser->getEmail();
 
-        // 1. Pehle provider + provider_id se existing user dhoondo
+        // 1. First try provider + provider_id.
         $user = User::where('provider', $provider)
             ->where('provider_id', $socialUser->getId())
             ->first();
 
-        // 2. Agar provider se user na mile, to same email wala existing account use karo
+        // 2. If not linked yet, reuse an existing account with same email.
         if (!$user && $email) {
             $user = User::where('email', $email)->first();
         }
 
-        // 3. Agar user bilkul naya hai to create karo
+        // Remember whether this social login creates a brand-new account.
+        $isNewUser = !$user;
+
         if (!$user) {
             $user = new User();
-
-            // Sirf naye social user ke liye default values
             $user->role = 'participant';
             $user->is_active = 1;
         }
 
-        // 4. Social account details update/link karo
+        // 3. Link/update social account details.
         $user->provider = $provider;
         $user->provider_id = $socialUser->getId();
 
@@ -67,7 +67,7 @@ class SocialController extends Controller
 
         $user->save();
 
-        // 5. Deactivated account ko login na karne dein
+        // 4. Block deactivated accounts.
         if (!$user->is_active) {
             return redirect('/login')->with(
                 'error',
@@ -75,12 +75,24 @@ class SocialController extends Controller
             );
         }
 
-        // 6. Login user
+        // 5. Login and rotate session ID.
         Auth::login($user);
-
         request()->session()->regenerate();
 
-        // 7. Role ke according dashboard redirect
+        // 6. Set the SAME dashboard welcome session values used by email login/register.
+        request()->session()->flash('show_welcome_banner', true);
+        request()->session()->flash(
+            'welcome_type',
+            $isNewUser ? 'register' : 'login'
+        );
+        request()->session()->flash(
+            'welcome_title',
+            $isNewUser
+                ? 'Welcome, ' . $user->name
+                : 'Welcome back, ' . $user->name
+        );
+
+        // 7. Role-based dashboard redirect.
         if ($user->role === 'admin') {
             return redirect('/admin/dashboard');
         }
