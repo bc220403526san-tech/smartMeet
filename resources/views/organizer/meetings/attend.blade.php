@@ -2564,16 +2564,11 @@
         // Ask for it only where the browser supports the constraint.
         if(supported.sampleRate) c.sampleRate={ideal:48000};
         if(supported.sampleSize) c.sampleSize={ideal:16};
-        if(supported.latency) c.latency={ideal:0.02,max:0.15};
 
-        // Mobile voice pickup: prefer browser voice processing without making
-        // any optional constraint mandatory. This keeps distant speech clearer
-        // while preserving compatibility with older Android/iOS browsers.
-        if(supported.volume) c.volume={ideal:1.0};
-
-        // Chrome/Android may expose voiceIsolation on supported hardware.
-        // It is deliberately optional so older browsers keep working.
-        if(supported.voiceIsolation) c.voiceIsolation=true;
+        // Keep browser/device buffering adaptive. Forcing ultra-low capture
+        // latency can create chopped audio on slower phones and Wi-Fi.
+        // Do not force voiceIsolation either: on some phones it suppresses
+        // a speaker who is farther away from the microphone.
 
         return c;
     }
@@ -2604,12 +2599,10 @@
 
             if(Array.isArray(params.encodings) && params.encodings.length){
                 params.encodings.forEach(enc=>{
-                    // Give Opus enough headroom for clean speech on laptop/mobile.
-                    // Audio is still mono and small compared with video bandwidth.
-                    enc.maxBitrate=128000;
-                    // Keep voice packets responsive on mobile networks. These
-                    // hints are optional and do not alter signaling/negotiation.
-                    try{ enc.bitratePriority=1.0; }catch(e){}
+                    // Stable cross-device speech profile. 64 kbps mono Opus is
+                    // high quality for voice while leaving headroom on weak mobile
+                    // networks so packets are less likely to arrive chopped.
+                    enc.maxBitrate=64000;
 
                     // These are supported by Chromium where available.
                     try{ enc.priority='high'; }catch(e){}

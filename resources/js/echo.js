@@ -3,13 +3,23 @@ import Pusher from 'pusher-js';
 
 window.Pusher = Pusher;
 
-// FIX: fall back to window.location.hostname so this works from ANY
-// device that can reach the app, instead of a single hardcoded LAN IP.
-// If VITE_REVERB_HOST is explicitly set (e.g. to 10.15.175.20), it is
-// used; otherwise whatever host the page itself was loaded from is used.
-const wsHost = import.meta.env.VITE_REVERB_HOST || window.location.hostname;
-const wsPort = import.meta.env.VITE_REVERB_PORT ?? 8080;
-const scheme = import.meta.env.VITE_REVERB_SCHEME ?? 'http';
+const pageIsHttps = window.location.protocol === 'https';
+
+const wsHost =
+    import.meta.env.VITE_REVERB_HOST ||
+    window.location.hostname;
+
+// Production HTTPS:
+// Browser -> WSS 443 -> Nginx -> Reverb 127.0.0.1:8080
+//
+// Local HTTP:
+// Browser -> WS -> configured Reverb port / 8080
+const configuredPort = Number(
+    import.meta.env.VITE_REVERB_PORT || 8080
+);
+
+const wsPort = pageIsHttps ? 443 : configuredPort;
+const wssPort = 443;
 
 const echo = new Echo({
     broadcaster: 'reverb',
@@ -19,12 +29,13 @@ const echo = new Echo({
     wsHost: wsHost,
 
     wsPort: wsPort,
+    wssPort: wssPort,
 
-    wssPort: wsPort,
+    forceTLS: pageIsHttps,
 
-    forceTLS: scheme === 'https',
-
-    enabledTransports: ['ws', 'wss'],
+    enabledTransports: pageIsHttps
+        ? ['wss']
+        : ['ws'],
 
     authEndpoint: '/broadcasting/auth',
 
