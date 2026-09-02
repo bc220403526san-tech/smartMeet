@@ -12,14 +12,15 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 
 class SettingsController extends Controller
 {
-    // ── INDEX ──
     public function index()
     {
         $user = Auth::user();
@@ -31,6 +32,7 @@ class SettingsController extends Controller
             ->first();
 
         $lastRequest = null;
+
         if (!$pendingRequest) {
             $lastRequest = RoleRequest::where('user_id', $user->id)
                 ->whereIn('status', ['approved', 'rejected'])
@@ -39,18 +41,13 @@ class SettingsController extends Controller
         }
 
         return view('organizer.settings.index', [
-            'user'           => $user,
-            'totalMeetings'  => $totalMeetings,
+            'user' => $user,
+            'totalMeetings' => $totalMeetings,
             'pendingRequest' => $pendingRequest,
-            'lastRequest'    => $lastRequest,
+            'lastRequest' => $lastRequest,
         ]);
     }
 
-    /**
-     * Role ke hisaab se sahi count nikalta hai:
-     * - organizer: khud ne jitni meetings banai hain
-     * - participant (ya koi aur role): jin meetings mein wo invited/participant hai
-     */
     private function getTotalMeetings($user): int
     {
         if ($user->role === 'organizer') {
@@ -62,47 +59,64 @@ class SettingsController extends Controller
             ->count('meeting_id');
     }
 
-    // ── PROFILE ──
     public function updateProfile(Request $request)
     {
         $user = Auth::user();
 
         $validated = $request->validate([
-            'name'  => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'name' => ['required', 'string', 'max:255'],
+            'email' => [
+                'required',
+                'email:rfc,dns',
+                'max:255',
+                Rule::unique('users', 'email')->ignore($user->id),
+            ],
             'phone' => ['nullable', 'string', 'max:30'],
+        ], [
+            'email.email' => 'Please enter a valid email address with a real mail domain.',
         ]);
 
+        $validated['email'] = strtolower(trim($validated['email']));
         $user->forceFill($validated)->save();
 
         if ($request->wantsJson()) {
-            return response()->json(['message' => 'Profile updated successfully.']);
+            return response()->json([
+                'message' => 'Profile updated successfully.',
+            ]);
         }
 
         return back()->with('success', 'Profile updated successfully.');
     }
 
-    // ── AVATAR ──
     public function updateAvatar(Request $request)
     {
         $request->validate([
-            'avatar' => ['required', 'file', 'max:8192'], // 8MB
+            'avatar' => ['required', 'file', 'max:8192'],
         ]);
 
         $file = $request->file('avatar');
         $mime = $file->getMimeType();
-        $ext  = strtolower($file->getClientOriginalExtension());
-        $allowedExt = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'heic', 'heif', 'avif'];
+        $ext = strtolower($file->getClientOriginalExtension());
+        $allowedExt = [
+            'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp',
+            'svg', 'heic', 'heif', 'avif',
+        ];
 
-        if (!str_starts_with((string) $mime, 'image/') && !in_array($ext, $allowedExt, true)) {
+        if (
+            !str_starts_with((string) $mime, 'image/') &&
+            !in_array($ext, $allowedExt, true)
+        ) {
             return $request->wantsJson()
-                ? response()->json(['message' => 'That file does not look like an image.'], 422)
-                : back()->withErrors(['avatar' => 'That file does not look like an image.']);
+                ? response()->json([
+                    'message' => 'That file does not look like an image.',
+                ], 422)
+                : back()->withErrors([
+                    'avatar' => 'That file does not look like an image.',
+                ]);
         }
 
         $user = Auth::user();
 
-        // Purani avatar delete karo (agar hai)
         if ($user->avatar) {
             Storage::disk('public')->delete($user->avatar);
         }
@@ -113,21 +127,24 @@ class SettingsController extends Controller
         if ($request->wantsJson()) {
             return response()->json([
                 'message' => 'Profile photo updated.',
-                'url'     => Storage::url($path),
+                'url' => Storage::url($path),
             ]);
         }
 
         return back()->with('success', 'Profile photo updated.');
     }
 
-    // ── PASSWORD ──
     public function updatePassword(Request $request)
     {
         $user = Auth::user();
 
         $request->validate([
             'current_password' => ['required', 'current_password'],
-            'password'          => ['required', 'confirmed', Password::min(8)->mixedCase()->numbers()->symbols()],
+            'password' => [
+                'required',
+                'confirmed',
+                Password::min(8)->mixedCase()->numbers()->symbols(),
+            ],
         ]);
 
         $user->forceFill([
@@ -135,19 +152,22 @@ class SettingsController extends Controller
         ])->save();
 
         if ($request->wantsJson()) {
-            return response()->json(['message' => 'Password updated successfully.']);
+            return response()->json([
+                'message' => 'Password updated successfully.',
+            ]);
         }
 
         return back()->with('success', 'Password updated successfully.');
     }
 
-    // ── NOTIFICATIONS ──
     public function updateNotifications(Request $request)
     {
         $user = Auth::user();
         $data = [];
 
-        foreach (['email_alerts', 'reminders_enabled', 'system_alerts'] as $key) {
+        foreach (
+            ['email_alerts', 'reminders_enabled', 'system_alerts'] as $key
+        ) {
             if ($request->has($key)) {
                 $data[$key] = $request->boolean($key);
             }
@@ -155,20 +175,26 @@ class SettingsController extends Controller
 
         if (empty($data)) {
             return $request->wantsJson()
-                ? response()->json(['message' => 'No preference provided.'], 422)
-                : back()->withErrors(['notifications' => 'No preference provided.']);
+                ? response()->json([
+                    'message' => 'No preference provided.',
+                ], 422)
+                : back()->withErrors([
+                    'notifications' => 'No preference provided.',
+                ]);
         }
 
         $user->forceFill($data)->save();
 
         if ($request->wantsJson()) {
-            return response()->json(['message' => 'Notification preferences saved.', 'data' => $data]);
+            return response()->json([
+                'message' => 'Notification preferences saved.',
+                'data' => $data,
+            ]);
         }
 
         return back()->with('success', 'Notification preferences saved.');
     }
 
-    // ── DEACTIVATE ──
     public function deactivate(Request $request)
     {
         $request->validate([
@@ -182,23 +208,25 @@ class SettingsController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect('/login')->with('status', 'Your account has been deactivated.');
+        return redirect('/login')
+            ->with('status', 'Your account has been deactivated.');
     }
 
-    // ── FLASH (AJAX ke liye session message store karta hai) ──
     public function storeFlash(Request $request)
     {
         $request->validate([
             'message' => ['required', 'string'],
-            'type'    => ['required', 'in:success,error'],
+            'type' => ['required', 'in:success,error'],
         ]);
 
         session()->flash($request->type, $request->message);
 
-        return response()->json(['message' => 'Flash stored.']);
+        return response()->json([
+            'message' => 'Flash stored.',
+        ]);
     }
 
-    // ── ROLE CHANGE REQUEST (Organizer -> Participant) ──
+    // Organizer -> Participant
     public function roleRequest(Request $request)
     {
         $user = Auth::user();
@@ -214,35 +242,93 @@ class SettingsController extends Controller
 
         if ($alreadyPending) {
             return $request->wantsJson()
-                ? response()->json(['message' => 'You already have a pending role change request.'], 422)
-                : back()->with('error', 'You already have a pending role change request.');
+                ? response()->json([
+                    'message' => 'You already have a pending role change request.',
+                ], 422)
+                : back()->with(
+                    'error',
+                    'You already have a pending role change request.'
+                );
         }
 
         $roleRequest = RoleRequest::create([
-            'user_id'        => $user->id,
-            'subject'        => $request->subject,
-            'message'        => $request->message,
-            'requested_role' => 'participant', // organizer sirf participant ban sakta hai
-            'status'         => 'pending',
+            'user_id' => $user->id,
+            'subject' => $request->subject,
+            'message' => $request->message,
+            'requested_role' => 'participant',
+            'status' => 'pending',
         ]);
 
         $admins = User::where('role', 'admin')->get();
 
         foreach ($admins as $admin) {
-            Mail::to($admin->email)->send(new RoleRequestSubmitted($roleRequest));
+            $emailValidator = Validator::make(
+                ['email' => $admin->email],
+                ['email' => 'required|email:rfc,dns']
+            );
+
+            if ($emailValidator->fails()) {
+                Log::warning('Role request admin email validation failed', [
+                    'role_request_id' => $roleRequest->id,
+                    'admin_id' => $admin->id,
+                    'email' => $admin->email,
+                    'errors' => $emailValidator->errors()->get('email'),
+                ]);
+
+                continue;
+            }
+
+            try {
+                Log::info('Role request email send attempt', [
+                    'role_request_id' => $roleRequest->id,
+                    'from_user_id' => $user->id,
+                    'admin_id' => $admin->id,
+                    'email' => $admin->email,
+                    'mailer' => config('mail.default'),
+                ]);
+
+                Mail::to($admin->email)->send(
+                    new RoleRequestSubmitted($roleRequest)
+                );
+
+                Log::info('Role request email accepted by mailer', [
+                    'role_request_id' => $roleRequest->id,
+                    'admin_id' => $admin->id,
+                    'email' => $admin->email,
+                    'mailer' => config('mail.default'),
+                    'note' => 'Mailer accepted the message; this is not final delivery confirmation.',
+                ]);
+            } catch (\Throwable $exception) {
+                Log::error('Role request email sending failed', [
+                    'role_request_id' => $roleRequest->id,
+                    'admin_id' => $admin->id,
+                    'email' => $admin->email,
+                    'mailer' => config('mail.default'),
+                    'exception' => get_class($exception),
+                    'error' => $exception->getMessage(),
+                    'file' => $exception->getFile(),
+                    'line' => $exception->getLine(),
+                ]);
+            }
 
             Notification::create([
                 'user_id' => $admin->id,
-                'title'   => 'New Role Change Request',
-                'message' => $user->name . ' has requested to become a Participant',
-                'link'    => route('admin.role-requests.index'),
+                'title' => 'New Role Change Request',
+                'message' => $user->name .
+                    ' has requested to become a Participant',
+                'link' => route('admin.role-requests.index'),
             ]);
         }
 
         if ($request->wantsJson()) {
-            return response()->json(['message' => 'Your role change request has been submitted.']);
+            return response()->json([
+                'message' => 'Your role change request has been submitted.',
+            ]);
         }
 
-        return back()->with('success', 'Your role change request has been submitted.');
+        return back()->with(
+            'success',
+            'Your role change request has been submitted.'
+        );
     }
 }
