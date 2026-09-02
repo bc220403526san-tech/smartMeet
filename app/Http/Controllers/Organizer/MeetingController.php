@@ -14,6 +14,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
 class MeetingController extends Controller
@@ -116,6 +117,16 @@ class MeetingController extends Controller
             'agenda_description' => 'nullable|array',
             'agenda_description.*' => 'nullable|string',
         ]);
+
+        // Validate every optional invite address before the meeting is created.
+        // The UI accepts multiple comma/semicolon/new-line separated addresses,
+        // so each address is checked with Laravel's RFC + DNS validation.
+        if (trim((string) $request->invite_emails) !== '') {
+            $this->validateInviteEmailList(
+                (string) $request->invite_emails,
+                'invite_emails'
+            );
+        }
 
         $timezone = $request->timezone ?: 'Asia/Karachi';
 
@@ -426,6 +437,11 @@ class MeetingController extends Controller
             'message' => 'nullable|string|max:1500',
         ]);
 
+        $this->validateInviteEmailList(
+            (string) $request->emails,
+            'emails'
+        );
+
         $emails = $this->parseInviteEmails($request->emails);
 
         if (empty($emails)) {
@@ -460,7 +476,8 @@ class MeetingController extends Controller
 
     /**
      * Convert a comma/semicolon/new-line separated email string into a clean,
-     * unique list of valid email addresses.
+     * unique list. Actual RFC + DNS validation is handled separately so invalid
+     * addresses are never silently discarded.
      */
     private function parseInviteEmails(?string $value): array
     {
@@ -472,10 +489,61 @@ class MeetingController extends Controller
 
         return collect($emails)
             ->map(fn ($email) => strtolower(trim((string) $email)))
-            ->filter(fn ($email) => filter_var($email, FILTER_VALIDATE_EMAIL))
+            ->filter(fn ($email) => $email !== '')
             ->unique()
             ->values()
             ->all();
+    }
+
+    /**
+     * Validate every invite address with Laravel's RFC + DNS checks.
+     *
+     * This is the multi-email equivalent of:
+     * $request->validate(['email' => 'required|email:rfc,dns']);
+     */
+    private function validateInviteEmailList(
+        string $value,
+        string $fieldName
+    ): void {
+        $emails = $this->parseInviteEmails($value);
+
+        if (empty($emails)) {
+            Log::warning('Meeting invite email validation failed', [
+                'field' => $fieldName,
+                'reason' => 'No email address was provided after parsing.',
+                'organizer_id' => auth()->id(),
+            ]);
+
+            validator(
+                [$fieldName => $value],
+                [$fieldName => 'required|string']
+            )->validate();
+        }
+
+        foreach ($emails as $email) {
+            $validator = Validator::make(
+                ['email' => $email],
+                ['email' => 'required|email:rfc,dns']
+            );
+
+            if ($validator->fails()) {
+                Log::warning('Meeting invite email validation failed', [
+                    'field' => $fieldName,
+                    'email' => $email,
+                    'errors' => $validator->errors()->get('email'),
+                    'organizer_id' => auth()->id(),
+                ]);
+
+                validator(
+                    [$fieldName => $email],
+                    [$fieldName => 'required|email:rfc,dns'],
+                    [
+                        $fieldName . '.email' =>
+                            'One or more invite email addresses are invalid.',
+                    ]
+                )->validate();
+            }
+        }
     }
 
     /**
@@ -493,10 +561,14 @@ class MeetingController extends Controller
         $failedEmails = [];
 
         foreach ($emails as $email) {
+            $recipientType = 'guest';
+
             try {
                 $existingUser = User::where('email', $email)->first();
 
                 if ($existingUser) {
+                    $recipientType = 'registered_user';
+
                     $meeting->participants()->firstOrCreate(
                         ['user_id' => $existingUser->id],
                         ['status' => 'invited']
@@ -507,6 +579,14 @@ class MeetingController extends Controller
                         $meeting->unique_code
                     );
 
+                    Log::info('Meeting invite send attempt', [
+                        'meeting_id' => $meeting->id,
+                        'organizer_id' => auth()->id(),
+                        'email' => $email,
+                        'recipient_type' => $recipientType,
+                        'mailer' => config('mail.default'),
+                    ]);
+
                     Mail::to($email)->send(
                         new MeetingInviteMail(
                             $meeting,
@@ -516,6 +596,15 @@ class MeetingController extends Controller
                             $message
                         )
                     );
+
+                    Log::info('Meeting invite accepted by mailer', [
+                        'meeting_id' => $meeting->id,
+                        'organizer_id' => auth()->id(),
+                        'email' => $email,
+                        'recipient_type' => $recipientType,
+                        'mailer' => config('mail.default'),
+                        'note' => 'Mailer accepted the message; this is not final delivery confirmation.',
+                    ]);
 
                     Notification::create([
                         'user_id' => $existingUser->id,
@@ -542,6 +631,14 @@ class MeetingController extends Controller
                         '?invite_token=' .
                         $invite->invite_token;
 
+                    Log::info('Meeting invite send attempt', [
+                        'meeting_id' => $meeting->id,
+                        'organizer_id' => auth()->id(),
+                        'email' => $email,
+                        'recipient_type' => $recipientType,
+                        'mailer' => config('mail.default'),
+                    ]);
+
                     Mail::to($email)->send(
                         new MeetingInviteMail(
                             $meeting,
@@ -551,16 +648,30 @@ class MeetingController extends Controller
                             $message
                         )
                     );
+
+                    Log::info('Meeting invite accepted by mailer', [
+                        'meeting_id' => $meeting->id,
+                        'organizer_id' => auth()->id(),
+                        'email' => $email,
+                        'recipient_type' => $recipientType,
+                        'mailer' => config('mail.default'),
+                        'note' => 'Mailer accepted the message; this is not final delivery confirmation.',
+                    ]);
                 }
 
                 $sentCount++;
             } catch (\Throwable $exception) {
-                Log::error(
-                    'Meeting invite failed for ' .
-                    $email .
-                    ': ' .
-                    $exception->getMessage()
-                );
+                Log::error('Meeting invite sending failed', [
+                    'meeting_id' => $meeting->id,
+                    'organizer_id' => auth()->id(),
+                    'email' => $email,
+                    'recipient_type' => $recipientType,
+                    'mailer' => config('mail.default'),
+                    'exception' => get_class($exception),
+                    'error' => $exception->getMessage(),
+                    'file' => $exception->getFile(),
+                    'line' => $exception->getLine(),
+                ]);
 
                 $failedEmails[] = $email;
             }
@@ -698,3 +809,4 @@ class MeetingController extends Controller
         );
     }
 }
+
