@@ -147,7 +147,7 @@
         </div>
     </main>
 
-    <footer class="border-t border-gray-200 bg-white">
+    <footer class="border-t border-gray-200 bg-white p-10">
         <div class="max-w-5xl mx-auto px-4 sm:px-6 py-7">
             <p class="text-xs sm:text-sm text-gray-500 text-center">
                 &copy; {{ date('Y') }} SmartMeet. All rights reserved.
