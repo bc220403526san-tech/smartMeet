@@ -3,6 +3,7 @@
 use App\Http\Controllers\Organizer\MeetingAttendController;
 use App\Http\Controllers\Organizer\MeetingController;
 use App\Http\Controllers\Organizer\ParticipantController;
+use App\Http\Controllers\Organizer\MeetingModerationController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -78,6 +79,8 @@ Route::middleware(['auth', 'role:organizer'])
             Route::post('/{meeting}/transcript', [MeetingAttendController::class, 'saveTranscript'])->name('transcript');
             Route::post('/{meeting}/mark-left', [\App\Http\Controllers\Organizer\MeetingAttendController::class, 'markLeft'])
                 ->name('markLeft');
+            Route::post('/{meeting}/moderate', [MeetingModerationController::class, 'moderate'])
+                ->name('moderate');
         });
 
     });

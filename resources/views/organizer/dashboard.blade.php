@@ -1,256 +1,3728 @@
-<x-layouts.app>
-    <x-slot name="header">
-        <x-header.page-title title="Organizer Dashboard" />
-    </x-slot>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <link rel="icon" href="{{ asset('images/s-logo.png') }}">
+    <title>{{ env('APP_NAME') }} — {{ $meeting->title }}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css">
+    @vite(['resources/css/meeting-room.css', 'resources/js/app.js'])
+    <style>
+        /* ================================================================
+           SMARTMEET ROOM — SINGLE SOURCE OF TRUTH THEME
+           ================================================================ */
+        :root{
+            --bg-1:#050a16; --bg-2:#0a1226; --bg-3:#0d1830;
+            --panel:rgba(13,22,42,.92); --panel-soft:rgba(15,25,46,.7);
+            --line:rgba(148,163,184,.14); --line-strong:rgba(148,163,184,.24);
+            --text:#f1f5f9; --muted:#8b98ad; --muted-2:#64748b;
+            --blue:#3b82f6; --blue-soft:rgba(59,130,246,.18);
+            --violet:#8b5cf6; --cyan:#22d3ee;
+            --green:#22c55e; --amber:#f59e0b; --red:#ef4444;
+            --radius-lg:20px; --radius-md:14px; --radius-sm:10px;
+            --shadow-lg:0 20px 55px rgba(0,0,0,.35);
+        }
+        *,*::before,*::after{box-sizing:border-box}
+        html,body{height:100%;max-width:100%;overflow-x:hidden}
+        body{
+            margin:0; min-height:100dvh; display:flex; flex-direction:column;
+            color:var(--text); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Inter,sans-serif;
+            background:
+                radial-gradient(circle at 10% 6%, rgba(59,130,246,.16), transparent 32%),
+                radial-gradient(circle at 92% 88%, rgba(139,92,246,.14), transparent 32%),
+                linear-gradient(160deg,var(--bg-1),var(--bg-2) 55%,var(--bg-3));
+        }
 
-    <x-success />
-    <x-error />
+        /* ---------- HEADER ---------- */
+        .header{
+            display:flex; align-items:center; justify-content:space-between; gap:12px;
+            flex-wrap:wrap; row-gap:8px; min-height:60px;
+            padding:10px 18px; background:rgba(6,11,22,.86); backdrop-filter:blur(18px);
+            border-bottom:1px solid var(--line); box-shadow:0 10px 30px rgba(0,0,0,.2);
+            position:relative; z-index:60;
+        }
+        .header-left{display:flex; align-items:center; gap:12px; min-width:0; flex:1 1 auto; overflow:hidden}
+        .header-brand{display:flex; align-items:center; gap:9px; padding-right:14px; border-right:1px solid var(--line); flex-shrink:0}
+        .header-brand img{width:30px; height:30px; object-fit:contain}
+        .header-brand-text .name{font-weight:700; font-size:14px}
+        .header-brand-text .tag{font-size:10px; color:var(--muted-2)}
+        .live-badge{
+            display:flex; align-items:center; gap:6px; font-size:10px; font-weight:700; letter-spacing:.5px;
+            text-transform:uppercase; color:#fecaca; background:rgba(239,68,68,.14);
+            border:1px solid rgba(239,68,68,.3); padding:4px 10px; border-radius:999px; flex-shrink:0;
+        }
+        .live-dot{width:7px; height:7px; border-radius:50%; background:var(--red); box-shadow:0 0 0 0 rgba(239,68,68,.5); animation:pulse-dot 1.6s infinite}
+        @keyframes pulse-dot{0%{box-shadow:0 0 0 0 rgba(239,68,68,.55)}70%{box-shadow:0 0 0 8px rgba(239,68,68,0)}100%{box-shadow:0 0 0 0 rgba(239,68,68,0)}}
+        .header-meeting-info{min-width:0; overflow:hidden}
+        .meeting-title{font-size:14px; font-weight:700; max-width:38vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+        .meeting-meta{font-size:10.5px; color:var(--muted); display:flex; gap:6px; align-items:center; overflow:hidden; white-space:nowrap; text-overflow:ellipsis}
+        .header-center{
+            display:flex; align-items:center; gap:7px; padding:6px 12px; border-radius:11px;
+            border:1px solid var(--line); background:rgba(255,255,255,.03); font-size:12.5px; font-weight:600; flex-shrink:0;
+        }
+        .header-right{display:flex; align-items:center; gap:10px; flex-shrink:0}
+        .participants-count{display:flex; align-items:center; gap:6px; font-size:11px; color:var(--muted); padding:6px 10px; border-radius:9px; background:rgba(255,255,255,.03); border:1px solid var(--line)}
+        .btn-leave{
+            display:flex; align-items:center; gap:7px; border:none; cursor:pointer; color:#fff; font-weight:700; font-size:12px;
+            padding:9px 16px; border-radius:11px; background:linear-gradient(135deg,#ef4444,#b91c1c);
+            box-shadow:0 10px 24px rgba(239,68,68,.28); transition:transform .15s ease, box-shadow .15s ease;
+        }
+        .btn-leave:hover{transform:translateY(-1px); box-shadow:0 14px 30px rgba(239,68,68,.36)}
+        .btn-cancel{
+            display:flex; align-items:center; gap:7px; border:1px solid rgba(239,68,68,.4); cursor:pointer;
+            color:#fecaca; font-weight:700; font-size:11.5px; padding:8px 14px; border-radius:11px;
+            background:rgba(239,68,68,.1); transition:background .15s ease;
+        }
+        .btn-cancel:hover{background:rgba(239,68,68,.2)}
 
-    <div class="p-4 bg-gray-50 rounded-2xl m-2 mt-0 space-y-4 overflow-y-auto min-h-screen">
+        /* ---------- MAIN LAYOUT ---------- */
+        .main{flex:1 1 auto; min-height:0; display:flex; gap:12px; padding:12px}
+        .video-area{
+            flex:1; min-width:0; position:relative; border-radius:var(--radius-lg); overflow:hidden;
+            border:1px solid var(--line); background:linear-gradient(155deg,rgba(10,18,36,.7),rgba(4,9,20,.85));
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.03), var(--shadow-lg);
+        }
+        .video-grid{
+            height:100%; width:100%; display:grid; overflow-y:auto;
+            grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+            grid-auto-rows:minmax(150px,220px); align-content:start; justify-content:center;
+            gap:16px; padding:16px; background-color:#02060f;
+        }
+        .video-grid:has(> .video-tile:only-child){grid-template-columns:minmax(240px,min(620px,92%)); align-content:center}
+        .video-tile{max-width:420px; margin:0 auto; width:100%}
+        .video-grid:has(> .video-tile:only-child) .video-tile{max-width:620px}
 
-        @if(session('show_welcome_banner'))
-            <x-banner
-                title="Welcome, {{ Auth::user()->name }}"
-                desc="Create, schedule, and monitor all your meetings in one place. Keep your team aligned and your workflow organized effortlessly."
-                action-route="organizer.meetings.index"
-                action-button="Manage Meeting"
-                color="black"
-            />
-        @endif
+        .video-tile{
+            position:relative; border-radius:var(--radius-md); overflow:hidden; aspect-ratio:16/10;
+            background:linear-gradient(155deg,rgba(28,42,68,.9),rgba(8,13,26,.96));
+            border:2px solid rgba(148,163,184,.32);
+            box-shadow:0 14px 34px rgba(0,0,0,.4), 0 0 0 1px rgba(0,0,0,.5);
+            transition:transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+        }
+        .video-tile:hover{transform:translateY(-2px); border-color:rgba(96,165,250,.4); box-shadow:0 18px 40px rgba(0,0,0,.34)}
+        .video-placeholder{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:radial-gradient(circle at 50% 35%,rgba(59,130,246,.1),transparent 55%)}
+        .video-placeholder video{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; background:#050a16}
+        .video-placeholder video.mirrored{transform:scaleX(-1)}
+        .avatar-circle{
+            width:74px; height:74px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+            font-size:24px; font-weight:800; color:#fff; box-shadow:0 12px 30px rgba(0,0,0,.3), 0 0 0 6px rgba(255,255,255,.04);
+        }
+        .tile-info{
+            position:absolute; left:0; right:0; bottom:0; z-index:5; padding:9px 12px;
+            background:linear-gradient(to top,rgba(2,6,16,.94),rgba(2,6,16,.5),transparent);
+            display:flex; align-items:center; justify-content:space-between; gap:8px;
+        }
+        .tile-name{font-size:12px; font-weight:650; display:flex; align-items:center; gap:6px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+        .role-badge{font-size:8px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; padding:2px 6px; border-radius:99px; flex-shrink:0}
+        .role-badge.organizer{background:rgba(251,191,36,.18); color:#fbbf24}
+        .role-badge.participant{background:rgba(59,130,246,.18); color:#60a5fa}
+        .tile-icons{display:flex; align-items:center; gap:6px; flex-shrink:0}
+        .mic-off{width:24px; height:24px; border-radius:8px; background:rgba(15,23,42,.92); border:1px solid rgba(148,163,184,.28); display:flex; align-items:center; justify-content:center; font-size:10px; color:#cbd5e1; box-shadow:0 4px 12px rgba(0,0,0,.3)}
+        .speaking-indicator{display:flex; align-items:flex-end; gap:2px; height:14px}
+        .speaking-bar{width:2.5px; background:var(--green); border-radius:2px; animation:speak 0.9s infinite ease-in-out}
+        .speaking-bar:nth-child(2){animation-delay:.15s} .speaking-bar:nth-child(3){animation-delay:.3s}
+        @keyframes speak{0%,100%{height:4px}50%{height:13px}}
+        .you-badge{position:absolute; top:8px; left:8px; z-index:5; font-size:9px; font-weight:700; padding:3px 8px; border-radius:99px; background:rgba(59,130,246,.35); border:1px solid rgba(96,165,250,.4)}
+        .tile-expand-btn{
+            position:absolute; top:8px; right:8px; z-index:6; width:28px; height:28px; border-radius:8px;
+            background:rgba(8,13,26,.65); border:1px solid rgba(255,255,255,.14); color:#fff; display:flex;
+            align-items:center; justify-content:center; font-size:12px; cursor:pointer; opacity:0; transition:opacity .2s, background .2s;
+        }
+        .video-tile:hover .tile-expand-btn, .video-tile.maximized .tile-expand-btn{opacity:1}
+        .tile-expand-btn:hover{background:rgba(59,130,246,.85)}
+        @media(hover:none){.tile-expand-btn{opacity:1}}
 
-        <div>
-            <h1 class="text-2xl font-semibold">Organizer Overview</h1>
-            <p class="text-gray-500 text-sm mt-1">
-                You have
-                <span class="text-blue-600 font-semibold">{{ $todayMeetings }} meetings</span>
-                scheduled for today.
-            </p>
+        #maximized-overlay{position:absolute; inset:0; z-index:30; background:#000; display:none}
+        #maximized-overlay.active{display:block}
+        #maximized-overlay .video-tile{width:100%; height:100%; border-radius:0; aspect-ratio:auto}
+        .maximize-close-btn{
+            position:absolute; top:14px; right:14px; z-index:40; width:38px; height:38px; border-radius:50%;
+            background:rgba(8,13,26,.75); border:1px solid rgba(255,255,255,.16); color:#fff; display:flex;
+            align-items:center; justify-content:center; font-size:15px; cursor:pointer;
+        }
+        .maximize-close-btn:hover{background:rgba(239,68,68,.85)}
+
+        /* ---------- SIDE PANEL ---------- */
+        #side-panel{
+            width:min(340px,32vw); min-width:300px; flex-shrink:0; display:none; flex-direction:column;
+            border-radius:var(--radius-lg); border:1px solid var(--line); background:var(--panel);
+            box-shadow:var(--shadow-lg); overflow:hidden; backdrop-filter:blur(20px); position:relative;
+        }
+        .panel-drag-handle{
+            display:none; align-items:center; justify-content:center; height:16px; flex-shrink:0;
+            cursor:ns-resize; touch-action:none; user-select:none;
+        }
+        .panel-drag-handle::before{content:""; width:36px; height:4px; border-radius:99px; background:rgba(203,213,225,.4)}
+        .panel-drag-handle:hover::before{background:rgba(96,165,250,.7)}
+        .panel-tabbar{display:flex; border-bottom:1px solid var(--line)}
+        .panel-tabbtn{
+            flex:1; text-align:center; padding:10px 6px; font-size:11.5px; font-weight:700; color:var(--muted);
+            cursor:pointer; border-bottom:2px solid transparent; transition:color .15s, border-color .15s; background:none; border-top:none; border-left:none; border-right:none;
+        }
+        .panel-tabbtn.active{color:var(--text); border-bottom-color:var(--blue)}
+        .panel-body{flex:1; overflow:hidden; display:flex; flex-direction:column}
+
+        .transcript-body,.chat-body{flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:10px}
+        .empty-note{text-align:center; color:var(--muted-2); font-size:12px; padding:26px 10px}
+        .transcript-entry{display:flex; gap:9px; padding:9px; border-radius:12px; background:rgba(255,255,255,.025)}
+        .transcript-avatar{width:30px; height:30px; border-radius:9px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:800; color:#fff}
+        .transcript-content{min-width:0; flex:1}
+        .transcript-meta{display:flex; align-items:center; gap:8px; margin-bottom:3px}
+        .transcript-name{font-size:11px; font-weight:700}
+        .transcript-time{font-size:9px; color:var(--muted-2); margin-left:auto}
+        .transcript-text{font-size:12px; line-height:1.5; color:#e2e8f0; word-break:break-word}
+        .lang-row{display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border-top:1px solid var(--line)}
+        #lang-toggle-btn{background:rgba(255,255,255,.04); border:1px solid var(--line); color:var(--muted); font-size:10.5px; padding:5px 11px; border-radius:99px; cursor:pointer}
+        .listening-indicator{display:none; align-items:center; gap:8px; margin:0 12px 10px; padding:7px 11px; border-radius:11px; background:rgba(34,197,94,.1); border:1px solid rgba(34,197,94,.22); font-size:11px; color:#86efac}
+        .listening-dot{width:7px; height:7px; border-radius:50%; background:var(--green); animation:pulse-dot 1.4s infinite}
+
+        .chat-message-row{display:flex; width:100%; gap:0}
+        .chat-message-row.is-me{justify-content:flex-end}
+        .chat-message-row.is-other{justify-content:flex-start}
+        .chat-message-content{max-width:82%; min-width:80px}
+        .chat-message-row.is-me .chat-message-content{text-align:right}
+        .chat-message-meta{display:flex; gap:7px; align-items:center; margin:0 4px 4px; font-size:9px; color:var(--muted-2)}
+        .chat-message-row.is-me .chat-message-meta{justify-content:flex-end}
+        .chat-message-meta strong{color:#e2e8f0; font-size:10px; font-weight:700}
+        .chat-message-bubble{padding:9px 12px; border-radius:14px 14px 4px 14px; background:rgba(30,41,59,.85); border:1px solid var(--line); font-size:12px; line-height:1.5; word-break:break-word; display:inline-block; text-align:left}
+        .chat-message-row.is-me .chat-message-bubble{border-radius:14px 14px 14px 4px; background:linear-gradient(135deg,#2563eb,#0891b2); border-color:rgba(125,211,252,.3)}
+        .chat-input-area{display:flex; align-items:center; gap:8px; padding:12px; border-top:1px solid var(--line); background:rgba(2,6,16,.4)}
+        .chat-input{flex:1; min-height:40px; padding:8px 12px; border-radius:12px; background:rgba(255,255,255,.04); border:1px solid var(--line); color:var(--text); font-size:12.5px; outline:none}
+        .chat-input:focus{border-color:rgba(56,189,248,.55); box-shadow:0 0 0 3px rgba(56,189,248,.08)}
+        .chat-voice-btn,.btn-send{width:40px; height:40px; flex-shrink:0; border-radius:12px; border:1px solid var(--line); background:rgba(255,255,255,.04); color:#e2e8f0; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:13px}
+        .btn-send{background:linear-gradient(135deg,#2563eb,#0891b2); border:none; color:#fff}
+        .chat-voice-btn.listening{color:#ef4444; border-color:rgba(239,68,68,.5); background:rgba(239,68,68,.14)}
+
+        .people-body{flex:1; min-height:0; max-height:100%; overflow-y:auto; overscroll-behavior:contain; padding:12px; display:flex; flex-direction:column; gap:8px}
+        .person-row{display:flex; align-items:center; gap:10px; padding:10px; border-radius:13px; border:1px solid var(--line); background:rgba(255,255,255,.02); transition:opacity .2s, filter .2s, background .2s, border-color .2s}
+        .person-row.joined{opacity:1; filter:none; background:rgba(34,197,94,.07); border-color:rgba(34,197,94,.22)}
+        .person-row.pending{opacity:.5; filter:grayscale(.5) saturate(.4)}
+        .person-avatar{width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; color:#fff; flex-shrink:0; overflow:hidden}
+        .avatar-circle{overflow:hidden}
+        .avatar-circle img,.person-avatar img{width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block}
+        .person-info{flex:1; min-width:0}
+        .person-name{font-size:12.5px; font-weight:700; display:flex; align-items:center; gap:5px}
+        .person-status{font-size:10px; color:var(--muted)}
+        .person-status.on{color:var(--green)}
+        .person-dot{width:8px; height:8px; border-radius:50%; background:var(--muted-2); flex-shrink:0}
+        .person-dot.on{background:var(--green)}
+        .person-action{border:1px solid var(--line); background:rgba(255,255,255,.04); color:var(--muted); font-size:10px; padding:5px 9px; border-radius:8px; cursor:pointer; flex-shrink:0}
+        .person-action:hover{background:rgba(239,68,68,.16); color:#fecaca; border-color:rgba(239,68,68,.3)}
+        .person-actions{display:flex;align-items:center;justify-content:flex-end;gap:4px;flex-wrap:wrap;flex-shrink:0;max-width:126px}
+        .person-action.request:hover{background:rgba(59,130,246,.16);color:#bfdbfe;border-color:rgba(59,130,246,.3)}
+        .person-action.allow{color:#86efac;border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.08)}
+        .person-action.camera-off{color:#fca5a5;border-color:rgba(239,68,68,.28)}
+        .person-action.remove:hover{background:rgba(239,68,68,.22);color:#fff;border-color:rgba(239,68,68,.45)}
+        .hand-raised{color:#fbbf24;font-size:13px;animation:handPulse 1.2s ease-in-out infinite}
+        @keyframes handPulse{50%{transform:translateY(-2px)}}
+
+
+        /* ---------- IN-ROOM INVITE (isolated; existing responsive layout untouched) ---------- */
+        .room-invite-card{
+            flex-shrink:0; margin:12px 12px 4px; padding:11px; border-radius:13px;
+            border:1px solid rgba(59,130,246,.24); background:rgba(59,130,246,.07);
+        }
+        .room-invite-title{display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:800;color:#dbeafe}
+        .room-invite-note{margin-top:4px;font-size:9.5px;line-height:1.45;color:var(--muted)}
+        .room-invite-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
+        .room-invite-btn{
+            min-width:0; flex:1 1 112px; display:flex;align-items:center;justify-content:center;gap:6px;
+            border-radius:9px;padding:7px 9px;border:1px solid var(--line);cursor:pointer;
+            background:rgba(255,255,255,.045);color:#e2e8f0;font-size:10px;font-weight:700;
+        }
+        .room-invite-btn:hover{background:rgba(59,130,246,.16);border-color:rgba(96,165,250,.35)}
+        .room-invite-btn.primary{background:linear-gradient(135deg,#2563eb,#0891b2);border-color:transparent;color:#fff}
+        .room-invite-link{
+            margin-top:8px; padding:7px 8px; border-radius:8px; background:rgba(2,6,23,.42);
+            border:1px solid var(--line); color:var(--muted); font-size:9px; white-space:nowrap;
+            overflow:hidden; text-overflow:ellipsis; user-select:all;
+        }
+
+
+        /* ---------- IN-ROOM EMAIL INVITE MODAL (self-contained) ---------- */
+        .room-email-overlay{
+            position:fixed; inset:0; z-index:10000; display:none;
+            align-items:center; justify-content:center; padding:16px;
+            background:rgba(0,0,0,.62); backdrop-filter:blur(5px);
+        }
+        .room-email-overlay.open{display:flex}
+        .room-email-dialog{
+            width:min(440px,100%); max-height:min(86dvh,680px); overflow-y:auto;
+            border-radius:18px; border:1px solid var(--line-strong);
+            background:linear-gradient(160deg,rgba(13,22,42,.99),rgba(7,13,27,.99));
+            color:var(--text); box-shadow:0 24px 70px rgba(0,0,0,.55);
+            padding:18px;
+        }
+        .room-email-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+        .room-email-title{font-size:15px;font-weight:800}
+        .room-email-close{
+            width:34px;height:34px;display:flex;align-items:center;justify-content:center;
+            border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.04);
+            color:#cbd5e1;cursor:pointer;flex-shrink:0;
+        }
+        .room-email-close:hover{background:rgba(239,68,68,.14);color:#fecaca}
+        .room-email-help{font-size:10.5px;line-height:1.5;color:var(--muted);margin:0 0 14px}
+        .room-email-field{margin-bottom:12px}
+        .room-email-label{display:block;font-size:10.5px;font-weight:700;color:#cbd5e1;margin-bottom:5px}
+        .room-email-input,.room-email-textarea{
+            width:100%;border-radius:10px;border:1px solid var(--line);
+            background:rgba(255,255,255,.045);color:var(--text);
+            font:inherit;font-size:12px;outline:none;padding:9px 10px;
+        }
+        .room-email-textarea{resize:vertical;min-height:76px}
+        .room-email-input:focus,.room-email-textarea:focus{
+            border-color:rgba(96,165,250,.55);box-shadow:0 0 0 3px rgba(59,130,246,.09)
+        }
+        .room-email-hint{font-size:9.5px;color:var(--muted-2);margin-top:5px}
+        .room-email-msg{display:none;font-size:10.5px;line-height:1.45;margin:4px 0 10px}
+        .room-email-msg.show{display:block}
+        .room-email-msg.error{color:#fca5a5}
+        .room-email-msg.success{color:#86efac}
+        .room-email-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+        .room-email-action{
+            border-radius:10px;padding:8px 13px;border:1px solid var(--line);
+            font-size:11px;font-weight:700;cursor:pointer;color:#e2e8f0;
+            background:rgba(255,255,255,.04);
+        }
+        .room-email-action.primary{border:none;color:#fff;background:linear-gradient(135deg,#2563eb,#0891b2)}
+        .room-email-action:disabled{opacity:.55;cursor:not-allowed}
+
+        /* ---------- CONTROLS ---------- */
+        .controls{
+            flex-shrink:0; display:flex; align-items:center; justify-content:center; gap:8px;
+            margin:0 12px 12px; padding:9px 14px; border-radius:18px; border:1px solid var(--line);
+            background:rgba(6,11,22,.92); box-shadow:0 -6px 26px rgba(0,0,0,.2), var(--shadow-lg);
+            backdrop-filter:blur(18px); overflow:hidden; scrollbar-width:none; min-width:0;
+        }
+        .controls::-webkit-scrollbar{display:none}
+        .ctrl-btn{display:flex; flex-direction:column; align-items:center; gap:4px; min-width:0; width:52px; flex:0 1 52px; padding:4px 4px; border-radius:12px; cursor:pointer; user-select:none}
+        .ctrl-btn:hover{background:rgba(255,255,255,.05)}
+        .ctrl-icon{
+            width:38px; height:38px; border-radius:12px; display:flex; align-items:center; justify-content:center;
+            background:rgba(255,255,255,.045); border:1px solid var(--line); font-size:13px; position:relative;
+            transition:transform .15s ease, background .15s ease, border-color .15s ease;
+        }
+        .ctrl-btn:hover .ctrl-icon{transform:translateY(-2px)}
+        .ctrl-icon.active{background:linear-gradient(135deg,rgba(37,99,235,.4),rgba(8,145,178,.32)); border-color:rgba(96,165,250,.45)}
+        .ctrl-icon.off{background:rgba(51,65,85,.7)}
+        .ctrl-label{font-size:8.5px; color:var(--muted); font-weight:600}
+        .ctrl-divider{width:1px; height:30px; background:var(--line); margin:0 2px; flex-shrink:0}
+        .btn-end{width:38px; height:38px; border-radius:12px; border:none; background:linear-gradient(135deg,#ef4444,#b91c1c); color:#fff; display:flex; align-items:center; justify-content:center; font-size:14px; cursor:pointer}
+        .btn-end:hover{transform:translateY(-2px)}
+        #chat-badge{position:absolute; top:-6px; right:-6px; background:var(--red); color:#fff; font-size:9px; font-weight:800; min-width:16px; height:16px; border-radius:99px; display:none; align-items:center; justify-content:center; padding:0 4px}
+
+        /* ---------- TOASTS ---------- */
+        #toast-stack{position:fixed; bottom:96px; left:50%; transform:translateX(-50%); z-index:999; display:flex; flex-direction:column; align-items:center; gap:8px; pointer-events:none}
+        .toast{
+            pointer-events:auto; display:flex; align-items:center; gap:10px; background:rgba(13,22,42,.94); backdrop-filter:blur(14px);
+            border:1px solid var(--line-strong); color:#fff; padding:11px 18px; border-radius:14px; font-size:13px; font-weight:600;
+            line-height:1.4; box-shadow:0 10px 30px rgba(0,0,0,.4); opacity:0; transform:translateY(16px) scale(.98);
+            transition:opacity .25s ease, transform .25s ease; max-width:min(90vw,420px);
+        }
+        .toast.show{opacity:1; transform:translateY(0) scale(1)}
+        .toast.leaving{opacity:0; transform:translateY(-6px) scale(.98)}
+        .moderation-notice{
+            position:fixed; top:80px; left:50%; transform:translateX(-50%); z-index:9999; background:#0f172a; color:#fff;
+            padding:12px 20px; border-radius:14px; box-shadow:0 14px 40px rgba(0,0,0,.4); font-weight:700; font-size:13px;
+            max-width:min(92vw,460px); text-align:center; opacity:0; transition:opacity .25s ease;
+        }
+        .moderation-notice.show{opacity:1}
+
+        /* ---------- RESPONSIVE / NON-OVERLAPPING ROOM LAYOUT ---------- */
+        /*
+         * Layout-only fixes:
+         * - header/timer stay on the same top row
+         * - tiles always reserve their own physical height
+         * - rows keep a visible gap and never overlap
+         * - video area gets its own vertical scrollbar as soon as another row is needed
+         * - mobile side panel remains full-width
+         */
+        html,body{
+            width:100%;
+            height:100%;
+            overflow:hidden;
+        }
+        body{
+            height:100dvh;
+            min-height:100dvh;
+            overflow:hidden;
+        }
+        .header{
+            flex:0 0 auto;
+        }
+        .main{
+            flex:1 1 0;
+            min-height:0;
+            height:auto !important;
+            overflow:hidden;
+        }
+        .video-area{
+            min-height:0;
+            padding:0 !important;
+            overflow:hidden !important;
+        }
+        .video-grid{
+            width:100%;
+            height:100%;
+            min-height:0;
+            overflow-y:auto !important;
+            overflow-x:hidden !important;
+            scrollbar-gutter:stable;
+            overscroll-behavior:contain;
+            display:grid;
+            grid-auto-flow:row;
+            grid-auto-rows:max-content !important;
+            align-content:start;
+            align-items:start;
+            justify-items:stretch;
+            row-gap:16px;
+            column-gap:16px;
+            padding:16px;
+        }
+        .video-tile{
+            position:relative;
+            width:100%;
+            max-width:none;
+            margin:0;
+            min-width:0;
+            min-height:220px !important;
+            height:clamp(220px,18vw,300px) !important;
+            aspect-ratio:auto !important;
+            align-self:start;
+        }
+        #maximized-overlay .video-tile{
+            width:100%;
+            height:100% !important;
+            min-height:0 !important;
+            max-width:none;
+            aspect-ratio:auto !important;
+        }
+
+        /* Desktop */
+        @media(min-width:1201px){
+            .video-grid{
+                grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+                gap:18px;
+                padding:18px;
+            }
+            #side-panel{
+                height:100%;
+                min-height:0;
+                align-self:stretch;
+            }
+        }
+
+        /* Laptop / iPad landscape */
+        @media(min-width:901px) and (max-width:1200px){
+            .main{padding:10px; gap:10px}
+            .video-grid{
+                grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+                gap:16px;
+                padding:16px;
+            }
+            .video-tile{
+                min-height:200px !important;
+                height:clamp(200px,22vw,270px) !important;
+            }
+            #side-panel{
+                width:clamp(280px,31vw,340px);
+                min-width:280px;
+                max-width:360px;
+                height:100%;
+                min-height:0;
+                align-self:stretch;
+            }
+        }
+
+        /* Tablet portrait and smaller */
+        @media(max-width:900px){
+            .header{
+                flex-wrap:nowrap !important;
+                row-gap:0;
+                gap:8px;
+                min-height:58px;
+                padding:8px 10px;
+            }
+            .header-left{
+                flex:1 1 auto;
+                min-width:0;
+                gap:8px;
+                overflow:hidden;
+            }
+            .header-center{
+                order:0 !important;
+                width:auto !important;
+                min-width:max-content;
+                flex:0 0 auto;
+                justify-content:center;
+                padding:6px 10px;
+                margin:0;
+            }
+            .header-right{
+                flex:0 0 auto;
+                gap:7px;
+            }
+            .meeting-title{
+                max-width:24vw;
+                overflow:hidden;
+                text-overflow:ellipsis;
+                white-space:nowrap;
+            }
+
+            .main{
+                flex-direction:column;
+                padding:8px;
+                gap:10px;
+                min-height:0;
+                overflow:hidden;
+            }
+            .video-area{
+                flex:1 1 0;
+                min-height:0;
+                width:100%;
+            }
+            .video-grid{
+                grid-template-columns:repeat(2,minmax(0,1fr));
+                grid-auto-rows:max-content !important;
+                gap:16px;
+                padding:14px;
+                overflow-y:auto !important;
+            }
+            .video-tile{
+                min-height:190px !important;
+                height:clamp(190px,30vw,270px) !important;
+            }
+
+            #side-panel{
+                position:fixed;
+                left:0;
+                right:0;
+                bottom:76px;
+                transform:none;
+                width:100% !important;
+                min-width:0 !important;
+                max-width:none !important;
+                height:min(58dvh,540px);
+                min-height:220px;
+                max-height:calc(100dvh - 128px);
+                z-index:55;
+                border-radius:18px 18px 0 0;
+            }
+            .panel-drag-handle{display:flex}
+        }
+
+        @media(min-width:901px){
+            .panel-drag-handle{display:none}
+        }
+
+        /* Phones: exactly one tile per row with a real gap between rows */
+        @media(max-width:640px){
+            .header{
+                padding:7px 8px;
+                gap:6px;
+                min-height:56px;
+            }
+            .header-brand-text,.participants-count,.meeting-meta{display:none}
+            .header-brand{
+                padding-right:6px;
+                gap:4px;
+            }
+            .header-brand img{
+                width:28px;
+                height:28px;
+            }
+            .live-badge{
+                padding:4px 7px;
+                font-size:9px;
+                gap:4px;
+            }
+            .meeting-title{
+                max-width:22vw;
+                font-size:12px;
+            }
+            .header-center{
+                padding:5px 8px;
+                font-size:11px;
+                gap:5px;
+            }
+            .header-right{gap:6px}
+            .btn-leave span,.btn-cancel span{display:none}
+            .btn-leave,.btn-cancel{
+                padding:0;
+                width:36px;
+                height:36px;
+                border-radius:50%;
+                justify-content:center;
+            }
+
+            .main{
+                padding:6px;
+                gap:10px;
+            }
+            .video-grid{
+                grid-template-columns:minmax(0,1fr) !important;
+                grid-auto-rows:max-content !important;
+                row-gap:16px !important;
+                column-gap:0 !important;
+                padding:10px;
+                overflow-y:auto !important;
+            }
+            .video-grid:has(>.video-tile:only-child){
+                grid-template-columns:minmax(0,1fr) !important;
+            }
+            .video-tile{
+                width:100%;
+                max-width:none;
+                min-height:220px !important;
+                height:clamp(220px,58vw,330px) !important;
+                aspect-ratio:auto !important;
+                border-radius:14px;
+                margin:0 !important;
+            }
+            .tile-info{
+                left:0;
+                right:0;
+                bottom:0;
+                padding:9px 11px;
+            }
+
+            .controls{
+                gap:2px;
+                padding:7px 8px;
+                margin:0 6px 6px;
+            }
+            .ctrl-btn{min-width:0;width:42px;flex-basis:42px;padding:3px 2px}
+
+            #side-panel{
+                bottom:70px;
+                width:100% !important;
+                min-width:0 !important;
+                max-width:none !important;
+                border-left:none;
+                border-right:none;
+                border-bottom:none;
+            }
+        }
+
+        @media(max-width:420px){
+            .header{gap:4px; padding:6px}
+            .header-left{gap:5px}
+            .header-brand{padding-right:3px}
+            .live-badge{padding:4px 6px}
+            .meeting-title{max-width:18vw; font-size:11.5px}
+            .header-center{padding:5px 6px; font-size:10.5px}
+            .btn-leave,.btn-cancel{width:34px; height:34px}
+
+            .main{padding:5px}
+            .video-grid{padding:8px; row-gap:14px !important}
+            .video-tile{
+                min-height:210px !important;
+                height:clamp(210px,62vw,300px) !important;
+            }
+            .avatar-circle{width:58px; height:58px; font-size:20px}
+            .tile-name{font-size:11px}
+            .role-badge{font-size:7px}
+            .controls{padding:6px 3px; gap:0;margin-left:4px;margin-right:4px}
+            .ctrl-btn{min-width:0;width:38px;flex-basis:38px;padding:2px 1px;gap:3px}
+            .ctrl-icon,.btn-end{width:32px;height:32px;border-radius:10px;font-size:12px}
+            .ctrl-label{font-size:7.5px;white-space:nowrap}
+            #side-panel{bottom:66px}
+        }
+
+
+        @media (max-width:900px){
+            .controls{gap:2px;padding:7px 5px}
+            .ctrl-btn{width:44px;flex-basis:44px;padding-left:2px;padding-right:2px}
+            .ctrl-icon,.btn-end{width:34px;height:34px}
+            .ctrl-label{font-size:8px}
+            .ctrl-divider{margin:0 1px}
+        }
+        @media (max-width:520px){
+            .controls{gap:0;padding:5px 2px}
+            .ctrl-btn{width:36px;flex-basis:36px;padding:2px 0}
+            .ctrl-icon,.btn-end{width:30px;height:30px;border-radius:9px}
+            .ctrl-label{font-size:7px}
+            .ctrl-divider{height:25px;margin:0}
+        }
+
+        @media (max-width:640px){
+            #transcript-btn,#transcriptBtn,[data-panel="transcript"],[data-tab="transcript"],
+            button[aria-label*="transcript" i],button[title*="transcript" i]{display:none!important}
+        }
+
+        @media (max-width:640px){
+            .ctrl-btn[onclick*="transcript"],
+            .panel-tabbtn[data-tab="transcript"],
+            #tab-transcript{
+                display:none !important;
+            }
+        }
+    </style>
+</head>
+@php
+    $organizer   = $meeting->organizer;
+    $orgInitials = strtoupper(substr($organizer->name, 0, 1) . substr(strrchr($organizer->name, ' ') ?: ' ', 1, 1));
+    $palette     = ['#3b82f6,#06b6d4', '#8b5cf6,#ec4899', '#22c55e,#06b6d4', '#f59e0b,#ef4444', '#64748b,#334155', '#ec4899,#f59e0b'];
+    $userInitials = strtoupper(substr(auth()->user()->name, 0, 1) . substr(strrchr(auth()->user()->name, ' ') ?: ' ', 1, 1));
+    $tz = $meeting->timezone ?? 'Asia/Karachi';
+    $meetingEnd = null;
+    if (!empty($meeting->end_time)) {
+        $meetingEnd = \Carbon\Carbon::parse($meeting->end_time, $tz)->utc()->toIso8601String();
+    } else {
+        $durationMinutes = $meeting->duration_minutes ?? $meeting->duration ?? null;
+        if ($durationMinutes) {
+            $startForCalc = $meeting->actual_start
+                ? \Carbon\Carbon::parse($meeting->actual_start)
+                : \Carbon\Carbon::parse($meeting->date . ' ' . $meeting->time, $tz);
+            $meetingEnd = $startForCalc->copy()->addMinutes((int) $durationMinutes)->utc()->toIso8601String();
+        }
+    }
+@endphp
+<body>
+
+<div class="header">
+    <div class="header-left">
+        <div class="header-brand">
+            <img src="{{ asset('images/s-logo.png') }}" alt="logo">
+            <div class="header-brand-text">
+                <div class="name">SmartMeet</div>
+                <div class="tag">Meeting Suite</div>
+            </div>
         </div>
-
-        <!-- STATS -->
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
-
-            <div class="bg-white/80 backdrop-blur-md p-4 sm:p-5 rounded-2xl shadow-lg hover:shadow-xl transition duration-300">
-                <div class="flex items-start justify-between">
-                    <div class="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl bg-blue-100">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M3 12h18M3 17h18" />
-                        </svg>
-                    </div>
-                    <p class="text-xs text-blue-500 font-semibold tracking-widest">TOTAL</p>
-                </div>
-                <h2 class="text-2xl sm:text-3xl font-bold text-gray-800 mt-3 sm:mt-4">
-                    {{ str_pad($totalMeetings, 2, '0', STR_PAD_LEFT) }}
-                </h2>
-                <p class="text-xs sm:text-sm text-gray-500 mt-1">My Meetings</p>
+        <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+        <div class="header-meeting-info">
+            <div class="meeting-title">{{ $meeting->title }}</div>
+            <div class="meeting-meta">
+                <span><i class="fa fa-users"></i> <span data-total-count>{{ $meeting->participants->count() + 1 }}</span> Participants</span>
+                <span>·</span>
+                <span>{{ $tz }}</span>
             </div>
-
-            <div class="bg-white/80 backdrop-blur-md p-4 sm:p-5 rounded-2xl shadow-lg hover:shadow-xl transition duration-300">
-                <div class="flex items-start justify-between">
-                    <div class="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl bg-green-100">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 sm:w-5 sm:h-5 text-green-600">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" />
-                        </svg>
-                    </div>
-                    <p class="text-xs text-green-500 font-semibold tracking-widest">LIVE</p>
-                </div>
-                <h2 class="text-2xl sm:text-3xl font-bold text-gray-800 mt-3 sm:mt-4">
-                    {{ str_pad($activeMeetings, 2, '0', STR_PAD_LEFT) }}
-                </h2>
-                <p class="text-xs sm:text-sm text-gray-500 mt-1">Active Meetings</p>
-            </div>
-
-            <div class="bg-white/80 backdrop-blur-md p-4 sm:p-5 rounded-2xl shadow-lg hover:shadow-xl transition duration-300">
-                <div class="flex items-start justify-between">
-                    <div class="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl bg-indigo-100">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10m-11 9h12a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v11a2 2 0 002 2z" />
-                        </svg>
-                    </div>
-                    <p class="text-xs text-indigo-500 font-semibold tracking-widest">TODAY</p>
-                </div>
-                <h2 class="text-2xl sm:text-3xl font-bold text-gray-800 mt-3 sm:mt-4">
-                    {{ str_pad($todayMeetings, 2, '0', STR_PAD_LEFT) }}
-                </h2>
-                <p class="text-xs sm:text-sm text-gray-500 mt-1">Today's Meetings</p>
-            </div>
-
-            <div class="bg-white/80 backdrop-blur-md p-4 sm:p-5 rounded-2xl shadow-lg hover:shadow-xl transition duration-300">
-                <div class="flex items-start justify-between">
-                    <div class="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl bg-orange-100">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 sm:w-5 sm:h-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                    </div>
-                    <p class="text-xs text-orange-500 font-semibold tracking-widest">UPCOMING</p>
-                </div>
-                <h2 class="text-2xl sm:text-3xl font-bold text-gray-800 mt-3 sm:mt-4">
-                    {{ str_pad($upcomingMeetings, 2, '0', STR_PAD_LEFT) }}
-                </h2>
-                <p class="text-xs sm:text-sm text-gray-500 mt-1">Upcoming Meetings</p>
-            </div>
-
         </div>
+    </div>
+    <div class="header-center"><i class="fa fa-clock"></i><span id="timer">00:00:00</span></div>
+    <div class="header-right">
+        <div class="participants-count"><i class="fa fa-circle" style="color:var(--green);font-size:8px;"></i><span data-online-count>1</span> online</div>
+        <button class="btn-cancel" onclick="cancelMeeting()"><i class="fa fa-ban"></i><span>Cancel</span></button>
+        <button class="btn-leave" onclick="safeLeaveMeeting()"><i class="fa fa-phone-slash"></i><span>Leave</span></button>
+    </div>
+</div>
+<form id="cancel-form" action="{{ route('organizer.meetings.cancel', $meeting) }}" method="POST" style="display:none;">
+    @csrf
+    @method('PATCH')
+</form>
 
-        <!-- AGENDA CARD -->
-        <div class="bg-white rounded-2xl shadow-md border border-blue-100 p-4 sm:p-6">
-
-            <div class="flex justify-between items-center mb-5">
-                <div>
-                    <h2 class="text-base sm:text-lg font-semibold text-gray-800">Today's Meetings</h2>
-                    <p class="text-xs text-gray-500">Your schedule for {{ \Carbon\Carbon::today()->format('M d, Y') }}</p>
-                </div>
-                <a href="{{ route('organizer.meetings.index') }}"
-                   class="bg-blue-600 text-white px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium hover:bg-blue-700 transition">
-                    View All
-                </a>
-            </div>
-
-            @forelse($agenda as $meeting)
-
-                @php
-                    $isActive    = $meeting->status === 'active';
-                    $isCompleted = $meeting->status === 'completed';
-                    $isCancelled = $meeting->status === 'cancelled';
-
-                    $borderColor = match($meeting->status) {
-                        'active'    => 'border-l-blue-600 bg-blue-50',
-                        'upcoming'  => 'border-l-blue-200 bg-white',
-                        'completed' => 'border-l-gray-300 bg-gray-50',
-                        'cancelled' => 'border-l-red-300 bg-red-50',
-                        default     => 'border-l-gray-200 bg-white',
-                    };
-
-                    $badgeClass = match($meeting->status) {
-                        'active'    => 'bg-orange-100 text-orange-600',
-                        'upcoming'  => 'bg-blue-100 text-blue-600',
-                        'completed' => 'bg-gray-100 text-gray-600',
-                        'cancelled' => 'bg-red-100 text-red-500',
-                        default     => 'bg-gray-100 text-gray-600',
-                    };
-
-                    $badgeLabel = match($meeting->status) {
-                        'active'    => 'LIVE NOW',
-                        'upcoming'  => 'SCHEDULED',
-                        'completed' => 'COMPLETED',
-                        'cancelled' => 'CANCELLED',
-                        default     => strtoupper($meeting->status),
-                    };
-
-                    $agendaItems = json_decode($meeting->agenda ?? '[]', true) ?? [];
-                @endphp
-
-                <div class="group relative flex flex-col sm:flex-row justify-between sm:items-center p-4 sm:p-5
-            bg-white border border-gray-100 border-l-4 {{ $borderColor }} rounded-2xl mb-3
-            shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 gap-4 overflow-hidden">
-
-                    <!-- Decorative glow on hover -->
-                    <div class="absolute -right-10 -top-10 w-32 h-32 bg-blue-50 rounded-full blur-2xl
-                opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-
-                    <div class="flex gap-4 items-start relative z-10">
-                        <!-- TIME BLOCK -->
-                        <div class="w-16 sm:w-[68px] text-center shrink-0 bg-gray-50 group-hover:bg-blue-50
-                    rounded-xl py-2.5 border border-gray-100 group-hover:border-blue-100 transition-colors duration-300">
-                            <p class="text-base font-bold text-gray-800 leading-none">
-                                {{ \Carbon\Carbon::parse($meeting->time)->format('h:i') }}
-                            </p>
-                            <p class="text-[10px] font-semibold text-gray-400 mt-1 tracking-wider">
-                                {{ \Carbon\Carbon::parse($meeting->time)->format('A') }}
-                            </p>
-                        </div>
-
-                        <div class="min-w-0">
-                            <div class="flex items-center gap-2 flex-wrap">
-                <span class="text-[11px] font-semibold px-2.5 py-1 rounded-full {{ $badgeClass }} tracking-wide">
-                    {{ $badgeLabel }}
-                </span>
-                                @if($isActive)
-                                    <span class="inline-flex items-center gap-1 text-[11px] font-medium text-green-600">
-                        <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-                        Live now
-                    </span>
-                                @endif
-                            </div>
-
-                            <h3 class="font-semibold text-gray-800 mt-1.5 text-sm sm:text-base leading-snug">
-                                {{ $meeting->title }}
-                            </h3>
-
-                            <div class="flex items-center gap-1.5 text-xs text-gray-400 mt-1">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                     stroke="currentColor" class="w-3.5 h-3.5 shrink-0">
-                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                          d="M12.75 3.03v.568c0 .334.148.65.405.864l1.068.89c.442.369.535 1.01.216 1.49l-.51.766a2.25 2.25 0 0 1-1.161.886l-.143.048a1.107 1.107 0 0 0-.57 1.664c.369.555.169 1.307-.427 1.605L9 13.125" />
-                                    <circle cx="12" cy="12" r="9" stroke-width="1.5" fill="none" />
-                                </svg>
-                                <span>{{ $meeting->timezone }}</span>
-                                <span class="text-gray-300">•</span>
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                     stroke="currentColor" class="w-3.5 h-3.5 shrink-0">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                                </svg>
-                                <span>{{ $meeting->duration }} min</span>
-                            </div>
-
-                            <!-- AGENDA ITEMS -->
-                            @if(count($agendaItems) > 0)
-                                <ul class="mt-2.5 space-y-1">
-                                    @foreach($agendaItems as $item)
-                                        <li class="text-xs text-gray-500 flex items-center gap-2">
-                                            <span class="w-1.5 h-1.5 bg-blue-400 rounded-full shrink-0"></span>
-                                            <span class="truncate">{{ $item['title'] ?? $item }}</span>
-                                        </li>
-                                    @endforeach
-                                </ul>
-                            @endif
-                        </div>
-                    </div>
-
-                    <!-- ACTION BUTTON -->
-                    <div class="flex gap-2 self-start sm:self-center shrink-0 relative z-10">
-                        @if($isActive)
-                            <a href="{{ route('organizer.meetings.attend', $meeting) }}"
-                               class="inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600
-                      text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-md
-                      hover:shadow-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200">
-                                <i class="fa-solid fa-video text-xs"></i>
-                                Join
-                            </a>
-                        @elseif(!$isCompleted && !$isCancelled)
-                            <a href="{{ route('organizer.meetings.show', $meeting) }}"
-                               class="inline-flex items-center gap-2 text-blue-600 bg-blue-50 border border-blue-100
-                      px-4 py-2.5 rounded-xl text-sm font-medium
-                      hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all duration-200">
-                                <i class="fa-solid fa-gear text-xs"></i>
-                                Manage
-                            </a>
-                        @else
-                            <a href="{{ route('organizer.meetings.show', $meeting) }}"
-                               class="inline-flex items-center gap-2 text-gray-500 bg-gray-50 border border-gray-200
-                      px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-100 transition-all duration-200">
-                                <i class="fa-solid fa-eye text-xs"></i>
-                                View
-                            </a>
-                        @endif
-                    </div>
-                </div>
-
-            @empty
-                <div class="text-center py-10 text-gray-400">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10m-11 9h12a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v11a2 2 0 002 2z" />
-                    </svg>
-                    <p class="text-sm font-medium">No meetings scheduled for today.</p>
-                    <a href="{{ route('organizer.meetings.create') }}"
-                       class="mt-3 inline-block text-blue-600 text-sm hover:underline">
-                        Schedule a meeting →
-                    </a>
-                </div>
-            @endforelse
-
+<div class="main">
+    <div class="video-area">
+        <div class="video-grid" id="video-grid"></div>
+        <div id="maximized-overlay">
+            <button class="maximize-close-btn" onclick="restoreMaximized()"><i class="fa fa-compress"></i></button>
         </div>
-
     </div>
 
-</x-layouts.app>
+    <div id="side-panel">
+        <div class="panel-drag-handle" id="panel-drag-handle" title="Drag to resize"></div>
+        <div class="panel-tabbar">
+            <button class="panel-tabbtn" data-tab="transcript" onclick="toggleSidePanel('transcript')"><i class="fa fa-closed-captioning"></i> Transcript</button>
+            <button class="panel-tabbtn" data-tab="chat" onclick="toggleSidePanel('chat')">Chat</button>
+            <button class="panel-tabbtn" data-tab="people" onclick="toggleSidePanel('people')">People</button>
+        </div>
+        <div class="panel-body">
+            <div id="tab-transcript" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
+                <div class="transcript-body" id="transcript-body">
+                    <div class="empty-note" data-empty>Live captions will appear here as people speak.</div>
+                </div>
+                <div class="lang-row">
+                    <span style="font-size:10px;color:var(--muted-2)">Live captions</span>
+                    <button id="lang-toggle-btn" onclick="toggleTranscriptLanguage()">🌐 English</button>
+                </div>
+                <div class="listening-indicator" id="listening-indicator"><div class="listening-dot"></div><span id="listening-text">Listening…</span></div>
+            </div>
+            <div id="tab-chat" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
+                <div class="chat-body" id="chat-body">
+                    <div class="empty-note" data-empty>No messages yet — say hello 👋</div>
+                </div>
+                <div class="chat-input-area">
+                    <input class="chat-input" id="chat-input" placeholder="Type a message…" onkeydown="if(event.key==='Enter') sendChat()">
+                    <button class="btn-send" onclick="sendChat()"><i class="fa fa-paper-plane"></i></button>
+                </div>
+            </div>
+            <div id="tab-people" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
+                <div class="room-invite-card">
+                    <div class="room-invite-title"><i class="fa-solid fa-user-plus"></i> Invite people</div>
+                    <div class="room-invite-note">Invite someone without leaving the live meeting. Copy the link for WhatsApp/SMS, or send it by email.</div>
+                    <div class="room-invite-actions">
+                        <button type="button" class="room-invite-btn primary" onclick="copyMeetingInviteLink()">
+                            <i class="fa-solid fa-link"></i> Copy link
+                        </button>
+                        <button type="button" class="room-invite-btn" onclick="openRoomEmailInvite()">
+                            <i class="fa-regular fa-envelope"></i> Email invite
+                        </button>
+                    </div>
+                    <div class="room-invite-link" id="room-invite-link-preview" title="Meeting invite link"></div>
+                </div>
+                <div class="people-body" id="people-body"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="controls">
+    <div class="ctrl-btn" onclick="safeToggleMic()"><div class="ctrl-icon off" id="ctrl-mic"><i class="fa fa-microphone-slash"></i></div><span class="ctrl-label">Mic</span></div>
+    <div class="ctrl-btn" onclick="safeToggleCamera()"><div class="ctrl-icon off" id="ctrl-camera"><i class="fa fa-video-slash"></i></div><span class="ctrl-label">Camera</span></div>
+    <div class="ctrl-divider"></div>
+    <div class="ctrl-btn" onclick="toggleSidePanel('transcript')"><div class="ctrl-icon" id="ctrl-transcript"><i class="fa fa-closed-captioning"></i></div><span class="ctrl-label">Captions</span></div>
+    <div class="ctrl-btn" onclick="toggleSidePanel('chat')"><div class="ctrl-icon" id="ctrl-chat"><i class="fa fa-comment"></i><span id="chat-badge">0</span></div><span class="ctrl-label">Chat</span></div>
+    <div class="ctrl-btn" onclick="toggleSidePanel('people')"><div class="ctrl-icon" id="ctrl-people"><i class="fa fa-users"></i></div><span class="ctrl-label">People</span></div>
+    <div class="ctrl-btn" onclick="muteAllParticipants()"><div class="ctrl-icon"><i class="fa fa-microphone-slash"></i></div><span class="ctrl-label">Mute all</span></div>
+    <div class="ctrl-divider"></div>
+    <div class="ctrl-btn"><button class="btn-end" style="background:linear-gradient(135deg,#7f1d1d,#450a0a);" onclick="cancelMeeting()" title="Cancel meeting for everyone"><i class="fa fa-ban"></i></button><span class="ctrl-label" style="color:var(--red);">Cancel</span></div>
+    <div class="ctrl-btn"><button class="btn-end" onclick="safeLeaveMeeting()"><i class="fa fa-phone-slash"></i></button><span class="ctrl-label" style="color:var(--red);">Leave</span></div>
+</div>
+
+
+<div id="room-email-overlay" class="room-email-overlay" aria-hidden="true">
+    <div class="room-email-dialog" role="dialog" aria-modal="true" aria-labelledby="room-email-title">
+        <div class="room-email-head">
+            <div class="room-email-title" id="room-email-title">Send email invitation</div>
+            <button type="button" class="room-email-close" onclick="closeRoomEmailInvite()" aria-label="Close">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <p class="room-email-help">
+            Send an invitation without leaving the live meeting.
+            Existing users can join this meeting; new users can register first.
+        </p>
+
+        <form id="room-email-form" onsubmit="sendRoomEmailInvite(event)">
+            <div class="room-email-field">
+                <label class="room-email-label" for="room-email-emails">Emails</label>
+                <textarea id="room-email-emails" class="room-email-textarea" rows="2"
+                          placeholder="email1@example.com, email2@example.com"></textarea>
+                <div class="room-email-hint">Separate multiple email addresses with commas.</div>
+            </div>
+
+            <div class="room-email-field">
+                <label class="room-email-label" for="room-email-subject">Subject</label>
+                <input id="room-email-subject" class="room-email-input" type="text">
+            </div>
+
+            <div class="room-email-field">
+                <label class="room-email-label" for="room-email-message">Message (optional)</label>
+                <textarea id="room-email-message" class="room-email-textarea" rows="3"
+                          placeholder="Hello, please join our meeting..."></textarea>
+            </div>
+
+            <div id="room-email-msg" class="room-email-msg"></div>
+
+            <div class="room-email-actions">
+                <button type="button" class="room-email-action" onclick="closeRoomEmailInvite()">Cancel</button>
+                <button type="submit" class="room-email-action primary" id="room-email-send-btn">
+                    <i class="fa-regular fa-envelope"></i> Send
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="toast-stack"></div>
+
+
+<script>
+    /* ============================================================
+       SMARTMEET — ORGANIZER ROOM (clean single implementation)
+       ============================================================ */
+    const IS_ORGANIZER   = true;
+    const MEETING_ID      = "{{ $meeting->id }}";
+    const MEETING_TITLE   = @json($meeting->title);
+    const INVITE_LINK     = @json(route('meetings.join.link', $meeting->unique_code));
+    const MY_USER_ID      = "{{ auth()->id() }}";
+    const ORGANIZER_ID    = String(MY_USER_ID);
+    const MY_NAME         = @json(auth()->user()->name);
+    const MY_INITIALS     = @json($userInitials);
+    const MY_AVATAR_URL   = @json($myAvatarUrl ?? null);
+    const SIGNAL_URL      = @json(route('organizer.meetings.signal', $meeting));
+    const MODERATION_URL  = @json(route('organizer.meetings.moderate', $meeting));
+    const TRANSCRIPT_URL  = @json(route('organizer.meetings.transcript', $meeting));
+    const MARK_LEFT_URL   = @json(route('organizer.meetings.markLeft', $meeting));
+    const LEAVE_URL       = @json(route('organizer.meetings.index'));
+    const CANCEL_URL      = @json(route('organizer.meetings.cancel', $meeting));
+    const CSRF            = @json(csrf_token());
+    const ALL_PARTICIPANTS = @json($allParticipants);
+    const MEETING_END_TIME   = @json($meetingEnd);
+    const ACTUAL_START = @json($meeting->actual_start ? \Carbon\Carbon::parse($meeting->actual_start)->utc()->toIso8601String() : now()->utc()->toIso8601String());
+    const COLORS = ['#3b82f6,#06b6d4','#8b5cf6,#ec4899','#22c55e,#06b6d4','#f59e0b,#ef4444','#64748b,#334155','#ec4899,#f59e0b'];
+    const IS_MOBILE_BROWSER = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+
+    /* ---------- Known participants (id -> {name, initials, isOrganizer, hasJoined}) ---------- */
+    const knownParticipants = {};
+    const raisedHands = new Set();
+    ALL_PARTICIPANTS.forEach(p => { knownParticipants[String(p.userId)] = { name: p.name, initials: p.initials, avatarUrl: p.avatarUrl || null, isOrganizer: false, hasJoined: Boolean(p.hasJoined) }; });
+
+    /* ---------- Runtime state ---------- */
+    const onlineUsers   = new Set([String(MY_USER_ID)]);
+    const leftUsers     = new Set();
+    const peers         = {};
+    const remoteStreams = {};
+    const negotiationTimers = {};
+    const makingOffer   = {};
+    const ignoreOffer   = {};
+    const offerHandling = {};
+    const pendingCandidates = {};
+    const micStatus     = {};
+    const camStatus     = {};
+    const receivedSignalIds = new Set();
+    let localStream = null, isMicOn = false, isCameraOn = false;
+    let maximizedUserId = null, maximizedPlaceholder = null;
+    let activeTab = null, panelOpen = false, unreadChat = 0;
+    let leftNotified = false, autoEndTimer = null, autoEndTriggered = false;
+
+    function colorFor(uid, isOrganizer){ if(isOrganizer) return COLORS[0]; let h=0; for(const c of String(uid)) h=(h*31+c.charCodeAt(0))>>>0; return COLORS[1+(h%(COLORS.length-1))]; }
+    function escapeHtml(t){ const d=document.createElement('div'); d.textContent=String(t??''); return d.innerHTML; }
+    function initialsOf(name){ const parts=String(name||'').trim().split(/\s+/); if(!parts.length) return '?'; return (parts[0][0]+(parts.length>1?parts[parts.length-1][0]:'')).toUpperCase(); }
+
+    function avatarContent(avatarUrl, initials){
+        const safeInitials=escapeHtml(initials||'?');
+        if(!avatarUrl) return safeInitials;
+        const safeUrl=escapeHtml(String(avatarUrl));
+        return `<img src="${safeUrl}" alt="" loading="eager"
+            onerror="const p=this.parentElement; this.remove(); if(p && !p.textContent.trim()) p.textContent='${safeInitials}'">`;
+    }
+
+
+    /* ---------- In-room invite ---------- */
+    async function copyMeetingInviteLink(){
+        const link=String(INVITE_LINK||'').trim();
+        if(!link){ showToast('Invite link is unavailable.'); return; }
+
+        try{
+            if(navigator.clipboard?.writeText){
+                await navigator.clipboard.writeText(link);
+            }else{
+                const input=document.createElement('textarea');
+                input.value=link;
+                input.setAttribute('readonly','');
+                input.style.position='fixed';
+                input.style.opacity='0';
+                document.body.appendChild(input);
+                input.select();
+                document.execCommand('copy');
+                input.remove();
+            }
+            showToast('🔗 Invite link copied.');
+        }catch(e){
+            showToast('Could not copy automatically. Select the link from People panel.');
+        }
+    }
+
+    function initRoomInviteUI(){
+        const preview=document.getElementById('room-invite-link-preview');
+        if(preview) preview.textContent=INVITE_LINK;
+    }
+
+    function setRoomEmailMessage(message='', type=''){
+        const box=document.getElementById('room-email-msg');
+        if(!box) return;
+        box.textContent=message;
+        box.className='room-email-msg';
+        if(message){
+            box.classList.add('show');
+            if(type) box.classList.add(type);
+        }
+    }
+
+    function openRoomEmailInvite(){
+        const overlay=document.getElementById('room-email-overlay');
+        const subject=document.getElementById('room-email-subject');
+        const message=document.getElementById('room-email-message');
+        const emails=document.getElementById('room-email-emails');
+
+        if(!overlay) return;
+        if(subject) subject.value=`You're invited: ${MEETING_TITLE}`;
+        if(message) message.value='';
+        if(emails) emails.value='';
+        setRoomEmailMessage('');
+        overlay.classList.add('open');
+        overlay.setAttribute('aria-hidden','false');
+        setTimeout(()=>emails?.focus(),30);
+    }
+
+    function closeRoomEmailInvite(){
+        const overlay=document.getElementById('room-email-overlay');
+        const form=document.getElementById('room-email-form');
+        overlay?.classList.remove('open');
+        overlay?.setAttribute('aria-hidden','true');
+        form?.reset();
+        setRoomEmailMessage('');
+    }
+
+    let roomEmailInviteSending=false;
+
+    async function sendRoomEmailInvite(event){
+        event.preventDefault();
+
+        if(roomEmailInviteSending) return;
+
+        const emails=document.getElementById('room-email-emails')?.value.trim() || '';
+        const subject=document.getElementById('room-email-subject')?.value.trim() || '';
+        const message=document.getElementById('room-email-message')?.value.trim() || '';
+        const sendBtn=document.getElementById('room-email-send-btn');
+
+        if(!emails){
+            setRoomEmailMessage('At least one email is required.','error');
+            return;
+        }
+
+        roomEmailInviteSending=true;
+        if(sendBtn){
+            sendBtn.disabled=true;
+            sendBtn.dataset.originalHtml=sendBtn.innerHTML;
+            sendBtn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Sending...';
+        }
+        setRoomEmailMessage('Sending invitation…','success');
+
+        try{
+            const response=await fetch(`/organizer/meetings/${encodeURIComponent(MEETING_ID)}/send-invite`,{
+                method:'POST',
+                credentials:'same-origin',
+                headers:{
+                    'Content-Type':'application/json',
+                    'Accept':'application/json',
+                    'X-Requested-With':'XMLHttpRequest',
+                    'X-CSRF-TOKEN':CSRF
+                },
+                body:JSON.stringify({emails,subject,message})
+            });
+
+            let data={};
+            try{ data=await response.json(); }catch(e){}
+
+            if(!response.ok){
+                throw new Error(data.message || `Email invite failed (HTTP ${response.status})`);
+            }
+
+            setRoomEmailMessage(data.message || 'Invitation sent successfully.','success');
+            showToast('✉️ Invitation sent.');
+            setTimeout(closeRoomEmailInvite,1200);
+        }catch(error){
+            console.error('[SmartMeet] email invite failed',error);
+            setRoomEmailMessage(error?.message || 'Failed to send invitation. Please try again.','error');
+        }finally{
+            roomEmailInviteSending=false;
+            if(sendBtn){
+                sendBtn.disabled=false;
+                sendBtn.innerHTML=sendBtn.dataset.originalHtml || '<i class="fa-regular fa-envelope"></i> Send';
+            }
+        }
+    }
+
+    document.addEventListener('click',(event)=>{
+        const overlay=document.getElementById('room-email-overlay');
+        if(overlay && event.target===overlay) closeRoomEmailInvite();
+    });
+
+    document.addEventListener('keydown',(event)=>{
+        if(event.key==='Escape'){
+            const overlay=document.getElementById('room-email-overlay');
+            if(overlay?.classList.contains('open')) closeRoomEmailInvite();
+        }
+    });
+
+    /* ---------- Toast ---------- */
+    const recentToasts = new Set();
+    function showToast(msg){
+        if(recentToasts.has(msg)) return;
+        recentToasts.add(msg); setTimeout(()=>recentToasts.delete(msg),4000);
+        const stack=document.getElementById('toast-stack'); if(!stack) return;
+        const el=document.createElement('div'); el.className='toast'; el.textContent=msg;
+        stack.appendChild(el);
+        requestAnimationFrame(()=>el.classList.add('show'));
+        setTimeout(()=>{ el.classList.remove('show'); el.classList.add('leaving'); setTimeout(()=>el.remove(),260); },3400);
+    }
+    function showModerationNotice(msg){
+        const old=document.getElementById('mod-notice'); if(old) old.remove();
+        const el=document.createElement('div'); el.id='mod-notice'; el.className='moderation-notice'; el.textContent=msg;
+        document.body.appendChild(el);
+        requestAnimationFrame(()=>el.classList.add('show'));
+        setTimeout(()=>el.classList.remove('show'),3200);
+        setTimeout(()=>el.remove(),3600);
+    }
+
+    installAudioPlaybackUnlock();
+
+    if(document.readyState==='loading'){
+        document.addEventListener('DOMContentLoaded', initRoomInviteUI, {once:true});
+    }else{
+        initRoomInviteUI();
+    }
+
+
+    window.addEventListener('unhandledrejection',(event)=>{
+        console.error('[SmartMeet] unhandled promise rejection',event.reason);
+    });
+
+    /* ---------- Timer ---------- */
+    let seconds = Math.max(0, Math.floor((Date.now()-new Date(ACTUAL_START).getTime())/1000));
+    const meetingClockInterval=setInterval(()=>{
+        seconds++;
+        const h=String(Math.floor(seconds/3600)).padStart(2,'0');
+        const m=String(Math.floor((seconds%3600)/60)).padStart(2,'0');
+        const s=String(seconds%60).padStart(2,'0');
+        const el=document.getElementById('timer'); if(el) el.textContent=`${h}:${m}:${s}`;
+    },1000);
+
+    function scheduleAutoEnd(){
+        if(!MEETING_END_TIME) return;
+        const msLeft = new Date(MEETING_END_TIME).getTime()-Date.now();
+        if(msLeft<=0){ triggerAutoEnd(); return; }
+        autoEndTimer = setTimeout(triggerAutoEnd, msLeft);
+    }
+    async function triggerAutoEnd(){
+        if(autoEndTriggered) return; autoEndTriggered=true;
+        showToast('⏰ Meeting time has ended.');
+        setTimeout(()=>{ cleanup(); window.location.href=LEAVE_URL; },1800);
+    }
+
+    /* ---------- Online count / people list ---------- */
+    function updateOnlineCount(){ document.querySelectorAll('[data-online-count]').forEach(el=>el.textContent=onlineUsers.size); }
+    function markOnline(uid){ uid=String(uid); onlineUsers.add(uid); if(knownParticipants[uid]) knownParticipants[uid].hasJoined=true; updateOnlineCount(); renderPersonRow(uid); }
+    function markOffline(uid){
+        uid=String(uid);
+        onlineUsers.delete(uid);
+        if(knownParticipants[uid]) knownParticipants[uid].hasJoined=false;
+        updateOnlineCount();
+        renderPersonRow(uid);
+    }
+
+    function markUserLeft(uid){
+        uid=String(uid);
+        leftUsers.add(uid);
+        onlineUsers.delete(uid);
+        if(knownParticipants[uid]) knownParticipants[uid].hasJoined=false;
+        updateOnlineCount();
+        renderPersonRow(uid);
+    }
+
+    function renderPeopleList(){
+        const body=document.getElementById('people-body'); if(!body) return;
+        body.innerHTML='';
+        const ids=Object.keys(knownParticipants);
+        if(!ids.includes(String(MY_USER_ID))) ids.unshift(String(MY_USER_ID));
+        ids.sort((a,b)=>{
+            if(a===String(MY_USER_ID)) return -1;
+            if(b===String(MY_USER_ID)) return 1;
+            const ao=onlineUsers.has(String(a)) ? 0 : 1;
+            const bo=onlineUsers.has(String(b)) ? 0 : 1;
+            if(ao!==bo) return ao-bo;
+            return String(knownParticipants[a]?.name||'').localeCompare(String(knownParticipants[b]?.name||''));
+        });
+        ids.forEach(uid=>renderPersonRow(String(uid)));
+    }
+    function renderPersonRow(uid){
+        uid=String(uid);
+        const body=document.getElementById('people-body'); if(!body) return;
+        const isMe = uid===String(MY_USER_ID);
+        const info = isMe ? { name: MY_NAME, initials: MY_INITIALS, avatarUrl: MY_AVATAR_URL, isOrganizer: true } : knownParticipants[uid];
+        if(!info) return;
+        const isLeft = !isMe && leftUsers.has(uid);
+        const isOnline = !isLeft && (isMe || onlineUsers.has(uid));
+        let row=document.getElementById('person-row-'+uid);
+        if(!row){ row=document.createElement('div'); row.id='person-row-'+uid; body.appendChild(row); }
+        row.className='person-row '+(isOnline?'joined':'pending');
+        const color=colorFor(uid, info.isOrganizer);
+        const canMute = IS_ORGANIZER && !isMe && isOnline;
+        const presenceLabel = isLeft ? 'Left' : (isOnline ? 'Joined' : 'Not joined yet');
+        row.innerHTML = `
+        <div class="person-avatar" style="background:linear-gradient(135deg,${color})">${avatarContent(info.avatarUrl,info.initials||initialsOf(info.name))}</div>
+        <div class="person-info">
+            <div class="person-name">${escapeHtml(info.name)}${isMe?' <span style="color:var(--blue);font-weight:600;">(You)</span>':''}${info.isOrganizer?'<i class="fa fa-crown" style="color:#fbbf24;font-size:10px;"></i>':''}</div>
+            <div class="person-status ${isOnline?'on':''}" ${isLeft?'style="color:#fca5a5"':''}>${info.isOrganizer?'Organizer':'Participant'} • ${presenceLabel}</div>
+        </div>
+        ${raisedHands.has(uid) ? `<i class="fa-solid fa-hand hand-raised" title="Hand raised"></i>` : ''}
+        ${canMute ? `<div class="person-actions">
+            <button class="person-action allow" onclick="requestParticipantMedia('${uid}','mic')" title="Request microphone ON"><i class="fa fa-microphone"></i></button>
+            <button class="person-action" onclick="muteParticipant('${uid}')" title="Turn microphone OFF"><i class="fa fa-microphone-slash"></i></button>
+            <button class="person-action allow" onclick="requestParticipantMedia('${uid}','camera')" title="Request camera ON"><i class="fa fa-video"></i></button>
+            <button class="person-action camera-off" onclick="turnParticipantCameraOff('${uid}')" title="Turn camera OFF"><i class="fa fa-video-slash"></i></button>
+            <button class="person-action remove" onclick="removeParticipantFromMeeting('${uid}')" title="Remove and restrict from this meeting"><i class="fa fa-user-xmark"></i></button>
+        </div>` : ''}
+        <span class="person-dot ${isOnline?'on':''}" ${isLeft?'style="background:#ef4444"':''}></span>`;
+    }
+
+    function muteParticipant(uid){
+        uid=String(uid);
+        const info=knownParticipants[uid];
+        sendSignal(uid, 'mute', {});
+        showToast(`🎙️ ${escapeHtml(info?info.name:'Participant')}'s microphone has been muted.`);
+    }
+
+    async function muteAllParticipants(){
+        const ids=[...onlineUsers].filter(uid=>String(uid)!==String(MY_USER_ID));
+        if(!ids.length){ showToast('No active participants to mute.'); return; }
+        await Promise.allSettled(ids.map(uid=>sendSignal(String(uid),'mute',{})));
+        showToast(`🎙️ Muted ${ids.length} participant${ids.length===1?'':'s'}.`);
+    }
+
+    async function moderateParticipant(uid, action){
+        uid=String(uid);
+        try{
+            const res=await fetch(MODERATION_URL,{
+                method:'POST',
+                headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':CSRF},
+                body:JSON.stringify({user_id:uid,action})
+            });
+            const data=await res.json().catch(()=>({}));
+            if(!res.ok) throw new Error(data.message||`HTTP ${res.status}`);
+            return true;
+        }catch(e){
+            console.error('[SmartMeet] moderation failed',action,uid,e);
+            showToast('Moderation action failed. Please try again.');
+            return false;
+        }
+    }
+
+    async function requestParticipantMedia(uid, kind){
+        const ok=await moderateParticipant(uid,kind==='camera'?'request-camera':'request-mic');
+        if(ok) showToast(kind==='camera'?'📷 Camera request sent.':'🎙️ Microphone request sent.');
+    }
+
+    async function turnParticipantCameraOff(uid){
+        uid=String(uid);
+        const info=knownParticipants[uid];
+        const ok=await moderateParticipant(uid,'camera-off');
+        if(ok) showToast(`📷 ${escapeHtml(info?info.name:'Participant')}'s camera has been turned off.`);
+    }
+
+    async function removeParticipantFromMeeting(uid){
+        uid=String(uid);
+        const info=knownParticipants[uid];
+        if(!window.confirm(`Remove ${info?.name||'this participant'} from this meeting? They will not be able to rejoin unless invited again.`)) return;
+        const ok=await moderateParticipant(uid,'remove');
+        if(!ok) return;
+        raisedHands.delete(uid);
+        markUserLeft(uid);
+        removeParticipantTile(uid,true);
+        delete knownParticipants[uid];
+        document.getElementById('person-row-'+uid)?.remove();
+        showToast(`🚫 ${info?.name||'Participant'} removed from the meeting.`);
+    }
+
+    function renderMyOwnTile(){
+        const grid=document.getElementById('video-grid');
+        const tile=document.createElement('div');
+        tile.className='video-tile'; tile.id='tile-'+MY_USER_ID;
+        tile.innerHTML = `
+        <div class="video-placeholder">
+            <video id="localVideo" autoplay muted playsinline class="mirrored" style="display:none;"></video>
+            <div class="avatar-circle" id="avatar-${MY_USER_ID}" style="background:linear-gradient(135deg,${COLORS[1]})">${avatarContent(MY_AVATAR_URL,MY_INITIALS)}</div>
+            <button class="tile-expand-btn" onclick="toggleMaximize('${MY_USER_ID}')"><i class="fa fa-expand" id="expand-icon-${MY_USER_ID}"></i></button>
+        </div>
+        <div class="tile-info">
+            <div class="tile-name"><i class="fa fa-crown" style="color:#fbbf24;font-size:10px;"></i> ${escapeHtml(MY_NAME)}<span class="role-badge organizer">You</span></div>
+            <div class="tile-icons">
+                <div class="speaking-indicator" id="speaking-${MY_USER_ID}" style="display:none;"><div class="speaking-bar"></div><div class="speaking-bar"></div><div class="speaking-bar"></div></div>
+                <div class="mic-off" id="micoff-${MY_USER_ID}" style="display:flex;"><i class="fa fa-microphone-slash"></i></div>
+            </div>
+        </div>`;
+        grid.appendChild(tile);
+    }
+
+    function refreshEmptyStage(){ /* empty-stage overlay removed by request */ }
+
+    /* ---------- Tiles ---------- */
+    function addParticipantTile(uid, name, initials, isOrganizer){
+        uid=String(uid);
+        if(uid===String(MY_USER_ID) || leftUsers.has(uid)) return;
+        if(document.getElementById('tile-'+uid)) return;
+        const color=colorFor(uid, isOrganizer);
+        const grid=document.getElementById('video-grid');
+        const startsMuted = micStatus[uid] !== false;
+        const cameraOn = camStatus[uid] === true;
+        const tile=document.createElement('div');
+        tile.className='video-tile'; tile.id='tile-'+uid;
+        tile.innerHTML = `
+        <div class="video-placeholder">
+            <video id="rvideo-${uid}" autoplay playsinline style="display:${cameraOn?'block':'none'};"></video>
+            <div class="avatar-circle" id="avatar-${uid}" style="background:linear-gradient(135deg,${color});display:${cameraOn?'none':'flex'};">${avatarContent(knownParticipants[uid]?.avatarUrl,initials)}</div>
+            <button class="tile-expand-btn" onclick="toggleMaximize('${uid}')"><i class="fa fa-expand" id="expand-icon-${uid}"></i></button>
+        </div>
+        <div class="tile-info">
+            <div class="tile-name">${isOrganizer?'<i class="fa fa-crown" style="color:#fbbf24;font-size:10px;"></i> ':''}${escapeHtml(name)}<span class="role-badge ${isOrganizer?'organizer':'participant'}">${isOrganizer?'Organizer':'Participant'}</span></div>
+            <div class="tile-icons">
+                <div class="speaking-indicator" id="speaking-${uid}" style="display:none;"><div class="speaking-bar"></div><div class="speaking-bar"></div><div class="speaking-bar"></div></div>
+                <div class="mic-off" id="micoff-${uid}" style="display:${startsMuted?'flex':'none'};"><i class="fa fa-microphone-slash"></i></div>
+            </div>
+        </div>`;
+        if(isOrganizer) grid.prepend(tile); else grid.appendChild(tile);
+        refreshEmptyStage();
+    }
+    function removeParticipantTile(uid, announce){
+        uid=String(uid);
+        if(uid===String(maximizedUserId)){
+            document.getElementById('maximized-overlay')?.classList.remove('active');
+            maximizedPlaceholder?.remove(); maximizedPlaceholder=null; maximizedUserId=null;
+        }
+        document.getElementById('tile-'+uid)?.remove();
+        markOffline(uid);
+        refreshEmptyStage();
+        if(announce){
+            const info=knownParticipants[uid];
+            showToast(`👋 ${escapeHtml(info?info.name:'A participant')} has left the meeting.`);
+        }
+    }
+
+    /* ---------- Maximize ---------- */
+    function toggleMaximize(uid){
+        uid=String(uid);
+        const overlay=document.getElementById('maximized-overlay'); if(!overlay) return;
+        if(maximizedUserId===uid){ restoreMaximized(); return; }
+        if(maximizedUserId) restoreMaximized();
+        const tile=document.getElementById('tile-'+uid); if(!tile) return;
+        maximizedPlaceholder=document.createComment('ph-'+uid);
+        tile.parentNode.insertBefore(maximizedPlaceholder, tile);
+        overlay.appendChild(tile); overlay.classList.add('active'); tile.classList.add('maximized');
+        maximizedUserId=uid; updateExpandIcons();
+    }
+    function restoreMaximized(){
+        if(!maximizedUserId) return;
+        const tile=document.getElementById('tile-'+maximizedUserId);
+        const overlay=document.getElementById('maximized-overlay');
+        const grid=document.getElementById('video-grid');
+        if(tile){
+            if(maximizedPlaceholder?.parentNode){ maximizedPlaceholder.parentNode.insertBefore(tile, maximizedPlaceholder); maximizedPlaceholder.remove(); }
+            else grid?.appendChild(tile);
+            tile.classList.remove('maximized');
+        }
+        overlay?.classList.remove('active');
+        maximizedPlaceholder=null; maximizedUserId=null; updateExpandIcons();
+    }
+    function updateExpandIcons(){
+        document.querySelectorAll('[id^="expand-icon-"]').forEach(icon=>{
+            const id=icon.id.replace('expand-icon-','');
+            icon.className = maximizedUserId===id ? 'fa fa-compress' : 'fa fa-expand';
+        });
+    }
+
+    /* ---------- Side panel drag-resize (mobile only) ---------- */
+    function setupPanelResize(){
+        const panel=document.getElementById('side-panel');
+        const handle=document.getElementById('panel-drag-handle');
+        if(!panel || !handle || handle.dataset.bound) return;
+        handle.dataset.bound='1';
+
+        let dragging=false, startY=0, startHeight=0;
+        const isMobile=()=>window.innerWidth<=900;
+
+        const resetForViewport=()=>{
+            if(!isMobile()){
+                /* Remove mobile drag height so desktop/right sidebar stretches full height again. */
+                panel.style.removeProperty('height');
+            }
+        };
+
+        const begin=(y)=>{
+            if(!isMobile()) return;
+            dragging=true;
+            startY=y;
+            startHeight=panel.getBoundingClientRect().height;
+            document.body.style.userSelect='none';
+        };
+
+        const move=(y)=>{
+            if(!dragging || !isMobile()) return;
+            const delta=startY-y;
+            const controls=document.querySelector('.controls');
+            const controlsH=controls ? controls.getBoundingClientRect().height : 70;
+            const maxH=Math.max(220, window.innerHeight-controlsH-58);
+            const nextH=Math.max(220, Math.min(maxH, startHeight+delta));
+            panel.style.setProperty('height', nextH+'px', 'important');
+        };
+
+        const end=()=>{
+            dragging=false;
+            document.body.style.userSelect='';
+        };
+
+        handle.addEventListener('pointerdown', e=>{
+            try{ handle.setPointerCapture(e.pointerId); }catch(err){}
+            begin(e.clientY);
+        });
+        handle.addEventListener('pointermove', e=>move(e.clientY));
+        handle.addEventListener('pointerup', end);
+        handle.addEventListener('pointercancel', end);
+
+        window.addEventListener('resize', resetForViewport, {passive:true});
+        window.addEventListener('orientationchange', resetForViewport, {passive:true});
+        resetForViewport();
+    }
+
+    /* ---------- Side panel tabs ---------- */
+    function toggleSidePanel(tab){
+        const panel=document.getElementById('side-panel'); if(!panel) return;
+        if(panelOpen && activeTab===tab){ panel.style.display='none'; panelOpen=false; activeTab=null; document.querySelectorAll('.ctrl-icon').forEach(i=>i.classList.remove('active')); document.querySelectorAll('.panel-tabbtn').forEach(b=>b.classList.remove('active')); return; }
+        panel.style.display='flex'; panelOpen=true; switchTab(tab);
+    }
+    function switchTab(tab){
+        ['transcript','chat','people'].forEach(t=>{ const el=document.getElementById('tab-'+t); if(el) el.style.display='none'; });
+        document.querySelectorAll('.ctrl-icon').forEach(i=>i.classList.remove('active'));
+        document.querySelectorAll('.panel-tabbtn').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+        const active=document.getElementById('tab-'+tab);
+        if(active) active.style.display='flex';
+        activeTab=tab;
+        document.getElementById('ctrl-'+tab)?.classList.add('active');
+        if(tab==='chat'){ unreadChat=0; updateChatBadge(); }
+        if(tab==='people') renderPeopleList();
+    }
+    function updateChatBadge(){
+        const badge=document.getElementById('chat-badge'); if(!badge) return;
+        if(unreadChat>0){ badge.textContent = unreadChat>99?'99+':String(unreadChat); badge.style.display='flex'; }
+        else badge.style.display='none';
+    }
+
+    /* ============================================================
+       WEBRTC — perfect negotiation, single implementation
+       ============================================================ */
+    const TURN_HOST = @json(config('services.turn.host'));
+    const TURN_USERNAME = @json(config('services.turn.username'));
+    const TURN_CREDENTIAL = @json(config('services.turn.credential'));
+    const HAS_TURN = Boolean(TURN_HOST && TURN_USERNAME && TURN_CREDENTIAL);
+
+    // Always keep direct/STUN candidates available. TURN is added as a relay
+    // fallback instead of replacing STUN completely, so laptop/mobile peers can
+    // still connect even when one TURN transport is temporarily unavailable.
+    const iceServers = [
+        { urls:[
+                'stun:stun.l.google.com:19302',
+                'stun:stun1.l.google.com:19302',
+                'stun:stun.cloudflare.com:3478'
+            ]}
+    ];
+
+    if(HAS_TURN){
+        iceServers.push({
+            urls:[
+                `turn:${TURN_HOST}:3478?transport=udp`,
+                `turn:${TURN_HOST}:3478?transport=tcp`
+            ],
+            username:TURN_USERNAME,
+            credential:TURN_CREDENTIAL
+        });
+    }else{
+        console.warn('[SmartMeet] Custom TURN is not configured; direct/STUN connectivity only.');
+    }
+
+    const iceConfig = {
+        iceServers,
+        iceCandidatePoolSize:4,
+        bundlePolicy:'max-bundle',
+        rtcpMuxPolicy:'require',
+        iceTransportPolicy:'all'
+    };
+    console.log('[SmartMeet] ICE servers configured:', iceServers.map(s=>s.urls));
+
+    function isPolite(otherUserId){
+        const a=Number(MY_USER_ID), b=Number(otherUserId);
+        if(!Number.isNaN(a) && !Number.isNaN(b)) return a>b;
+        return String(MY_USER_ID) > String(otherUserId);
+    }
+
+    function getOrCreateRemoteStream(uid){ uid=String(uid); if(!remoteStreams[uid]) remoteStreams[uid]=new MediaStream(); return remoteStreams[uid]; }
+
+    function shouldInitiate(uid){
+        const a=Number(MY_USER_ID), b=Number(uid);
+        if(!Number.isNaN(a) && !Number.isNaN(b)) return a<b;
+        return String(MY_USER_ID)<String(uid);
+    }
+
+    function waitForIceGatheringComplete(pc, timeoutMs=5000){
+        if(!pc || pc.signalingState==='closed' || pc.iceGatheringState==='complete') return Promise.resolve();
+        return new Promise(resolve=>{
+            let done=false;
+            const finish=()=>{
+                if(done) return;
+                done=true;
+                clearTimeout(timer);
+                try{ pc.removeEventListener('icegatheringstatechange', onState); }catch(e){}
+                resolve();
+            };
+            const onState=()=>{ if(pc.iceGatheringState==='complete') finish(); };
+            const timer=setTimeout(finish,timeoutMs);
+            pc.addEventListener('icegatheringstatechange',onState);
+        });
+    }
+
+    async function resendPendingOffer(uid){
+        uid=String(uid);
+        const pc=peers[uid];
+        if(!pc || pc.signalingState==='closed' || leftUsers.has(uid)) return false;
+        if(pc.signalingState!=='have-local-offer' || pc.localDescription?.type!=='offer') return false;
+        if(!pc.localDescription?.sdp) return false;
+        pc.__lastOfferAt=Date.now();
+        console.log('[SmartMeet] re-sending pending offer ->',uid);
+        return sendSignal(uid,'offer',{
+            type:'offer',
+            sdp:btoa(unescape(encodeURIComponent(pc.localDescription.sdp))),
+            resend:true
+        });
+    }
+
+    async function negotiatePeer(uid, iceRestart=false){
+        uid=String(uid);
+        const pc=peers[uid];
+        if(!pc || pc.signalingState==='closed' || leftUsers.has(uid)) return false;
+        if(!iceRestart && (pc.connectionState==='connected' || pc.iceConnectionState==='connected' || pc.iceConnectionState==='completed')) return false;
+        if(makingOffer[uid] || pc.signalingState!=='stable') return false;
+        // onnegotiationneeded + presence repair can fire almost together.
+        // Do not create a second normal offer while the first negotiation is settling.
+        if(!iceRestart && pc.__lastOfferAt && (Date.now()-pc.__lastOfferAt)<4500) return false;
+        try{
+            makingOffer[uid]=true;
+            ensureOfferTransceivers(pc);
+            await syncLocalTracksToPeer(uid);
+            const offer=await pc.createOffer(iceRestart ? {iceRestart:true} : undefined);
+            if(pc.signalingState!=='stable') return false;
+            await pc.setLocalDescription(offer);
+            // Send the SDP immediately and trickle TURN candidates as they arrive.
+            // Waiting for ICE gathering to finish delayed cross-device answers by
+            // several seconds and could fire the connection watchdog before DTLS
+            // had a chance to finish.
+            pc.__lastOfferAt=Date.now();
+            console.log('[SmartMeet] sending offer ->', uid, iceRestart?'(ICE restart)':'');
+            return await sendSignal(uid,'offer',{
+                type:pc.localDescription.type,
+                sdp:btoa(unescape(encodeURIComponent(pc.localDescription.sdp))),
+                iceRestart:Boolean(iceRestart)
+            });
+        }catch(err){
+            console.warn('[SmartMeet] negotiate failed', uid, err);
+            return false;
+        }finally{
+            makingOffer[uid]=false;
+        }
+    }
+
+    function armPeerWatchdog(uid, pc){
+        if(!pc || pc.signalingState==='closed') return;
+        clearTimeout(pc.__connectWatchdog);
+        pc.__connectWatchdog=setTimeout(()=>{
+            if(!peers[uid] || peers[uid]!==pc || pc.signalingState==='closed') return;
+
+            // ICE connected/completed means the network path is already valid.
+            // Do not restart a healthy relay merely because DTLS/media takes a
+            // little longer on a different phone/network. The old watchdog did
+            // exactly that and could break an otherwise successful call.
+            const iceReady=['connected','completed'].includes(pc.iceConnectionState);
+            if(iceReady) return;
+
+            const stuckIce=['checking','new'].includes(pc.iceConnectionState);
+            const stuckConn=['connecting','new'].includes(pc.connectionState);
+            if(stuckIce || stuckConn){
+                console.warn('[SmartMeet] peer stuck while connecting', uid, {
+                    ice:pc.iceConnectionState,
+                    connection:pc.connectionState
+                });
+                if(shouldInitiate(uid)){
+                    if(pc.signalingState==='have-local-offer') resendPendingOffer(uid);
+                    else restartPeer(uid);
+                }else{
+                    sendSignal(uid,'reconnect-request',{reason:'ice-failed'});
+                    requestPresence(true);
+                }
+            }
+        },30000);
+    }
+
+    function bindPeerTransceivers(pc){
+        if(!pc) return;
+
+        const txs=(pc.getTransceivers?.()||[]).filter(tx=>tx && !tx.stopped);
+
+        // Recovery/renegotiation can leave more than one audio/video transceiver.
+        // Always bind local media to the ACTIVE negotiated m-line, never blindly
+        // to the first receiver of that kind.
+        const choose=(kind,current)=>{
+            const candidates=txs.filter(tx=>
+                tx.receiver?.track?.kind===kind ||
+                tx.sender?.track?.kind===kind
+            );
+            if(!candidates.length) return current && !current.stopped ? current : null;
+
+            const score=tx=>{
+                let n=0;
+                const currentDirection=String(tx.currentDirection||'');
+                const desiredDirection=String(tx.direction||'');
+
+                // A negotiated MID is the strongest signal that this is the real
+                // remote m-line, not an old/unassociated transceiver.
+                if(tx.mid!==null && tx.mid!==undefined) n+=300;
+                if(currentDirection.includes('send')) n+=140;
+                if(currentDirection.includes('recv')) n+=80;
+                if(tx.sender?.track?.readyState==='live') n+=120;
+                if(tx.receiver?.track?.readyState==='live') n+=40;
+                if(desiredDirection==='sendrecv') n+=25;
+                if(tx===current) n+=10;
+                return n;
+            };
+
+            return candidates.sort((a,b)=>score(b)-score(a))[0] || null;
+        };
+
+        pc.__audioTx=choose('audio',pc.__audioTx);
+        pc.__videoTx=choose('video',pc.__videoTx);
+
+        [pc.__audioTx, pc.__videoTx].forEach(tx=>{
+            if(!tx || tx.stopped) return;
+            try{ if(tx.direction!=='sendrecv') tx.direction='sendrecv'; }catch(e){}
+        });
+    }
+
+    function ensureOfferTransceivers(pc){
+        if(!pc) return;
+        bindPeerTransceivers(pc);
+        if(!pc.__audioTx) pc.__audioTx=pc.addTransceiver('audio',{direction:'sendrecv'});
+        if(!pc.__videoTx) pc.__videoTx=pc.addTransceiver('video',{direction:'sendrecv'});
+        bindPeerTransceivers(pc);
+    }
+
+    function createPeerConnection(uid){
+        uid=String(uid);
+        if(uid===String(MY_USER_ID) || leftUsers.has(uid)) return null;
+        let pc=peers[uid];
+        if(pc && pc.signalingState!=='closed' && pc.connectionState!=='closed') return pc;
+        if(pc){ try{ pc.close(); }catch(e){} }
+
+        pc=new RTCPeerConnection(iceConfig);
+        peers[uid]=pc;
+        pc.__createdAt=Date.now();
+        pc.__lastOfferAt=0;
+        pc.__connectedOnce=false;
+        pc.__audioTx=null;
+        pc.__videoTx=null;
+        // Only the deterministic initiator creates the initial media m-lines.
+        // The answering browser receives matching transceivers from setRemoteDescription().
+        // Pre-creating them on both sides can produce duplicate/unassociated m-lines on
+        // some Chromium builds and is a common cause of one-way audio.
+        if(shouldInitiate(uid)) ensureOfferTransceivers(pc);
+        syncLocalTracksToPeer(uid);
+
+        // Only one side proactively initiates. The other side answers.
+        // This avoids offer glare on mobile while still keeping perfect-negotiation handling.
+        pc.onnegotiationneeded = async () => {
+            if(!shouldInitiate(uid)) return;
+            if(pc.connectionState==='connected' || pc.iceConnectionState==='connected' || pc.iceConnectionState==='completed') return;
+            await negotiatePeer(uid,false);
+        };
+
+        pc.onicecandidate = (e)=>{
+            if(!e.candidate) return;
+            if(e.candidate.type==='relay') console.log('[SmartMeet] relay candidate ready ->',uid);
+
+            // Trickle ICE makes different-device / different-network joins much
+            // faster and avoids waiting for the full TURN gathering cycle before
+            // the remote browser can start connectivity checks.
+            const candidate = typeof e.candidate.toJSON==='function'
+                ? e.candidate.toJSON()
+                : {
+                    candidate:e.candidate.candidate,
+                    sdpMid:e.candidate.sdpMid,
+                    sdpMLineIndex:e.candidate.sdpMLineIndex,
+                    usernameFragment:e.candidate.usernameFragment
+                };
+            sendSignal(uid,'ice-candidate',{candidate});
+        };
+        pc.onicecandidateerror = (e)=>{
+            // Chromium may report 701 for one local network interface even when
+            // another interface successfully gathers a TURN relay candidate.
+            // It is non-fatal and must not trigger a reconnect loop.
+            if(Number(e?.errorCode)===701) return;
+            console.warn('[SmartMeet] ICE candidate error', uid, e?.errorCode||'', e?.errorText||'');
+        };
+
+        pc.ontrack = (event)=>{
+            if(leftUsers.has(uid)) return;
+            const info=knownParticipants[uid];
+            if(info){ info.hasJoined=true; addParticipantTile(uid, info.name, info.initials, Boolean(info.isOrganizer)); markOnline(uid); }
+
+            const stream=getOrCreateRemoteStream(uid);
+            const incoming=(event.streams?.[0]?.getTracks?.()||[]);
+            const tracks=incoming.length ? incoming : [event.track].filter(Boolean);
+
+            // Keep the exact remote tracks delivered by ontrack. This is more reliable
+            // than reconstructing the stream only from receiver order after renegotiation.
+            tracks.forEach(track=>{
+                if(track && track.readyState!=='ended' && !stream.getTracks().some(t=>t.id===track.id)){
+                    try{ stream.addTrack(track); }catch(e){}
+                }
+            });
+
+            attachRemoteStream(uid);
+
+            const track=event.track;
+            if(track){
+                if(track.kind==='audio'){
+                    pc.__preferredRemoteAudioTrack=track;
+                    scheduleRemoteAttach(uid,0);
+                    unlockRemoteAudio();
+                }
+                if(track.kind==='video') pc.__preferredRemoteVideoTrack=track;
+
+                if(track.kind==='video' && track.readyState==='live'){
+                    camStatus[uid]=true;
+                    const remoteVideo=document.getElementById('rvideo-'+uid);
+                    const avatar=document.getElementById('avatar-'+uid);
+                    if(remoteVideo){
+                        const directStream=(event.streams && event.streams[0])
+                            ? event.streams[0]
+                            : new MediaStream([track]);
+                        remoteVideo.srcObject=directStream;
+                        remoteVideo.muted=true;
+                        remoteVideo.autoplay=true;
+                        remoteVideo.playsInline=true;
+                        remoteVideo.setAttribute('playsinline','');
+                        remoteVideo.style.display='block';
+                        remoteVideo.play().catch(()=>{});
+                    }
+                    if(avatar) avatar.style.display='none';
+                }
+
+                track.onunmute = ()=>{
+                    if(track.kind==='video') camStatus[uid]=true;
+                    scheduleRemoteAttach(uid,60);
+                    if(track.kind==='audio') unlockRemoteAudio();
+                };
+                track.onmute = ()=>scheduleRemoteAttach(uid,180);
+                track.onended = ()=>{
+                    const s=remoteStreams[uid];
+                    const existing=s?.getTracks().find(t=>t.id===track.id);
+                    if(existing) s.removeTrack(existing);
+                    scheduleRemoteAttach(uid,60);
+                };
+            }
+        };
+
+        pc.oniceconnectionstatechange = ()=>{
+            const state=pc.iceConnectionState;
+            console.log('[SmartMeet] ICE state', uid, '->', state);
+            if(state==='checking' || state==='new'){
+                armPeerWatchdog(uid,pc);
+            }else if(state==='connected' || state==='completed'){
+                clearTimeout(pc.__connectWatchdog);
+                pc.__connectedOnce=true;
+                ensureTileVisible(uid);
+                attachRemoteStream(uid);
+                unlockRemoteAudio();
+
+                // Give DTLS/media plenty of time after ICE succeeds. Only if it
+                // is STILL connecting much later do a single controlled recovery.
+                clearTimeout(pc.__dtlsWatchdog);
+                pc.__dtlsWatchdog=setTimeout(()=>{
+                    if(!peers[uid] || peers[uid]!==pc || pc.signalingState==='closed') return;
+                    const iceOk=['connected','completed'].includes(pc.iceConnectionState);
+                    if(iceOk && pc.connectionState==='connecting'){
+                        console.warn('[SmartMeet] DTLS/media still connecting ->',uid);
+                        if(shouldInitiate(uid)) restartPeer(uid);
+                        else sendSignal(uid,'reconnect-request',{reason:'dtls-stuck'});
+                    }
+                },25000);
+            }else if(state==='failed'){
+                clearTimeout(pc.__connectWatchdog);
+                console.warn('[SmartMeet] ICE FAILED for', uid, '- attempting recovery');
+                if(shouldInitiate(uid)) restartPeer(uid);
+                else{
+                    sendSignal(uid,'reconnect-request',{reason:'ice-failed'});
+                    requestPresence(true);
+                }
+            }else if(state==='closed'){
+                clearTimeout(pc.__connectWatchdog);
+            }
+        };
+        pc.onconnectionstatechange = ()=>{
+            console.log('[SmartMeet] connection state', uid, '->', pc.connectionState);
+            if(pc.connectionState==='connecting' || pc.connectionState==='new'){
+                armPeerWatchdog(uid,pc);
+            }else if(pc.connectionState==='connected'){
+                clearTimeout(pc.__connectWatchdog);
+                clearTimeout(pc.__dtlsWatchdog);
+                pc.__connectedOnce=true;
+                clearTimeout(pc.__disconnectTimer);
+                ensureTileVisible(uid);
+                awaitSyncPeerMedia(uid);
+                attachRemoteStream(uid);
+                unlockRemoteAudio();
+                sendSignal(uid,'mic-status',{userId:MY_USER_ID,muted:!isMicOn});
+                sendSignal(uid,'camera-status',{userId:MY_USER_ID,cameraOn:isCameraOn});
+                setTimeout(()=>ensureOutboundMediaNegotiated(uid),120);
+                if(isMicOn) setTimeout(()=>verifyPeerAudioOutbound(uid),700);
+                pc.__restartAttempts=0;
+            }else if(pc.connectionState==='disconnected'){
+                clearTimeout(pc.__connectWatchdog);
+                clearTimeout(pc.__disconnectTimer);
+                pc.__disconnectTimer=setTimeout(()=>{
+                    if(pc.connectionState==='disconnected'){
+                        if(shouldInitiate(uid)){
+                            if(pc.signalingState==='have-local-offer') resendPendingOffer(uid);
+                            else restartPeer(uid);
+                        }else{
+                            sendSignal(uid,'reconnect-request',{reason:'disconnected'});
+                            requestPresence(true);
+                        }
+                    }
+                },8000);
+            }else if(pc.connectionState==='failed'){
+                clearTimeout(pc.__connectWatchdog);
+                clearTimeout(pc.__disconnectTimer);
+                if(shouldInitiate(uid)){
+                    if(pc.signalingState==='have-local-offer') resendPendingOffer(uid);
+                    else restartPeer(uid);
+                }else{
+                    sendSignal(uid,'reconnect-request',{reason:'connection-failed'});
+                    requestPresence(true);
+                }
+            }else if(pc.connectionState==='closed'){
+                clearTimeout(pc.__connectWatchdog);
+                clearTimeout(pc.__dtlsWatchdog);
+            }
+        };
+        pc.onicegatheringstatechange = ()=>{ console.log('[SmartMeet] ICE gathering', uid, '->', pc.iceGatheringState); };
+
+        return pc;
+    }
+
+    function ensureTileVisible(uid){
+        uid=String(uid); if(leftUsers.has(uid)) return;
+        const info=knownParticipants[uid];
+        if(info){ info.hasJoined=true; addParticipantTile(uid, info.name, info.initials, Boolean(info.isOrganizer)); markOnline(uid); }
+    }
+
+    async function restartPeer(uid){
+        uid=String(uid);
+        if(leftUsers.has(uid) || uid===String(MY_USER_ID)) return;
+        const pc=peers[uid];
+        if(!pc || pc.signalingState==='closed') return;
+        // If the first offer was posted before the remote Reverb subscription
+        // became live, do not try to create a second offer while signaling is
+        // have-local-offer. Re-send the already valid full SDP instead.
+        if(pc.signalingState==='have-local-offer'){
+            await resendPendingOffer(uid);
+            return;
+        }
+        if(pc.signalingState!=='stable') return;
+
+        // Backoff + cap: without this, a persistently broken relay path (e.g. bad
+        // TURN credentials) causes an endless offer/answer loop that hammers the
+        // signaling server and battery without ever actually recovering the call.
+        pc.__restartAttempts = pc.__restartAttempts || 0;
+        const backoff = Math.min(20000, 1500 * Math.pow(1.8, pc.__restartAttempts));
+        const sinceLast = Date.now() - (pc.__lastRestartAt || 0);
+        if(pc.__lastRestartAt && sinceLast < backoff) return;
+
+        clearTimeout(pc.__connectWatchdog);
+        clearTimeout(pc.__restartTimer);
+        pc.__restartTimer=setTimeout(async ()=>{
+            if(!peers[uid] || peers[uid]!==pc || pc.signalingState==='closed' || leftUsers.has(uid)) return;
+            if(pc.iceConnectionState==='connected' || pc.iceConnectionState==='completed'){ pc.__restartAttempts=0; return; }
+            pc.__lastRestartAt=Date.now();
+            pc.__restartAttempts++;
+            try{
+                // createOffer({iceRestart:true}) already generates fresh ICE credentials —
+                // calling pc.restartIce() as well fired a SECOND, overlapping negotiation
+                // and was the cause of the continuous offer/answer loop. Either side may
+                // now initiate a restart; the polite/impolite handling in handleOffer()
+                // safely resolves any collision if both sides try at once.
+                await negotiatePeer(uid,true);
+            }catch(e){ console.warn('[SmartMeet] ICE restart failed', uid, e); }
+            if(pc.__restartAttempts===5){
+                showToast('⚠️ Connection to a participant is unstable — this usually means the TURN relay server needs checking.');
+            }
+        },250);
+    }
+
+    async function syncLocalTracksToPeer(uid){
+        const pc=peers[uid];
+        if(!pc || pc.signalingState==='closed') return;
+        removeDeadLocalTracks();
+        bindPeerTransceivers(pc);
+
+        [pc.__audioTx, pc.__videoTx].forEach(tx=>{
+            if(!tx || tx.stopped) return;
+            try{ if(tx.direction!=='sendrecv') tx.direction='sendrecv'; }catch(e){}
+        });
+
+        const audioTrack=liveLocalTrack('audio');
+        const videoTrack=liveLocalTrack('video');
+
+        if(audioTrack){
+            await optimizeVoiceTrack(audioTrack);
+            audioTrack.enabled=Boolean(isMicOn);
+        }
+        try{ if(videoTrack && 'contentHint' in videoTrack) videoTrack.contentHint='motion'; }catch(e){}
+
+        try{
+            // On the answering side the transceiver may appear only after the
+            // remote offer/answer is applied, so bind again immediately before sync.
+            bindPeerTransceivers(pc);
+
+            if(pc.__audioTx?.sender){
+                if(pc.__audioTx.sender.track!==audioTrack){
+                    await pc.__audioTx.sender.replaceTrack(audioTrack || null);
+                }
+                if(audioTrack) audioTrack.enabled=Boolean(isMicOn);
+                await optimizeAudioSender(pc.__audioTx.sender);
+            }
+        }catch(e){ console.warn('[SmartMeet] audio sender sync failed',uid,e); }
+
+        try{
+            if(pc.__videoTx?.sender){
+                if(pc.__videoTx.sender.track!==videoTrack) await pc.__videoTx.sender.replaceTrack(videoTrack);
+                if(videoTrack) videoTrack.enabled=Boolean(isCameraOn);
+                if(videoTrack){
+                    try{
+                        const sender=pc.__videoTx.sender;
+                        const params=sender.getParameters();
+                        if(!params.encodings || !params.encodings.length) params.encodings=[{}];
+                        params.encodings[0].maxBitrate=IS_MOBILE_BROWSER ? 250000 : 400000;
+                        params.encodings[0].maxFramerate=15;
+                        await sender.setParameters(params);
+                    }catch(e){}
+                }
+            }
+        }catch(e){ console.warn('[SmartMeet] video sender sync failed',uid,e); }
+    }
+
+    async function syncTracksToEveryPeer(){ await Promise.allSettled(Object.keys(peers).map(uid=>syncLocalTracksToPeer(uid))); }
+
+    async function ensureOutboundMediaNegotiated(uid){
+        uid=String(uid);
+        const pc=peers[uid];
+        if(!pc || pc.signalingState==='closed' || leftUsers.has(uid)) return false;
+
+        // First attach the current local tracks. replaceTrack() does not need a new
+        // offer when the already-negotiated sendrecv m-line is healthy.
+        ensureOfferTransceivers(pc);
+        await syncLocalTracksToPeer(uid);
+        bindPeerTransceivers(pc);
+
+        const audioTrack=liveLocalTrack('audio');
+        const videoTrack=liveLocalTrack('video');
+        const audioDirection=String(pc.__audioTx?.currentDirection||'');
+        const videoDirection=String(pc.__videoTx?.currentDirection||'');
+        const audioSenderTrack=pc.__audioTx?.sender?.track || null;
+        const videoSenderTrack=pc.__videoTx?.sender?.track || null;
+
+        const audioNeedsSend=Boolean(
+            isMicOn &&
+            audioTrack &&
+            (
+                !pc.__audioTx ||
+                audioSenderTrack?.id!==audioTrack.id ||
+                !audioDirection.includes('send')
+            )
+        );
+
+        const videoNeedsSend=Boolean(
+            isCameraOn &&
+            videoTrack &&
+            (
+                !pc.__videoTx ||
+                videoSenderTrack?.id!==videoTrack.id ||
+                !videoDirection.includes('send')
+            )
+        );
+
+        if(!audioNeedsSend && !videoNeedsSend) return true;
+
+        // Only the deterministic initiator is allowed to renegotiate media m-lines.
+        // The other side asks it to repair, preventing offer glare with 5–6 peers.
+        if(!shouldInitiate(uid)){
+            sendSignal(uid,'reconnect-request',{
+                reason:'media-sender-needs-renegotiation',
+                audioNeedsSend,
+                videoNeedsSend
+            });
+            return false;
+        }
+
+        if(makingOffer[uid] || pc.signalingState!=='stable') return false;
+
+        try{
+            makingOffer[uid]=true;
+            ensureOfferTransceivers(pc);
+            await syncLocalTracksToPeer(uid);
+
+            const offer=await pc.createOffer();
+            if(pc.signalingState!=='stable') return false;
+            await pc.setLocalDescription(offer);
+
+            console.log('[SmartMeet] media renegotiation ->',uid,{
+                audioNeedsSend,
+                videoNeedsSend
+            });
+
+            return await sendSignal(uid,'offer',{
+                type:pc.localDescription.type,
+                sdp:btoa(unescape(encodeURIComponent(pc.localDescription.sdp))),
+                mediaRenegotiation:true
+            });
+        }catch(err){
+            console.warn('[SmartMeet] media renegotiation failed',uid,err);
+            return false;
+        }finally{
+            makingOffer[uid]=false;
+        }
+    }
+
+    function ensureOutboundMediaForAll(){
+        Object.keys(peers).forEach(uid=>{
+            const pc=peers[uid];
+            if(!pc || pc.signalingState==='closed') return;
+            ensureOutboundMediaNegotiated(uid);
+        });
+    }
+
+    async function awaitSyncPeerMedia(uid){
+        await syncLocalTracksToPeer(uid);
+        setTimeout(()=>syncLocalTracksToPeer(uid),250);
+        setTimeout(()=>syncLocalTracksToPeer(uid),900);
+    }
+
+
+    function sameTrackSet(stream, tracks){
+        const a=(stream?.getTracks?.()||[]).map(t=>t.id).sort().join('|');
+        const b=(tracks||[]).map(t=>t.id).sort().join('|');
+        return a===b;
+    }
+
+    // ---------- Clear/loud remote meeting audio ----------
+    // HTMLMediaElement.volume cannot go above 1. Web Audio gives quiet remote
+    // microphones a controlled boost while a compressor prevents clipping.
+    let meetingAudioContext=null;
+    const remoteAudioNodes={};
+
+    function getMeetingAudioContext(){ return null; }
+
+    function disposeRemoteAudioBoost(uid){
+        delete remoteAudioNodes[String(uid)];
+    }
+
+    function attachBoostedRemoteAudio(uid, track, audioEl){
+        // CPU-safe mode: use the browser's native audio playback path.
+        if(audioEl){
+            audioEl.muted=false;
+            audioEl.defaultMuted=false;
+            audioEl.volume=1;
+        }
+        return false;
+    }
+
+    async function resumeMeetingAudioContext(){ return; }
+
+
+    function scheduleRemoteAttach(uid, delay=90){
+        uid=String(uid);
+        const pc=peers[uid];
+        if(!pc || pc.signalingState==='closed') return;
+
+        clearTimeout(pc.__attachTimer);
+        pc.__attachTimer=setTimeout(()=>{
+            pc.__attachTimer=null;
+            if(!peers[uid] || peers[uid]!==pc || pc.signalingState==='closed') return;
+            attachRemoteStream(uid);
+        }, Math.max(0, Number(delay)||0));
+    }
+
+    function attachRemoteStream(uid){
+        uid=String(uid);
+        const localIds=new Set((localStream?.getTracks?.()||[]).map(t=>t.id));
+        const pc=peers[uid];
+
+        const source=getOrCreateRemoteStream(uid);
+
+        // Prefer receivers that belong to an ACTIVE negotiated recv m-line.
+        // Fall back to tracks already delivered by ontrack. This prevents a stale
+        // muted receiver created by an earlier negotiation from replacing the live
+        // participant camera/audio in the DOM.
+        const transceiverTracks=(pc?.getTransceivers?.()||[])
+            .filter(tx=>tx && !tx.stopped)
+            .map(tx=>({
+                tx,
+                track:tx.receiver?.track
+            }))
+            .filter(x=>
+                x.track &&
+                x.track.readyState!=='ended' &&
+                !localIds.has(x.track.id)
+            );
+
+        const cachedTracks=(source.getTracks?.()||[])
+            .filter(t=>t && t.readyState!=='ended' && !localIds.has(t.id));
+
+        const pickBest=(kind)=>{
+            const candidates=[];
+
+            const preferred = kind==='audio'
+                ? pc?.__preferredRemoteAudioTrack
+                : pc?.__preferredRemoteVideoTrack;
+            if(preferred && preferred.readyState!=='ended' && !localIds.has(preferred.id)){
+                let score=1000;
+                if(!preferred.muted) score+=200;
+                candidates.push({track:preferred,score});
+            }
+
+            transceiverTracks
+                .filter(x=>x.track.kind===kind)
+                .forEach(x=>{
+                    const d=String(x.tx.currentDirection||'');
+                    let score=0;
+                    if(d.includes('recv')) score+=100;
+                    if(x.tx.mid!==null && x.tx.mid!==undefined) score+=20;
+                    if(x.track.readyState==='live') score+=40;
+                    if(!x.track.muted) score+=80;
+                    candidates.push({track:x.track,score});
+                });
+
+            cachedTracks
+                .filter(t=>t.kind===kind)
+                .forEach(t=>{
+                    let score=10;
+                    if(t.readyState==='live') score+=40;
+                    if(!t.muted) score+=80;
+                    candidates.push({track:t,score});
+                });
+
+            candidates.sort((a,b)=>b.score-a.score);
+            return candidates[0]?.track || null;
+        };
+
+        const bestAudio=pickBest('audio');
+        const bestVideo=pickBest('video');
+
+        // Keep one canonical live audio and video track for this remote user.
+        const keepIds=new Set([bestAudio?.id,bestVideo?.id].filter(Boolean));
+        source.getTracks().forEach(t=>{
+            if(t.readyState==='ended' || (keepIds.size && !keepIds.has(t.id))){
+                try{ source.removeTrack(t); }catch(e){}
+            }
+        });
+        [bestAudio,bestVideo].filter(Boolean).forEach(t=>{
+            if(!source.getTracks().some(x=>x.id===t.id)){
+                try{ source.addTrack(t); }catch(e){}
+            }
+        });
+
+        // -------- Remote audio --------
+        let audio=document.getElementById('audio-'+uid);
+        if(!audio){
+            audio=document.createElement('audio');
+            audio.id='audio-'+uid;
+            audio.autoplay=true;
+            audio.playsInline=true;
+            audio.setAttribute('playsinline','');
+            audio.style.display='none';
+            document.body.appendChild(audio);
+        }
+
+        const wantedAudio=bestAudio?[bestAudio]:[];
+        if(!sameTrackSet(audio.srcObject,wantedAudio)){
+            audio.srcObject=new MediaStream(wantedAudio);
+        }
+        audio.volume=1;
+        audio.preload='auto';
+
+        if(!audio.__smartMeetUnlockBound){
+            audio.__smartMeetUnlockBound=true;
+            audio.addEventListener('canplay',()=>{
+                resumeMeetingAudioContext();
+                if(!audio.muted) audio.play().catch(()=>armAudioUnlock());
+            });
+            audio.addEventListener('loadedmetadata',()=>{
+                resumeMeetingAudioContext();
+                if(!audio.muted) audio.play().catch(()=>armAudioUnlock());
+            });
+        }
+
+        if(bestAudio){
+            try{ if('contentHint' in bestAudio) bestAudio.contentHint='speech'; }catch(e){}
+
+            const boosted=attachBoostedRemoteAudio(uid,bestAudio,audio);
+
+            if(boosted){
+                // The Web Audio graph provides louder, compressed playback.
+                resumeMeetingAudioContext().catch(()=>{});
+            }else{
+                // Safe fallback for browsers that do not expose Web Audio.
+                audio.muted=false;
+                audio.defaultMuted=false;
+                audio.volume=1;
+                const tryPlay=()=>audio.play().catch(()=>armAudioUnlock());
+                tryPlay();
+                if(!audio.__smartMeetResumeBound){
+                    audio.__smartMeetResumeBound=true;
+                    audio.addEventListener('pause',()=>{
+                        const live=(audio.srcObject?.getAudioTracks?.()||[]).some(t=>t.readyState==='live');
+                        if(live && document.visibilityState==='visible') setTimeout(tryPlay,120);
+                    });
+                }
+            }
+        }else{
+            disposeRemoteAudioBoost(uid);
+            audio.muted=false;
+            audio.defaultMuted=false;
+        }
+
+        // -------- Remote video --------
+        const video=document.getElementById('rvideo-'+uid);
+        const avatar=document.getElementById('avatar-'+uid);
+        if(video){
+            const wantedVideo=bestVideo?[bestVideo]:[];
+            if(!sameTrackSet(video.srcObject,wantedVideo)){
+                video.srcObject=new MediaStream(wantedVideo);
+            }
+
+            video.muted=true;
+            video.autoplay=true;
+            video.playsInline=true;
+            video.setAttribute('playsinline','');
+
+            // Actual received frames are the source of truth.
+            // A stale camera-status signal must not hide a real unmuted track.
+            const show=Boolean(bestVideo && bestVideo.readyState==='live' && !bestVideo.muted);
+            video.style.display=show?'block':'none';
+            if(avatar) avatar.style.display=show?'none':'flex';
+
+            if(show){
+                const playVideo=()=>video.play().catch(()=>{});
+                playVideo();
+                setTimeout(playVideo,120);
+                setTimeout(playVideo,600);
+                if(!video.__smartMeetPlayBound){
+                    video.__smartMeetPlayBound=true;
+                    video.addEventListener('loadedmetadata',()=>video.play().catch(()=>{}));
+                    video.addEventListener('canplay',()=>video.play().catch(()=>{}));
+                }
+            }
+        }
+
+        if(bestVideo && bestVideo.readyState==='live'){
+            // A muted remote track can stay muted indefinitely when the remote camera
+            // is OFF. Never poll attachRemoteStream() recursively here: that created
+            // an endless ~180ms DOM/media loop per peer and could freeze Chromium.
+            if(!bestVideo.muted) camStatus[uid]=true;
+        }
+    }
+
+    let audioUnlockArmed=false;
+    async function unlockRemoteAudio(){
+        await resumeMeetingAudioContext();
+
+        const seen=new Set();
+        const audios=[...document.querySelectorAll('audio[id^="audio-"]')].filter(a=>{
+            if(!a.id || seen.has(a.id)) return false;
+            seen.add(a.id);
+            return true;
+        });
+
+        await Promise.allSettled(audios.map(a=>{
+            const uid=String(a.id).replace(/^audio-/,'');
+            const boosted=Boolean(remoteAudioNodes[uid]);
+            a.volume=1;
+
+            if(boosted){
+                // Keep HTML audio muted to avoid hearing the same remote user twice.
+                a.muted=true;
+                a.defaultMuted=true;
+                return Promise.resolve();
+            }
+
+            a.muted=false;
+            a.defaultMuted=false;
+            return a.play();
+        }));
+    }
+
+
+    var audioPlaybackUnlockInstalled=false;
+    function installAudioPlaybackUnlock(){
+        if(audioPlaybackUnlockInstalled) return;
+        audioPlaybackUnlockInstalled=true;
+
+        const unlock=()=>{
+            if(document.visibilityState!=='visible') return;
+            unlockRemoteAudio().catch(()=>{});
+        };
+
+        // pointerdown preserves the browser user-activation window on phone/tablet.
+        document.addEventListener('pointerdown',unlock,{passive:true});
+        document.addEventListener('keydown',unlock,{passive:true});
+    }
+
+    function armAudioUnlock(){
+        if(audioUnlockArmed) return;
+        audioUnlockArmed=true;
+        showToast('🔊 Tap once to enable meeting audio.');
+        const unlock=()=>{
+            unlockRemoteAudio().finally(()=>{ audioUnlockArmed=false; });
+            document.removeEventListener('pointerdown',unlock);
+            document.removeEventListener('touchstart',unlock);
+            document.removeEventListener('click',unlock);
+        };
+        document.addEventListener('pointerdown',unlock,{once:true,passive:true});
+        document.addEventListener('touchstart',unlock,{once:true,passive:true});
+        document.addEventListener('click',unlock,{once:true,passive:true});
+    }
+
+    function decodeSdp(sdp){ if(!sdp) return ''; try{ return decodeURIComponent(escape(atob(sdp))); }catch(e){ return sdp; } }
+
+    async function handleOffer(from, data){
+        from=String(from);
+        if(offerHandling[from]){
+            console.log('[SmartMeet] duplicate/concurrent offer ignored while handling <-', from);
+            return;
+        }
+        offerHandling[from]=true;
+        console.log('[SmartMeet] received offer <-', from);
+        const pc=createPeerConnection(from);
+        if(!pc){ offerHandling[from]=false; return; }
+
+        const polite=isPolite(from);
+        const offerCollision = makingOffer[from] || pc.signalingState!=='stable';
+        ignoreOffer[from] = !polite && offerCollision;
+
+        if(ignoreOffer[from]){
+            console.log('[SmartMeet] ignoring colliding offer from', from);
+            offerHandling[from]=false;
+            return;
+        }
+
+        try{
+            // Perfect-negotiation collision handling. A polite peer rolls back
+            // its own unfinished offer before accepting the remote offer.
+            if(offerCollision && polite && pc.signalingState==='have-local-offer'){
+                await pc.setLocalDescription({type:'rollback'});
+            }
+
+            if(pc.signalingState!=='stable'){
+                console.log('[SmartMeet] offer deferred; peer not stable <-',from,pc.signalingState);
+                return;
+            }
+
+            await pc.setRemoteDescription({
+                type:data.type||'offer',
+                sdp:decodeSdp(data.sdp)
+            });
+
+            bindPeerTransceivers(pc);
+            await syncLocalTracksToPeer(from);
+
+            if(pendingCandidates[from]?.length){
+                for(const c of pendingCandidates[from]){
+                    await pc.addIceCandidate(c).catch(()=>{});
+                }
+                delete pendingCandidates[from];
+            }
+
+            // Another async negotiation may already have resolved this offer.
+            // Never apply an answer unless the peer still owns a remote offer.
+            if(pc.signalingState!=='have-remote-offer'){
+                console.log('[SmartMeet] stale offer resolved before answer <-',from,pc.signalingState);
+                return;
+            }
+
+            const answer=await pc.createAnswer();
+
+            if(pc.signalingState!=='have-remote-offer'){
+                console.log('[SmartMeet] answer no longer needed <-',from,pc.signalingState);
+                return;
+            }
+
+            await pc.setLocalDescription(answer);
+
+            console.log('[SmartMeet] sending answer ->', from);
+            await sendSignal(from,'answer',{
+                type:pc.localDescription.type,
+                sdp:btoa(unescape(encodeURIComponent(pc.localDescription.sdp)))
+            });
+
+            bindPeerTransceivers(pc);
+            await syncLocalTracksToPeer(from);
+            setTimeout(()=>ensureOutboundMediaNegotiated(from),160);
+            if(isMicOn) setTimeout(()=>verifyPeerAudioOutbound(from),850);
+        }catch(err){
+            // InvalidStateError here is normally a stale duplicate negotiation.
+            // It is safe to ignore; bounded recovery will renegotiate if needed.
+            if(err?.name==='InvalidStateError'){
+                console.log('[SmartMeet] stale offer ignored <-',from,pc.signalingState);
+            }else{
+                console.warn('[SmartMeet] offer handling failed', from, err);
+            }
+        }finally{
+            offerHandling[from]=false;
+        }
+    }
+    async function handleAnswer(from, data){
+        console.log('[SmartMeet] received answer <-', from);
+        const pc=peers[from]; if(!pc) return;
+        // An answer is valid only while our local offer is outstanding.
+        // Reverb/repair retries can deliver an old or duplicate answer after the
+        // connection has already returned to stable; ignore it safely.
+        if(pc.signalingState!=='have-local-offer'){
+            console.log('[SmartMeet] ignoring stale/duplicate answer <-', from, 'state:', pc.signalingState);
+            return;
+        }
+        try{
+            await pc.setRemoteDescription({ type:data.type||'answer', sdp:decodeSdp(data.sdp) });
+            bindPeerTransceivers(pc);
+            await syncLocalTracksToPeer(from);
+            if(pendingCandidates[from]?.length){
+                for(const c of pendingCandidates[from]) await pc.addIceCandidate(c).catch(()=>{});
+                delete pendingCandidates[from];
+            }
+            await syncLocalTracksToPeer(from);
+            attachRemoteStream(from);
+            setTimeout(()=>ensureOutboundMediaNegotiated(from),160);
+            if(isMicOn) setTimeout(()=>verifyPeerAudioOutbound(from),850);
+        }catch(err){ console.warn('[SmartMeet] answer handling failed', from, err); }
+    }
+    async function handleIceCandidate(from, data){
+        const candidate=data.candidate; if(!candidate) return;
+        const pc=peers[from];
+        if(!pc || !pc.remoteDescription){ (pendingCandidates[from]=pendingCandidates[from]||[]).push(candidate); return; }
+        try{ await pc.addIceCandidate(candidate); }catch(err){ if(!ignoreOffer[from]) console.warn('[SmartMeet] ICE candidate error', from, err); }
+    }
+
+    /* ---------- Signal transport (idempotent + load-safe) ---------- */
+    function makeSignalId(type){ return `${MY_USER_ID}:${type}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`; }
+
+    // Presence/device-state messages are snapshots. If the same snapshot is
+    // already being posted, re-use that request instead of creating parallel
+    // POSTs every time the media repair loop runs.
+    var signalInFlight = signalInFlight || new Map();
+    var COALESCED_SIGNAL_TYPES = COALESCED_SIGNAL_TYPES || new Set([
+        'mic-status',
+        'camera-status',
+        'presence-request',
+        'presence-response'
+    ]);
+
+    async function postSignal(toUserId, type, payload, attempts=1){
+        const maxAttempts=Math.max(1,Math.min(Number(attempts)||1,2));
+        for(let i=0;i<maxAttempts;i++){
+            try{
+                const res=await fetch(SIGNAL_URL,{
+                    method:'POST',
+                    headers:{
+                        'Content-Type':'application/json',
+                        'Accept':'application/json',
+                        'X-CSRF-TOKEN':CSRF
+                    },
+                    credentials:'same-origin',
+                    cache:'no-store',
+                    body:JSON.stringify({ to_user_id:toUserId, type, data:payload })
+                });
+                if(res.ok) return true;
+
+                // 4xx responses are application/auth errors; retrying them only
+                // adds load and cannot repair the request.
+                if(res.status>=400 && res.status<500){
+                    console.warn('[SmartMeet] signal rejected',type,'HTTP',res.status);
+                    return false;
+                }
+            }catch(e){
+                // A network/DNS transition can briefly break both HTTPS signaling
+                // and WSS. Retry once, then let the periodic repair/reconnect hook heal it.
+                if(i===maxAttempts-1){
+                    console.warn('[SmartMeet] signal network failure',type,e?.name||e);
+                    return false;
+                }
+            }
+            if(i<maxAttempts-1) await new Promise(r=>setTimeout(r,300*(i+1)));
+        }
+        return false;
+    }
+
+    function sendSignal(toUserId, type, data){
+        if(!(signalInFlight instanceof Map)) signalInFlight=new Map();
+        if(!(COALESCED_SIGNAL_TYPES instanceof Set)){
+            COALESCED_SIGNAL_TYPES=new Set([
+                'mic-status',
+                'camera-status',
+                'presence-request',
+                'presence-response'
+            ]);
+        }
+
+        const key=`${String(toUserId)}:${type}`;
+        if(COALESCED_SIGNAL_TYPES.has(type) && signalInFlight.has(key)){
+            return signalInFlight.get(key);
+        }
+
+        const payload={ ...(data||{}), _signalId: data?._signalId || makeSignalId(type) };
+
+        // Critical signaling gets one cautious retry. The same _signalId is
+        // reused, so duplicate broadcasts are ignored by the receiver while transient
+        // DNS/Wi-Fi changes do not permanently lose an offer, TURN candidate or join.
+        const RETRYABLE_SIGNAL_TYPES=new Set([
+            'offer','answer','ice-candidate','user-joined','user-left',
+            'presence-request','presence-response','mic-status','camera-status',
+            'chat','meeting-cancelled','meeting-ended','reconnect-request'
+        ]);
+        const attempts=RETRYABLE_SIGNAL_TYPES.has(type) ? 2 : 1;
+        const request=postSignal(toUserId,type,payload,attempts);
+
+        if(!COALESCED_SIGNAL_TYPES.has(type)) return request;
+
+        signalInFlight.set(key,request);
+        request.finally(()=>{
+            if(signalInFlight.get(key)===request) signalInFlight.delete(key);
+        });
+        return request;
+    }
+
+    /* ---------- Realtime channel ---------- */
+    let realtimeChannel=null;
+    let realtimeConnectionRecoveryBound=false;
+    let realtimeReconnectTimer=null;
+
+    function bindRealtimeConnectionRecovery(){
+        if(realtimeConnectionRecoveryBound) return;
+        const connection=window.Echo?.connector?.pusher?.connection;
+        if(!connection || typeof connection.bind!=='function') return;
+        realtimeConnectionRecoveryBound=true;
+
+        connection.bind('connected',()=>{
+            clearTimeout(realtimeReconnectTimer);
+            realtimeReconnectTimer=setTimeout(()=>{
+                console.log('[SmartMeet] Reverb reconnected -> repairing meeting media');
+                try{ announceJoin(true); }catch(e){}
+                try{ repairMeetingMedia(true); }catch(e){}
+            },180);
+        });
+    }
+
+    function listenForSignals(){
+        return new Promise(resolve=>{
+            if(typeof window.Echo==='undefined'){ console.error('Echo not initialized'); resolve(false); return; }
+            const channel=window.Echo.channel('meeting.'+MEETING_ID);
+            realtimeChannel=channel;
+            bindRealtimeConnectionRecovery();
+            let done=false; const finish=v=>{ if(!done){ done=true; resolve(v); } };
+            channel.listen('.signal', handleSignal);
+            channel.listen('.transcript', handleRemoteTranscript);
+            if(typeof channel.subscribed==='function') channel.subscribed(()=>{
+                console.log('[SmartMeet] Reverb channel subscribed');
+                finish(true);
+            });
+            if(typeof channel.error==='function') channel.error(err=>{
+                console.error('[SmartMeet] Reverb channel error', err);
+                finish(false);
+            });
+            // Do not start offer/presence traffic before the realtime channel
+            // has had a realistic chance to subscribe. The old 1.2s optimistic
+            // success could make the first offer invisible to the other browser.
+            setTimeout(()=>finish(false), 7000);
+        });
+    }
+
+    async function handleSignal(data){
+        const from=String(data.fromUserId);
+        const isSelf = from===String(MY_USER_ID);
+        const sigId=data.data?._signalId;
+        if(sigId){ if(receivedSignalIds.has(sigId)) return; receivedSignalIds.add(sigId); if(receivedSignalIds.size>1000){ receivedSignalIds.clear(); receivedSignalIds.add(sigId); } }
+        if(isSelf && !['meeting-cancelled','meeting-ended'].includes(data.type)) return;
+
+        if(data.type==='meeting-cancelled'){
+            showToast('🚫 The organizer cancelled this meeting.');
+            setTimeout(()=>{ cleanup(); window.location.href=LEAVE_URL; },2200);
+            return;
+        }
+        if(data.type==='meeting-ended'){
+            showToast(data.data?.auto ? '⏰ Meeting time has ended.' : '📞 The meeting has ended.');
+            setTimeout(()=>{ cleanup(); window.location.href=LEAVE_URL; },2200);
+            return;
+        }
+        if(data.type==='presence-request'){
+            const requester=String(data.data?.userId || from);
+            if(requester!==String(MY_USER_ID)) sendPresence(requester);
+            return;
+        }
+        if(data.type==='presence-response'){
+            const uid=String(data.data?.userId || from);
+            if(uid===String(MY_USER_ID)) return;
+
+            // Ignore stale presence packets that arrive after user-left.
+            // A real rejoin always emits a fresh user-joined event first.
+            if(leftUsers.has(uid)) return;
+
+            registerJoinedUser(uid, data.data?.name, data.data?.initials, Boolean(data.data?.isOrganizer), data.data?.avatarUrl || null);
+
+            // Update remote state directly. The previous helper calls were undefined
+            // and could abort this handler before WebRTC negotiation was scheduled.
+            if(Boolean(data.data?.cameraOn)) camStatus[uid]=true;
+            else if(!(remoteStreams[uid]?.getVideoTracks?.()||[]).some(t=>t.readyState==='live')) camStatus[uid]=false;
+            micStatus[uid]=!Boolean(data.data?.micOn);
+            const micEl=document.getElementById('micoff-'+uid);
+            if(micEl) micEl.style.display=micStatus[uid] ? 'flex' : 'none';
+            attachRemoteStream(uid);
+
+            const pc=peers[uid];
+            const connected=pc && (
+                pc.connectionState==='connected' ||
+                pc.iceConnectionState==='connected' ||
+                pc.iceConnectionState==='completed'
+            );
+            if(pc){
+                bindPeerTransceivers(pc);
+                setTimeout(()=>syncLocalTracksToPeer(uid),40);
+            }
+            if(shouldInitiate(uid) && pc && !connected && pc.signalingState==='stable'){
+                setTimeout(()=>negotiatePeer(uid,false),80);
+            }
+            return;
+        }
+        if(data.type==='user-joined'){
+            const uid=String(data.data.userId); if(uid===String(MY_USER_ID)) return;
+            const wasOnline=onlineUsers.has(uid);
+            leftUsers.delete(uid);
+            registerJoinedUser(uid, data.data.name, data.data.initials, Boolean(data.data?.isOrganizer || uid===String(ORGANIZER_ID)), data.data?.avatarUrl || null);
+            const pc=peers[uid];
+            if(shouldInitiate(uid) && pc && pc.signalingState==='stable' &&
+                !['connected'].includes(pc.connectionState) &&
+                !['connected','completed'].includes(pc.iceConnectionState)){
+                setTimeout(()=>negotiatePeer(uid,false),60);
+            }
+            if(!wasOnline) showToast(`✅ ${escapeHtml(data.data.name)} has joined the meeting.`);
+            sendSignal(uid,'mic-status',{ userId:MY_USER_ID, muted:!isMicOn });
+            sendSignal(uid,'camera-status',{ userId:MY_USER_ID, cameraOn:isCameraOn });
+            return;
+        }
+
+        if(data.type==='user-left'){
+            if(isSelf) return;
+
+            // Remove from the video stage immediately, but keep the People row
+            // visible with an explicit LEFT status.
+            markUserLeft(from);
+            removeParticipantTile(from, true);
+
+            if(peers[from]){
+                try{
+                    clearTimeout(peers[from].__connectWatchdog);
+                    clearTimeout(peers[from].__disconnectTimer);
+                    clearTimeout(peers[from].__restartTimer);
+                    clearTimeout(peers[from].__dtlsWatchdog);
+                    clearTimeout(peers[from].__attachTimer);
+                }catch(e){}
+                try{ peers[from].close(); }catch(e){}
+                delete peers[from];
+            }
+
+            delete pendingCandidates[from];
+            delete remoteStreams[from];
+            document.getElementById('audio-'+from)?.remove();
+            renderPersonRow(from);
+            return;
+        }
+        if(data.type==='chat'){
+            if(isSelf) return;
+
+            const control=String(data.data?.smartmeetControl||'');
+            const controlUser=String(data.data?.userId||from);
+
+            if(control==='raise-hand'){
+                raisedHands.add(controlUser);
+                renderPersonRow(controlUser);
+                const who=knownParticipants[controlUser]?.name || data.data?.name || 'Participant';
+                showToast(`✋ ${escapeHtml(who)} raised a hand.`);
+                return;
+            }
+            if(control==='lower-hand'){
+                raisedHands.delete(controlUser);
+                renderPersonRow(controlUser);
+                return;
+            }
+
+            const text=data.data?.text||''; if(!text) return;
+            addChatBubble(data.data?.name||'User', text, false);
+            if(activeTab!=='chat'){ unreadChat++; updateChatBadge(); }
+            return;
+        }
+        if(data.type==='mic-status'){
+            const uid=String(data.data.userId||from); if(uid===String(MY_USER_ID)) return;
+            micStatus[uid]=data.data.muted;
+            const el=document.getElementById('micoff-'+uid); if(el) el.style.display=data.data.muted?'flex':'none';
+            return;
+        }
+        if(data.type==='camera-status'){
+            const uid=String(data.data.userId||from); if(uid===String(MY_USER_ID)) return;
+            if(Boolean(data.data.cameraOn)) camStatus[uid]=true;
+            else if(!(remoteStreams[uid]?.getVideoTracks?.()||[]).some(t=>t.readyState==='live')) camStatus[uid]=false;
+            attachRemoteStream(uid);
+            return;
+        }
+        if(String(data.toUserId)!==String(MY_USER_ID)) return;
+        if(!data.data) return;
+        if(leftUsers.has(from) && ['offer','ice-candidate'].includes(data.type)) return;
+
+        if(data.type==='reconnect-request'){
+            if(shouldInitiate(from)){
+                const pc=peers[String(from)] || createPeerConnection(String(from));
+                if(pc){
+                    pc.__restartAttempts=0;
+                    pc.__lastRestartAt=0;
+                    restartPeer(String(from));
+                }
+            }
+            return;
+        }
+        if(data.type==='offer') return handleOffer(from, data.data);
+        if(data.type==='answer') return handleAnswer(from, data.data);
+        if(data.type==='ice-candidate') return handleIceCandidate(from, data.data);
+        if(data.type==='mute'){
+            isMicOn=false;
+            if(localStream) localStream.getAudioTracks().forEach(t=>t.enabled=false);
+            setMicButton(false);
+            stopRecognition();
+            showModerationNotice('🎙️ Your microphone was muted by the organizer.');
+            if(localStream) broadcastMyMicStatus();
+            return;
+        }
+        if(data.type==='unmute'){ showModerationNotice('🎙️ The organizer allowed your microphone. Tap Mic to speak.'); return; }
+    }
+
+    /* ---------- Media ---------- */
+    function buildVoiceAudioConstraints(){
+        const supported=navigator.mediaDevices?.getSupportedConstraints?.() || {};
+        const c={
+            echoCancellation:true,
+            noiseSuppression:true,
+            autoGainControl:true,
+            channelCount:1
+        };
+
+        // WebRTC audio is internally optimized around 48 kHz Opus.
+        // Ask for it only where the browser supports the constraint.
+        if(supported.sampleRate) c.sampleRate={ideal:48000};
+        if(supported.sampleSize) c.sampleSize={ideal:16};
+        if(supported.latency) c.latency={ideal:0.02,max:0.15};
+
+        // Chrome/Android may expose voiceIsolation on supported hardware.
+        // It is deliberately optional so older browsers keep working.
+        if(supported.voiceIsolation) c.voiceIsolation=true;
+
+        return c;
+    }
+
+    const audioConstraints = buildVoiceAudioConstraints();
+
+    async function optimizeVoiceTrack(track){
+        if(!track || track.kind!=='audio' || track.readyState==='ended') return;
+
+        try{
+            if('contentHint' in track) track.contentHint='speech';
+        }catch(e){}
+
+        try{
+            await track.applyConstraints?.(audioConstraints);
+        }catch(e){
+            // Never break an already-working microphone because one optional
+            // device/browser constraint is unavailable.
+        }
+    }
+
+    async function optimizeAudioSender(sender){
+        if(!sender) return;
+
+        try{
+            const params=sender.getParameters?.();
+            if(!params) return;
+
+            if(Array.isArray(params.encodings) && params.encodings.length){
+                params.encodings.forEach(enc=>{
+                    // Give Opus enough headroom for clean speech on laptop/mobile.
+                    // Audio is still mono and small compared with video bandwidth.
+                    enc.maxBitrate=128000;
+
+                    // These are supported by Chromium where available.
+                    try{ enc.priority='high'; }catch(e){}
+                    try{ enc.networkPriority='high'; }catch(e){}
+                });
+
+                await sender.setParameters(params);
+            }
+        }catch(e){
+            // Some Safari/older Android builds reject optional RTP tuning.
+            // Their normal Opus defaults remain fully usable.
+        }
+    }
+
+    function liveLocalTrack(kind){
+        if(!localStream) return null;
+        const list = kind==='audio' ? localStream.getAudioTracks() : localStream.getVideoTracks();
+        return list.find(t=>t.readyState==='live') || null;
+    }
+
+    function removeDeadLocalTracks(kind=null){
+        if(!localStream) return;
+        localStream.getTracks().forEach(t=>{
+            if((!kind || t.kind===kind) && t.readyState==='ended'){
+                try{ localStream.removeTrack(t); }catch(e){}
+            }
+        });
+    }
+
+    async function ensureAudioTrack(enableNow=false){
+        if(!window.isSecureContext || !navigator.mediaDevices?.getUserMedia){
+            showToast('⚠️ Mic/Camera needs HTTPS and browser permission.');
+            return null;
+        }
+
+        removeDeadLocalTracks('audio');
+        let track=liveLocalTrack('audio');
+
+        if(!track){
+            try{
+                const s=await navigator.mediaDevices.getUserMedia({audio:audioConstraints,video:false});
+                track=s.getAudioTracks().find(t=>t.readyState==='live') || null;
+                if(!track) throw new Error('No live microphone track returned');
+                await optimizeVoiceTrack(track);
+                if(!localStream) localStream=new MediaStream();
+                // Keep one microphone track only.
+                localStream.getAudioTracks().forEach(old=>{
+                    if(old!==track){
+                        try{ localStream.removeTrack(old); }catch(e){}
+                        try{ old.stop(); }catch(e){}
+                    }
+                });
+                localStream.addTrack(track);
+
+                track.onended=async ()=>{
+                    try{ localStream?.removeTrack(track); }catch(e){}
+                    const shouldRecover=isMicOn;
+                    if(!shouldRecover) return;
+                    isMicOn=false;
+                    setMicButton(false);
+                    const replacement=await ensureAudioTrack(true);
+                    if(replacement){
+                        isMicOn=true;
+                        setMicButton(true);
+                        await syncTracksToEveryPeer();
+                        broadcastMyMicStatus();
+                        startTranscript();
+                        startRecognition();
+                    }
+                };
+            }catch(err){
+                console.error('[SmartMeet] microphone error',err);
+                if(err?.name==='NotAllowedError') showToast('🎙️ Allow microphone permission in browser settings.');
+                else if(err?.name==='NotFoundError') showToast('🎙️ No microphone found.');
+                else showToast('🎙️ Could not start microphone.');
+                return null;
+            }
+        }
+
+        track.enabled=Boolean(enableNow);
+        return track;
+    }
+
+    async function startAudio(){
+        // Start with ZERO capture devices open. Mic/camera are acquired only after
+        // the user presses a control. This avoids background capture/encoding load
+        // on every device as soon as the meeting page opens.
+        if(!localStream) localStream=new MediaStream();
+        isMicOn=false;
+        isCameraOn=false;
+        setMicButton(false);
+        setCameraButton(false);
+
+        const localVideo=document.getElementById('localVideo');
+        if(localVideo){
+            localVideo.srcObject=localStream;
+            localVideo.muted=true;
+            localVideo.playsInline=true;
+            localVideo.style.display='none';
+        }
+    }
+
+    function setMicButton(on){
+        const btn=document.getElementById('ctrl-mic');
+        const off=document.getElementById('micoff-'+MY_USER_ID);
+        if(btn){
+            btn.innerHTML=on?'<i class="fa fa-microphone"></i>':'<i class="fa fa-microphone-slash"></i>';
+            btn.classList.toggle('off',!on);
+            btn.classList.toggle('active',on);
+        }
+        if(off) off.style.display=on?'none':'flex';
+    }
+
+
+    async function getOutboundAudioBytes(sender){
+        if(!sender?.getStats) return null;
+        try{
+            const stats=await sender.getStats();
+            let bytes=0;
+            stats.forEach(report=>{
+                if(report.type==='outbound-rtp' && report.kind==='audio' && !report.isRemote){
+                    bytes+=Number(report.bytesSent||0);
+                }
+            });
+            return bytes;
+        }catch(e){
+            return null;
+        }
+    }
+
+    async function verifyPeerAudioOutbound(uid, forceRepair=false){
+        uid=String(uid);
+        const pc=peers[uid];
+        const track=liveLocalTrack('audio');
+
+        if(
+            !isMicOn ||
+            !track ||
+            track.readyState!=='live' ||
+            !track.enabled ||
+            !pc ||
+            pc.signalingState==='closed' ||
+            leftUsers.has(uid)
+        ) return true;
+
+        bindPeerTransceivers(pc);
+
+        const sender=pc.__audioTx?.sender;
+        if(!sender){
+            // Answering side may not have bound its negotiated audio m-line yet.
+            await syncLocalTracksToPeer(uid);
+            bindPeerTransceivers(pc);
+        }
+
+        const activeSender=pc.__audioTx?.sender;
+        if(!activeSender) return false;
+
+        if(activeSender.track?.id!==track.id){
+            try{ await activeSender.replaceTrack(track); }catch(e){}
+        }
+
+        await optimizeAudioSender(activeSender);
+
+        const before=await getOutboundAudioBytes(activeSender);
+        if(before===null) return true; // stats unsupported; sender attachment is our fallback check.
+
+        await new Promise(resolve=>setTimeout(resolve,900));
+
+        if(!isMicOn || !track.enabled || track.readyState!=='live') return true;
+
+        const after=await getOutboundAudioBytes(activeSender);
+        if(after===null || after>before) return true;
+
+        // Zero RTP growth means this peer has a real sender object but no outgoing
+        // audio packets. Perform ONE bounded repair; never run an endless watchdog.
+        const now=Date.now();
+        if(!forceRepair && pc.__lastAudioRepairAt && (now-pc.__lastAudioRepairAt)<10000){
+            return false;
+        }
+        pc.__lastAudioRepairAt=now;
+
+        console.warn('[SmartMeet] outbound audio stalled ->',uid);
+
+        try{
+            await activeSender.replaceTrack(null);
+            await new Promise(resolve=>setTimeout(resolve,40));
+            await activeSender.replaceTrack(track);
+            track.enabled=true;
+            await optimizeAudioSender(activeSender);
+        }catch(e){
+            console.warn('[SmartMeet] audio replaceTrack repair failed',uid,e);
+        }
+
+        // If the negotiated direction itself is wrong, repair from one side only.
+        const direction=String(pc.__audioTx?.currentDirection||'');
+        if(!direction.includes('send')){
+            if(shouldInitiate(uid)){
+                await ensureOutboundMediaNegotiated(uid);
+            }else{
+                sendSignal(uid,'reconnect-request',{reason:'outbound-audio-stalled'});
+            }
+        }
+
+        return false;
+    }
+
+    function verifyAudioForAllPeers(){
+        const ids=Object.keys(peers).filter(uid=>onlineUsers.has(String(uid)) && !leftUsers.has(String(uid)));
+        return Promise.allSettled(ids.map(uid=>verifyPeerAudioOutbound(uid)));
+    }
+
+    async function toggleMic(){
+        if(toggleMic.busy) return;
+        toggleMic.busy=true;
+        try{
+            const targetOn=!isMicOn;
+
+            if(!targetOn){
+                isMicOn=false;
+
+                // Keep the already-negotiated microphone track attached and only
+                // disable samples. Removing/stopping it on every mute forced sender
+                // replacement across all peers and caused one-way audio after unmute.
+                const old=liveLocalTrack('audio');
+                if(old) old.enabled=false;
+
+                setMicButton(false);
+                stopRecognition();
+                const sp=document.getElementById('speaking-'+MY_USER_ID);
+                if(sp) sp.style.display='none';
+
+                // No renegotiation is needed for mute; senders keep the same track.
+                broadcastMyMicStatus();
+                return;
+            }
+
+            const track=await ensureAudioTrack(true);
+            if(!track) return;
+            isMicOn=true;
+            track.enabled=true;
+            setMicButton(true);
+
+            // Attach the microphone to every current peer in parallel.
+            await syncTracksToEveryPeer();
+
+            // The first click also satisfies mobile autoplay policy for remote audio.
+            unlockRemoteMedia();
+
+            // Verify negotiated sender direction once, then verify real outbound RTP.
+            await Promise.allSettled(
+                Object.keys(peers).map(uid=>ensureOutboundMediaNegotiated(uid))
+            );
+            setTimeout(()=>verifyAudioForAllPeers(),350);
+
+            broadcastMyMicStatus();
+            startTranscript();
+            startRecognition();
+        }finally{
+            toggleMic.busy=false;
+        }
+    }
+
+    async function ensureVideoTrack(enableNow=false){
+        if(!window.isSecureContext || !navigator.mediaDevices?.getUserMedia){
+            showToast('⚠️ Mic/Camera needs HTTPS and browser permission.');
+            return null;
+        }
+
+        removeDeadLocalTracks('video');
+        let track=liveLocalTrack('video');
+        if(!track){
+            try{
+                const s=await navigator.mediaDevices.getUserMedia({
+                    audio:false,
+                    video:{
+                        width:{ideal:640,max:640},
+                        height:{ideal:360,max:480},
+                        frameRate:{ideal:15,max:15},
+                        facingMode:'user'
+                    }
+                });
+                track=s.getVideoTracks().find(t=>t.readyState==='live') || null;
+                if(!track) throw new Error('No live camera track returned');
+
+                if(!localStream) localStream=new MediaStream();
+                localStream.getVideoTracks().forEach(old=>{
+                    if(old!==track){
+                        try{ localStream.removeTrack(old); }catch(e){}
+                        try{ old.stop(); }catch(e){}
+                    }
+                });
+                localStream.addTrack(track);
+
+                track.onended=async ()=>{
+                    try{ localStream?.removeTrack(track); }catch(e){}
+                    if(!isCameraOn) return;
+                    isCameraOn=false;
+                    setCameraButton(false);
+                    await syncTracksToEveryPeer();
+                    broadcastMyCameraStatus();
+                };
+            }catch(err){
+                console.error('[SmartMeet] camera error',err);
+                if(err?.name==='NotAllowedError') showToast('📷 Allow camera permission in browser settings.');
+                else if(err?.name==='NotFoundError') showToast('📷 No camera found.');
+                else showToast('📷 Camera could not start.');
+                return null;
+            }
+        }
+        track.enabled=Boolean(enableNow);
+        return track;
+    }
+
+    function setCameraButton(on){
+        const btn=document.getElementById('ctrl-camera');
+        const localVideo=document.getElementById('localVideo');
+        const avatar=document.getElementById('avatar-'+MY_USER_ID);
+        if(btn){
+            btn.innerHTML=on?'<i class="fa fa-video"></i>':'<i class="fa fa-video-slash"></i>';
+            btn.classList.toggle('off',!on);
+            btn.classList.toggle('active',on);
+        }
+        if(localVideo) localVideo.style.display=on?'block':'none';
+        if(avatar) avatar.style.display=on?'none':'flex';
+    }
+
+    async function toggleCamera(){
+        if(toggleCamera.busy) return;
+        toggleCamera.busy=true;
+        try{
+            const targetOn=!isCameraOn;
+
+            if(!targetOn){
+                isCameraOn=false;
+                const old=liveLocalTrack('video');
+                if(old){
+                    try{ localStream?.removeTrack(old); }catch(e){}
+                    try{ old.stop(); }catch(e){}
+                }
+                setCameraButton(false);
+                const localVideo=document.getElementById('localVideo');
+                if(localVideo) localVideo.srcObject=localStream || new MediaStream();
+                await syncTracksToEveryPeer();
+                broadcastMyCameraStatus();
+                return;
+            }
+
+            const track=await ensureVideoTrack(true);
+            if(!track) return;
+            isCameraOn=true;
+            track.enabled=true;
+            setCameraButton(true);
+
+            const localVideo=document.getElementById('localVideo');
+            if(localVideo && localStream){
+                localVideo.srcObject=localStream;
+                localVideo.muted=true;
+                localVideo.autoplay=true;
+                localVideo.playsInline=true;
+                localVideo.setAttribute('playsinline','');
+                localVideo.play().catch(()=>{});
+            }
+
+            // One sender update + at most one negotiation pass.
+            await syncTracksToEveryPeer();
+            ensureOutboundMediaForAll();
+            broadcastMyCameraStatus();
+            unlockRemoteMedia();
+        }finally{
+            toggleCamera.busy=false;
+        }
+    }
+
+    function broadcastMyMicStatus(){
+        void sendSignal('all','mic-status',{userId:MY_USER_ID,muted:!isMicOn}).catch(()=>{});
+    }
+    function broadcastMyCameraStatus(){
+        void sendSignal('all','camera-status',{userId:MY_USER_ID,cameraOn:isCameraOn}).catch(()=>{});
+    }
+
+    /* ---------- Mobile media recovery ---------- */
+    let mobileMicMutedSince=0;
+    let mobileVideoMutedSince=0;
+    let mobileRecoveryBusy=false;
+
+    async function recoverMobileLocalMedia(){
+        if(!IS_MOBILE_BROWSER || mobileRecoveryBusy || document.visibilityState!=='visible') return;
+        mobileRecoveryBusy=true;
+        try{
+            if(isMicOn){
+                let a=liveLocalTrack('audio');
+                if(!a || a.readyState!=='live'){
+                    a=await ensureAudioTrack(true);
+                    if(a){
+                        a.enabled=true;
+                        await syncTracksToEveryPeer();
+                        broadcastMyMicStatus();
+                    }
+                }else if(a.muted){
+                    if(!mobileMicMutedSince) mobileMicMutedSince=Date.now();
+                    if(Date.now()-mobileMicMutedSince>2500){
+                        try{ localStream?.removeTrack(a); }catch(e){}
+                        try{ a.stop(); }catch(e){}
+                        const replacement=await ensureAudioTrack(true);
+                        if(replacement){
+                            replacement.enabled=true;
+                            await syncTracksToEveryPeer();
+                            broadcastMyMicStatus();
+                        }
+                        mobileMicMutedSince=0;
+                    }
+                }else{
+                    mobileMicMutedSince=0;
+                    a.enabled=true;
+                }
+            }else{
+                mobileMicMutedSince=0;
+            }
+
+            if(isCameraOn){
+                let v=liveLocalTrack('video');
+                if(!v || v.readyState!=='live'){
+                    v=await ensureVideoTrack(true);
+                    if(v){
+                        v.enabled=true;
+                        const lv=document.getElementById('localVideo');
+                        if(lv && localStream){
+                            lv.srcObject=localStream;
+                            lv.muted=true;
+                            lv.autoplay=true;
+                            lv.playsInline=true;
+                            lv.setAttribute('playsinline','');
+                            lv.play().catch(()=>{});
+                        }
+                        await syncTracksToEveryPeer();
+                        broadcastMyCameraStatus();
+                    }
+                }else if(v.muted){
+                    if(!mobileVideoMutedSince) mobileVideoMutedSince=Date.now();
+                    if(Date.now()-mobileVideoMutedSince>3000){
+                        try{ localStream?.removeTrack(v); }catch(e){}
+                        try{ v.stop(); }catch(e){}
+                        const replacement=await ensureVideoTrack(true);
+                        if(replacement){
+                            replacement.enabled=true;
+                            const lv=document.getElementById('localVideo');
+                            if(lv && localStream){
+                                lv.srcObject=localStream;
+                                lv.muted=true;
+                                lv.autoplay=true;
+                                lv.playsInline=true;
+                                lv.setAttribute('playsinline','');
+                                lv.play().catch(()=>{});
+                            }
+                            await syncTracksToEveryPeer();
+                            broadcastMyCameraStatus();
+                        }
+                        mobileVideoMutedSince=0;
+                    }
+                }else{
+                    mobileVideoMutedSince=0;
+                    v.enabled=true;
+                }
+            }else{
+                mobileVideoMutedSince=0;
+            }
+        }finally{
+            mobileRecoveryBusy=false;
+        }
+    }
+
+    function unlockRemoteMedia(){
+        unlockRemoteAudio();
+        document.querySelectorAll('video[id^="rvideo-"]').forEach(v=>{
+            if(v.srcObject && v.style.display!=='none'){
+                v.muted=true;
+                v.autoplay=true;
+                v.playsInline=true;
+                v.setAttribute('playsinline','');
+                v.play().catch(()=>{});
+            }
+        });
+    }
+
+    function hideMobileTranscriptUI(){
+        if(!IS_MOBILE_BROWSER) return;
+        ['#transcript-btn','#transcriptBtn','[data-panel="transcript"]','[data-tab="transcript"]',
+            '.ctrl-btn[onclick*="transcript"]','#tab-transcript',
+            'button[aria-label*="transcript" i]','button[title*="transcript" i]']
+            .forEach(sel=>document.querySelectorAll(sel).forEach(el=>el.style.setProperty('display','none','important')));
+    }
+    if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',hideMobileTranscriptUI,{once:true});
+    else hideMobileTranscriptUI();
+
+    /* ---------- Transcript (Web Speech API) ---------- */
+    let recognition=null, recognitionRunning=false, recognitionStopping=false, recognitionRestartTimer=null;
+    function startTranscript(){
+        if(IS_MOBILE_BROWSER) return;
+        // Chrome Android can block Web Speech while WebRTC owns the microphone.
+        // Keep meeting audio/video stable there; mobile still receives everyone else's
+        // broadcast transcripts. Desktop Chrome/Edge can produce local captions.
+        const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+        if(!SR){ showToast('⚠️ Live captions require Chrome or Edge.'); return; }
+        if(recognition) return;
+        recognition=new SR();
+        recognition.continuous=true; recognition.interimResults=true; recognition.maxAlternatives=1; recognition.lang='en-US';
+        recognition.onstart=()=>{ recognitionRunning=true; const ind=document.getElementById('listening-indicator'); if(ind) ind.style.display='flex'; };
+        recognition.onresult=(e)=>{
+            if(!isMicOn){ stopRecognition(); return; }
+            let interim='';
+            for(let i=e.resultIndex;i<e.results.length;i++){
+                const r=e.results[i]; const text=r[0].transcript.trim(); if(!text) continue;
+                if(r.isFinal){
+                    const sp=document.getElementById('speaking-'+MY_USER_ID); if(sp) sp.style.display='none';
+                    showLocalTranscript(text,false); saveTranscript(text);
+                } else interim += (interim?' ':'')+text;
+            }
+            if(interim){ const sp=document.getElementById('speaking-'+MY_USER_ID); if(sp) sp.style.display='flex'; showLocalTranscript(interim,true); }
+        };
+        recognition.onerror=(e)=>{
+            recognitionRunning=false;
+            if(e.error==='not-allowed'||e.error==='service-not-allowed'){
+                showToast('Microphone/caption permission is required.');
+                return;
+            }
+            if(e.error==='audio-capture'){
+                console.warn('[SmartMeet] SpeechRecognition audio capture unavailable; WebRTC audio stays active.');
+                scheduleRecognitionRestart(IS_MOBILE_BROWSER?2500:900);
+                return;
+            }
+            scheduleRecognitionRestart(e.error==='network'?1200:500);
+        };
+        recognition.onend=()=>{ recognitionRunning=false; const ind=document.getElementById('listening-indicator'); if(ind) ind.style.display='none'; scheduleRecognitionRestart(400); };
+    }
+    function scheduleRecognitionRestart(delay=400){
+        if(!recognition || recognitionStopping || !isMicOn || document.visibilityState!=='visible') return;
+        if(recognitionRestartTimer) clearTimeout(recognitionRestartTimer);
+        recognitionRestartTimer=setTimeout(()=>{ recognitionRestartTimer=null; startRecognition(); }, delay);
+    }
+    function startRecognition(){
+        if(IS_MOBILE_BROWSER) return;
+        if(!recognition || recognitionRunning || recognitionStopping || !isMicOn || document.visibilityState!=='visible') return;
+        const mic=liveLocalTrack('audio');
+        if(!mic || !mic.enabled || mic.readyState!=='live') return;
+        try{ recognition.start(); recognitionRunning=true; }
+        catch(e){
+            recognitionRunning=false;
+            scheduleRecognitionRestart(500);
+        }
+    }
+
+    function stopRecognition(){
+        if(!recognition) return;
+        if(recognitionRestartTimer){ clearTimeout(recognitionRestartTimer); recognitionRestartTimer=null; }
+        recognitionStopping=true;
+        try{ if(recognitionRunning) recognition.abort(); }catch(e){}
+        recognitionRunning=false;
+        setTimeout(()=>{ recognitionStopping=false; },250);
+    }
+    function toggleTranscriptLanguage(){
+        const btn=document.getElementById('lang-toggle-btn');
+        const langs=[['en-US','🌐 English'],['ur-PK','🌐 Urdu']];
+        const current = recognition?.lang || 'en-US';
+        const next = current==='en-US' ? langs[1] : langs[0];
+        stopRecognition(); recognition=null; startTranscript();
+        if(recognition) recognition.lang=next[0];
+        if(btn) btn.textContent=next[1];
+        showToast('Captions language: '+(next[0]==='en-US'?'English':'Urdu'));
+        if(isMicOn) scheduleRecognitionRestart(300);
+    }
+    function showLocalTranscript(text, isInterim){
+        const body=document.getElementById('transcript-body'); if(!body) return;
+        body.querySelector('[data-empty]')?.remove();
+        let live=document.getElementById('live-entry-'+MY_USER_ID);
+        if(isInterim){
+            if(!live){
+                live=document.createElement('div'); live.className='transcript-entry'; live.id='live-entry-'+MY_USER_ID;
+                live.innerHTML=`<div class="transcript-avatar" style="background:linear-gradient(135deg,#3b82f6,#06b6d4)">${escapeHtml(MY_INITIALS)}</div>
+            <div class="transcript-content"><div class="transcript-meta"><span class="transcript-name">${escapeHtml(MY_NAME)} (You)</span><span class="transcript-time">${new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</span></div>
+            <div class="transcript-text" style="opacity:.6;font-style:italic;"></div></div>`;
+                body.appendChild(live);
+            }
+            live.querySelector('.transcript-text').textContent=text;
+        } else {
+            if(live){ const t=live.querySelector('.transcript-text'); t.style.opacity='1'; t.style.fontStyle='normal'; t.textContent=text; live.removeAttribute('id'); }
+            else {
+                const div=document.createElement('div'); div.className='transcript-entry';
+                div.innerHTML=`<div class="transcript-avatar" style="background:linear-gradient(135deg,#3b82f6,#06b6d4)">${escapeHtml(MY_INITIALS)}</div>
+            <div class="transcript-content"><div class="transcript-meta"><span class="transcript-name">${escapeHtml(MY_NAME)} (You)</span><span class="transcript-time">${new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</span></div>
+            <div class="transcript-text">${escapeHtml(text)}</div></div>`;
+                body.appendChild(div);
+            }
+        }
+        body.scrollTop=body.scrollHeight;
+    }
+    function handleRemoteTranscript(data){
+        if(String(data.userId)===String(MY_USER_ID)) return;
+        const body=document.getElementById('transcript-body'); if(!body) return;
+        body.querySelector('[data-empty]')?.remove();
+        const div=document.createElement('div'); div.className='transcript-entry';
+        div.innerHTML = `<div class="transcript-avatar" style="background:linear-gradient(135deg,#8b5cf6,#ec4899)">${escapeHtml(data.userInitials||'?')}</div>
+    <div class="transcript-content"><div class="transcript-meta"><span class="transcript-name">${escapeHtml(data.userName||'User')}</span><span class="transcript-time">${data.spokenAt||''}</span></div>
+    <div class="transcript-text">${escapeHtml(data.text||'')}</div></div>`;
+        body.appendChild(div); body.scrollTop=body.scrollHeight;
+    }
+    async function saveTranscript(text){
+        const clean=String(text||'').trim();
+        if(!clean) return false;
+        for(let attempt=0; attempt<2; attempt++){
+            try{
+                const ctrl=new AbortController();
+                const timer=setTimeout(()=>ctrl.abort(),6500);
+                const res=await fetch(TRANSCRIPT_URL,{
+                    method:'POST',
+                    headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':CSRF},
+                    body:JSON.stringify({text:clean}),
+                    signal:ctrl.signal
+                });
+                clearTimeout(timer);
+                if(res.ok) return true;
+                console.error('transcript save failed',res.status);
+            }catch(e){
+                if(e?.name!=='AbortError') console.error('transcript save error',e);
+            }
+            await new Promise(r=>setTimeout(r,350));
+        }
+        return false;
+    }
+
+    /* ---------- Chat ---------- */
+    function addChatBubble(name, text, isMe){
+        const body=document.getElementById('chat-body'); if(!body) return;
+        body.querySelector('[data-empty]')?.remove();
+        const safeName=String(name||(isMe?MY_NAME:'User')).trim()||'User';
+        const time=new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+        const row=document.createElement('div'); row.className='chat-message-row '+(isMe?'is-me':'is-other');
+        row.innerHTML = `<div class="chat-message-content"><div class="chat-message-meta"><strong>${escapeHtml(isMe?MY_NAME+' (You)':safeName)}</strong><span>${time}</span></div><div class="chat-message-bubble">${escapeHtml(text)}</div></div>`;
+        body.appendChild(row); body.scrollTop=body.scrollHeight;
+    }
+    let chatSending=false;
+    async function sendChat(){
+        const input=document.getElementById('chat-input'); if(!input || chatSending) return;
+        const text=input.value.trim(); if(!text) return;
+        chatSending=true;
+        const ok=await sendSignal('all','chat',{text,name:MY_NAME});
+        chatSending=false;
+        if(ok){
+            addChatBubble(MY_NAME,text,true);
+            input.value='';
+        }else{
+            showToast('💬 Message could not be sent. Check your connection.');
+            input.focus();
+        }
+    }
+    function setupChatVoiceInput(){
+        const btn=document.getElementById('chat-voice-btn'); const input=document.getElementById('chat-input');
+        if(!btn || !input) return;
+        const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+        if(!SR){ btn.disabled=true; btn.title='Voice input not supported in this browser'; return; }
+        const rec=new SR(); rec.lang='en-US'; rec.continuous=false; rec.interimResults=true; rec.maxAlternatives=1;
+        let baseText='';
+        btn.addEventListener('click', ()=>{ try{ baseText=input.value.trim(); btn.classList.add('listening'); rec.start(); }catch(e){} });
+        rec.onresult=(e)=>{ let spoken=''; for(let i=e.resultIndex;i<e.results.length;i++) spoken+=e.results[i][0].transcript; input.value=[baseText,spoken.trim()].filter(Boolean).join(' '); };
+        rec.onend=()=>btn.classList.remove('listening');
+        rec.onerror=()=>btn.classList.remove('listening');
+    }
+
+    /* ---------- Cancel meeting (organizer only) ---------- */
+    let cancelling=false;
+    async function cancelMeeting(){
+        if(cancelling) return;
+        if(!window.confirm('Cancel this meeting for everyone? This cannot be undone.')) return;
+        cancelling=true; leftNotified=true;
+        if(autoEndTimer) clearTimeout(autoEndTimer);
+        try{
+            await sendSignal('all','meeting-cancelled',{ message:'Meeting has been cancelled by the organizer.' });
+        }catch(e){}
+        showToast('🚫 Meeting cancelled for everyone.');
+        cleanup();
+        setTimeout(()=>{ document.getElementById('cancel-form')?.submit(); }, 250);
+    }
+
+
+    async function safeToggleMic(){
+        try{
+            await toggleMic();
+        }catch(e){
+            console.error('[SmartMeet] microphone toggle failed',e);
+            showToast('🎙️ Microphone action failed. Please try again.');
+        }
+    }
+
+    async function safeToggleCamera(){
+        try{
+            await toggleCamera();
+        }catch(e){
+            console.error('[SmartMeet] camera toggle failed',e);
+            showToast('📷 Camera action failed. Please try again.');
+        }
+    }
+
+    async function safeLeaveMeeting(){
+        try{
+            await leaveMeeting();
+        }catch(e){
+            console.error('[SmartMeet] leave action failed',e);
+            try{ cleanup(); }catch(_){}
+            window.location.href=LEAVE_URL;
+        }
+    }
+
+    /* ---------- Leave / cleanup ---------- */
+    async function leaveMeeting(){
+        if(leftNotified) return;
+        leftNotified=true;
+
+        if(autoEndTimer) clearTimeout(autoEndTimer);
+        showToast('👋 You have left the meeting.');
+
+        // Never let signaling failure trap the user inside the meeting room.
+        try{
+            await Promise.race([
+                Promise.resolve(sendSignal('all','user-left',{
+                    userId:MY_USER_ID,
+                    name:MY_NAME
+                })),
+                new Promise(resolve=>setTimeout(resolve,650))
+            ]);
+        }catch(e){
+            console.warn('[SmartMeet] user-left signal failed',e);
+        }
+
+        try{
+            await Promise.race([
+                fetch(MARK_LEFT_URL,{
+                    method:'POST',
+                    headers:{
+                        'Content-Type':'application/json',
+                        'X-CSRF-TOKEN':CSRF
+                    },
+                    body:JSON.stringify({}),
+                    keepalive:true
+                }),
+                new Promise(resolve=>setTimeout(resolve,650))
+            ]);
+        }catch(e){}
+
+        try{ cleanup(); }catch(e){}
+        window.location.href=LEAVE_URL;
+    }
+    function notifyDisconnectBeacon(){
+        if(leftNotified) return;
+        leftNotified=true;
+        const payload=JSON.stringify({});
+
+        // One keepalive request is enough. Sending both fetch() and sendBeacon()
+        // could mark the same user left twice and cause unnecessary peer churn.
+        try{
+            fetch(MARK_LEFT_URL,{
+                method:'POST',
+                headers:{
+                    'Content-Type':'application/json',
+                    'X-CSRF-TOKEN':CSRF
+                },
+                body:payload,
+                keepalive:true
+            });
+        }catch(e){}
+    }
+
+    window.addEventListener('pagehide', (event)=>{
+        // When the browser keeps the page in back/forward cache (common on mobile),
+        // do not mark the user left or destroy working media connections.
+        if(event.persisted) return;
+        notifyDisconnectBeacon();
+        cleanup();
+    });
+    window.addEventListener('beforeunload', notifyDisconnectBeacon);
+    function cleanup(){
+        if(autoEndTimer){ clearTimeout(autoEndTimer); autoEndTimer=null; }
+        if(meetingClockInterval){ clearInterval(meetingClockInterval); }
+        if(presenceHeartbeatInterval){ clearInterval(presenceHeartbeatInterval); presenceHeartbeatInterval=null; }
+        Object.values(peers).forEach(pc=>{
+            try{ if(pc.__connectWatchdog) clearTimeout(pc.__connectWatchdog); }catch(e){}
+            try{ if(pc.__disconnectTimer) clearTimeout(pc.__disconnectTimer); }catch(e){}
+            try{ if(pc.__restartTimer) clearTimeout(pc.__restartTimer); }catch(e){}
+            try{ if(pc.__dtlsWatchdog) clearTimeout(pc.__dtlsWatchdog); }catch(e){}
+            try{ if(pc.__attachTimer) clearTimeout(pc.__attachTimer); }catch(e){}
+            try{ pc.ontrack=null; pc.onicecandidate=null; pc.onconnectionstatechange=null; pc.oniceconnectionstatechange=null; }catch(e){}
+            try{ pc.close(); }catch(e){}
+        });
+        Object.keys(peers).forEach(uid=>delete peers[uid]);
+        Object.keys(remoteAudioNodes).forEach(disposeRemoteAudioBoost);
+        try{ meetingAudioContext?.close?.(); }catch(e){}
+        meetingAudioContext=null;
+        localStream?.getTracks().forEach(t=>t.stop());
+        stopRecognition();
+    }
+
+    /* ---------- Presence / reconnection ---------- */
+    function registerJoinedUser(uid, name, initials, isOrganizer=false, avatarUrl=null){
+        uid=String(uid);
+        if(uid===String(MY_USER_ID)) return;
+        leftUsers.delete(uid);
+        const old=knownParticipants[uid] || {};
+        knownParticipants[uid]={
+            ...old,
+            name:name || old.name || ('User '+uid),
+            initials:initials || old.initials || ((name||old.name||'U').trim().charAt(0).toUpperCase()),
+            avatarUrl:avatarUrl || old.avatarUrl || null,
+            isOrganizer:Boolean(isOrganizer || old.isOrganizer || uid===String(ORGANIZER_ID)),
+            hasJoined:true
+        };
+        addParticipantTile(uid, knownParticipants[uid].name, knownParticipants[uid].initials, knownParticipants[uid].isOrganizer);
+        markOnline(uid);
+        renderPeopleList();
+        createPeerConnection(uid);
+    }
+    function sendPresence(to='all'){
+        return sendSignal(to,'presence-response',{
+            userId:MY_USER_ID, name:MY_NAME, initials:MY_INITIALS, avatarUrl:MY_AVATAR_URL,
+            isOrganizer:String(MY_USER_ID)===String(ORGANIZER_ID),
+            micOn:Boolean(isMicOn), cameraOn:Boolean(isCameraOn)
+        });
+    }
+    function connectToAll(){
+        Object.keys(knownParticipants).forEach(uid=>{
+            uid=String(uid);
+            if(uid===String(MY_USER_ID) || leftUsers.has(uid)) return;
+            // Only create/repair WebRTC peers for users confirmed online in the
+            // current room. Historical hasJoined flags can be stale and previously
+            // created ghost peer connections that kept recovery/media work alive.
+            if(!onlineUsers.has(uid)) return;
+
+            const pc=createPeerConnection(uid);
+            if(!pc) return;
+            syncLocalTracksToPeer(uid);
+
+            // If signaling was missed while a phone/laptop slept or changed network,
+            // deterministic initiator re-sends a fresh offer.
+            const age=Date.now()-(pc.__lastOfferAt||pc.__createdAt||0);
+            const alreadyConnected=(
+                pc.connectionState==='connected' ||
+                pc.iceConnectionState==='connected' ||
+                pc.iceConnectionState==='completed'
+            );
+            if(!alreadyConnected &&
+                shouldInitiate(uid) &&
+                ['new','connecting','disconnected'].includes(pc.connectionState) &&
+                pc.signalingState==='stable' &&
+                age>5000){
+                negotiatePeer(uid,pc.connectionState==='disconnected');
+            }
+        });
+    }
+    let joinAnnounced=false;
+    let lastPresenceRequestAt=0;
+    function requestPresence(force=false){
+        const now=Date.now();
+        if(!force && now-lastPresenceRequestAt<5000) return;
+        lastPresenceRequestAt=now;
+        sendSignal('all','presence-request',{ userId:MY_USER_ID });
+    }
+    function announceJoin(force=false){
+        if(!force && joinAnnounced) return;
+        joinAnnounced=true;
+        sendSignal('all','user-joined',{ userId:MY_USER_ID, name:MY_NAME, initials:MY_INITIALS, avatarUrl:MY_AVATAR_URL, isOrganizer:String(MY_USER_ID)===String(ORGANIZER_ID) });
+        requestPresence(true);
+    }
+
+    let recoveryRunning=false;
+    let lastRecoveryAt=0;
+    let presenceHeartbeatInterval=null;
+
+    async function repairMeetingMedia(forcePresence=false){
+        if(document.visibilityState!=='visible') return;
+
+        // Recovery is event-driven. Prevent overlapping repair/renegotiation storms
+        // when online/pageshow/visibility/device events fire close together.
+        const now=Date.now();
+        if(recoveryRunning) return;
+        if(!forcePresence && now-lastRecoveryAt<1500) return;
+        recoveryRunning=true;
+        lastRecoveryAt=now;
+
+        try{
+            connectToAll();
+
+            Object.keys(peers).forEach(uid=>{
+                const pc=peers[uid];
+                if(!pc || pc.connectionState==='closed' || leftUsers.has(String(uid))) return;
+
+                const connected=(
+                    pc.connectionState==='connected' ||
+                    pc.iceConnectionState==='connected' ||
+                    pc.iceConnectionState==='completed'
+                );
+
+                if(connected){
+                    attachRemoteStream(uid);
+                    return;
+                }
+
+                if(pc.connectionState==='failed' || pc.iceConnectionState==='failed'){
+                    if(shouldInitiate(uid)) restartPeer(uid);
+                    else requestPresence(false);
+                    return;
+                }
+
+                if(pc.connectionState==='connecting' || pc.iceConnectionState==='checking' || pc.connectionState==='disconnected'){
+                    armPeerWatchdog(uid,pc);
+                }
+            });
+
+            requestPresence(forcePresence);
+            unlockRemoteAudio();
+        }finally{
+            recoveryRunning=false;
+        }
+    }
+
+    window.addEventListener('online', ()=>{
+        setTimeout(()=>repairMeetingMedia(true),250);
+    });
+    window.addEventListener('pageshow', ()=>{
+        setTimeout(()=>repairMeetingMedia(true),300);
+    });
+    document.addEventListener('visibilitychange', ()=>{
+        if(document.visibilityState==='visible'){
+            setTimeout(()=>repairMeetingMedia(true),250);
+            setTimeout(()=>unlockRemoteMedia(),450);
+            if(isMicOn){ startTranscript(); startRecognition(); }
+        }else{
+            stopRecognition();
+        }
+    });
+    let mediaDeviceChangeTimer=null;
+    if(navigator.mediaDevices?.addEventListener){
+        navigator.mediaDevices.addEventListener('devicechange',()=>{
+            clearTimeout(mediaDeviceChangeTimer);
+            mediaDeviceChangeTimer=setTimeout(()=>{
+                if(document.visibilityState!=='visible') return;
+                if((isMicOn && !liveLocalTrack('audio')) || (isCameraOn && !liveLocalTrack('video'))){
+                    repairMeetingMedia(true);
+                }
+            },1200);
+        });
+    }
+
+    // Autoplay recovery is armed only when playback actually fails (armAudioUnlock).
+    // Do not run media-unlock work on every click/touch/key event.
+
+    /* ---------- Boot ---------- */
+    window.addEventListener('load', async () => {
+        renderMyOwnTile();
+        setupPanelResize();
+        renderPeopleList();
+
+        // Live roster comes only from current Reverb presence.
+        // Historical database join flags must not create ghost tiles/people.
+        renderPeopleList();
+        refreshEmptyStage();
+
+        await startAudio();
+        const realtimeReady=await listenForSignals();
+        announceJoin(true);
+        scheduleAutoEnd();
+
+        // Bounded startup recovery only. Do not continuously resync tracks,
+        // renegotiate peers, reacquire media, or reattach streams on timers.
+        setTimeout(()=>repairMeetingMedia(false),500);
+
+        if(!realtimeReady){
+            setTimeout(()=>announceJoin(true),1500);
+        }
+
+        // Lightweight roster heartbeat only. WebRTC repair itself is driven by
+        // connection/network/device events and per-peer watchdogs.
+        presenceHeartbeatInterval=setInterval(()=>{
+            if(document.visibilityState==='visible') requestPresence(false);
+        },30000);
+    });
+</script>
+</body>
+</html>

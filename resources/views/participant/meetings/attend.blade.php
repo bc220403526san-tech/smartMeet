@@ -2375,6 +2375,15 @@
                     showModerationNotice('📷 Organizer requested your camera. Tap Camera to turn it on.');
                     return;
                 }
+                if(control==='camera-off' && controlUser===String(MY_USER_ID)){
+                    if(isCameraOn){
+                        await toggleCamera();
+                    }else{
+                        setCameraButton(false);
+                    }
+                    showModerationNotice('📷 Your camera was turned off by the organizer.');
+                    return;
+                }
             }
 
             const text=data.data?.text||''; if(!text) return;
