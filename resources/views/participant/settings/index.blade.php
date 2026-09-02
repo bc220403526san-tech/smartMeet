@@ -1,4 +1,3 @@
-
 <x-layouts.app>
     <x-slot name="header">
         <x-header.page-title title="Participant Dashboard" />
@@ -251,11 +250,17 @@
                         <div id="role-request-rejected-alert"
                              data-role-request-id="{{ $lastRequest->id }}"
                              class="flex items-start gap-3 bg-rose-50 border border-rose-200 rounded-xl p-4 mb-4 transition-all duration-300">
-                            <div class="w-9 h-9 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-rose-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+
+                            {{-- Existing cross icon is now the ONLY dismiss button --}}
+                            <button type="button"
+                                    id="dismiss-role-request-rejection"
+                                    aria-label="Dismiss rejected role request message"
+                                    title="Dismiss"
+                                    class="w-9 h-9 rounded-full bg-rose-100 hover:bg-rose-200 flex items-center justify-center shrink-0 transition-colors focus:outline-none focus:ring-2 focus:ring-rose-300">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-rose-600 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                                 </svg>
-                            </div>
+                            </button>
 
                             <div class="flex-1 min-w-0">
                                 <p class="text-sm font-semibold text-rose-800">Request declined</p>
@@ -263,16 +268,6 @@
                                     Your last request wasn't approved. You're welcome to submit a new one below.
                                 </p>
                             </div>
-
-                            <button type="button"
-                                    id="dismiss-role-request-rejection"
-                                    aria-label="Dismiss rejected role request message"
-                                    title="Dismiss"
-                                    class="shrink-0 w-8 h-8 -mt-1 -mr-1 rounded-lg flex items-center justify-center text-rose-400 hover:text-rose-700 hover:bg-rose-100 focus:outline-none focus:ring-2 focus:ring-rose-300 transition-colors">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
                         </div>
                     @endif
                     <button type="button"
@@ -686,7 +681,7 @@
                     return;
                 }
             } catch (error) {
-                // localStorage may be unavailable in strict/private browser modes.
+                // Ignore storage restrictions; current-page dismiss still works.
             }
 
             dismissButton.addEventListener('click', function () {
@@ -694,7 +689,7 @@
                     try {
                         localStorage.setItem(storageKey, requestId);
                     } catch (error) {
-                        // Dismiss still works for the current page.
+                        // Ignore storage restrictions.
                     }
                 }
 
