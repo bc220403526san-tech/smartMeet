@@ -10,7 +10,6 @@ use App\Models\MeetingInvite;
 use App\Models\MeetingParticipant;
 use App\Models\Notification;
 use App\Models\User;
-use App\Rules\StrongEmail;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -122,7 +121,7 @@ class MeetingController extends Controller
 
         // Validate every optional invite address before the meeting is created.
         // The UI accepts multiple comma/semicolon/new-line separated addresses,
-        // so each address is checked with Laravel's RFC + DNS validation.
+        // so each address is checked with Laravel's RFC + domain-dot validation.
         if (trim((string) $request->invite_emails) !== '') {
             $this->validateInviteEmailList(
                 (string) $request->invite_emails,
@@ -478,7 +477,7 @@ class MeetingController extends Controller
 
     /**
      * Convert a comma/semicolon/new-line separated email string into a clean,
-     * unique list. Actual RFC + DNS validation is handled separately so invalid
+     * unique list. Actual RFC + domain-dot validation is handled separately so invalid
      * addresses are never silently discarded.
      */
     private function parseInviteEmails(?string $value): array
@@ -498,10 +497,11 @@ class MeetingController extends Controller
     }
 
     /**
-     * Validate every invite address with Laravel's RFC + DNS checks.
+     * Validate every invite address with Laravel's RFC + domain-dot checks.
      *
      * This is the multi-email equivalent of:
-     * $request->validate(['email' => ['required', 'email:rfc,dns', new StrongEmail]]);
+     * $request->validate(['email' => ['required', 'email:rfc',
+    'regex:/^.+@.+\\..+$/']]);
      */
     private function validateInviteEmailList(
         string $value,
@@ -526,7 +526,8 @@ class MeetingController extends Controller
         foreach ($emails as $email) {
             $validator = Validator::make(
                 ['email' => $email],
-                ['email' => ['required', 'email:rfc,dns', new StrongEmail]]
+                ['email' => ['required', 'email:rfc',
+                    'regex:/^.+@.+\\..+$/']]
             );
 
             if ($validator->fails()) {

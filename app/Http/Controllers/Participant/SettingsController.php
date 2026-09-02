@@ -8,7 +8,6 @@ use App\Models\MeetingParticipant;
 use App\Models\Notification;
 use App\Models\RoleRequest;
 use App\Models\User;
-use App\Rules\StrongEmail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -58,14 +57,14 @@ class SettingsController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => [
                 'required',
-                'email:rfc,dns',
-                new StrongEmail,
+                'email:rfc',
+                'regex:/^.+@.+\\..+$/',
                 'max:255',
                 Rule::unique('users', 'email')->ignore($user->id),
             ],
             'phone' => ['nullable', 'string', 'max:30'],
         ], [
-            'email.email' => 'Please enter a valid email address with a real mail domain.',
+            'email.email' => 'Please enter a valid email address, for example name@example.com.',
         ]);
 
         $validated['email'] = strtolower(trim($validated['email']));
@@ -256,7 +255,7 @@ class SettingsController extends Controller
         foreach ($admins as $admin) {
             $emailValidator = Validator::make(
                 ['email' => $admin->email],
-                ['email' => ['required', 'email:rfc,dns', new StrongEmail]]
+                ['email' => ['required', 'email:rfc', 'regex:/^.+@.+\\..+$/']]
             );
 
             if ($emailValidator->fails()) {
