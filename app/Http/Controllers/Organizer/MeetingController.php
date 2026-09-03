@@ -772,7 +772,17 @@ class MeetingController extends Controller
 
     private function syncSingleMeetingStatus(Meeting $meeting): void
     {
-        if (in_array($meeting->status, ['cancelled', 'completed', 'ended'], true)) {
+        /*
+         * IMPORTANT:
+         * ended / cancelled / completed are FINAL statuses.
+         *
+         * Always refresh first, then use an atomic conditional UPDATE below.
+         * This prevents a stale request that loaded the meeting as "active"
+         * from later overwriting a newer organizer action such as ended/cancelled.
+         */
+        $meeting->refresh();
+
+        if (!in_array($meeting->status, ['upcoming', 'active'], true)) {
             return;
         }
 
@@ -790,11 +800,24 @@ class MeetingController extends Controller
             $correctStatus = 'active';
         }
 
-        if ($meeting->status !== $correctStatus) {
-            $meeting->update([
+        if ($meeting->status === $correctStatus) {
+            return;
+        }
+
+        /*
+         * Atomic guard:
+         * Update ONLY when the database row is still upcoming/active.
+         * If another request has already set ended/cancelled/completed,
+         * this UPDATE affects 0 rows and the final status stays untouched.
+         */
+        Meeting::query()
+            ->whereKey($meeting->id)
+            ->whereIn('status', ['upcoming', 'active'])
+            ->update([
                 'status' => $correctStatus,
             ]);
-        }
+
+        $meeting->refresh();
     }
 
     private function getMeetingStartTime(Meeting $meeting): Carbon

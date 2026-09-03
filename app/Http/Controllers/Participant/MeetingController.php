@@ -370,6 +370,14 @@ class MeetingController extends Controller
      */
     private function syncSingleMeetingStatus(Meeting $meeting): void
     {
+        /*
+         * ended / cancelled / completed are FINAL statuses.
+         *
+         * Refresh first so this request does not act on an old in-memory
+         * "active" value after the organizer has already ended/cancelled it.
+         */
+        $meeting->refresh();
+
         if (!in_array($meeting->status, ['upcoming', 'active'], true)) {
             return;
         }
@@ -388,10 +396,23 @@ class MeetingController extends Controller
             $newStatus = 'upcoming';
         }
 
-        if ($meeting->status !== $newStatus) {
-            $meeting->status = $newStatus;
-            $meeting->save();
+        if ($meeting->status === $newStatus) {
+            return;
         }
+
+        /*
+         * Atomic terminal-status protection.
+         * A stale participant refresh/poll can NEVER turn:
+         * ended -> completed, cancelled -> completed, or completed -> anything.
+         */
+        Meeting::query()
+            ->whereKey($meeting->id)
+            ->whereIn('status', ['upcoming', 'active'])
+            ->update([
+                'status' => $newStatus,
+            ]);
+
+        $meeting->refresh();
     }
 
     /**
