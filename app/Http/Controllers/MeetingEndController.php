@@ -19,7 +19,7 @@ class MeetingEndController extends Controller
         abort_unless($allowed, 403);
         abort_unless($meeting->status === 'ended', 404);
 
-        $meeting->loadMissing('organizer');
+        $meeting->loadMissing('organizers');
 
         $isOrganizer =
             (string) $meeting->organizer_id === (string) $user->id;
@@ -27,7 +27,7 @@ class MeetingEndController extends Controller
         return view('meetings.ended', [
             'meeting' => $meeting,
             'backUrl' => $isOrganizer
-                ? route('organizer.meetings.index')
+                ? route('organizers.meetings.index')
                 : route('participant.meetings.index'),
         ]);
     }
@@ -50,7 +50,7 @@ class MeetingEndController extends Controller
         return view('meetings.ended', [
             'meeting' => $meeting,
             'backUrl' => $isOrganizer
-                ? route('organizer.meetings.index')
+                ? route('organizers.meetings.index')
                 : route('participant.meetings.index'),
         ]);
     }

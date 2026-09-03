@@ -13,7 +13,7 @@
     // Role ke hisaab se dynamic settings route
     $settingsRoute = match($u?->role) {
         'admin'       => 'admin.settings.index',
-        'organizer'   => 'organizer.settings.index',
+        'organizers'   => 'organizers.settings.index',
         'participant' => 'participant.settings.index',
         default       => 'settings',
     };

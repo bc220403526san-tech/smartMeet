@@ -79,7 +79,7 @@ class DashboardController extends Controller
         $dismissedKeys = DismissedActivity::pluck('activity_key')->toArray();
 
         // ✅ 50 lo — filter ke baad limit lagega
-        $recentMeetings = Meeting::with('organizer')->latest()->take(50)->get();
+        $recentMeetings = Meeting::with('organizers')->latest()->take(50)->get();
         foreach ($recentMeetings as $meeting) {
             $key = 'meeting-' . $meeting->id;
             if (in_array($key, $dismissedKeys)) continue;

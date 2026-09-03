@@ -3,12 +3,15 @@
 namespace App\Http\Controllers\Participant;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Participant\Concerns\SyncsParticipantMeetings;
 use App\Models\Meeting;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 
 class DashboardController extends Controller
 {
+    use SyncsParticipantMeetings;
+
     public function index()
     {
         $user = Auth::user();
@@ -16,6 +19,13 @@ class DashboardController extends Controller
         $now = Carbon::now($timezone);
         $today = $now->toDateString();
         $scheduleEnd = $now->copy()->addHours(48);
+
+        /*
+         * Same exact server-time synchronization as My Meetings / Today,
+         * so the dashboard never shows a stale Upcoming/Active status
+         * until someone manually refreshes.
+         */
+        $this->syncParticipantMeetingStatuses($user->id);
 
         /*
          * Use the same participants relationship as My Meetings.
@@ -26,22 +36,15 @@ class DashboardController extends Controller
                 $query->where('user_id', $user->id);
             });
 
-        $totalMeetings = (clone $participantMeetings)->count();
+        $stats = $this->getParticipantMeetingStats($user->id, $today);
 
-        $todayMeetings = (clone $participantMeetings)
-            ->whereDate('date', $today)
-            ->count();
-
-        $liveMeetings = (clone $participantMeetings)
-            ->where('status', 'active')
-            ->count();
-
-        $upcomingMeetings = (clone $participantMeetings)
-            ->where('status', 'upcoming')
-            ->count();
+        $totalMeetings = $stats['total'];
+        $todayMeetings = $stats['today'];
+        $liveMeetings = $stats['active'];
+        $upcomingMeetings = $stats['upcoming'];
 
         $schedule = (clone $participantMeetings)
-            ->with(['organizer:id,name,email,image,avatar'])
+            ->with(['organizers:id,name,email,image,avatar'])
             ->where(function ($query) use ($today, $now, $scheduleEnd) {
                 $query
                     ->where(function ($active) use ($today) {
@@ -70,12 +73,19 @@ class DashboardController extends Controller
             ->take(10)
             ->get();
 
+        // Exact server-time boundaries so the stat cards and schedule table
+        // flip Upcoming -> Active -> Completed live, without a page refresh.
+        $serverNowMs = now('UTC')->valueOf();
+        $nextTransitionMs = $this->getNextParticipantMeetingTransition($user->id)?->valueOf();
+
         return view('participant.dashboard', compact(
             'totalMeetings',
             'todayMeetings',
             'liveMeetings',
             'upcomingMeetings',
-            'schedule'
+            'schedule',
+            'serverNowMs',
+            'nextTransitionMs'
         ));
     }
 }

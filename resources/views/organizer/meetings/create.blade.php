@@ -36,7 +36,7 @@
                             </ul>
                         </div>
                     @endif
-                    <form action="{{ route('organizer.meetings.store') }}" method="POST" id="meeting-form">
+                    <form action="{{ route('organizers.meetings.store') }}" method="POST" id="meeting-form">
                         @csrf
                         <!-- TITLE -->
                         <div class="mb-5">
@@ -282,7 +282,7 @@
                         </div>
                         <!-- BUTTONS -->
                         <div class="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-2 border-t border-gray-100">
-                            <a href="{{ route('organizer.meetings.index') }}"
+                            <a href="{{ route('organizers.meetings.index') }}"
                                class="px-6 py-2.5 text-sm text-gray-600 border border-gray-200 rounded-xl
                                       hover:bg-gray-50 transition w-full sm:w-auto text-center font-medium">
                                 Cancel

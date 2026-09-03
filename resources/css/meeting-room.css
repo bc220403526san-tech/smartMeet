@@ -1382,7 +1382,7 @@ body{
 /* =========================================================
    RESPONSIVE COMPATIBILITY OVERRIDES
    Keeps the shared stylesheet from forcing fixed tile heights
-   in the newer organizer/participant room templates.
+   in the newer organizers/participant room templates.
 ========================================================= */
 .video-grid{
     grid-auto-rows:auto;

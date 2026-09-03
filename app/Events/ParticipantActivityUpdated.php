@@ -27,7 +27,7 @@ class ParticipantActivityUpdated implements ShouldBroadcastNow
     public function broadcastOn(): array
     {
         return [
-            new PrivateChannel('organizer.' . $this->organizerId),
+            new PrivateChannel('organizers.' . $this->organizerId),
         ];
     }
 

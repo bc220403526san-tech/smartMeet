@@ -13,7 +13,7 @@
             <x-sidebar.sidebar-link
                 route="organizer.dashboard"
                 label="Dashboard"
-                :active="request()->routeIs('organizer.dashboard')">
+                :active="request()->routeIs('organizers.dashboard')">
 
                 <x-slot name="icon">
                     <path stroke-linecap="round" stroke-linejoin="round"
@@ -26,7 +26,7 @@
             <x-sidebar.sidebar-link
                 route="organizer.meetings.index"
                 label="My Meetings"
-                :active="request()->routeIs('organizer.meetings.index','organizer.meetings.show','organizer.meetings.edit')">
+                :active="request()->routeIs('organizers.meetings.index','organizers.meetings.show','organizers.meetings.edit')">
 
                 <x-slot name="icon">
                     <path stroke-linecap="round" stroke-linejoin="round"
@@ -39,7 +39,7 @@
             <x-sidebar.sidebar-link
                 route="organizer.meetings.create"
                 label="Create Meeting"
-                :active="request()->routeIs('organizer.meetings.create')">
+                :active="request()->routeIs('organizers.meetings.create')">
 
                 <x-slot name="icon">
                     <path stroke-linecap="round" stroke-linejoin="round"
@@ -52,7 +52,7 @@
             <x-sidebar.sidebar-link
                 route="organizer.participants.index"
                 label="Participants"
-                :active="request()->routeIs('organizer.participants.*')">
+                :active="request()->routeIs('organizers.participants.*')">
 
                 <x-slot name="icon">
                     <path stroke-linecap="round" stroke-linejoin="round"
@@ -65,7 +65,7 @@
             <x-sidebar.sidebar-link
                 route="organizer.settings.index"
                 label="Settings"
-                :active="request()->routeIs('organizer.settings.index')">
+                :active="request()->routeIs('organizers.settings.index')">
 
                 <x-slot name="icon">
                     <path stroke-linecap="round" stroke-linejoin="round"

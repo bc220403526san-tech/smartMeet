@@ -24,7 +24,7 @@ class MeetingParticipantObserver
 
     private function broadcast(MeetingParticipant $participant): void
     {
-        // meeting relation se organizer_id nikal ke usi organizer ke channel par bhejo
+        // meeting relation se organizer_id nikal ke usi organizers ke channel par bhejo
         $organizerId = optional($participant->meeting)->organizer_id;
 
         if ($organizerId) {

@@ -6,6 +6,6 @@ Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
     return (int) $user->id === (int) $id;
 });
 
-Broadcast::channel('organizer.{organizerId}', function ($user, $organizerId) {
+Broadcast::channel('organizers.{organizerId}', function ($user, $organizerId) {
     return (int) $user->id === (int) $organizerId;
 });

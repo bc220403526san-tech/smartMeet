@@ -17,7 +17,7 @@ class RoleMiddleware
         $userRole = Auth::user()->role;
 
         if ($userRole !== $role) {
-            if (in_array($userRole, ['admin', 'organizer', 'participant']) && Route::has($userRole . '.dashboard')) {
+            if (in_array($userRole, ['admin', 'organizers', 'participant']) && Route::has($userRole . '.dashboard')) {
                 return redirect()->route($userRole . '.dashboard');
             }
 

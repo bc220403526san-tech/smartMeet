@@ -1065,7 +1065,7 @@
             <button class="tile-expand-btn" onclick="toggleMaximize('${uid}')"><i class="fa fa-expand" id="expand-icon-${uid}"></i></button>
         </div>
         <div class="tile-info">
-            <div class="tile-name">${isOrganizer?'<i class="fa fa-crown" style="color:#fbbf24;font-size:10px;"></i> ':''}${escapeHtml(name)}<span class="role-badge ${isOrganizer?'organizer':'participant'}">${isOrganizer?'Organizer':'Participant'}</span></div>
+            <div class="tile-name">${isOrganizer?'<i class="fa fa-crown" style="color:#fbbf24;font-size:10px;"></i> ':''}${escapeHtml(name)}<span class="role-badge ${isOrganizer?'organizers':'participant'}">${isOrganizer?'Organizer':'Participant'}</span></div>
             <div class="tile-icons">
                 <div class="speaking-indicator" id="speaking-${uid}" style="display:none;"><div class="speaking-bar"></div><div class="speaking-bar"></div><div class="speaking-bar"></div></div>
                 <div class="mic-off" id="micoff-${uid}" style="display:${startsMuted?'flex':'none'};"><i class="fa fa-microphone-slash"></i></div>
@@ -2297,12 +2297,12 @@
         if(isSelf && !['meeting-cancelled','meeting-ended'].includes(data.type)) return;
 
         if(data.type==='meeting-cancelled'){
-            showToast('🚫 The organizer ended this meeting.');
+            showToast('🚫 The organizers ended this meeting.');
             setTimeout(()=>{ cleanup(); window.location.href=CANCELLED_PAGE_URL; },4500);
             return;
         }
         if(data.type==='meeting-ended'){
-            showToast('📞 The organizer ended this meeting.');
+            showToast('📞 The organizers ended this meeting.');
             setTimeout(()=>{
                 try{ cleanup(); }catch(e){}
                 window.location.href=ENDED_PAGE_URL;
@@ -2414,7 +2414,7 @@
                 return;
             }
 
-            // Moderation commands are trusted only when sent by the real organizer.
+            // Moderation commands are trusted only when sent by the real organizers.
             if(from===String(ORGANIZER_ID)){
                 if(control==='camera-off' && controlUser===String(MY_USER_ID)){
                     if(isCameraOn){
@@ -2422,7 +2422,7 @@
                     }else{
                         setCameraButton(false);
                     }
-                    showModerationNotice('📹 Your camera was turned off by the organizer.');
+                    showModerationNotice('📹 Your camera was turned off by the organizers.');
                     return;
                 }
 
@@ -2430,16 +2430,16 @@
                     try{
                         if(!isCameraOn) await toggleCamera();
                         else setCameraButton(true);
-                        showModerationNotice('📹 Your camera was turned on by the organizer.');
+                        showModerationNotice('📹 Your camera was turned on by the organizers.');
                     }catch(e){
-                        console.warn('[SmartMeet] organizer camera-on failed',e);
+                        console.warn('[SmartMeet] organizers camera-on failed',e);
                         showModerationNotice('Please allow camera access to turn it on.');
                     }
                     return;
                 }
 
                 if(control==='participant-removed' && controlUser===String(MY_USER_ID)){
-                    showModerationNotice('🚫 You were restricted from this meeting by the organizer.');
+                    showModerationNotice('🚫 You were restricted from this meeting by the organizers.');
                     setTimeout(()=>{ try{ cleanup(); }catch(e){} window.location.href=LEAVE_URL; },1700);
                     return;
                 }
@@ -2522,7 +2522,7 @@
             if(localStream) localStream.getAudioTracks().forEach(t=>t.enabled=false);
             setMicButton(false);
             stopRecognition();
-            showModerationNotice('🎙️ Your microphone was muted by the organizer.');
+            showModerationNotice('🎙️ Your microphone was muted by the organizers.');
             if(localStream) broadcastMyMicStatus();
             return;
         }
@@ -2531,9 +2531,9 @@
                 try{
                     if(!isMicOn) await toggleMic();
                     else setMicButton(true);
-                    showModerationNotice('🎙️ Your microphone was unmuted by the organizer.');
+                    showModerationNotice('🎙️ Your microphone was unmuted by the organizers.');
                 }catch(e){
-                    console.warn('[SmartMeet] organizer unmute failed',e);
+                    console.warn('[SmartMeet] organizers unmute failed',e);
                     showModerationNotice('Please allow microphone access to unmute.');
                 }
             }

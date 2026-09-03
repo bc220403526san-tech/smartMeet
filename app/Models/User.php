@@ -162,7 +162,7 @@ class User extends Authenticatable
 
     public function isOrganizer(): bool
     {
-        return $this->role === 'organizer';
+        return $this->role === 'organizers';
     }
 
     public function isParticipant(): bool
@@ -190,7 +190,7 @@ class User extends Authenticatable
             'admin' =>
             'bg-blue-100 text-blue-700',
 
-            'organizer' =>
+            'organizers' =>
             'bg-gray-200 text-gray-700',
 
             'participant' =>

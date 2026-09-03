@@ -13,7 +13,7 @@
 
     {{-- VIEW --}}
     <a
-        href="{{ route('organizer.meetings.show', $meeting) }}"
+        href="{{ route('organizers.meetings.show', $meeting) }}"
         title="View meeting"
         class="w-8 h-8 rounded-lg
                bg-gray-100 hover:bg-blue-100
@@ -33,7 +33,7 @@
             onclick="openMeetingEmailInvite(
                 '{{ $meeting->id }}',
                 @js($meeting->title),
-                @js(route('organizer.meetings.sendInvite', $meeting))
+                @js(route('organizers.meetings.sendInvite', $meeting))
             )"
             class="w-8 h-8 rounded-lg
                    bg-gray-100 hover:bg-blue-100
@@ -67,7 +67,7 @@
     @if($meeting->status === 'upcoming')
 
         <a
-            href="{{ route('organizer.meetings.edit', $meeting) }}"
+            href="{{ route('organizers.meetings.edit', $meeting) }}"
             title="Edit meeting"
             class="w-8 h-8 rounded-lg
                    bg-gray-100 hover:bg-blue-100
@@ -85,7 +85,7 @@
 
         <form
             method="POST"
-            action="{{ route('organizer.meetings.cancel', $meeting) }}"
+            action="{{ route('organizers.meetings.cancel', $meeting) }}"
             onsubmit="
                 return confirm(
                     'Cancel this meeting? Participants will no longer be able to join.'
@@ -353,7 +353,7 @@
         |--------------------------------------------------------------------------
         |
         | Previous working logic restored:
-        | - same organizer sendInvite route
+        | - same organizers sendInvite route
         | - multiple emails
         | - same subject/message payload
         | - CSRF

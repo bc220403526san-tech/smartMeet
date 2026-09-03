@@ -101,7 +101,7 @@
                     @endphp
 
                     @foreach($statuses as $value => $config)
-                        <a href="{{ route('organizer.meetings.index', ['status' => $value]) }}"
+                        <a href="{{ route('organizers.meetings.index', ['status' => $value]) }}"
                            class="filter-link text-xs px-4 py-2 rounded-xl transition
                                   {{ request('status', '') == $value ? $config['active'] : $config['inactive'] }}"
                            data-status="{{ $value }}"
@@ -111,7 +111,7 @@
                         </a>
                     @endforeach
 
-                    <a href="{{ route('organizer.meetings.create') }}"
+                    <a href="{{ route('organizers.meetings.create') }}"
                        class="text-xs px-4 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition shadow-sm">
                         + New Meeting
                     </a>
@@ -209,7 +209,7 @@
             const paginationWrapper = document.getElementById('pagination-wrapper');
             const showingText = document.getElementById('showing-text');
             const exactTimeIndicator = document.getElementById('exact-time-indicator');
-            const indexUrl = @json(route('organizer.meetings.index'));
+            const indexUrl = @json(route('organizers.meetings.index'));
 
             let state = {
                 status: @json(request('status', '')),

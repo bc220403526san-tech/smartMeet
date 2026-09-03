@@ -16,7 +16,7 @@ class RedirectIfAuthenticated
             if (Auth::guard($guard)->check()) {
                 $role = Auth::user()->role;
 
-                if (in_array($role, ['admin', 'organizer', 'participant']) && Route::has($role . '.dashboard')) {
+                if (in_array($role, ['admin', 'organizers', 'participant']) && Route::has($role . '.dashboard')) {
                     return redirect()->route($role . '.dashboard');
                 }
 

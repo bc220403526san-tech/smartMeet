@@ -9,7 +9,7 @@
         <!-- TOP BAR -->
         <div class="flex items-center justify-between">
             <div class="flex items-center gap-2 text-sm text-gray-500">
-                <a href="{{ route('organizer.meetings.index') }}"
+                <a href="{{ route('organizers.meetings.index') }}"
                    class="hover:text-blue-600 transition flex items-center gap-1">
                     <i class="fa-solid fa-arrow-left text-xs"></i>
                     Back to Meetings
@@ -20,7 +20,7 @@
             <div class="flex items-center gap-2">
                 {{-- Edit — sirf upcoming --}}
                 @if($meeting->status === 'upcoming')
-                    <a href="{{ route('organizer.meetings.edit', $meeting) }}"
+                    <a href="{{ route('organizers.meetings.edit', $meeting) }}"
                        class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200
                               rounded-lg hover:bg-gray-50 hover:border-gray-300 transition shadow-sm">
                         Edit Meeting
@@ -28,7 +28,7 @@
                 @endif
                 {{-- Cancel — upcoming ya active --}}
                 @if(in_array($meeting->status, ['upcoming', 'active']))
-                    <form action="{{ route('organizer.meetings.cancel', $meeting) }}"
+                    <form action="{{ route('organizers.meetings.cancel', $meeting) }}"
                           method="POST"
                           onsubmit="return confirm('Cancel this meeting?')">
                         @csrf

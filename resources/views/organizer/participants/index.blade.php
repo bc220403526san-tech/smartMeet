@@ -123,7 +123,7 @@
         const tbody             = document.getElementById('participants-tbody');
         const paginationWrapper = document.getElementById('pagination-wrapper');
         const showingText       = document.getElementById('showing-text');
-        const indexUrl          = "{{ route('organizer.participants.index') }}";
+        const indexUrl          = "{{ route('organizers.participants.index') }}";
         const csrfToken         = "{{ csrf_token() }}";
         const toast          = document.getElementById('participant-toast');
         let state = { search: "{{ request('search', '') }}", page: {{ (int) request('page', 1) }} };

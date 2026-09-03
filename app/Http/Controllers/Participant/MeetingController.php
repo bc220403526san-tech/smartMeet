@@ -3,12 +3,15 @@
 namespace App\Http\Controllers\Participant;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Participant\Concerns\SyncsParticipantMeetings;
 use App\Models\Meeting;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class MeetingController extends Controller
 {
+    use SyncsParticipantMeetings;
+
     // ── INDEX ──
     public function index(Request $request)
     {
@@ -17,19 +20,19 @@ class MeetingController extends Controller
         $today = Carbon::now($timezone)->toDateString();
 
         // Keep only time-based Upcoming -> Active -> Completed synchronized from server time.
-        // "ended" is reserved for the organizer's explicit End Meeting action.
+        // "ended" is reserved for the organizers's explicit End Meeting action.
         $this->syncParticipantMeetingStatuses($userId);
 
         /*
          * Lightweight live-status endpoint using the EXISTING participant
          * meetings index route. This avoids depending on a second route and
-         * mirrors the organizer dashboard's server-time synchronization.
+         * mirrors the organizers dashboard's server-time synchronization.
          */
         if ($request->boolean('status_sync')) {
             return $this->participantStatusSyncResponse($request, $userId, $today);
         }
 
-        $query = Meeting::with(['organizer', 'participants'])
+        $query = Meeting::with(['organizers', 'participants'])
             ->whereHas('participants', function ($q) use ($userId) {
                 $q->where('user_id', $userId);
             });
@@ -72,34 +75,20 @@ class MeetingController extends Controller
             ->paginate(4)
             ->withQueryString();
 
-        $participantMeetings = Meeting::whereHas('participants', function ($q) use ($userId) {
-            $q->where('user_id', $userId);
-        });
+        $stats = $this->getParticipantMeetingStats($userId, $today);
 
-        $upcomingToday = (clone $participantMeetings)
-            ->whereDate('date', $today)
-            ->where('status', 'upcoming')
-            ->count();
-
-        $totalMeetings = (clone $participantMeetings)->count();
-
-        $completedMeetings = (clone $participantMeetings)
-            ->where('status', 'completed')
-            ->count();
-
-        // Fixes the previous "Undefined variable $serverNowMs" Blade error
-        // and lets the browser schedule status refreshes against server time.
+        // Lets the browser schedule status refreshes against server time.
         $serverNowMs = now('UTC')->valueOf();
         $nextTransitionMs = $this->getNextParticipantMeetingTransition($userId)?->valueOf();
 
-        return view('participant.meetings.index', compact(
-            'meetings',
-            'upcomingToday',
-            'totalMeetings',
-            'completedMeetings',
-            'serverNowMs',
-            'nextTransitionMs'
-        ));
+        return view('participant.meetings.index', [
+            'meetings' => $meetings,
+            'upcomingToday' => $stats['upcomingToday'],
+            'totalMeetings' => $stats['total'],
+            'completedMeetings' => $stats['completed'],
+            'serverNowMs' => $serverNowMs,
+            'nextTransitionMs' => $nextTransitionMs,
+        ]);
     }
 
     // ── TODAY ──
@@ -112,7 +101,7 @@ class MeetingController extends Controller
 
         $this->syncParticipantMeetingStatuses($userId);
 
-        $todayMeetings = Meeting::with(['organizer', 'participants.user'])
+        $todayMeetings = Meeting::with(['organizers', 'participants.user'])
             ->whereHas('participants', function ($q) use ($userId) {
                 $q->where('user_id', $userId);
             })
@@ -182,7 +171,16 @@ class MeetingController extends Controller
                 return $meeting;
             });
 
-        return view('participant.meetings.today', compact('todayMeetings'));
+        // Exact server-time boundaries so today's list flips status
+        // automatically, without a manual refresh.
+        $serverNowMs = now('UTC')->valueOf();
+        $nextTransitionMs = $this->getNextParticipantMeetingTransition($userId)?->valueOf();
+
+        return view('participant.meetings.today', compact(
+            'todayMeetings',
+            'serverNowMs',
+            'nextTransitionMs'
+        ));
     }
 
     // ── SHOW ──
@@ -196,8 +194,8 @@ class MeetingController extends Controller
             abort(403, 'You are not invited to this meeting.');
         }
 
-        $this->syncSingleMeetingStatus($meeting);
-        $meeting->refresh()->load(['organizer', 'participants.user']);
+        $this->syncSingleParticipantMeetingStatus($meeting);
+        $meeting->refresh()->load(['organizers', 'participants.user']);
 
         $meetingTimezone = $meeting->timezone
             ?: config('app.timezone', 'Asia/Karachi');
@@ -222,13 +220,13 @@ class MeetingController extends Controller
             abort(403, 'You are not invited to this meeting.');
         }
 
-        $this->syncSingleMeetingStatus($meeting);
+        $this->syncSingleParticipantMeetingStatus($meeting);
         $meeting->refresh();
 
         if ($meeting->status !== 'active') {
             $message = match ($meeting->status) {
-                'ended' => 'This meeting was ended by the organizer.',
-                'cancelled' => 'This meeting was cancelled by the organizer.',
+                'ended' => 'This meeting was ended by the organizers.',
+                'cancelled' => 'This meeting was cancelled by the organizers.',
                 'completed' => 'This meeting has been completed.',
                 default => "This meeting isn't active right now. You'll be able to join only during its scheduled time.",
             };
@@ -239,7 +237,7 @@ class MeetingController extends Controller
         }
 
         $isOrganizer = false;
-        $meeting->load(['participants.user', 'organizer']);
+        $meeting->load(['participants.user', 'organizers']);
 
         return view('participant.meetings.attend', compact('meeting', 'isOrganizer'));
     }
@@ -265,23 +263,9 @@ class MeetingController extends Controller
             ->when(!empty($ids), fn ($q) => $q->whereIn('id', $ids))
             ->get(['id', 'status']);
 
-        $participantMeetings = Meeting::whereHas(
-            'participants',
-            fn ($q) => $q->where('user_id', $userId)
-        );
-
         return response()->json([
             'meetings' => $meetings->keyBy('id')->map->status,
-            'stats' => [
-                'upcomingToday' => (clone $participantMeetings)
-                    ->whereDate('date', $today)
-                    ->where('status', 'upcoming')
-                    ->count(),
-                'total' => (clone $participantMeetings)->count(),
-                'completed' => (clone $participantMeetings)
-                    ->where('status', 'completed')
-                    ->count(),
-            ],
+            'stats' => $this->getParticipantMeetingStats($userId, $today),
             'server_now_ms' => now('UTC')->valueOf(),
             'next_transition_ms' => $this
                 ->getNextParticipantMeetingTransition($userId)?->valueOf(),
@@ -293,6 +277,8 @@ class MeetingController extends Controller
     }
 
     // ── STATUS CHECK ──
+    // Shared by My Meetings, Today, and the Dashboard — each passes its own
+    // set of meeting `ids`, but all read the same exact-time sync + stats.
     public function statusCheck(Request $request)
     {
         $userId = auth()->id();
@@ -308,31 +294,16 @@ class MeetingController extends Controller
         // Active -> Completed at end time
         $this->syncParticipantMeetingStatuses($userId);
 
-        $meetings = Meeting::whereIn('id', $ids)
+        $meetings = Meeting::query()
             ->whereHas('participants', function ($q) use ($userId) {
                 $q->where('user_id', $userId);
             })
+            ->when(!empty($ids), fn ($q) => $q->whereIn('id', $ids))
             ->get(['id', 'status']);
-
-        $participantMeetings = Meeting::whereHas(
-            'participants',
-            fn ($q) => $q->where('user_id', $userId)
-        );
 
         return response()->json([
             'meetings' => $meetings->keyBy('id')->map->status,
-            'stats' => [
-                'upcomingToday' => (clone $participantMeetings)
-                    ->whereDate('date', $today)
-                    ->where('status', 'upcoming')
-                    ->count(),
-
-                'total' => (clone $participantMeetings)->count(),
-
-                'completed' => (clone $participantMeetings)
-                    ->where('status', 'completed')
-                    ->count(),
-            ],
+            'stats' => $this->getParticipantMeetingStats($userId, $today),
             'server_now_ms' => now('UTC')->valueOf(),
             'next_transition_ms' => $this
                 ->getNextParticipantMeetingTransition($userId)?->valueOf(),
@@ -341,120 +312,5 @@ class MeetingController extends Controller
             'Pragma' => 'no-cache',
             'Expires' => '0',
         ]);
-    }
-
-    /**
-     * Synchronize all meetings visible to this participant against exact
-     * server time. This mirrors the organizer-side status behavior.
-     */
-    private function syncParticipantMeetingStatuses(int|string $userId): void
-    {
-        $meetings = Meeting::whereHas(
-            'participants',
-            fn ($q) => $q->where('user_id', $userId)
-        )
-            ->whereIn('status', ['upcoming', 'active'])
-            ->get();
-
-        foreach ($meetings as $meeting) {
-            $this->syncSingleMeetingStatus($meeting);
-        }
-    }
-
-    /**
-     * Time-based lifecycle only:
-     * Upcoming -> Active exactly at start.
-     * Upcoming/Active -> Completed exactly at scheduled end.
-     *
-     * Ended/Cancelled are terminal manual statuses and are never overwritten here.
-     */
-    private function syncSingleMeetingStatus(Meeting $meeting): void
-    {
-        /*
-         * Only UPCOMING and ACTIVE may change with time.
-         * ENDED, CANCELLED and COMPLETED are permanent final statuses.
-         */
-        $meeting->refresh();
-
-        if (!in_array($meeting->status, ['upcoming', 'active'], true)) {
-            return;
-        }
-
-        $now = now('UTC');
-        $startTime = $this->meetingStartUtc($meeting);
-        $endTime = $startTime->copy()->addMinutes((int) $meeting->duration);
-
-        if ($now->greaterThanOrEqualTo($endTime)) {
-            $newStatus = 'completed';
-        } elseif ($now->greaterThanOrEqualTo($startTime)) {
-            $newStatus = 'active';
-        } else {
-            $newStatus = 'upcoming';
-        }
-
-        if ($meeting->status === $newStatus) {
-            return;
-        }
-
-        /*
-         * Atomic protection:
-         * a stale participant refresh can never overwrite ended/cancelled/completed.
-         */
-        Meeting::query()
-            ->whereKey($meeting->id)
-            ->whereIn('status', ['upcoming', 'active'])
-            ->update([
-                'status' => $newStatus,
-            ]);
-
-        $meeting->refresh();
-    }
-
-    /**
-     * Return the next start/end boundary so the browser can refresh at the
-     * exact scheduled moment instead of relying on a 2-second polling delay.
-     */
-    private function getNextParticipantMeetingTransition(
-        int|string $userId
-    ): ?Carbon {
-        $now = now('UTC');
-        $nextTransition = null;
-
-        $meetings = Meeting::whereHas(
-            'participants',
-            fn ($q) => $q->where('user_id', $userId)
-        )
-            ->whereIn('status', ['upcoming', 'active'])
-            ->get();
-
-        foreach ($meetings as $meeting) {
-            $startTime = $this->meetingStartUtc($meeting);
-            $endTime = $startTime->copy()->addMinutes((int) $meeting->duration);
-
-            if ($meeting->status === 'upcoming' && $startTime->greaterThan($now)) {
-                $candidate = $startTime;
-            } elseif ($endTime->greaterThan($now)) {
-                $candidate = $endTime;
-            } else {
-                continue;
-            }
-
-            if ($nextTransition === null || $candidate->lessThan($nextTransition)) {
-                $nextTransition = $candidate->copy();
-            }
-        }
-
-        return $nextTransition;
-    }
-
-    private function meetingStartUtc(Meeting $meeting): Carbon
-    {
-        $timezone = $meeting->timezone
-            ?: config('app.timezone', 'Asia/Karachi');
-
-        return Carbon::parse(
-            trim($meeting->date . ' ' . $meeting->time),
-            $timezone
-        )->utc();
     }
 }

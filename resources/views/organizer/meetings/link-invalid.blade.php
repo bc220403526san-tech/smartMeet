@@ -20,7 +20,7 @@
         if (auth()->check()) {
             $homeUrl = match (auth()->user()->role) {
                 'admin'      => url('/admin/dashboard'),
-                'organizer'  => url('/organizer/dashboard'),
+                'organizers'  => url('/organizers/dashboard'),
                 default      => url('/participant/dashboard'),
             };
         }

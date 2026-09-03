@@ -17,12 +17,12 @@ class ReportController extends Controller
         $flagged = $request->boolean('flagged');
 
         // ── Base query with filters applied ──
-        $meetingsQuery = Meeting::with(['organizer', 'participants'])
+        $meetingsQuery = Meeting::with(['organizers', 'participants'])
             ->when($status && $status !== 'All Status', fn($q) => $q->where('status', strtolower($status)))
             ->when($flagged, fn($q) => $q->where('is_flagged', true))
             ->when($search, function ($q) use ($search) {
                 $q->where('title', 'like', "%{$search}%")
-                    ->orWhereHas('organizer', fn($q2) => $q2->where('name', 'like', "%{$search}%"));
+                    ->orWhereHas('organizers', fn($q2) => $q2->where('name', 'like', "%{$search}%"));
             });
 
         // ── Stats ──
@@ -39,7 +39,7 @@ class ReportController extends Controller
             'total_users'      => User::count(),
             'active_users'     => User::where('is_active', 1)->count(),
             'inactive_users'   => User::where('is_active', 0)->count(),
-            'organizers'       => User::where('role', 'organizer')->count(),
+            'organizers'       => User::where('role', 'organizers')->count(),
             'participants'     => User::where('role', 'participant')->count(),
             'created_today'    => Meeting::whereDate('created_at', $today)->count(),
             'completed_today'  => Meeting::where('status', 'completed')->whereDate('updated_at', $today)->count(),
@@ -62,7 +62,7 @@ class ReportController extends Controller
             'total_users'     => $change(User::class),
             'active_users'    => $change(User::class, ['is_active' => 1]),
             'inactive_users'  => $change(User::class, ['is_active' => 0]),
-            'organizers'      => $change(User::class, ['role' => 'organizer']),
+            'organizers'      => $change(User::class, ['role' => 'organizers']),
             'participants'    => $change(User::class, ['role' => 'participant']),
         ];
 
@@ -78,12 +78,12 @@ class ReportController extends Controller
         $search  = $request->input('search');
         $flagged = $request->boolean('flagged');
 
-        $meetings = Meeting::with(['organizer', 'participants'])
+        $meetings = Meeting::with(['organizers', 'participants'])
             ->when($status && $status !== 'All Status', fn($q) => $q->where('status', strtolower($status)))
             ->when($flagged, fn($q) => $q->where('is_flagged', true))
             ->when($search, function ($q) use ($search) {
                 $q->where('title', 'like', "%{$search}%")
-                    ->orWhereHas('organizer', fn($q2) => $q2->where('name', 'like', "%{$search}%"));
+                    ->orWhereHas('organizers', fn($q2) => $q2->where('name', 'like', "%{$search}%"));
             })
             ->latest('date')
             ->get();
@@ -99,7 +99,7 @@ class ReportController extends Controller
             'total_users'      => User::count(),
             'active_users'     => User::where('is_active', 1)->count(),
             'inactive_users'   => User::where('is_active', 0)->count(),
-            'organizers'       => User::where('role', 'organizer')->count(),
+            'organizers'       => User::where('role', 'organizers')->count(),
             'participants'     => User::where('role', 'participant')->count(),
             'created_today'    => Meeting::whereDate('created_at', $today)->count(),
             'completed_today'  => Meeting::where('status', 'completed')->whereDate('updated_at', $today)->count(),

@@ -56,7 +56,7 @@
 
                     <span class="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full
                         {{ $user->role == 'admin'       ? 'bg-blue-100 text-blue-600'   : '' }}
-                        {{ $user->role == 'organizer'   ? 'bg-gray-200 text-gray-600'   : '' }}
+                        {{ $user->role == 'organizers'   ? 'bg-gray-200 text-gray-600'   : '' }}
                         {{ $user->role == 'participant' ? 'bg-green-100 text-green-600' : '' }}">
                         {{ strtoupper($user->role) }}
                     </span>

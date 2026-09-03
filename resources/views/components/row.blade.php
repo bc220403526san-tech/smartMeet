@@ -1,4 +1,4 @@
-@props(['title', 'date', 'time', 'organizer', 'image', 'status'])
+@props(['title', 'date', 'time', 'organizers', 'image', 'status'])
 
 @php
     $colors = [

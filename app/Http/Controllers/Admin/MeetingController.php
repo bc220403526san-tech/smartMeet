@@ -17,7 +17,7 @@ class MeetingController extends Controller
         $upcomingMeetings = Meeting::where('status', 'upcoming')->count();
         $issueMeetings    = Meeting::whereIn('status', ['incomplete', 'cancelled', 'flagged'])->count();
 
-        $query = Meeting::with(['organizer', 'participants']);
+        $query = Meeting::with(['organizers', 'participants']);
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
@@ -28,7 +28,7 @@ class MeetingController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('title', 'like', "%{$search}%")
                     ->orWhere('description', 'like', "%{$search}%")
-                    ->orWhereHas('organizer', function ($q2) use ($search) {
+                    ->orWhereHas('organizers', function ($q2) use ($search) {
                         $q2->where('name', 'like', "%{$search}%");
                     });
             });
@@ -57,7 +57,7 @@ class MeetingController extends Controller
 
     public function show(Meeting $meeting)
     {
-        $meeting->load(['organizer', 'participants.user']);
+        $meeting->load(['organizers', 'participants.user']);
         return view('admin.meetings.show', compact('meeting'));
     }
 
@@ -85,11 +85,11 @@ class MeetingController extends Controller
 
     /**
      * Get every user that should be notified for this meeting:
-     * all participants' users + the organizer (deduped, excluding nulls).
+     * all participants' users + the organizers (deduped, excluding nulls).
      */
     protected function notifiableUsersFor(Meeting $meeting)
     {
-        $meeting->loadMissing(['participants.user', 'organizer']);
+        $meeting->loadMissing(['participants.user', 'organizers']);
 
         $participantUsers = $meeting->participants
             ->pluck('user')

@@ -9,7 +9,7 @@
             <!-- TOP BAR -->
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div class="flex items-center gap-2 text-xs">
-                    <a href="{{ route('organizer.meetings.index') }}"
+                    <a href="{{ route('organizers.meetings.index') }}"
                        class="text-gray-400 font-medium hover:text-blue-600 transition">
                         Manage Meetings
                     </a>
@@ -50,7 +50,7 @@
                     </div>
                 </div>
                 <!-- FORM -->
-                <form action="{{ route('organizer.meetings.update', $meeting) }}" method="POST">
+                <form action="{{ route('organizers.meetings.update', $meeting) }}" method="POST">
                     @csrf
                     @method('PUT')
                     <div class="p-5 lg:p-6 space-y-6">
@@ -293,7 +293,7 @@
                         </div>
                         <!-- BUTTONS -->
                         <div class="flex items-center justify-end gap-3 pt-2">
-                            <a href="{{ route('organizer.meetings.index') }}"
+                            <a href="{{ route('organizers.meetings.index') }}"
                                class="h-11 px-5 rounded-2xl bg-white border border-gray-200
                                       text-gray-600 hover:bg-gray-50 transition text-sm font-medium
                                       flex items-center">

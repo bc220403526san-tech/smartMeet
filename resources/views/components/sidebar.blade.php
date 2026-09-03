@@ -4,7 +4,7 @@
         @include('components.sidebar.admin-menu')
     @endif
 
-    @if(auth()->user()->role === 'organizer')
+    @if(auth()->user()->role === 'organizers')
         @include('components.sidebar.organizer-menu')
     @endif
 

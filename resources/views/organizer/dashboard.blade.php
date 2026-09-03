@@ -100,7 +100,7 @@
                     <h2 class="text-base sm:text-lg font-semibold text-gray-800">Today's Meetings</h2>
                     <p class="text-xs text-gray-500">Your schedule for {{ \Carbon\Carbon::today()->format('M d, Y') }}</p>
                 </div>
-                <a href="{{ route('organizer.meetings.index') }}"
+                <a href="{{ route('organizers.meetings.index') }}"
                    class="bg-blue-600 text-white px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium hover:bg-blue-700 transition">
                     View All
                 </a>
@@ -198,7 +198,7 @@
 
                     <div class="flex gap-2 self-start sm:self-center shrink-0 relative z-10">
                         @if($isActive)
-                            <a href="{{ route('organizer.meetings.attend', $meeting) }}"
+                            <a href="{{ route('organizers.meetings.attend', $meeting) }}"
                                class="inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600
                                    text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-md
                                    hover:shadow-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200">
@@ -206,7 +206,7 @@
                                 Join
                             </a>
                         @elseif(!$isCompleted && !$isCancelled)
-                            <a href="{{ route('organizer.meetings.show', $meeting) }}"
+                            <a href="{{ route('organizers.meetings.show', $meeting) }}"
                                class="inline-flex items-center gap-2 text-blue-600 bg-blue-50 border border-blue-100
                                    px-4 py-2.5 rounded-xl text-sm font-medium
                                    hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all duration-200">
@@ -214,7 +214,7 @@
                                 Manage
                             </a>
                         @else
-                            <a href="{{ route('organizer.meetings.show', $meeting) }}"
+                            <a href="{{ route('organizers.meetings.show', $meeting) }}"
                                class="inline-flex items-center gap-2 text-gray-500 bg-gray-50 border border-gray-200
                                    px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-100 transition-all duration-200">
                                 <i class="fa-solid fa-eye text-xs"></i>
@@ -230,7 +230,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10m-11 9h12a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v11a2 2 0 002 2z" />
                     </svg>
                     <p class="text-sm font-medium">No meetings scheduled for today.</p>
-                    <a href="{{ route('organizer.meetings.create') }}"
+                    <a href="{{ route('organizers.meetings.create') }}"
                        class="mt-3 inline-block text-blue-600 text-sm hover:underline">
                         Schedule a meeting →
                     </a>

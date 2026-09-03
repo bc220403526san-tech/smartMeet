@@ -52,7 +52,7 @@ Route::middleware(['auth', 'role:admin'])
         });
 
         /*
-        | Role Requests — approve/reject organizer role change requests
+        | Role Requests — approve/reject organizers role change requests
         */
         Route::prefix('role-requests')->name('role-requests.')->group(function () {
             Route::get('/', [RoleRequestController::class, 'index'])->name('index');

@@ -43,7 +43,7 @@
             <i class="fa fa-calendar-xmark text-4xl mb-3 block"></i>
             No meetings found.
             <div class="mt-3">
-                <a href="{{ route('organizer.meetings.create') }}" class="inline-block text-blue-600 text-sm hover:underline">
+                <a href="{{ route('organizers.meetings.create') }}" class="inline-block text-blue-600 text-sm hover:underline">
                     + Create your first meeting
                 </a>
             </div>

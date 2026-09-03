@@ -12,9 +12,9 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth', 'role:organizer'])
-    ->prefix('organizer')
-    ->name('organizer.')
+Route::middleware(['auth', 'role:organizers'])
+    ->prefix('organizers')
+    ->name('organizers.')
     ->group(function () {
 
         Route::get('/dashboard', [App\Http\Controllers\Organizer\DashboardController::class, 'index'])

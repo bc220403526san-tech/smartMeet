@@ -211,7 +211,7 @@ class MeetingController extends Controller
         }
 
         return redirect()
-            ->route('organizer.meetings.index')
+            ->route('organizers.meetings.index')
             ->with('success', $successMessage);
     }
 
@@ -221,7 +221,7 @@ class MeetingController extends Controller
         $this->syncSingleMeetingStatus($meeting);
 
         $meeting->refresh()->load([
-            'organizer',
+            'organizers',
             'participants.user',
         ]);
 
@@ -236,7 +236,7 @@ class MeetingController extends Controller
 
         if ($meeting->status !== 'upcoming') {
             return redirect()
-                ->route('organizer.meetings.show', $meeting)
+                ->route('organizers.meetings.show', $meeting)
                 ->with('error', 'Only upcoming meetings can be edited.');
         }
 
@@ -263,7 +263,7 @@ class MeetingController extends Controller
 
         if ($meeting->status !== 'upcoming') {
             return redirect()
-                ->route('organizer.meetings.show', $meeting)
+                ->route('organizers.meetings.show', $meeting)
                 ->with('error', 'Only upcoming meetings can be edited.');
         }
 
@@ -342,12 +342,12 @@ class MeetingController extends Controller
         }
 
         return redirect()
-            ->route('organizer.meetings.index')
+            ->route('organizers.meetings.index')
             ->with('success', 'Meeting updated successfully!');
     }
 
     /**
-     * Explicit organizer action from the live room.
+     * Explicit organizers action from the live room.
      *
      * IMPORTANT:
      * - Organizer index/status exact-time synchronization remains unchanged.
@@ -355,10 +355,10 @@ class MeetingController extends Controller
      * - Explicit End Meeting stores status = ended.
      * - Natural scheduled expiry remains status = completed.
      *
-     * Realtime room notification is intentionally sent by the organizer room
+     * Realtime room notification is intentionally sent by the organizers room
      * through the existing signal endpoint AFTER this database write succeeds.
      * That keeps a transient Reverb/broadcast failure from turning this endpoint
-     * into HTTP 500 after the organizer deliberately presses End.
+     * into HTTP 500 after the organizers deliberately presses End.
      */
     public function end(Meeting $meeting)
     {
@@ -479,7 +479,7 @@ class MeetingController extends Controller
         ))->toOthers();
 
         return redirect()
-            ->route('organizer.meetings.index')
+            ->route('organizers.meetings.index')
             ->with('success', 'Meeting cancelled successfully.');
     }
 
@@ -524,7 +524,7 @@ class MeetingController extends Controller
         $meeting->delete();
 
         return redirect()
-            ->route('organizer.meetings.index')
+            ->route('organizers.meetings.index')
             ->with('success', 'Meeting deleted successfully.');
     }
 

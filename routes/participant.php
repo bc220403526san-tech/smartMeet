@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Participant\MeetingAttendController;
 use App\Http\Controllers\Participant\MeetingController;
+use App\Http\Controllers\Participant\OrganizerController;
 use App\Http\Controllers\Participant\SettingsController;
 use Illuminate\Support\Facades\Route;
 
@@ -31,6 +32,14 @@ Route::middleware(['auth', 'role:participant'])
             Route::delete('/deactivate', [SettingsController::class, 'deactivate'])->name('deactivate');
             Route::post('/flash', [SettingsController::class, 'storeFlash'])->name('flash');
             Route::post('/role-request', [SettingsController::class, 'roleRequest'])->name('role-request');
+        });
+
+        /*
+        | Organizers — read-only profile view, reachable from a meeting's
+        | organizers card.
+        */
+        Route::prefix('organizers')->name('organizers.')->group(function () {
+            Route::get('/{organizers}', [OrganizerController::class, 'show'])->name('show');
         });
 
         /*

@@ -60,7 +60,7 @@ class MeetingAttendController extends Controller
 
         $meeting->loadMissing([
             'participants.user',
-            'organizer',
+            'organizers',
         ]);
 
         $allUserIds = $meeting->participants

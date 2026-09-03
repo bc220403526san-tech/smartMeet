@@ -22,8 +22,8 @@ class MeetingJoinController extends Controller
 
         if (in_array($meeting->status, ['cancelled', 'completed', 'ended'], true)) {
             $message = match ($meeting->status) {
-                'cancelled' => 'This meeting has been cancelled by the organizer.',
-                'ended' => 'This meeting was ended by the organizer.',
+                'cancelled' => 'This meeting has been cancelled by the organizers.',
+                'ended' => 'This meeting was ended by the organizers.',
                 default => 'This meeting has already completed.',
             };
 
@@ -45,7 +45,7 @@ class MeetingJoinController extends Controller
         $user = auth()->user();
 
         if ($user->role !== 'participant') {
-            return redirect($user->role === 'admin' ? '/admin/dashboard' : '/organizer/dashboard')
+            return redirect($user->role === 'admin' ? '/admin/dashboard' : '/organizers/dashboard')
                 ->with('error', 'Meeting invite links can only be joined with a Participant account.');
         }
 

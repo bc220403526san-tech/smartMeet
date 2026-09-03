@@ -1,6 +1,6 @@
 @props(['meeting'])
 @if($meeting->status === 'active')
-    <a href="{{ route('organizer.meetings.attend', $meeting->id) }}"
+    <a href="{{ route('organizers.meetings.attend', $meeting->id) }}"
        class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 active:scale-95 text-white text-xs font-semibold rounded-lg transition-all duration-150 shadow-sm">
         <i class="fa fa-video text-[11px]"></i>
         Attend

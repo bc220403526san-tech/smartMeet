@@ -97,8 +97,8 @@ class SocialController extends Controller
             return redirect('/admin/dashboard');
         }
 
-        if ($user->role === 'organizer') {
-            return redirect('/organizer/dashboard');
+        if ($user->role === 'organizers') {
+            return redirect('/organizers/dashboard');
         }
 
         return redirect('/participant/dashboard');

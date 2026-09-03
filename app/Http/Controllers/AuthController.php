@@ -25,7 +25,7 @@ class AuthController extends Controller
                 'confirmed',
                 PasswordRule::min(8)->mixedCase()->letters()->numbers()->symbols(),
             ],
-            'role' => 'required|in:organizer,participant',
+            'role' => 'required|in:organizers,participant',
             'terms' => 'accepted',
         ], [
             'email.email' => 'Please enter a valid email address, for example name@example.com.',
@@ -52,8 +52,8 @@ class AuthController extends Controller
             return $redirect;
         }
 
-        return $user->role === 'organizer'
-            ? redirect('/organizer/dashboard')
+        return $user->role === 'organizers'
+            ? redirect('/organizers/dashboard')
             : redirect('/participant/dashboard');
     }
 
@@ -102,8 +102,8 @@ class AuthController extends Controller
             return redirect('/admin/dashboard');
         }
 
-        if ($user->role === 'organizer') {
-            return redirect('/organizer/dashboard');
+        if ($user->role === 'organizers') {
+            return redirect('/organizers/dashboard');
         }
 
         return redirect('/participant/dashboard');
@@ -241,8 +241,8 @@ class AuthController extends Controller
             session()->forget('pending_meeting_code');
 
             $message = match ($meeting->status) {
-                'cancelled' => 'This meeting was cancelled by the organizer.',
-                'ended' => 'This meeting was ended by the organizer.',
+                'cancelled' => 'This meeting was cancelled by the organizers.',
+                'ended' => 'This meeting was ended by the organizers.',
                 default => 'This meeting has already completed.',
             };
 

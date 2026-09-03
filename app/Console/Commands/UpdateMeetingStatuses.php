@@ -49,7 +49,7 @@ class UpdateMeetingStatuses extends Command
                 }
 
                 /*
-                 * Atomic guard is essential because organizer End/Cancel may run
+                 * Atomic guard is essential because organizers End/Cancel may run
                  * at the same moment as this scheduled command.
                  */
                 Meeting::query()

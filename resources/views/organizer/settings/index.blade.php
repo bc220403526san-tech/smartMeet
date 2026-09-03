@@ -94,7 +94,7 @@
                                 <p class="text-xs text-gray-400">Update your personal details</p>
                             </div>
                         </div>
-                        <form action="{{ route('organizer.settings.profile.update') }}" method="POST" class="p-4">
+                        <form action="{{ route('organizers.settings.profile.update') }}" method="POST" class="p-4">
                             @csrf
                             @method('PATCH')
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -275,7 +275,7 @@
                                 </svg>
                             </button>
                         </div>
-                        <form id="role-request-form" method="POST" action="{{ route('organizer.settings.role-request') }}" class="p-5" onsubmit="return submitRoleRequest(event)">
+                        <form id="role-request-form" method="POST" action="{{ route('organizers.settings.role-request') }}" class="p-5" onsubmit="return submitRoleRequest(event)">
                             @csrf
                             <div class="grid grid-cols-2 gap-3 mb-3 pb-3 border-b border-gray-100">
                                 <div>
@@ -331,7 +331,7 @@
                     <p class="text-xs text-gray-400">Keep your account secure with a strong password</p>
                 </div>
             </div>
-            <form action="{{ route('organizer.settings.password.update') }}" method="POST" class="p-4 sm:p-6">
+            <form action="{{ route('organizers.settings.password.update') }}" method="POST" class="p-4 sm:p-6">
                 @csrf
                 @method('PUT')
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
@@ -367,7 +367,7 @@
 
         {{-- ---- DEACTIVATE ACCOUNT ---- --}}
         <div class="w-full bg-gradient-to-r from-red-50 to-red-50/50 rounded-2xl border border-red-200 hover:border-red-300 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden">
-            <form action="{{ route('organizer.settings.deactivate') }}" method="POST"
+            <form action="{{ route('organizers.settings.deactivate') }}" method="POST"
                   onsubmit="return confirm('Are you sure you want to permanently deactivate this account? This cannot be undone.');"
                   class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-6">
                 @csrf
@@ -426,7 +426,7 @@
             autoHideFlashMessages();
 
             function showFlashMessage(message, type = 'success') {
-                fetch('{{ route("organizer.settings.flash") }}', {
+                fetch('{{ route("organizers.settings.flash") }}', {
                     method: 'POST',
                     headers: {
                         'X-CSRF-TOKEN': csrfToken,
@@ -549,7 +549,7 @@
                 }
                 const formData = new FormData();
                 formData.append('avatar', file);
-                fetch('{{ route("organizer.settings.avatar.update") }}', {
+                fetch('{{ route("organizers.settings.avatar.update") }}', {
                     method: 'POST',
                     headers: {
                         'X-CSRF-TOKEN': csrfToken,
@@ -580,7 +580,7 @@
                         showFlashMessage('Missing CSRF meta tag — add <meta name="csrf-token"> to your layout head.', 'error');
                         return;
                     }
-                    fetch('{{ route("organizer.settings.notifications.update") }}', {
+                    fetch('{{ route("organizers.settings.notifications.update") }}', {
                         method: 'PATCH',
                         headers: {
                             'X-CSRF-TOKEN': csrfToken,

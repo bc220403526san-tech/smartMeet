@@ -47,7 +47,7 @@
                                         class="text-sm text-gray-600 bg-transparent outline-none cursor-pointer">
                                     <option value="">All Roles</option>
                                     <option value="admin"       {{ request('role') == 'admin'       ? 'selected' : '' }}>Admin</option>
-                                    <option value="organizer"   {{ request('role') == 'organizer'   ? 'selected' : '' }}>Organizer</option>
+                                    <option value="organizer"   {{ request('role') == 'organizers'   ? 'selected' : '' }}>Organizer</option>
                                     <option value="participant" {{ request('role') == 'participant' ? 'selected' : '' }}>Participant</option>
                                 </select>
                             </form>
@@ -86,7 +86,7 @@
                         <p class="text-sm text-gray-600 truncate pr-4">{{ $user->email }}</p>
                         <span class="px-3 py-1.5 rounded-full text-xs font-semibold w-fit
                             {{ $user->role == 'admin'       ? 'bg-blue-100 text-blue-700 border border-blue-200'   : '' }}
-                            {{ $user->role == 'organizer'   ? 'bg-gray-100 text-gray-700 border border-gray-200'   : '' }}
+                            {{ $user->role == 'organizers'   ? 'bg-gray-100 text-gray-700 border border-gray-200'   : '' }}
                             {{ $user->role == 'participant' ? 'bg-green-100 text-green-700 border border-green-200' : '' }}">
                             {{ ucfirst($user->role) }}
                         </span>
@@ -115,7 +115,7 @@
                             </div>
                             <span class="px-2.5 py-1 rounded-full text-xs font-medium shrink-0
                                 {{ $user->role == 'admin'       ? 'bg-blue-100 text-blue-700 border border-blue-200'   : '' }}
-                                {{ $user->role == 'organizer'   ? 'bg-gray-100 text-gray-700 border border-gray-200'   : '' }}
+                                {{ $user->role == 'organizers'   ? 'bg-gray-100 text-gray-700 border border-gray-200'   : '' }}
                                 {{ $user->role == 'participant' ? 'bg-green-100 text-green-700 border border-green-200' : '' }}">
                                 {{ ucfirst($user->role) }}
                             </span>
