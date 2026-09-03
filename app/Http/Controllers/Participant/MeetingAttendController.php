@@ -6,21 +6,36 @@ use App\Events\MeetingSignal;
 use App\Events\TranscriptUpdated;
 use App\Http\Controllers\Controller;
 use App\Models\Meeting;
+use App\Models\MeetingParticipantLog;
 use App\Models\MeetingTranscript;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class MeetingAttendController extends Controller
 {
-    public function attend(Meeting $meeting): View
+    public function attend(Request $request, Meeting $meeting): View
     {
         $this->authorizeParticipant($meeting);
 
         $user = auth()->user();
         $now = now();
+
+        // Create one immutable audit row for this room load/join session.
+        // Public IP and user-agent are captured server-side and are never trusted from JavaScript.
+        $auditSessionUuid = (string) Str::uuid();
+
+        MeetingParticipantLog::create([
+            'meeting_id' => $meeting->id,
+            'user_id' => $user->id,
+            'session_uuid' => $auditSessionUuid,
+            'public_ip' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'joined_at' => $now,
+        ]);
 
         $meeting->participants()
             ->where('user_id', $user->id)
@@ -95,8 +110,49 @@ class MeetingAttendController extends Controller
             'allParticipants',
             'organizerJoined',
             'myAvatarUrl',
-            'organizerAvatarUrl'
+            'organizerAvatarUrl',
+            'auditSessionUuid'
         ));
+    }
+
+    public function updateSessionMetadata(Request $request, Meeting $meeting): JsonResponse
+    {
+        $this->authorizeParticipant($meeting);
+
+        $validated = $request->validate([
+            'session_uuid' => ['required', 'uuid'],
+            'device_type' => ['nullable', 'string', 'max:50'],
+            'system_name' => ['nullable', 'string', 'max:100'],
+            'operating_system' => ['nullable', 'string', 'max:100'],
+            'browser' => ['nullable', 'string', 'max:100'],
+            'local_ip' => ['nullable', 'ip'],
+            'network_type' => ['nullable', 'string', 'max:50'],
+            'network_effective_type' => ['nullable', 'string', 'max:50'],
+            'network_downlink' => ['nullable', 'numeric', 'min:0', 'max:100000'],
+            'network_rtt' => ['nullable', 'integer', 'min:0', 'max:600000'],
+        ]);
+
+        $log = MeetingParticipantLog::query()
+            ->where('meeting_id', $meeting->id)
+            ->where('user_id', auth()->id())
+            ->where('session_uuid', $validated['session_uuid'])
+            ->firstOrFail();
+
+        $log->update([
+            'device_type' => $validated['device_type'] ?? null,
+            'system_name' => $validated['system_name'] ?? null,
+            'operating_system' => $validated['operating_system'] ?? null,
+            'browser' => $validated['browser'] ?? null,
+            // Modern browsers usually do not expose the real LAN/private IP.
+            // Keep it nullable rather than inventing a value.
+            'local_ip' => $validated['local_ip'] ?? null,
+            'network_type' => $validated['network_type'] ?? null,
+            'network_effective_type' => $validated['network_effective_type'] ?? null,
+            'network_downlink' => $validated['network_downlink'] ?? null,
+            'network_rtt' => $validated['network_rtt'] ?? null,
+        ]);
+
+        return response()->json(['status' => 'updated']);
     }
 
     public function signal(Request $request, Meeting $meeting): JsonResponse
@@ -201,7 +257,7 @@ class MeetingAttendController extends Controller
         ]);
     }
 
-    public function markLeft(Meeting $meeting): JsonResponse
+    public function markLeft(Request $request, Meeting $meeting): JsonResponse
     {
         $this->authorizeParticipant($meeting);
 
@@ -213,6 +269,18 @@ class MeetingAttendController extends Controller
             ->update([
                 'left_at' => $now,
             ]);
+
+        // Close only this browser-room audit session. This does not change meeting status.
+        $sessionUuid = trim((string) $request->input('session_uuid', ''));
+
+        if ($sessionUuid !== '') {
+            MeetingParticipantLog::query()
+                ->where('meeting_id', $meeting->id)
+                ->where('user_id', $user->id)
+                ->where('session_uuid', $sessionUuid)
+                ->whereNull('left_at')
+                ->update(['left_at' => $now]);
+        }
 
         $this->broadcastSignal(
             meeting: $meeting,

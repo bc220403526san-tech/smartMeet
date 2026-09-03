@@ -743,6 +743,8 @@
     const SIGNAL_URL      = @json(route('participant.meetings.signal', $meeting));
     const TRANSCRIPT_URL  = @json(route('participant.meetings.transcript', $meeting));
     const MARK_LEFT_URL   = @json(route('participant.meetings.markLeft', $meeting));
+    const SESSION_METADATA_URL = @json(route('participant.meetings.session-metadata', $meeting));
+    const AUDIT_SESSION_UUID = @json($auditSessionUuid);
     const LEAVE_URL       = @json(route('participant.meetings.index'));
     const CANCELLED_PAGE_URL = @json(route('meetings.cancelled', $meeting));
     const ENDED_PAGE_URL     = @json(route('meetings.ended', $meeting));
@@ -757,6 +759,73 @@
     const ACTUAL_START = @json($meeting->actual_start ? \Carbon\Carbon::parse($meeting->actual_start)->utc()->toIso8601String() : now()->utc()->toIso8601String());
     const COLORS = ['#3b82f6,#06b6d4','#8b5cf6,#ec4899','#22c55e,#06b6d4','#f59e0b,#ef4444','#64748b,#334155','#ec4899,#f59e0b'];
     const IS_MOBILE_BROWSER = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+
+
+    /* ---------- Participant audit metadata (background only; no UI/layout changes) ---------- */
+    function detectAuditClientMetadata(){
+        const ua = navigator.userAgent || '';
+        const uaData = navigator.userAgentData || null;
+
+        let deviceType = 'Desktop';
+        if (/iPad|Tablet/i.test(ua)) deviceType = 'Tablet';
+        else if (/Android|iPhone|iPod|Mobile/i.test(ua)) deviceType = 'Mobile';
+
+        let operatingSystem = 'Unknown';
+        if (/Windows NT/i.test(ua)) operatingSystem = 'Windows';
+        else if (/Android/i.test(ua)) operatingSystem = 'Android';
+        else if (/iPhone|iPad|iPod/i.test(ua)) operatingSystem = 'iOS/iPadOS';
+        else if (/Mac OS X|Macintosh/i.test(ua)) operatingSystem = 'macOS';
+        else if (/Linux/i.test(ua)) operatingSystem = 'Linux';
+
+        let browser = 'Unknown';
+        if (/Edg\//i.test(ua)) browser = 'Microsoft Edge';
+        else if (/OPR\//i.test(ua)) browser = 'Opera';
+        else if (/Firefox\//i.test(ua)) browser = 'Firefox';
+        else if (/Chrome\//i.test(ua)) browser = 'Chrome';
+        else if (/Safari\//i.test(ua)) browser = 'Safari';
+
+        const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection || null;
+        const platform = (uaData && uaData.platform) || navigator.platform || operatingSystem;
+
+        return {
+            session_uuid: AUDIT_SESSION_UUID,
+            device_type: deviceType,
+            // Browser security does not expose the real Windows hostname. This is the available platform/system label.
+            system_name: platform || null,
+            operating_system: operatingSystem,
+            browser: browser,
+            local_ip: null,
+            network_type: connection?.type || null,
+            network_effective_type: connection?.effectiveType || null,
+            network_downlink: Number.isFinite(connection?.downlink) ? connection.downlink : null,
+            network_rtt: Number.isFinite(connection?.rtt) ? connection.rtt : null
+        };
+    }
+
+    async function updateParticipantAuditMetadata(){
+        try{
+            const response = await fetch(SESSION_METADATA_URL,{
+                method:'POST',
+                credentials:'same-origin',
+                headers:{
+                    'Content-Type':'application/json',
+                    'Accept':'application/json',
+                    'X-Requested-With':'XMLHttpRequest',
+                    'X-CSRF-TOKEN':CSRF
+                },
+                body:JSON.stringify(detectAuditClientMetadata())
+            });
+
+            if(!response.ok){
+                console.warn('[SmartMeet] participant audit metadata update failed', response.status);
+            }
+        }catch(e){
+            // Audit logging must never interrupt the meeting room.
+            console.warn('[SmartMeet] participant audit metadata unavailable',e);
+        }
+    }
+
+    updateParticipantAuditMetadata();
 
     /* ---------- Known participants (id -> {name, initials, isOrganizer, hasJoined}) ---------- */
     const knownParticipants = {};
@@ -3289,7 +3358,7 @@
                         'Content-Type':'application/json',
                         'X-CSRF-TOKEN':CSRF
                     },
-                    body:JSON.stringify({}),
+                    body:JSON.stringify({session_uuid:AUDIT_SESSION_UUID}),
                     keepalive:true
                 }),
                 new Promise(resolve=>setTimeout(resolve,650))
@@ -3302,7 +3371,7 @@
     function notifyDisconnectBeacon(){
         if(leftNotified) return;
         leftNotified=true;
-        const payload=JSON.stringify({});
+        const payload=JSON.stringify({session_uuid:AUDIT_SESSION_UUID});
 
         // One keepalive request is enough. Sending both fetch() and sendBeacon()
         // could mark the same user left twice and cause unnecessary peer churn.

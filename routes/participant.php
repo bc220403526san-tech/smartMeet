@@ -40,16 +40,17 @@ Route::middleware(['auth', 'role:participant'])
 
             Route::get('/', [MeetingController::class, 'index'])->name('index');
             Route::get('/today', [MeetingController::class, 'today'])->name('today');
+            Route::get('/status-check', [MeetingController::class, 'statusCheck'])->name('status-check');
+
             Route::get('/{meeting}', [MeetingController::class, 'show'])->name('show');
-            Route::get('/status-check', [\App\Http\Controllers\Participant\MeetingController::class, 'statusCheck'])
-                ->name('status-check');
 
             // Live session
             Route::get('/{meeting}/attend', [MeetingAttendController::class, 'attend'])->name('attend');
+            Route::post('/{meeting}/session-metadata', [MeetingAttendController::class, 'updateSessionMetadata'])
+                ->name('session-metadata');
             Route::post('/{meeting}/signal', [MeetingAttendController::class, 'signal'])->name('signal');
             Route::post('/{meeting}/transcript', [MeetingAttendController::class, 'saveTranscript'])->name('transcript');
-            Route::post('meetings/{meeting}/mark-left', [\App\Http\Controllers\Participant\MeetingAttendController::class, 'markLeft'])
-                ->name('markLeft');
+            Route::post('/{meeting}/mark-left', [MeetingAttendController::class, 'markLeft'])->name('markLeft');
         });
 
     });
