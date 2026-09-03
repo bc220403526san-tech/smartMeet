@@ -25,7 +25,7 @@ class AuthController extends Controller
                 'confirmed',
                 PasswordRule::min(8)->mixedCase()->letters()->numbers()->symbols(),
             ],
-            'role' => 'required|in:organizers,participant',
+            'role' => 'required|in:organizer,participant',
             'terms' => 'accepted',
         ], [
             'email.email' => 'Please enter a valid email address, for example name@example.com.',
@@ -52,8 +52,8 @@ class AuthController extends Controller
             return $redirect;
         }
 
-        return $user->role === 'organizers'
-            ? redirect('/organizers/dashboard')
+        return $user->role === 'organizer'
+            ? redirect('/organizer/dashboard')
             : redirect('/participant/dashboard');
     }
 
@@ -102,8 +102,8 @@ class AuthController extends Controller
             return redirect('/admin/dashboard');
         }
 
-        if ($user->role === 'organizers') {
-            return redirect('/organizers/dashboard');
+        if ($user->role === 'organizer') {
+            return redirect('/organizer/dashboard');
         }
 
         return redirect('/participant/dashboard');
@@ -241,8 +241,8 @@ class AuthController extends Controller
             session()->forget('pending_meeting_code');
 
             $message = match ($meeting->status) {
-                'cancelled' => 'This meeting was cancelled by the organizers.',
-                'ended' => 'This meeting was ended by the organizers.',
+                'cancelled' => 'This meeting was cancelled by the organizer.',
+                'ended' => 'This meeting was ended by the organizer.',
                 default => 'This meeting has already completed.',
             };
 
@@ -276,30 +276,30 @@ class AuthController extends Controller
     {
         $meeting->refresh();
 
-        if (!in_array($meeting->status, ['upcoming', 'active'], true)) {
+        // Login/invite navigation may only activate an UPCOMING meeting.
+        // It can never complete or rewrite a final meeting status.
+        if ($meeting->status !== 'upcoming') {
             return;
         }
 
-        $timezone = $meeting->timezone ?: config('app.timezone', 'Asia/Karachi');
+        $timezone = $meeting->timezone
+            ?: config('app.timezone', 'Asia/Karachi');
+
         $start = Carbon::parse(
             trim($meeting->date . ' ' . $meeting->time),
             $timezone
         )->utc();
-        $end = $start->copy()->addMinutes((int) $meeting->duration);
-        $now = now('UTC');
 
-        $status = $now->gte($end)
-            ? 'completed'
-            : ($now->gte($start) ? 'active' : 'upcoming');
-
-        if ($meeting->status === $status) {
+        if (now('UTC')->lt($start)) {
             return;
         }
 
         Meeting::query()
             ->whereKey($meeting->id)
-            ->whereIn('status', ['upcoming', 'active'])
-            ->update(['status' => $status]);
+            ->where('status', 'upcoming')
+            ->update([
+                'status' => 'active',
+            ]);
 
         $meeting->refresh();
     }

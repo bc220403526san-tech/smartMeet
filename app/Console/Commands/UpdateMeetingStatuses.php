@@ -9,57 +9,46 @@ use Illuminate\Console\Command;
 class UpdateMeetingStatuses extends Command
 {
     protected $signature = 'meetings:update-status';
-    protected $description = 'Auto update only upcoming/active meeting statuses based on date and time';
+    protected $description = 'Activate upcoming meetings without overwriting final meeting states';
 
     public function handle()
     {
         /*
-         * This command is a backup time synchronizer.
-         * Final statuses are NEVER touched:
-         * ended, cancelled, completed.
+         * IMPORTANT:
+         * Scheduler may ONLY perform UPCOMING -> ACTIVE.
+         * It must NEVER perform ACTIVE -> COMPLETED.
+         * The live room persists natural completion when its scheduled timer ends.
          */
         Meeting::query()
-            ->whereIn('status', ['upcoming', 'active'])
+            ->where('status', 'upcoming')
             ->get()
             ->each(function (Meeting $meeting) {
                 $meeting->refresh();
 
-                if (!in_array($meeting->status, ['upcoming', 'active'], true)) {
+                if ($meeting->status !== 'upcoming') {
                     return;
                 }
 
-                $timezone = $meeting->timezone ?: config('app.timezone', 'Asia/Karachi');
-                $now = Carbon::now($timezone);
+                $timezone = $meeting->timezone
+                    ?: config('app.timezone', 'Asia/Karachi');
+
                 $start = Carbon::parse(
                     trim($meeting->date . ' ' . $meeting->time),
                     $timezone
                 );
-                $end = $start->copy()->addMinutes((int) $meeting->duration);
 
-                if ($now->gte($end)) {
-                    $newStatus = 'completed';
-                } elseif ($now->gte($start)) {
-                    $newStatus = 'active';
-                } else {
-                    $newStatus = 'upcoming';
-                }
-
-                if ($meeting->status === $newStatus) {
+                if (Carbon::now($timezone)->lt($start)) {
                     return;
                 }
 
-                /*
-                 * Atomic guard is essential because organizers End/Cancel may run
-                 * at the same moment as this scheduled command.
-                 */
                 Meeting::query()
                     ->whereKey($meeting->id)
-                    ->whereIn('status', ['upcoming', 'active'])
+                    ->where('status', 'upcoming')
                     ->update([
-                        'status' => $newStatus,
+                        'status' => 'active',
                     ]);
             });
 
-        $this->info('Meeting statuses updated safely.');
+        $this->info('Upcoming meetings activated safely; final states untouched.');
     }
 }

@@ -798,42 +798,29 @@ class MeetingController extends Controller
     private function syncSingleMeetingStatus(Meeting $meeting): void
     {
         /*
-         * Only UPCOMING and ACTIVE are time-managed.
-         * ENDED, CANCELLED and COMPLETED are permanent final values.
+         * REFRESH / AJAX / INDEX STATUS SYNC:
+         * Only UPCOMING -> ACTIVE is automatic here.
+         * ACTIVE -> COMPLETED is intentionally NOT done by refresh/polling.
+         * Natural completion is persisted only by the live-room time-over endpoint.
+         * COMPLETED / ENDED / CANCELLED are permanent final states.
          */
         $meeting->refresh();
 
-        if (!in_array($meeting->status, ['upcoming', 'active'], true)) {
+        if ($meeting->status !== 'upcoming') {
             return;
         }
 
-        $now = now('UTC');
         $startTime = $this->getMeetingStartTime($meeting);
-        $endTime = $startTime
-            ->copy()
-            ->addMinutes((int) $meeting->duration);
 
-        if ($now->lt($startTime)) {
-            $correctStatus = 'upcoming';
-        } elseif ($now->gte($endTime)) {
-            $correctStatus = 'completed';
-        } else {
-            $correctStatus = 'active';
-        }
-
-        if ($meeting->status === $correctStatus) {
+        if (now('UTC')->lt($startTime)) {
             return;
         }
 
-        /*
-         * Atomic guard protects against stale refresh/poll/scheduler requests.
-         * If another request has already finalized the meeting, 0 rows update.
-         */
         Meeting::query()
             ->whereKey($meeting->id)
-            ->whereIn('status', ['upcoming', 'active'])
+            ->where('status', 'upcoming')
             ->update([
-                'status' => $correctStatus,
+                'status' => 'active',
             ]);
 
         $meeting->refresh();
@@ -866,32 +853,18 @@ class MeetingController extends Controller
         $nextTransition = null;
 
         $meetings = Meeting::where('organizer_id', $organizerId)
-            ->whereIn('status', ['upcoming', 'active'])
+            ->where('status', 'upcoming')
             ->get();
 
         foreach ($meetings as $meeting) {
             $startTime = $this->getMeetingStartTime($meeting);
 
-            $endTime = $startTime
-                ->copy()
-                ->addMinutes((int) $meeting->duration);
-
-            if ($now->lt($startTime)) {
-                $candidate = $startTime;
-            } elseif ($now->lt($endTime)) {
-                $candidate = $endTime;
-            } else {
-                $candidate = null;
+            if ($startTime->lessThanOrEqualTo($now)) {
+                continue;
             }
 
-            if (
-                $candidate !== null &&
-                (
-                    $nextTransition === null ||
-                    $candidate->lt($nextTransition)
-                )
-            ) {
-                $nextTransition = $candidate;
+            if ($nextTransition === null || $startTime->lessThan($nextTransition)) {
+                $nextTransition = $startTime->copy();
             }
         }
 

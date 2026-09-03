@@ -627,10 +627,16 @@
     } else {
         $durationMinutes = $meeting->duration_minutes ?? $meeting->duration ?? null;
         if ($durationMinutes) {
-            $startForCalc = $meeting->actual_start
-                ? \Carbon\Carbon::parse($meeting->actual_start)
-                : \Carbon\Carbon::parse($meeting->date . ' ' . $meeting->time, $tz);
-            $meetingEnd = $startForCalc->copy()->addMinutes((int) $durationMinutes)->utc()->toIso8601String();
+            // Use scheduled start + duration. Refresh/rejoin must not move the natural end time.
+            $startForCalc = \Carbon\Carbon::parse(
+                $meeting->date . ' ' . $meeting->time,
+                $tz
+            );
+            $meetingEnd = $startForCalc
+                ->copy()
+                ->addMinutes((int) $durationMinutes)
+                ->utc()
+                ->toIso8601String();
         }
     }
 @endphp
@@ -743,6 +749,7 @@
     const SIGNAL_URL      = @json(route('participant.meetings.signal', $meeting));
     const TRANSCRIPT_URL  = @json(route('participant.meetings.transcript', $meeting));
     const MARK_LEFT_URL   = @json(route('participant.meetings.markLeft', $meeting));
+    const COMPLETE_BY_TIME_URL = @json(route('participant.meetings.completeByTime', $meeting));
     const SESSION_METADATA_URL = @json(route('participant.meetings.session-metadata', $meeting));
     const AUDIT_SESSION_UUID = @json($auditSessionUuid);
     const LEAVE_URL       = @json(route('participant.meetings.index'));
@@ -944,7 +951,36 @@
         autoEndTimer = setTimeout(triggerAutoEnd, msLeft);
     }
     async function triggerAutoEnd(){
-        if(autoEndTriggered) return; autoEndTriggered=true;
+        if(autoEndTriggered) return;
+        autoEndTriggered=true;
+
+        let finalStatus='';
+        try{
+            const response=await fetch(COMPLETE_BY_TIME_URL,{
+                method:'POST',
+                credentials:'same-origin',
+                headers:{
+                    'Accept':'application/json',
+                    'X-Requested-With':'XMLHttpRequest',
+                    'X-CSRF-TOKEN':CSRF
+                },
+                keepalive:true
+            });
+            const data=await response.json().catch(()=>({}));
+            finalStatus=String(data.status||'');
+        }catch(e){
+            console.warn('[SmartMeet] natural completion save failed',e);
+        }
+
+        if(finalStatus==='ended'){
+            window.location.href=ENDED_PAGE_URL;
+            return;
+        }
+        if(finalStatus==='cancelled'){
+            window.location.href=CANCELLED_PAGE_URL;
+            return;
+        }
+
         showToast('⏰ Meeting time has ended.');
         setTimeout(()=>{ cleanup(); window.location.href=LEAVE_URL; },1800);
     }
@@ -1065,7 +1101,7 @@
             <button class="tile-expand-btn" onclick="toggleMaximize('${uid}')"><i class="fa fa-expand" id="expand-icon-${uid}"></i></button>
         </div>
         <div class="tile-info">
-            <div class="tile-name">${isOrganizer?'<i class="fa fa-crown" style="color:#fbbf24;font-size:10px;"></i> ':''}${escapeHtml(name)}<span class="role-badge ${isOrganizer?'organizers':'participant'}">${isOrganizer?'Organizer':'Participant'}</span></div>
+            <div class="tile-name">${isOrganizer?'<i class="fa fa-crown" style="color:#fbbf24;font-size:10px;"></i> ':''}${escapeHtml(name)}<span class="role-badge ${isOrganizer?'organizer':'participant'}">${isOrganizer?'Organizer':'Participant'}</span></div>
             <div class="tile-icons">
                 <div class="speaking-indicator" id="speaking-${uid}" style="display:none;"><div class="speaking-bar"></div><div class="speaking-bar"></div><div class="speaking-bar"></div></div>
                 <div class="mic-off" id="micoff-${uid}" style="display:${startsMuted?'flex':'none'};"><i class="fa fa-microphone-slash"></i></div>
@@ -2297,12 +2333,12 @@
         if(isSelf && !['meeting-cancelled','meeting-ended'].includes(data.type)) return;
 
         if(data.type==='meeting-cancelled'){
-            showToast('🚫 The organizers ended this meeting.');
+            showToast('🚫 The organizer ended this meeting.');
             setTimeout(()=>{ cleanup(); window.location.href=CANCELLED_PAGE_URL; },4500);
             return;
         }
         if(data.type==='meeting-ended'){
-            showToast('📞 The organizers ended this meeting.');
+            showToast('📞 The organizer ended this meeting.');
             setTimeout(()=>{
                 try{ cleanup(); }catch(e){}
                 window.location.href=ENDED_PAGE_URL;
@@ -2414,7 +2450,7 @@
                 return;
             }
 
-            // Moderation commands are trusted only when sent by the real organizers.
+            // Moderation commands are trusted only when sent by the real organizer.
             if(from===String(ORGANIZER_ID)){
                 if(control==='camera-off' && controlUser===String(MY_USER_ID)){
                     if(isCameraOn){
@@ -2422,7 +2458,7 @@
                     }else{
                         setCameraButton(false);
                     }
-                    showModerationNotice('📹 Your camera was turned off by the organizers.');
+                    showModerationNotice('📹 Your camera was turned off by the organizer.');
                     return;
                 }
 
@@ -2430,16 +2466,16 @@
                     try{
                         if(!isCameraOn) await toggleCamera();
                         else setCameraButton(true);
-                        showModerationNotice('📹 Your camera was turned on by the organizers.');
+                        showModerationNotice('📹 Your camera was turned on by the organizer.');
                     }catch(e){
-                        console.warn('[SmartMeet] organizers camera-on failed',e);
+                        console.warn('[SmartMeet] organizer camera-on failed',e);
                         showModerationNotice('Please allow camera access to turn it on.');
                     }
                     return;
                 }
 
                 if(control==='participant-removed' && controlUser===String(MY_USER_ID)){
-                    showModerationNotice('🚫 You were restricted from this meeting by the organizers.');
+                    showModerationNotice('🚫 You were restricted from this meeting by the organizer.');
                     setTimeout(()=>{ try{ cleanup(); }catch(e){} window.location.href=LEAVE_URL; },1700);
                     return;
                 }
@@ -2522,7 +2558,7 @@
             if(localStream) localStream.getAudioTracks().forEach(t=>t.enabled=false);
             setMicButton(false);
             stopRecognition();
-            showModerationNotice('🎙️ Your microphone was muted by the organizers.');
+            showModerationNotice('🎙️ Your microphone was muted by the organizer.');
             if(localStream) broadcastMyMicStatus();
             return;
         }
@@ -2531,9 +2567,9 @@
                 try{
                     if(!isMicOn) await toggleMic();
                     else setMicButton(true);
-                    showModerationNotice('🎙️ Your microphone was unmuted by the organizers.');
+                    showModerationNotice('🎙️ Your microphone was unmuted by the organizer.');
                 }catch(e){
-                    console.warn('[SmartMeet] organizers unmute failed',e);
+                    console.warn('[SmartMeet] organizer unmute failed',e);
                     showModerationNotice('Please allow microphone access to unmute.');
                 }
             }

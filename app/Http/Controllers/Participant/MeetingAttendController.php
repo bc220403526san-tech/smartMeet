@@ -17,9 +17,23 @@ use Illuminate\View\View;
 
 class MeetingAttendController extends Controller
 {
-    public function attend(Request $request, Meeting $meeting): View
+    public function attend(Request $request, Meeting $meeting): View|RedirectResponse
     {
         $this->authorizeParticipant($meeting);
+        $meeting->refresh();
+
+        if ($meeting->status !== 'active') {
+            $message = match ($meeting->status) {
+                'ended' => 'This meeting was ended by the organizer.',
+                'cancelled' => 'This meeting was cancelled by the organizer.',
+                'completed' => 'This meeting has been completed.',
+                default => 'This meeting is not active right now.',
+            };
+
+            return redirect()
+                ->route('participant.meetings.index')
+                ->with('info', $message);
+        }
 
         $user = auth()->user();
         $now = now();
@@ -60,7 +74,7 @@ class MeetingAttendController extends Controller
 
         $meeting->loadMissing([
             'participants.user',
-            'organizers',
+            'organizer',
         ]);
 
         $allUserIds = $meeting->participants
@@ -255,6 +269,40 @@ class MeetingAttendController extends Controller
         return response()->json([
             'status' => 'saved',
         ]);
+    }
+
+    public function completeByTime(Meeting $meeting): JsonResponse
+    {
+        $this->authorizeParticipant($meeting);
+        $meeting->refresh();
+
+        if (in_array($meeting->status, ['completed', 'ended', 'cancelled'], true)) {
+            return response()->json(['status' => $meeting->status]);
+        }
+
+        if (!in_array($meeting->status, ['active', 'live'], true)) {
+            return response()->json(['status' => $meeting->status], 422);
+        }
+
+        $timezone = $meeting->timezone ?: 'Asia/Karachi';
+        $scheduledEnd = Carbon::parse(
+            $meeting->date . ' ' . $meeting->time,
+            $timezone
+        )->utc()->addMinutes((int) $meeting->duration);
+
+        if (now('UTC')->lt($scheduledEnd)) {
+            return response()->json([
+                'status' => $meeting->status,
+                'message' => 'Meeting scheduled time has not ended yet.',
+            ], 422);
+        }
+
+        Meeting::query()->whereKey($meeting->id)
+            ->whereIn('status', ['active', 'live'])
+            ->update(['status' => 'completed']);
+
+        $meeting->refresh();
+        return response()->json(['status' => $meeting->status]);
     }
 
     public function markLeft(Request $request, Meeting $meeting): JsonResponse

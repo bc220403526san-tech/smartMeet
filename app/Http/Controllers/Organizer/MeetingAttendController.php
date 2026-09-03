@@ -9,14 +9,29 @@ use App\Models\Meeting;
 use App\Models\MeetingTranscript;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class MeetingAttendController extends Controller
 {
-    public function attend(Meeting $meeting): View
+    public function attend(Meeting $meeting): View|RedirectResponse
     {
         $this->authorizeOrganizer($meeting);
+        $meeting->refresh();
+
+        if ($meeting->status !== 'active') {
+            $message = match ($meeting->status) {
+                'ended' => 'This meeting was ended by the organizer.',
+                'cancelled' => 'This meeting has been cancelled.',
+                'completed' => 'This meeting has been completed.',
+                default => 'This meeting is not active right now.',
+            };
+
+            return redirect()
+                ->route('organizer.meetings.index')
+                ->with('info', $message);
+        }
 
         $user = auth()->user();
 
@@ -52,18 +67,11 @@ class MeetingAttendController extends Controller
             ]
         );
 
-        $meeting->loadMissing([
-            'participants.user',
-            'organizers',
-        ]);
+        $meeting->loadMissing(['participants.user', 'organizer']);
 
-        $allUserIds = $meeting->participants
-            ->pluck('user_id')
-            ->push($meeting->organizer_id)
-            ->filter()
-            ->map(fn ($id) => (string) $id)
-            ->unique()
-            ->values();
+        $allUserIds = $meeting->participants->pluck('user_id')
+            ->push($meeting->organizer_id)->filter()->map(fn ($id) => (string) $id)
+            ->unique()->values();
 
         $alreadyJoined = $meeting->participants
             ->filter(fn ($participant) => $this->participantIsCurrentlyJoined($participant))
@@ -73,8 +81,7 @@ class MeetingAttendController extends Controller
                 'name' => $participant->user->name,
                 'initials' => $this->initials($participant->user->name),
                 'avatarUrl' => $this->avatarUrl($participant->user),
-            ])
-            ->values();
+            ])->values();
 
         $allParticipants = $meeting->participants
             ->filter(fn ($participant) => $participant->user !== null)
@@ -84,110 +91,61 @@ class MeetingAttendController extends Controller
                 'initials' => $this->initials($participant->user->name),
                 'avatarUrl' => $this->avatarUrl($participant->user),
                 'hasJoined' => $this->participantIsCurrentlyJoined($participant),
-            ])
-            ->values();
+            ])->values();
 
         $organizerJoined = true;
         $myAvatarUrl = $this->avatarUrl($user);
 
         return view('organizer.meetings.attend', compact(
-            'meeting',
-            'allUserIds',
-            'alreadyJoined',
-            'allParticipants',
-            'organizerJoined',
-            'myAvatarUrl'
+            'meeting', 'allUserIds', 'alreadyJoined', 'allParticipants',
+            'organizerJoined', 'myAvatarUrl'
         ));
+    }
+
+    public function completeByTime(Meeting $meeting): JsonResponse
+    {
+        $this->authorizeOrganizer($meeting);
+        return $this->persistNaturalCompletion($meeting);
     }
 
     public function signal(Request $request, Meeting $meeting): JsonResponse
     {
         $this->authorizeOrganizer($meeting);
-
         $validated = $request->validate([
             'to_user_id' => ['nullable', 'string'],
-            'type' => [
-                'required',
-                'string',
-                'in:offer,answer,ice-candidate,reconnect-request,presence-request,presence-response,chat,mute,unmute,mic-status,camera-status,transcript,user-joined,user-left,meeting-cancelled,meeting-ended',
-            ],
+            'type' => ['required', 'string', 'in:offer,answer,ice-candidate,reconnect-request,presence-request,presence-response,chat,mute,unmute,mic-status,camera-status,transcript,user-joined,user-left,meeting-cancelled,meeting-ended'],
             'data' => ['required', 'array'],
         ]);
 
         $fromUserId = (string) auth()->id();
         $type = $validated['type'];
         $data = $validated['data'];
-
-        $broadcastTypes = [
-            'chat',
-            'mic-status',
-            'camera-status',
-            'presence-request',
-            'user-joined',
-            'user-left',
-            'meeting-cancelled',
-            'meeting-ended',
-        ];
+        $broadcastTypes = ['chat','mic-status','camera-status','presence-request','user-joined','user-left','meeting-cancelled','meeting-ended'];
 
         if (in_array($type, $broadcastTypes, true)) {
-            $this->broadcastSignal(
-                meeting: $meeting,
-                fromUserId: $fromUserId,
-                toUserId: 'all',
-                type: $type,
-                data: $data
-            );
-
-            return response()->json([
-                'status' => 'broadcast sent',
-            ]);
+            $this->broadcastSignal($meeting, $fromUserId, 'all', $type, $data);
+            return response()->json(['status' => 'broadcast sent']);
         }
 
         $toUserId = trim((string) ($validated['to_user_id'] ?? ''));
-
-        abort_if(
-            $toUserId === '' || $toUserId === 'all',
-            422,
-            'A target user is required for direct signaling.'
-        );
-
-        abort_if(
-            $toUserId === $fromUserId,
-            422,
-            'A user cannot signal itself.'
-        );
-
-        $this->broadcastSignal(
-            meeting: $meeting,
-            fromUserId: $fromUserId,
-            toUserId: $toUserId,
-            type: $type,
-            data: $data
-        );
-
-        return response()->json([
-            'status' => 'signal sent',
-        ]);
+        abort_if($toUserId === '' || $toUserId === 'all', 422, 'A target user is required for direct signaling.');
+        abort_if($toUserId === $fromUserId, 422, 'A user cannot signal itself.');
+        $this->broadcastSignal($meeting, $fromUserId, $toUserId, $type, $data);
+        return response()->json(['status' => 'signal sent']);
     }
 
     public function saveTranscript(Request $request, Meeting $meeting): JsonResponse
     {
         $this->authorizeOrganizer($meeting);
-
-        $validated = $request->validate([
-            'text' => ['required', 'string', 'max:5000'],
-        ]);
-
+        $validated = $request->validate(['text' => ['required', 'string', 'max:5000']]);
         $user = auth()->user();
         $spokenAt = now();
-
         $transcript = MeetingTranscript::create([
             'meeting_id' => $meeting->id,
             'user_id' => $user->id,
             'text' => trim($validated['text']),
             'spoken_at' => $spokenAt,
         ]);
-
         broadcast(new TranscriptUpdated(
             meetingId: (string) $meeting->id,
             userId: (string) $user->id,
@@ -196,74 +154,75 @@ class MeetingAttendController extends Controller
             text: $transcript->text,
             spokenAt: $spokenAt->format('h:i A')
         ))->toOthers();
-
-        return response()->json([
-            'status' => 'saved',
-        ]);
+        return response()->json(['status' => 'saved']);
     }
 
     public function markLeft(Request $request, Meeting $meeting): JsonResponse
     {
         $this->authorizeOrganizer($meeting);
-
         $user = auth()->user();
 
-        // Presence only: Leave / refresh / tab close must NOT end the meeting.
-        $meeting->update([
-            'organizer_left_at' => now(),
+        // PRESENCE ONLY. Leave / refresh / back / tab close NEVER changes meetings.status.
+        $meeting->update(['organizer_left_at' => now()]);
+
+        $this->broadcastSignal($meeting, (string) $user->id, 'all', 'user-left', [
+            'userId' => (string) $user->id,
+            'name' => $user->name,
+            'isOrganizer' => true,
         ]);
 
-        $this->broadcastSignal(
-            meeting: $meeting,
-            fromUserId: (string) $user->id,
-            toUserId: 'all',
-            type: 'user-left',
-            data: [
-                'userId' => (string) $user->id,
-                'name' => $user->name,
-                'isOrganizer' => true,
-            ]
-        );
+        return response()->json(['status' => 'left']);
+    }
 
-        return response()->json([
-            'status' => 'left',
-        ]);
+    private function persistNaturalCompletion(Meeting $meeting): JsonResponse
+    {
+        $meeting->refresh();
+
+        if (in_array($meeting->status, ['completed', 'ended', 'cancelled'], true)) {
+            return response()->json(['status' => $meeting->status]);
+        }
+
+        if (!in_array($meeting->status, ['active', 'live'], true)) {
+            return response()->json(['status' => $meeting->status], 422);
+        }
+
+        $timezone = $meeting->timezone ?: 'Asia/Karachi';
+        $scheduledEnd = Carbon::parse(
+            $meeting->date . ' ' . $meeting->time,
+            $timezone
+        )->utc()->addMinutes((int) $meeting->duration);
+
+        if (now('UTC')->lt($scheduledEnd)) {
+            return response()->json([
+                'status' => $meeting->status,
+                'message' => 'Meeting scheduled time has not ended yet.',
+            ], 422);
+        }
+
+        Meeting::query()->whereKey($meeting->id)
+            ->whereIn('status', ['active', 'live'])
+            ->update(['status' => 'completed']);
+
+        $meeting->refresh();
+        return response()->json(['status' => $meeting->status]);
     }
 
     private function authorizeOrganizer(Meeting $meeting): void
     {
-        abort_unless(
-            (string) auth()->id() === (string) $meeting->organizer_id,
-            403
-        );
+        abort_unless((string) auth()->id() === (string) $meeting->organizer_id, 403);
     }
 
     private function participantIsCurrentlyJoined($participant): bool
     {
-        $joinedAt = $participant->joined_at
-            ?? $participant->pivot?->joined_at;
-
-        $leftAt = $participant->left_at
-            ?? $participant->pivot?->left_at;
-
-        if ($joinedAt === null) {
-            return false;
-        }
-
-        if ($leftAt === null) {
-            return true;
-        }
-
+        $joinedAt = $participant->joined_at ?? $participant->pivot?->joined_at;
+        $leftAt = $participant->left_at ?? $participant->pivot?->left_at;
+        if ($joinedAt === null) return false;
+        if ($leftAt === null) return true;
         return Carbon::parse($joinedAt)->gt(Carbon::parse($leftAt));
     }
 
-    private function broadcastSignal(
-        Meeting $meeting,
-        string $fromUserId,
-        string $toUserId,
-        string $type,
-        array $data
-    ): void {
+    private function broadcastSignal(Meeting $meeting, string $fromUserId, string $toUserId, string $type, array $data): void
+    {
         broadcast(new MeetingSignal(
             meetingId: (string) $meeting->id,
             fromUserId: $fromUserId,
@@ -275,57 +234,27 @@ class MeetingAttendController extends Controller
 
     private function avatarUrl($user): ?string
     {
-        if ($user === null) {
-            return null;
-        }
-
+        if ($user === null) return null;
         $path = null;
-
-        foreach (['avatar', 'avatar_path', 'profile_image', 'profile_photo', 'image'] as $field) {
+        foreach (['avatar','avatar_path','profile_image','profile_photo','image'] as $field) {
             $value = data_get($user, $field);
-
-            if (is_string($value) && trim($value) !== '') {
-                $path = trim($value);
-                break;
-            }
+            if (is_string($value) && trim($value) !== '') { $path = trim($value); break; }
         }
-
-        if ($path === null) {
-            return null;
-        }
-
-        if (preg_match('#^https?://#i', $path)) {
-            return $path;
-        }
-
-        if (str_starts_with($path, '/storage/')) {
-            return url($path);
-        }
-
-        if (str_starts_with($path, 'storage/')) {
-            return asset($path);
-        }
-
+        if ($path === null) return null;
+        if (preg_match('#^https?://#i', $path)) return $path;
+        if (str_starts_with($path, '/storage/')) return url($path);
+        if (str_starts_with($path, 'storage/')) return asset($path);
         return asset('storage/' . ltrim($path, '/'));
     }
 
     private function initials(string $name): string
     {
         $parts = preg_split('/\s+/', trim($name)) ?: [];
-
-        if ($parts === []) {
-            return '';
-        }
-
+        if ($parts === []) return '';
         $first = $parts[0] ?? '';
-        $last = $parts[count($parts) - 1] ?? '';
-
-        $initials = mb_substr($first, 0, 1);
-
-        if (count($parts) > 1) {
-            $initials .= mb_substr($last, 0, 1);
-        }
-
+        $last = $parts[count($parts)-1] ?? '';
+        $initials = mb_substr($first,0,1);
+        if (count($parts)>1) $initials .= mb_substr($last,0,1);
         return strtoupper($initials);
     }
 }

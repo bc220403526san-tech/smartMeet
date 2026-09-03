@@ -703,10 +703,16 @@
     } else {
         $durationMinutes = $meeting->duration_minutes ?? $meeting->duration ?? null;
         if ($durationMinutes) {
-            $startForCalc = $meeting->actual_start
-                ? \Carbon\Carbon::parse($meeting->actual_start)
-                : \Carbon\Carbon::parse($meeting->date . ' ' . $meeting->time, $tz);
-            $meetingEnd = $startForCalc->copy()->addMinutes((int) $durationMinutes)->utc()->toIso8601String();
+            // Use scheduled start + duration. Refresh/rejoin must not move the natural end time.
+            $startForCalc = \Carbon\Carbon::parse(
+                $meeting->date . ' ' . $meeting->time,
+                $tz
+            );
+            $meetingEnd = $startForCalc
+                ->copy()
+                ->addMinutes((int) $durationMinutes)
+                ->utc()
+                ->toIso8601String();
         }
     }
 @endphp
@@ -738,7 +744,7 @@
         <button class="btn-leave" onclick="safeLeaveMeeting()"><i class="fa fa-phone-slash"></i><span>Leave</span></button>
     </div>
 </div>
-<form id="cancel-form" action="{{ route('organizers.meetings.cancel', $meeting) }}" method="POST" style="display:none;">
+<form id="cancel-form" action="{{ route('organizer.meetings.cancel', $meeting) }}" method="POST" style="display:none;">
     @csrf
     @method('PATCH')
 </form>
@@ -873,13 +879,14 @@
     const MY_NAME         = @json(auth()->user()->name);
     const MY_INITIALS     = @json($userInitials);
     const MY_AVATAR_URL   = @json($myAvatarUrl ?? null);
-    const SIGNAL_URL      = @json(route('organizers.meetings.signal', $meeting));
-    const TRANSCRIPT_URL  = @json(route('organizers.meetings.transcript', $meeting));
-    const MARK_LEFT_URL   = @json(route('organizers.meetings.markLeft', $meeting));
-    const LEAVE_URL       = @json(route('organizers.meetings.index'));
-    const CANCEL_URL      = @json(route('organizers.meetings.cancel', $meeting));
-    const END_MEETING_URL = @json(route('organizers.meetings.end', $meeting));
-    const MODERATION_URL  = @json(route('organizers.meetings.moderate', $meeting));
+    const SIGNAL_URL      = @json(route('organizer.meetings.signal', $meeting));
+    const TRANSCRIPT_URL  = @json(route('organizer.meetings.transcript', $meeting));
+    const MARK_LEFT_URL   = @json(route('organizer.meetings.markLeft', $meeting));
+    const COMPLETE_BY_TIME_URL = @json(route('organizer.meetings.completeByTime', $meeting));
+    const LEAVE_URL       = @json(route('organizer.meetings.index'));
+    const CANCEL_URL      = @json(route('organizer.meetings.cancel', $meeting));
+    const END_MEETING_URL = @json(route('organizer.meetings.end', $meeting));
+    const MODERATION_URL  = @json(route('organizer.meetings.moderate', $meeting));
     const CANCELLED_PAGE_URL = @json(route('meetings.cancelled', $meeting));
     const ENDED_PAGE_URL     = @json(route('meetings.ended', $meeting));
     const CSRF            = @json(csrf_token());
@@ -1112,7 +1119,36 @@
         autoEndTimer = setTimeout(triggerAutoEnd, msLeft);
     }
     async function triggerAutoEnd(){
-        if(autoEndTriggered) return; autoEndTriggered=true;
+        if(autoEndTriggered || endingMeeting) return;
+        autoEndTriggered=true;
+
+        let finalStatus='';
+        try{
+            const response=await fetch(COMPLETE_BY_TIME_URL,{
+                method:'POST',
+                credentials:'same-origin',
+                headers:{
+                    'Accept':'application/json',
+                    'X-Requested-With':'XMLHttpRequest',
+                    'X-CSRF-TOKEN':CSRF
+                },
+                keepalive:true
+            });
+            const data=await response.json().catch(()=>({}));
+            finalStatus=String(data.status||'');
+        }catch(e){
+            console.warn('[SmartMeet] natural completion save failed',e);
+        }
+
+        if(finalStatus==='ended'){
+            window.location.href=ENDED_PAGE_URL;
+            return;
+        }
+        if(finalStatus==='cancelled'){
+            window.location.href=CANCELLED_PAGE_URL;
+            return;
+        }
+
         showToast('⏰ Meeting time has ended.');
         setTimeout(()=>{ cleanup(); window.location.href=LEAVE_URL; },1800);
     }
@@ -1416,7 +1452,7 @@
             <button class="tile-expand-btn" onclick="toggleMaximize('${uid}')"><i class="fa fa-expand" id="expand-icon-${uid}"></i></button>
         </div>
         <div class="tile-info">
-            <div class="tile-name">${isOrganizer?'<i class="fa fa-crown" style="color:#fbbf24;font-size:10px;"></i> ':''}${escapeHtml(name)}<span class="role-badge ${isOrganizer?'organizers':'participant'}">${isOrganizer?'Organizer':'Participant'}</span></div>
+            <div class="tile-name">${isOrganizer?'<i class="fa fa-crown" style="color:#fbbf24;font-size:10px;"></i> ':''}${escapeHtml(name)}<span class="role-badge ${isOrganizer?'organizer':'participant'}">${isOrganizer?'Organizer':'Participant'}</span></div>
             <div class="tile-icons">
                 <div class="speaking-indicator" id="speaking-${uid}" style="display:none;"><div class="speaking-bar"></div><div class="speaking-bar"></div><div class="speaking-bar"></div></div>
                 <div class="mic-off" id="micoff-${uid}" style="display:${startsMuted?'flex':'none'};"><i class="fa fa-microphone-slash"></i></div>
@@ -2648,12 +2684,12 @@
         if(isSelf && !['meeting-cancelled','meeting-ended'].includes(data.type)) return;
 
         if(data.type==='meeting-cancelled'){
-            showToast('🚫 The organizers ended this meeting.');
+            showToast('🚫 The organizer ended this meeting.');
             setTimeout(()=>{ cleanup(); window.location.href=CANCELLED_PAGE_URL; },4500);
             return;
         }
         if(data.type==='meeting-ended'){
-            showToast('📞 The organizers ended this meeting.');
+            showToast('📞 The organizer ended this meeting.');
             setTimeout(()=>{
                 try{ cleanup(); }catch(e){}
                 window.location.href=ENDED_PAGE_URL;
@@ -2864,11 +2900,11 @@
             if(localStream) localStream.getAudioTracks().forEach(t=>t.enabled=false);
             setMicButton(false);
             stopRecognition();
-            showModerationNotice('🎙️ Your microphone was muted by the organizers.');
+            showModerationNotice('🎙️ Your microphone was muted by the organizer.');
             if(localStream) broadcastMyMicStatus();
             return;
         }
-        if(data.type==='unmute'){ showModerationNotice('🎙️ The organizers allowed your microphone. Tap Mic to speak.'); return; }
+        if(data.type==='unmute'){ showModerationNotice('🎙️ The organizer allowed your microphone. Tap Mic to speak.'); return; }
     }
 
     /* ---------- Media ---------- */
@@ -3590,10 +3626,10 @@
         rec.onerror=()=>btn.classList.remove('listening');
     }
 
-    /* ---------- End meeting (organizers only) ---------- */
+    /* ---------- End meeting (organizer only) ---------- */
     let endingMeeting=false;
     async function endMeeting(){
-        if(endingMeeting) return;
+        if(endingMeeting || autoEndTriggered) return;
         if(!window.confirm('End this meeting for everyone? This cannot be undone.')) return;
 
         endingMeeting=true;
@@ -3645,7 +3681,7 @@
             try{
                 await sendSignal('all','meeting-ended',{
                     by:MY_NAME,
-                    reason:'organizers-ended'
+                    reason:'organizer-ended'
                 });
             }catch(signalError){
                 console.error('[SmartMeet] meeting-ended realtime signal failed',signalError);

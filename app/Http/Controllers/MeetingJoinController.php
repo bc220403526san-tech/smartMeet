@@ -22,8 +22,8 @@ class MeetingJoinController extends Controller
 
         if (in_array($meeting->status, ['cancelled', 'completed', 'ended'], true)) {
             $message = match ($meeting->status) {
-                'cancelled' => 'This meeting has been cancelled by the organizers.',
-                'ended' => 'This meeting was ended by the organizers.',
+                'cancelled' => 'This meeting has been cancelled by the organizer.',
+                'ended' => 'This meeting was ended by the organizer.',
                 default => 'This meeting has already completed.',
             };
 
@@ -45,7 +45,7 @@ class MeetingJoinController extends Controller
         $user = auth()->user();
 
         if ($user->role !== 'participant') {
-            return redirect($user->role === 'admin' ? '/admin/dashboard' : '/organizers/dashboard')
+            return redirect($user->role === 'admin' ? '/admin/dashboard' : '/organizer/dashboard')
                 ->with('error', 'Meeting invite links can only be joined with a Participant account.');
         }
 
@@ -74,30 +74,30 @@ class MeetingJoinController extends Controller
     {
         $meeting->refresh();
 
-        if (!in_array($meeting->status, ['upcoming', 'active'], true)) {
+        // Login/invite navigation may only activate an UPCOMING meeting.
+        // It can never complete or rewrite a final meeting status.
+        if ($meeting->status !== 'upcoming') {
             return;
         }
 
-        $timezone = $meeting->timezone ?: config('app.timezone', 'Asia/Karachi');
+        $timezone = $meeting->timezone
+            ?: config('app.timezone', 'Asia/Karachi');
+
         $start = Carbon::parse(
             trim($meeting->date . ' ' . $meeting->time),
             $timezone
         )->utc();
-        $end = $start->copy()->addMinutes((int) $meeting->duration);
-        $now = now('UTC');
 
-        $status = $now->gte($end)
-            ? 'completed'
-            : ($now->gte($start) ? 'active' : 'upcoming');
-
-        if ($meeting->status === $status) {
+        if (now('UTC')->lt($start)) {
             return;
         }
 
         Meeting::query()
             ->whereKey($meeting->id)
-            ->whereIn('status', ['upcoming', 'active'])
-            ->update(['status' => $status]);
+            ->where('status', 'upcoming')
+            ->update([
+                'status' => 'active',
+            ]);
 
         $meeting->refresh();
     }

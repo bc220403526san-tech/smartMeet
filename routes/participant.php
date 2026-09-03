@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\Participant\MeetingAttendController;
 use App\Http\Controllers\Participant\MeetingController;
-use App\Http\Controllers\Participant\OrganizerController;
 use App\Http\Controllers\Participant\SettingsController;
 use Illuminate\Support\Facades\Route;
 
@@ -35,14 +34,6 @@ Route::middleware(['auth', 'role:participant'])
         });
 
         /*
-        | Organizers — read-only profile view, reachable from a meeting's
-        | organizers card.
-        */
-        Route::prefix('organizers')->name('organizers.')->group(function () {
-            Route::get('/{organizers}', [OrganizerController::class, 'show'])->name('show');
-        });
-
-        /*
         | Meetings — browse + live session
         */
         Route::prefix('meetings')->name('meetings.')->group(function () {
@@ -59,6 +50,7 @@ Route::middleware(['auth', 'role:participant'])
                 ->name('session-metadata');
             Route::post('/{meeting}/signal', [MeetingAttendController::class, 'signal'])->name('signal');
             Route::post('/{meeting}/transcript', [MeetingAttendController::class, 'saveTranscript'])->name('transcript');
+            Route::post('/{meeting}/complete-by-time', [MeetingAttendController::class, 'completeByTime'])->name('completeByTime');
             Route::post('/{meeting}/mark-left', [MeetingAttendController::class, 'markLeft'])->name('markLeft');
         });
 
