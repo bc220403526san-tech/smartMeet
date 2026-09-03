@@ -13,7 +13,7 @@
             <x-sidebar.sidebar-link
                 route="organizer.dashboard"
                 label="Dashboard"
-                :active="request()->routeIs('organizers.dashboard')">
+                :active="request()->routeIs('organizer.dashboard')">
 
                 <x-slot name="icon">
                     <path stroke-linecap="round" stroke-linejoin="round"
@@ -26,7 +26,12 @@
             <x-sidebar.sidebar-link
                 route="organizer.meetings.index"
                 label="My Meetings"
-                :active="request()->routeIs('organizers.meetings.index','organizers.meetings.show','organizers.meetings.edit')">
+                :active="request()->routeIs(
+                    'organizer.meetings.index',
+                    'organizer.meetings.show',
+                    'organizer.meetings.edit',
+                    'organizer.meetings.attend'
+                )">
 
                 <x-slot name="icon">
                     <path stroke-linecap="round" stroke-linejoin="round"
@@ -39,7 +44,7 @@
             <x-sidebar.sidebar-link
                 route="organizer.meetings.create"
                 label="Create Meeting"
-                :active="request()->routeIs('organizers.meetings.create')">
+                :active="request()->routeIs('organizer.meetings.create')">
 
                 <x-slot name="icon">
                     <path stroke-linecap="round" stroke-linejoin="round"
@@ -52,7 +57,7 @@
             <x-sidebar.sidebar-link
                 route="organizer.participants.index"
                 label="Participants"
-                :active="request()->routeIs('organizers.participants.*')">
+                :active="request()->routeIs('organizer.participants.*')">
 
                 <x-slot name="icon">
                     <path stroke-linecap="round" stroke-linejoin="round"
@@ -65,7 +70,7 @@
             <x-sidebar.sidebar-link
                 route="organizer.settings.index"
                 label="Settings"
-                :active="request()->routeIs('organizers.settings.index')">
+                :active="request()->routeIs('organizer.settings.*')">
 
                 <x-slot name="icon">
                     <path stroke-linecap="round" stroke-linejoin="round"
@@ -83,39 +88,31 @@
     <!-- BOTTOM -->
     <div class="p-5 border-t border-gray-200 space-y-3">
 
-{{--        <a href="#"--}}
-{{--           class="w-full flex items-center justify-center gap-2 text-sm font-medium bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 transition">--}}
-
-{{--            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"--}}
-{{--                 stroke-width="1.5" stroke="currentColor" class="w-4 h-4">--}}
-{{--                <path stroke-linecap="round" stroke-linejoin="round"--}}
-{{--                      d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z"/>--}}
-{{--            </svg>--}}
-
-{{--            Start Meeting--}}
-{{--        </a>--}}
-
         <form method="POST" action="{{ route('logout') }}">
             @csrf
+
             <button type="submit"
                     class="w-full flex items-center gap-2 text-sm text-gray-600
-                       hover:bg-red-50 hover:text-red-600 p-2.5 rounded-xl transition group">
+                           hover:bg-red-50 hover:text-red-600 p-2.5 rounded-xl transition group">
 
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none"
-                     viewBox="0 0 24 24" stroke-width="1.5"
-                     stroke="currentColor" class="w-5 h-5">
-                    <path stroke-linecap="round" stroke-linejoin="round"
+                <svg xmlns="http://www.w3.org/2000/svg"
+                     fill="none"
+                     viewBox="0 0 24 24"
+                     stroke-width="1.5"
+                     stroke="currentColor"
+                     class="w-5 h-5">
+                    <path stroke-linecap="round"
+                          stroke-linejoin="round"
                           d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9"/>
                 </svg>
 
                 Logout
 
-                {{-- Gray dot animation on hover --}}
                 <span class="ml-auto flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                <span class="w-1 h-1 rounded-full bg-red-400 animate-bounce" style="animation-delay: 0ms"></span>
-                <span class="w-1 h-1 rounded-full bg-red-400 animate-bounce" style="animation-delay: 150ms"></span>
-                <span class="w-1 h-1 rounded-full bg-red-400 animate-bounce" style="animation-delay: 300ms"></span>
-            </span>
+                    <span class="w-1 h-1 rounded-full bg-red-400 animate-bounce" style="animation-delay: 0ms"></span>
+                    <span class="w-1 h-1 rounded-full bg-red-400 animate-bounce" style="animation-delay: 150ms"></span>
+                    <span class="w-1 h-1 rounded-full bg-red-400 animate-bounce" style="animation-delay: 300ms"></span>
+                </span>
 
             </button>
         </form>
