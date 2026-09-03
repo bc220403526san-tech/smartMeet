@@ -347,7 +347,7 @@ class MeetingController extends Controller
     }
 
     /**
-     * Explicit organizer action from the live room.
+     * Explicit organizers action from the live room.
      *
      * IMPORTANT:
      * - Organizer index/status exact-time synchronization remains unchanged.
@@ -355,10 +355,10 @@ class MeetingController extends Controller
      * - Explicit End Meeting stores status = ended.
      * - Natural scheduled expiry remains status = completed.
      *
-     * Realtime room notification is intentionally sent by the organizer room
+     * Realtime room notification is intentionally sent by the organizers room
      * through the existing signal endpoint AFTER this database write succeeds.
      * That keeps a transient Reverb/broadcast failure from turning this endpoint
-     * into HTTP 500 after the organizer deliberately presses End.
+     * into HTTP 500 after the organizers deliberately presses End.
      */
     public function end(Meeting $meeting)
     {
@@ -798,29 +798,42 @@ class MeetingController extends Controller
     private function syncSingleMeetingStatus(Meeting $meeting): void
     {
         /*
-         * REFRESH / AJAX / INDEX STATUS SYNC:
-         * Only UPCOMING -> ACTIVE is automatic here.
-         * ACTIVE -> COMPLETED is intentionally NOT done by refresh/polling.
-         * Natural completion is persisted only by the live-room time-over endpoint.
-         * COMPLETED / ENDED / CANCELLED are permanent final states.
+         * Only UPCOMING and ACTIVE are time-managed.
+         * ENDED, CANCELLED and COMPLETED are permanent final values.
          */
         $meeting->refresh();
 
-        if ($meeting->status !== 'upcoming') {
+        if (!in_array($meeting->status, ['upcoming', 'active'], true)) {
             return;
         }
 
+        $now = now('UTC');
         $startTime = $this->getMeetingStartTime($meeting);
+        $endTime = $startTime
+            ->copy()
+            ->addMinutes((int) $meeting->duration);
 
-        if (now('UTC')->lt($startTime)) {
+        if ($now->lt($startTime)) {
+            $correctStatus = 'upcoming';
+        } elseif ($now->gte($endTime)) {
+            $correctStatus = 'completed';
+        } else {
+            $correctStatus = 'active';
+        }
+
+        if ($meeting->status === $correctStatus) {
             return;
         }
 
+        /*
+         * Atomic guard protects against stale refresh/poll/scheduler requests.
+         * If another request has already finalized the meeting, 0 rows update.
+         */
         Meeting::query()
             ->whereKey($meeting->id)
-            ->where('status', 'upcoming')
+            ->whereIn('status', ['upcoming', 'active'])
             ->update([
-                'status' => 'active',
+                'status' => $correctStatus,
             ]);
 
         $meeting->refresh();
@@ -853,18 +866,32 @@ class MeetingController extends Controller
         $nextTransition = null;
 
         $meetings = Meeting::where('organizer_id', $organizerId)
-            ->where('status', 'upcoming')
+            ->whereIn('status', ['upcoming', 'active'])
             ->get();
 
         foreach ($meetings as $meeting) {
             $startTime = $this->getMeetingStartTime($meeting);
 
-            if ($startTime->lessThanOrEqualTo($now)) {
-                continue;
+            $endTime = $startTime
+                ->copy()
+                ->addMinutes((int) $meeting->duration);
+
+            if ($now->lt($startTime)) {
+                $candidate = $startTime;
+            } elseif ($now->lt($endTime)) {
+                $candidate = $endTime;
+            } else {
+                $candidate = null;
             }
 
-            if ($nextTransition === null || $startTime->lessThan($nextTransition)) {
-                $nextTransition = $startTime->copy();
+            if (
+                $candidate !== null &&
+                (
+                    $nextTransition === null ||
+                    $candidate->lt($nextTransition)
+                )
+            ) {
+                $nextTransition = $candidate;
             }
         }
 
