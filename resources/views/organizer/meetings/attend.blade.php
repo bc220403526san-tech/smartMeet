@@ -1227,7 +1227,7 @@
                 onclick="toggleParticipantCamera('${uid}')"
                 title="Turn camera off"
                 aria-label="Turn camera off">
-                <i class="fa-solid fa-video-slash"></i>
+                <i class="fa-solid fa-video"></i>
             </button>
             ` : ''}
 

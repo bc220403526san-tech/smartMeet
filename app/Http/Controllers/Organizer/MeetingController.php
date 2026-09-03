@@ -350,84 +350,75 @@ class MeetingController extends Controller
      * Explicit organizer action from the live room.
      *
      * IMPORTANT:
-     * - Organizer index/status synchronization stays unchanged.
+     * - Organizer index/status exact-time synchronization remains unchanged.
      * - Leave / refresh / tab close MUST NOT call this method.
      * - Explicit End Meeting stores status = ended.
-     * - Natural scheduled expiry is still handled by syncSingleMeetingStatus()
-     *   and remains status = completed.
+     * - Natural scheduled expiry remains status = completed.
+     *
+     * Realtime room notification is intentionally sent by the organizer room
+     * through the existing signal endpoint AFTER this database write succeeds.
+     * That keeps a transient Reverb/broadcast failure from turning this endpoint
+     * into HTTP 500 after the organizer deliberately presses End.
      */
     public function end(Meeting $meeting)
     {
         $this->authorizeOrganizer($meeting);
-
-        /*
-         * Do NOT run syncSingleMeetingStatus() before this explicit End write.
-         * The organizer index and statusCheck still keep the full exact-time sync.
-         *
-         * This endpoint records the organizer's deliberate End action, so if an
-         * exact-time AJAX sync changes active -> completed at the same boundary,
-         * this explicit request is still allowed to finish as "ended".
-         */
         $meeting->refresh();
 
         if ($meeting->status === 'ended') {
-            return request()->expectsJson()
-                ? response()->json([
-                    'status' => 'ended',
-                    'message' => 'Meeting has already been ended.',
-                ])
-                : redirect()
-                    ->route('organizer.meetings.index')
-                    ->with('success', 'Meeting has already been ended.');
+            return response()->json([
+                'status' => 'ended',
+                'message' => 'Meeting has already been ended.',
+            ]);
         }
 
         if ($meeting->status === 'cancelled') {
-            $message = 'A cancelled meeting cannot be ended.';
-
-            return request()->expectsJson()
-                ? response()->json(['message' => $message], 422)
-                : back()->with('error', $message);
+            return response()->json([
+                'message' => 'A cancelled meeting cannot be ended.',
+            ], 422);
         }
 
         if ($meeting->status === 'upcoming') {
-            $message = 'This meeting has not started yet.';
-
-            return request()->expectsJson()
-                ? response()->json(['message' => $message], 422)
-                : back()->with('error', $message);
+            return response()->json([
+                'message' => 'This meeting has not started yet.',
+            ], 422);
         }
 
+        /*
+         * "completed" is accepted only for the tiny exact-time race where the
+         * index/status synchronizer reaches the scheduled boundary at the same
+         * instant the organizer presses End from an already-open room.
+         */
         if (!in_array($meeting->status, ['active', 'live', 'completed'], true)) {
-            $message = 'This meeting cannot be ended from the meeting room.';
-
-            return request()->expectsJson()
-                ? response()->json(['message' => $message], 422)
-                : back()->with('error', $message);
+            return response()->json([
+                'message' => 'This meeting cannot be ended from the meeting room.',
+            ], 422);
         }
 
-        $meeting->update([
-            'status' => 'ended',
-        ]);
-
-        broadcast(new MeetingSignal(
-            meetingId: (string) $meeting->id,
-            fromUserId: (string) auth()->id(),
-            toUserId: 'all',
-            type: 'meeting-ended',
-            data: [
-                'by' => auth()->user()->name,
-                'reason' => 'organizer-ended',
-            ]
-        ))->toOthers();
-
-        return request()->expectsJson()
-            ? response()->json([
+        try {
+            $meeting->update([
                 'status' => 'ended',
-                'message' => 'Meeting ended successfully.',
-            ])
-            : redirect()
-                ->route('organizer.meetings.index')
-                ->with('success', 'Meeting ended successfully.');
+            ]);
+
+            $meeting->refresh();
+        } catch (\Throwable $exception) {
+            Log::error('Explicit meeting end status update failed', [
+                'meeting_id' => $meeting->id,
+                'organizer_id' => auth()->id(),
+                'current_status' => $meeting->status,
+                'error' => $exception->getMessage(),
+                'exception' => get_class($exception),
+            ]);
+
+            return response()->json([
+                'message' => 'Could not save the Ended status. Please check the meetings.status database enum/migration.',
+            ], 500);
+        }
+
+        return response()->json([
+            'status' => $meeting->status,
+            'message' => 'Meeting ended successfully.',
+        ]);
     }
 
     public function cancel(Meeting $meeting)
