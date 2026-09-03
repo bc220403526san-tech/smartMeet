@@ -84,7 +84,7 @@
             box-shadow:inset 0 1px 0 rgba(255,255,255,.03), var(--shadow-lg);
         }
         .video-grid{
-            height:100%; width:100%; display:grid; overflow-y:auto;
+            height:100%; width:100%; display:grid; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable;
             grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
             grid-auto-rows:minmax(150px,220px); align-content:start; justify-content:center;
             gap:16px; padding:16px; background-color:#02060f;
@@ -124,6 +124,16 @@
         .speaking-bar:nth-child(2){animation-delay:.15s} .speaking-bar:nth-child(3){animation-delay:.3s}
         @keyframes speak{0%,100%{height:4px}50%{height:13px}}
         .you-badge{position:absolute; top:8px; left:8px; z-index:5; font-size:9px; font-weight:700; padding:3px 8px; border-radius:99px; background:rgba(59,130,246,.35); border:1px solid rgba(96,165,250,.4)}
+        .tile-hand-raised{
+            position:absolute; top:9px; left:50%; transform:translateX(-50%); z-index:8;
+            display:flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px;
+            color:#fff7cc; background:linear-gradient(135deg,rgba(245,158,11,.96),rgba(234,88,12,.96));
+            border:1px solid rgba(253,230,138,.7); box-shadow:0 10px 25px rgba(245,158,11,.28);
+            font-size:10px; font-weight:800; letter-spacing:.15px; pointer-events:none;
+            animation:raisedHandFloat 1.7s ease-in-out infinite;
+        }
+        .tile-hand-raised i{font-size:12px}
+        @keyframes raisedHandFloat{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,-3px)}}
         .tile-expand-btn{
             position:absolute; top:8px; right:8px; z-index:6; width:28px; height:28px; border-radius:8px;
             background:rgba(8,13,26,.65); border:1px solid rgba(255,255,255,.14); color:#fff; display:flex;
@@ -194,7 +204,7 @@
         .btn-send{background:linear-gradient(135deg,#2563eb,#0891b2); border:none; color:#fff}
         .chat-voice-btn.listening{color:#ef4444; border-color:rgba(239,68,68,.5); background:rgba(239,68,68,.14)}
 
-        .people-body{flex:1; min-height:0; max-height:100%; overflow-y:auto; overscroll-behavior:contain; padding:12px; display:flex; flex-direction:column; gap:8px}
+        .people-body{flex:1; min-height:0; max-height:100%; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; padding:12px; display:flex; flex-direction:column; gap:8px}
         .person-row{display:flex; align-items:center; gap:10px; padding:10px; border-radius:13px; border:1px solid var(--line); background:rgba(255,255,255,.02); transition:opacity .2s, filter .2s, background .2s, border-color .2s}
         .person-row.joined{opacity:1; filter:none; background:rgba(34,197,94,.07); border-color:rgba(34,197,94,.22)}
         .person-row.pending{opacity:.5; filter:grayscale(.5) saturate(.4)}
@@ -209,8 +219,10 @@
         .person-dot.on{background:var(--green)}
         .person-action{border:1px solid var(--line); background:rgba(255,255,255,.04); color:var(--muted); font-size:10px; padding:5px 9px; border-radius:8px; cursor:pointer; flex-shrink:0}
         .person-action:hover{background:rgba(239,68,68,.16); color:#fecaca; border-color:rgba(239,68,68,.3)}
-        .person-actions{display:flex;align-items:center;gap:5px;flex-shrink:0}
+        .person-actions{display:flex;align-items:center;justify-content:flex-end;gap:4px;flex-wrap:wrap;flex-shrink:0;max-width:126px}
         .person-action.request:hover{background:rgba(59,130,246,.16);color:#bfdbfe;border-color:rgba(59,130,246,.3)}
+        .person-action.allow{color:#86efac;border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.08)}
+        .person-action.camera-off{color:#fca5a5;border-color:rgba(239,68,68,.28)}
         .person-action.remove:hover{background:rgba(239,68,68,.22);color:#fff;border-color:rgba(239,68,68,.45)}
         .hand-raised{color:#fbbf24;font-size:13px;animation:handPulse 1.2s ease-in-out infinite}
         @keyframes handPulse{50%{transform:translateY(-2px)}}
@@ -772,7 +784,7 @@
     <div class="ctrl-btn" onclick="toggleSidePanel('transcript')"><div class="ctrl-icon" id="ctrl-transcript"><i class="fa fa-closed-captioning"></i></div><span class="ctrl-label">Captions</span></div>
     <div class="ctrl-btn" onclick="toggleSidePanel('chat')"><div class="ctrl-icon" id="ctrl-chat"><i class="fa fa-comment"></i><span id="chat-badge">0</span></div><span class="ctrl-label">Chat</span></div>
     <div class="ctrl-btn" onclick="toggleSidePanel('people')"><div class="ctrl-icon" id="ctrl-people"><i class="fa fa-users"></i></div><span class="ctrl-label">People</span></div>
-    <div class="ctrl-btn" onclick="muteAllParticipants()"><div class="ctrl-icon"><i class="fa fa-microphone-slash"></i></div><span class="ctrl-label">Mute all</span></div>
+    <div class="ctrl-btn" onclick="muteAllParticipants()"><div class="ctrl-icon"><i class="fa-solid fa-microphone-slash"></i></div><span class="ctrl-label">Mute all</span></div>
     <div class="ctrl-divider"></div>
     <div class="ctrl-btn"><button class="btn-end" style="background:linear-gradient(135deg,#7f1d1d,#450a0a);" onclick="cancelMeeting()" title="Cancel meeting for everyone"><i class="fa fa-ban"></i></button><span class="ctrl-label" style="color:var(--red);">Cancel</span></div>
     <div class="ctrl-btn"><button class="btn-end" onclick="safeLeaveMeeting()"><i class="fa fa-phone-slash"></i></button><span class="ctrl-label" style="color:var(--red);">Leave</span></div>
@@ -845,6 +857,7 @@
     const TRANSCRIPT_URL  = @json(route('organizer.meetings.transcript', $meeting));
     const MARK_LEFT_URL   = @json(route('organizer.meetings.markLeft', $meeting));
     const LEAVE_URL       = @json(route('organizer.meetings.index'));
+    const END_URL         = @json(route('meetings.ended', $meeting));
     const CANCEL_URL      = @json(route('organizer.meetings.cancel', $meeting));
     const CSRF            = @json(csrf_token());
     const ALL_PARTICIPANTS = @json($allParticipants);
@@ -1031,20 +1044,20 @@
     const recentToasts = new Set();
     function showToast(msg){
         if(recentToasts.has(msg)) return;
-        recentToasts.add(msg); setTimeout(()=>recentToasts.delete(msg),4000);
+        recentToasts.add(msg); setTimeout(()=>recentToasts.delete(msg),5200);
         const stack=document.getElementById('toast-stack'); if(!stack) return;
         const el=document.createElement('div'); el.className='toast'; el.textContent=msg;
         stack.appendChild(el);
         requestAnimationFrame(()=>el.classList.add('show'));
-        setTimeout(()=>{ el.classList.remove('show'); el.classList.add('leaving'); setTimeout(()=>el.remove(),260); },3400);
+        setTimeout(()=>{ el.classList.remove('show'); el.classList.add('leaving'); setTimeout(()=>el.remove(),280); },4600);
     }
     function showModerationNotice(msg){
         const old=document.getElementById('mod-notice'); if(old) old.remove();
         const el=document.createElement('div'); el.id='mod-notice'; el.className='moderation-notice'; el.textContent=msg;
         document.body.appendChild(el);
         requestAnimationFrame(()=>el.classList.add('show'));
-        setTimeout(()=>el.classList.remove('show'),3200);
-        setTimeout(()=>el.remove(),3600);
+        setTimeout(()=>el.classList.remove('show'),4300);
+        setTimeout(()=>el.remove(),4700);
     }
 
     installAudioPlaybackUnlock();
@@ -1078,8 +1091,22 @@
     }
     async function triggerAutoEnd(){
         if(autoEndTriggered) return; autoEndTriggered=true;
+        leftNotified=true;
         showToast('⏰ Meeting time has ended.');
-        setTimeout(()=>{ cleanup(); window.location.href=LEAVE_URL; },1800);
+        try{
+            await Promise.race([
+                fetch(MARK_LEFT_URL,{
+                    method:'POST',
+                    headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':CSRF},
+                    body:JSON.stringify({reason:'timeout'}),
+                    keepalive:true
+                }),
+                new Promise(resolve=>setTimeout(resolve,900))
+            ]);
+        }catch(e){
+            try{ await sendSignal('all','meeting-ended',{auto:true,reason:'timeout'}); }catch(_){}
+        }
+        setTimeout(()=>{ cleanup(); window.location.href=END_URL+'?reason=timeout'; },900);
     }
 
     /* ---------- Online count / people list ---------- */
@@ -1139,10 +1166,10 @@
         </div>
         ${raisedHands.has(uid) ? `<i class="fa-solid fa-hand hand-raised" title="Hand raised"></i>` : ''}
         ${canMute ? `<div class="person-actions">
-            <button class="person-action" onclick="muteParticipant('${uid}')" title="Mute"><i class="fa fa-microphone-slash"></i></button>
-            <button class="person-action request" onclick="requestParticipantMedia('${uid}','mic')" title="Ask to turn microphone on"><i class="fa fa-microphone"></i></button>
-            <button class="person-action request" onclick="requestParticipantMedia('${uid}','camera')" title="Ask to turn camera on"><i class="fa fa-video"></i></button>
-            <button class="person-action remove" onclick="removeParticipantFromMeeting('${uid}')" title="Remove and restrict from this meeting"><i class="fa fa-user-xmark"></i></button>
+            <button class="person-action" onclick="muteParticipant('${uid}')" title="Mute participant"><i class="fa-solid fa-microphone-slash"></i></button>
+            <button class="person-action allow" onclick="requestParticipantMedia('${uid}','camera')" title="Request camera on"><i class="fa-solid fa-video"></i></button>
+            <button class="person-action camera-off" onclick="turnParticipantCameraOff('${uid}')" title="Turn camera off"><i class="fa-solid fa-video-slash"></i></button>
+            <button class="person-action remove" onclick="removeParticipantFromMeeting('${uid}')" title="Remove participant"><i class="fa-solid fa-user-minus"></i></button>
         </div>` : ''}
         <span class="person-dot ${isOnline?'on':''}" ${isLeft?'style="background:#ef4444"':''}></span>`;
     }
@@ -1180,8 +1207,16 @@
     }
 
     async function requestParticipantMedia(uid, kind){
-        const ok=await moderateParticipant(uid,kind==='camera'?'request-camera':'request-mic');
-        if(ok) showToast(kind==='camera'?'📷 Camera request sent.':'🎙️ Microphone request sent.');
+        if(kind!=='camera') return;
+        const ok=await moderateParticipant(uid,'request-camera');
+        if(ok) showToast('📹 Camera request sent to the participant.');
+    }
+
+    async function turnParticipantCameraOff(uid){
+        uid=String(uid);
+        const info=knownParticipants[uid];
+        const ok=await moderateParticipant(uid,'camera-off');
+        if(ok) showToast(`📷 ${escapeHtml(info?info.name:'Participant')}'s camera has been turned off.`);
     }
 
     async function removeParticipantFromMeeting(uid){
@@ -1220,6 +1255,22 @@
 
     function refreshEmptyStage(){ /* empty-stage overlay removed by request */ }
 
+    function syncRaisedHandIndicator(uid){
+        uid=String(uid);
+        const tile=document.getElementById('tile-'+uid);
+        if(!tile) return;
+        let badge=tile.querySelector('.tile-hand-raised');
+        const raised=raisedHands.has(uid);
+        if(raised && !badge){
+            badge=document.createElement('div');
+            badge.className='tile-hand-raised';
+            badge.innerHTML='<i class="fa-solid fa-hand"></i><span>Hand raised</span>';
+            tile.appendChild(badge);
+        }else if(!raised && badge){
+            badge.remove();
+        }
+    }
+
     /* ---------- Tiles ---------- */
     function addParticipantTile(uid, name, initials, isOrganizer){
         uid=String(uid);
@@ -1245,6 +1296,7 @@
             </div>
         </div>`;
         if(isOrganizer) grid.prepend(tile); else grid.appendChild(tile);
+        syncRaisedHandIndicator(uid);
         refreshEmptyStage();
     }
     function removeParticipantTile(uid, announce){
@@ -1258,7 +1310,7 @@
         refreshEmptyStage();
         if(announce){
             const info=knownParticipants[uid];
-            showToast(`👋 ${escapeHtml(info?info.name:'A participant')} has left the meeting.`);
+            showToast(`👋 ${escapeHtml(info?info.name:'A participant')} left the meeting.`);
         }
     }
 
@@ -2521,13 +2573,15 @@
         if(isSelf && !['meeting-cancelled','meeting-ended'].includes(data.type)) return;
 
         if(data.type==='meeting-cancelled'){
-            showToast('🚫 The organizer cancelled this meeting.');
-            setTimeout(()=>{ cleanup(); window.location.href=LEAVE_URL; },2200);
+            showToast('🚫 This meeting was ended by the organizer.');
+            setTimeout(()=>{ cleanup(); window.location.href=END_URL+'?reason=cancelled'; },4650);
             return;
         }
         if(data.type==='meeting-ended'){
-            showToast(data.data?.auto ? '⏰ Meeting time has ended.' : '📞 The meeting has ended.');
-            setTimeout(()=>{ cleanup(); window.location.href=LEAVE_URL; },2200);
+            const endReason=String(data.data?.reason || (data.data?.auto ? 'timeout' : 'organizer-left'));
+            const isTimeout=endReason==='timeout' || Boolean(data.data?.auto);
+            showToast(isTimeout ? '⏰ Meeting time has ended.' : '📞 The organizer ended the meeting.');
+            setTimeout(()=>{ cleanup(); window.location.href=END_URL+'?reason='+(isTimeout?'timeout':'organizer-left'); },4650);
             return;
         }
         if(data.type==='presence-request'){
@@ -2550,6 +2604,10 @@
             if(Boolean(data.data?.cameraOn)) camStatus[uid]=true;
             else if(!(remoteStreams[uid]?.getVideoTracks?.()||[]).some(t=>t.readyState==='live')) camStatus[uid]=false;
             micStatus[uid]=!Boolean(data.data?.micOn);
+            if(Boolean(data.data?.handRaised)) raisedHands.add(uid);
+            else raisedHands.delete(uid);
+            renderPersonRow(uid);
+            syncRaisedHandIndicator(uid);
             const micEl=document.getElementById('micoff-'+uid);
             if(micEl) micEl.style.display=micStatus[uid] ? 'flex' : 'none';
             attachRemoteStream(uid);
@@ -2621,6 +2679,7 @@
             if(control==='raise-hand'){
                 raisedHands.add(controlUser);
                 renderPersonRow(controlUser);
+                syncRaisedHandIndicator(controlUser);
                 const who=knownParticipants[controlUser]?.name || data.data?.name || 'Participant';
                 showToast(`✋ ${escapeHtml(who)} raised a hand.`);
                 return;
@@ -2628,6 +2687,7 @@
             if(control==='lower-hand'){
                 raisedHands.delete(controlUser);
                 renderPersonRow(controlUser);
+                syncRaisedHandIndicator(controlUser);
                 return;
             }
 
@@ -3402,15 +3462,23 @@
     let cancelling=false;
     async function cancelMeeting(){
         if(cancelling) return;
-        if(!window.confirm('Cancel this meeting for everyone? This cannot be undone.')) return;
+        if(!window.confirm('End this meeting for everyone? This cannot be undone.')) return;
         cancelling=true; leftNotified=true;
         if(autoEndTimer) clearTimeout(autoEndTimer);
+
         try{
-            await sendSignal('all','meeting-cancelled',{ message:'Meeting has been cancelled by the organizer.' });
-        }catch(e){}
-        showToast('🚫 Meeting cancelled for everyone.');
-        cleanup();
-        setTimeout(()=>{ document.getElementById('cancel-form')?.submit(); }, 250);
+            const res=await fetch(CANCEL_URL,{
+                method:'PATCH',
+                headers:{'Accept':'application/json','X-CSRF-TOKEN':CSRF}
+            });
+            if(!res.ok) throw new Error(`HTTP ${res.status}`);
+            showToast('🚫 Meeting ended for everyone.');
+            setTimeout(()=>{ cleanup(); window.location.href=END_URL+'?reason=cancelled'; },900);
+        }catch(e){
+            console.error('[SmartMeet] cancel failed',e);
+            cancelling=false;
+            showToast('Meeting could not be ended. Please try again.');
+        }
     }
 
 
@@ -3471,7 +3539,7 @@
                         'Content-Type':'application/json',
                         'X-CSRF-TOKEN':CSRF
                     },
-                    body:JSON.stringify({}),
+                    body:JSON.stringify({reason:'organizer-left'}),
                     keepalive:true
                 }),
                 new Promise(resolve=>setTimeout(resolve,650))
@@ -3479,12 +3547,12 @@
         }catch(e){}
 
         try{ cleanup(); }catch(e){}
-        window.location.href=LEAVE_URL;
+        window.location.href=END_URL+'?reason=organizer-left';
     }
     function notifyDisconnectBeacon(){
         if(leftNotified) return;
         leftNotified=true;
-        const payload=JSON.stringify({});
+        const payload=JSON.stringify({reason:'organizer-left'});
 
         // One keepalive request is enough. Sending both fetch() and sendBeacon()
         // could mark the same user left twice and cause unnecessary peer churn.

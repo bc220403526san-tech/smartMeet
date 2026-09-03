@@ -202,30 +202,44 @@ class MeetingAttendController extends Controller
         ]);
     }
 
-    public function markLeft(Meeting $meeting): JsonResponse
+    public function markLeft(Request $request, Meeting $meeting): JsonResponse
     {
         $this->authorizeOrganizer($meeting);
 
         $user = auth()->user();
+        $reason = (string) $request->input('reason', 'organizer-left');
+        $reason = $reason === 'timeout' ? 'timeout' : 'organizer-left';
 
-        $meeting->update([
+        $updates = [
             'organizer_left_at' => now(),
-        ]);
+        ];
+
+        // Organizer leaving an active room ends the session for everyone.
+        // "completed" is already part of the existing project status lifecycle,
+        // so no migration/new enum value is introduced.
+        if ($meeting->status === 'active') {
+            $updates['status'] = 'completed';
+        }
+
+        $meeting->update($updates);
 
         $this->broadcastSignal(
             meeting: $meeting,
             fromUserId: (string) $user->id,
             toUserId: 'all',
-            type: 'user-left',
+            type: 'meeting-ended',
             data: [
                 'userId' => (string) $user->id,
                 'name' => $user->name,
                 'isOrganizer' => true,
+                'reason' => $reason,
+                'auto' => $reason === 'timeout',
             ]
         );
 
         return response()->json([
-            'status' => 'left',
+            'status' => 'ended',
+            'reason' => $reason,
         ]);
     }
 

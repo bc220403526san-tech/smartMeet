@@ -84,7 +84,7 @@
             box-shadow:inset 0 1px 0 rgba(255,255,255,.03), var(--shadow-lg);
         }
         .video-grid{
-            height:100%; width:100%; display:grid; overflow-y:auto;
+            height:100%; width:100%; display:grid; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable;
             grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
             grid-auto-rows:minmax(150px,220px); align-content:start; justify-content:center;
             gap:16px; padding:16px; background-color:#02060f;
@@ -124,6 +124,16 @@
         .speaking-bar:nth-child(2){animation-delay:.15s} .speaking-bar:nth-child(3){animation-delay:.3s}
         @keyframes speak{0%,100%{height:4px}50%{height:13px}}
         .you-badge{position:absolute; top:8px; left:8px; z-index:5; font-size:9px; font-weight:700; padding:3px 8px; border-radius:99px; background:rgba(59,130,246,.35); border:1px solid rgba(96,165,250,.4)}
+        .tile-hand-raised{
+            position:absolute; top:9px; left:50%; transform:translateX(-50%); z-index:8;
+            display:flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px;
+            color:#fff7cc; background:linear-gradient(135deg,rgba(245,158,11,.96),rgba(234,88,12,.96));
+            border:1px solid rgba(253,230,138,.7); box-shadow:0 10px 25px rgba(245,158,11,.28);
+            font-size:10px; font-weight:800; letter-spacing:.15px; pointer-events:none;
+            animation:raisedHandFloat 1.7s ease-in-out infinite;
+        }
+        .tile-hand-raised i{font-size:12px}
+        @keyframes raisedHandFloat{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,-3px)}}
         .tile-expand-btn{
             position:absolute; top:8px; right:8px; z-index:6; width:28px; height:28px; border-radius:8px;
             background:rgba(8,13,26,.65); border:1px solid rgba(255,255,255,.14); color:#fff; display:flex;
@@ -194,7 +204,7 @@
         .btn-send{background:linear-gradient(135deg,#2563eb,#0891b2); border:none; color:#fff}
         .chat-voice-btn.listening{color:#ef4444; border-color:rgba(239,68,68,.5); background:rgba(239,68,68,.14)}
 
-        .people-body{flex:1; min-height:0; max-height:100%; overflow-y:auto; overscroll-behavior:contain; padding:12px; display:flex; flex-direction:column; gap:8px}
+        .people-body{flex:1; min-height:0; max-height:100%; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; padding:12px; display:flex; flex-direction:column; gap:8px}
         .person-row{display:flex; align-items:center; gap:10px; padding:10px; border-radius:13px; border:1px solid var(--line); background:rgba(255,255,255,.02); transition:opacity .2s, filter .2s, background .2s, border-color .2s}
         .person-row.joined{opacity:1; filter:none; background:rgba(34,197,94,.07); border-color:rgba(34,197,94,.22)}
         .person-row.pending{opacity:.5; filter:grayscale(.5) saturate(.4)}
@@ -209,6 +219,11 @@
         .person-dot.on{background:var(--green)}
         .person-action{border:1px solid var(--line); background:rgba(255,255,255,.04); color:var(--muted); font-size:10px; padding:5px 9px; border-radius:8px; cursor:pointer; flex-shrink:0}
         .person-action:hover{background:rgba(239,68,68,.16); color:#fecaca; border-color:rgba(239,68,68,.3)}
+        .person-actions{display:flex;align-items:center;justify-content:flex-end;gap:4px;flex-wrap:wrap;flex-shrink:0;max-width:126px}
+        .person-action.request:hover{background:rgba(59,130,246,.16);color:#bfdbfe;border-color:rgba(59,130,246,.3)}
+        .person-action.allow{color:#86efac;border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.08)}
+        .person-action.camera-off{color:#fca5a5;border-color:rgba(239,68,68,.28)}
+        .person-action.remove:hover{background:rgba(239,68,68,.22);color:#fff;border-color:rgba(239,68,68,.45)}
         .hand-raised{color:#fbbf24;font-size:13px;animation:handPulse 1.2s ease-in-out infinite}
         @keyframes handPulse{50%{transform:translateY(-2px)}}
 
@@ -233,6 +248,55 @@
             border:1px solid var(--line); color:var(--muted); font-size:9px; white-space:nowrap;
             overflow:hidden; text-overflow:ellipsis; user-select:all;
         }
+
+
+        /* ---------- IN-ROOM EMAIL INVITE MODAL (self-contained) ---------- */
+        .room-email-overlay{
+            position:fixed; inset:0; z-index:10000; display:none;
+            align-items:center; justify-content:center; padding:16px;
+            background:rgba(0,0,0,.62); backdrop-filter:blur(5px);
+        }
+        .room-email-overlay.open{display:flex}
+        .room-email-dialog{
+            width:min(440px,100%); max-height:min(86dvh,680px); overflow-y:auto;
+            border-radius:18px; border:1px solid var(--line-strong);
+            background:linear-gradient(160deg,rgba(13,22,42,.99),rgba(7,13,27,.99));
+            color:var(--text); box-shadow:0 24px 70px rgba(0,0,0,.55);
+            padding:18px;
+        }
+        .room-email-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+        .room-email-title{font-size:15px;font-weight:800}
+        .room-email-close{
+            width:34px;height:34px;display:flex;align-items:center;justify-content:center;
+            border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.04);
+            color:#cbd5e1;cursor:pointer;flex-shrink:0;
+        }
+        .room-email-close:hover{background:rgba(239,68,68,.14);color:#fecaca}
+        .room-email-help{font-size:10.5px;line-height:1.5;color:var(--muted);margin:0 0 14px}
+        .room-email-field{margin-bottom:12px}
+        .room-email-label{display:block;font-size:10.5px;font-weight:700;color:#cbd5e1;margin-bottom:5px}
+        .room-email-input,.room-email-textarea{
+            width:100%;border-radius:10px;border:1px solid var(--line);
+            background:rgba(255,255,255,.045);color:var(--text);
+            font:inherit;font-size:12px;outline:none;padding:9px 10px;
+        }
+        .room-email-textarea{resize:vertical;min-height:76px}
+        .room-email-input:focus,.room-email-textarea:focus{
+            border-color:rgba(96,165,250,.55);box-shadow:0 0 0 3px rgba(59,130,246,.09)
+        }
+        .room-email-hint{font-size:9.5px;color:var(--muted-2);margin-top:5px}
+        .room-email-msg{display:none;font-size:10.5px;line-height:1.45;margin:4px 0 10px}
+        .room-email-msg.show{display:block}
+        .room-email-msg.error{color:#fca5a5}
+        .room-email-msg.success{color:#86efac}
+        .room-email-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+        .room-email-action{
+            border-radius:10px;padding:8px 13px;border:1px solid var(--line);
+            font-size:11px;font-weight:700;cursor:pointer;color:#e2e8f0;
+            background:rgba(255,255,255,.04);
+        }
+        .room-email-action.primary{border:none;color:#fff;background:linear-gradient(135deg,#2563eb,#0891b2)}
+        .room-email-action:disabled{opacity:.55;cursor:not-allowed}
 
         /* ---------- CONTROLS ---------- */
         .controls{
@@ -649,9 +713,14 @@
     <div class="header-center"><i class="fa fa-clock"></i><span id="timer">00:00:00</span></div>
     <div class="header-right">
         <div class="participants-count"><i class="fa fa-circle" style="color:var(--green);font-size:8px;"></i><span data-online-count>1</span> online</div>
+        <button class="btn-cancel" onclick="cancelMeeting()"><i class="fa fa-ban"></i><span>Cancel</span></button>
         <button class="btn-leave" onclick="safeLeaveMeeting()"><i class="fa fa-phone-slash"></i><span>Leave</span></button>
     </div>
 </div>
+<form id="cancel-form" action="{{ route('organizer.meetings.cancel', $meeting) }}" method="POST" style="display:none;">
+    @csrf
+    @method('PATCH')
+</form>
 
 <div class="main">
     <div class="video-area">
@@ -691,10 +760,13 @@
             <div id="tab-people" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
                 <div class="room-invite-card">
                     <div class="room-invite-title"><i class="fa-solid fa-user-plus"></i> Invite people</div>
-                    <div class="room-invite-note">Share the secure meeting link without leaving the room. The invited user can sign in/register and join this meeting.</div>
+                    <div class="room-invite-note">Invite someone without leaving the live meeting. Copy the link for WhatsApp/SMS, or send it by email.</div>
                     <div class="room-invite-actions">
                         <button type="button" class="room-invite-btn primary" onclick="copyMeetingInviteLink()">
-                            <i class="fa-solid fa-link"></i> Copy invite link
+                            <i class="fa-solid fa-link"></i> Copy link
+                        </button>
+                        <button type="button" class="room-invite-btn" onclick="openRoomEmailInvite()">
+                            <i class="fa-regular fa-envelope"></i> Email invite
                         </button>
                     </div>
                     <div class="room-invite-link" id="room-invite-link-preview" title="Meeting invite link"></div>
@@ -712,36 +784,83 @@
     <div class="ctrl-btn" onclick="toggleSidePanel('transcript')"><div class="ctrl-icon" id="ctrl-transcript"><i class="fa fa-closed-captioning"></i></div><span class="ctrl-label">Captions</span></div>
     <div class="ctrl-btn" onclick="toggleSidePanel('chat')"><div class="ctrl-icon" id="ctrl-chat"><i class="fa fa-comment"></i><span id="chat-badge">0</span></div><span class="ctrl-label">Chat</span></div>
     <div class="ctrl-btn" onclick="toggleSidePanel('people')"><div class="ctrl-icon" id="ctrl-people"><i class="fa fa-users"></i></div><span class="ctrl-label">People</span></div>
-    <div class="ctrl-btn" onclick="toggleRaiseHand()"><div class="ctrl-icon" id="ctrl-hand"><i class="fa-regular fa-hand"></i></div><span class="ctrl-label">Raise hand</span></div>
+    <div class="ctrl-btn" onclick="muteAllParticipants()"><div class="ctrl-icon"><i class="fa-solid fa-microphone-slash"></i></div><span class="ctrl-label">Mute all</span></div>
     <div class="ctrl-divider"></div>
+    <div class="ctrl-btn"><button class="btn-end" style="background:linear-gradient(135deg,#7f1d1d,#450a0a);" onclick="cancelMeeting()" title="Cancel meeting for everyone"><i class="fa fa-ban"></i></button><span class="ctrl-label" style="color:var(--red);">Cancel</span></div>
     <div class="ctrl-btn"><button class="btn-end" onclick="safeLeaveMeeting()"><i class="fa fa-phone-slash"></i></button><span class="ctrl-label" style="color:var(--red);">Leave</span></div>
+</div>
+
+
+<div id="room-email-overlay" class="room-email-overlay" aria-hidden="true">
+    <div class="room-email-dialog" role="dialog" aria-modal="true" aria-labelledby="room-email-title">
+        <div class="room-email-head">
+            <div class="room-email-title" id="room-email-title">Send email invitation</div>
+            <button type="button" class="room-email-close" onclick="closeRoomEmailInvite()" aria-label="Close">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <p class="room-email-help">
+            Send an invitation without leaving the live meeting.
+            Existing users can join this meeting; new users can register first.
+        </p>
+
+        <form id="room-email-form" onsubmit="sendRoomEmailInvite(event)">
+            <div class="room-email-field">
+                <label class="room-email-label" for="room-email-emails">Emails</label>
+                <textarea id="room-email-emails" class="room-email-textarea" rows="2"
+                          placeholder="email1@example.com, email2@example.com"></textarea>
+                <div class="room-email-hint">Separate multiple email addresses with commas.</div>
+            </div>
+
+            <div class="room-email-field">
+                <label class="room-email-label" for="room-email-subject">Subject</label>
+                <input id="room-email-subject" class="room-email-input" type="text">
+            </div>
+
+            <div class="room-email-field">
+                <label class="room-email-label" for="room-email-message">Message (optional)</label>
+                <textarea id="room-email-message" class="room-email-textarea" rows="3"
+                          placeholder="Hello, please join our meeting..."></textarea>
+            </div>
+
+            <div id="room-email-msg" class="room-email-msg"></div>
+
+            <div class="room-email-actions">
+                <button type="button" class="room-email-action" onclick="closeRoomEmailInvite()">Cancel</button>
+                <button type="submit" class="room-email-action primary" id="room-email-send-btn">
+                    <i class="fa-regular fa-envelope"></i> Send
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
 
 <div id="toast-stack"></div>
 
+
 <script>
     /* ============================================================
-       SMARTMEET — PARTICIPANT ROOM (clean single implementation)
+       SMARTMEET — ORGANIZER ROOM (clean single implementation)
        ============================================================ */
-    const IS_ORGANIZER   = false;
+    const IS_ORGANIZER   = true;
     const MEETING_ID      = "{{ $meeting->id }}";
     const MEETING_TITLE   = @json($meeting->title);
     const INVITE_LINK     = @json(route('meetings.join.link', $meeting->unique_code));
     const MY_USER_ID      = "{{ auth()->id() }}";
+    const ORGANIZER_ID    = String(MY_USER_ID);
     const MY_NAME         = @json(auth()->user()->name);
     const MY_INITIALS     = @json($userInitials);
     const MY_AVATAR_URL   = @json($myAvatarUrl ?? null);
-    const SIGNAL_URL      = @json(route('participant.meetings.signal', $meeting));
-    const TRANSCRIPT_URL  = @json(route('participant.meetings.transcript', $meeting));
-    const MARK_LEFT_URL   = @json(route('participant.meetings.markLeft', $meeting));
-    const LEAVE_URL       = @json(route('participant.meetings.index'));
+    const SIGNAL_URL      = @json(route('organizer.meetings.signal', $meeting));
+    const MODERATION_URL  = @json(route('organizer.meetings.moderate', $meeting));
+    const TRANSCRIPT_URL  = @json(route('organizer.meetings.transcript', $meeting));
+    const MARK_LEFT_URL   = @json(route('organizer.meetings.markLeft', $meeting));
+    const LEAVE_URL       = @json(route('organizer.meetings.index'));
+    const END_URL         = @json(route('meetings.ended', $meeting));
+    const CANCEL_URL      = @json(route('organizer.meetings.cancel', $meeting));
     const CSRF            = @json(csrf_token());
     const ALL_PARTICIPANTS = @json($allParticipants);
-    const ORGANIZER_ID    = "{{ $organizer->id }}";
-    const ORGANIZER_NAME  = @json($organizer->name);
-    const ORGANIZER_INITIALS = @json($orgInitials);
-    const ORGANIZER_AVATAR_URL = @json($organizerAvatarUrl ?? null);
-    const ORGANIZER_JOINED   = @json($organizerJoined ?? false);
     const MEETING_END_TIME   = @json($meetingEnd);
     const ACTUAL_START = @json($meeting->actual_start ? \Carbon\Carbon::parse($meeting->actual_start)->utc()->toIso8601String() : now()->utc()->toIso8601String());
     const COLORS = ['#3b82f6,#06b6d4','#8b5cf6,#ec4899','#22c55e,#06b6d4','#f59e0b,#ef4444','#64748b,#334155','#ec4899,#f59e0b'];
@@ -750,8 +869,6 @@
     /* ---------- Known participants (id -> {name, initials, isOrganizer, hasJoined}) ---------- */
     const knownParticipants = {};
     const raisedHands = new Set();
-    let myHandRaised=false;
-    knownParticipants[ORGANIZER_ID] = { name: ORGANIZER_NAME, initials: ORGANIZER_INITIALS, avatarUrl: ORGANIZER_AVATAR_URL || null, isOrganizer: true, hasJoined: Boolean(ORGANIZER_JOINED) };
     ALL_PARTICIPANTS.forEach(p => { knownParticipants[String(p.userId)] = { name: p.name, initials: p.initials, avatarUrl: p.avatarUrl || null, isOrganizer: false, hasJoined: Boolean(p.hasJoined) }; });
 
     /* ---------- Runtime state ---------- */
@@ -815,24 +932,132 @@
         if(preview) preview.textContent=INVITE_LINK;
     }
 
+    function setRoomEmailMessage(message='', type=''){
+        const box=document.getElementById('room-email-msg');
+        if(!box) return;
+        box.textContent=message;
+        box.className='room-email-msg';
+        if(message){
+            box.classList.add('show');
+            if(type) box.classList.add(type);
+        }
+    }
+
+    function openRoomEmailInvite(){
+        const overlay=document.getElementById('room-email-overlay');
+        const subject=document.getElementById('room-email-subject');
+        const message=document.getElementById('room-email-message');
+        const emails=document.getElementById('room-email-emails');
+
+        if(!overlay) return;
+        if(subject) subject.value=`You're invited: ${MEETING_TITLE}`;
+        if(message) message.value='';
+        if(emails) emails.value='';
+        setRoomEmailMessage('');
+        overlay.classList.add('open');
+        overlay.setAttribute('aria-hidden','false');
+        setTimeout(()=>emails?.focus(),30);
+    }
+
+    function closeRoomEmailInvite(){
+        const overlay=document.getElementById('room-email-overlay');
+        const form=document.getElementById('room-email-form');
+        overlay?.classList.remove('open');
+        overlay?.setAttribute('aria-hidden','true');
+        form?.reset();
+        setRoomEmailMessage('');
+    }
+
+    let roomEmailInviteSending=false;
+
+    async function sendRoomEmailInvite(event){
+        event.preventDefault();
+
+        if(roomEmailInviteSending) return;
+
+        const emails=document.getElementById('room-email-emails')?.value.trim() || '';
+        const subject=document.getElementById('room-email-subject')?.value.trim() || '';
+        const message=document.getElementById('room-email-message')?.value.trim() || '';
+        const sendBtn=document.getElementById('room-email-send-btn');
+
+        if(!emails){
+            setRoomEmailMessage('At least one email is required.','error');
+            return;
+        }
+
+        roomEmailInviteSending=true;
+        if(sendBtn){
+            sendBtn.disabled=true;
+            sendBtn.dataset.originalHtml=sendBtn.innerHTML;
+            sendBtn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Sending...';
+        }
+        setRoomEmailMessage('Sending invitation…','success');
+
+        try{
+            const response=await fetch(`/organizer/meetings/${encodeURIComponent(MEETING_ID)}/send-invite`,{
+                method:'POST',
+                credentials:'same-origin',
+                headers:{
+                    'Content-Type':'application/json',
+                    'Accept':'application/json',
+                    'X-Requested-With':'XMLHttpRequest',
+                    'X-CSRF-TOKEN':CSRF
+                },
+                body:JSON.stringify({emails,subject,message})
+            });
+
+            let data={};
+            try{ data=await response.json(); }catch(e){}
+
+            if(!response.ok){
+                throw new Error(data.message || `Email invite failed (HTTP ${response.status})`);
+            }
+
+            setRoomEmailMessage(data.message || 'Invitation sent successfully.','success');
+            showToast('✉️ Invitation sent.');
+            setTimeout(closeRoomEmailInvite,1200);
+        }catch(error){
+            console.error('[SmartMeet] email invite failed',error);
+            setRoomEmailMessage(error?.message || 'Failed to send invitation. Please try again.','error');
+        }finally{
+            roomEmailInviteSending=false;
+            if(sendBtn){
+                sendBtn.disabled=false;
+                sendBtn.innerHTML=sendBtn.dataset.originalHtml || '<i class="fa-regular fa-envelope"></i> Send';
+            }
+        }
+    }
+
+    document.addEventListener('click',(event)=>{
+        const overlay=document.getElementById('room-email-overlay');
+        if(overlay && event.target===overlay) closeRoomEmailInvite();
+    });
+
+    document.addEventListener('keydown',(event)=>{
+        if(event.key==='Escape'){
+            const overlay=document.getElementById('room-email-overlay');
+            if(overlay?.classList.contains('open')) closeRoomEmailInvite();
+        }
+    });
+
     /* ---------- Toast ---------- */
     const recentToasts = new Set();
     function showToast(msg){
         if(recentToasts.has(msg)) return;
-        recentToasts.add(msg); setTimeout(()=>recentToasts.delete(msg),4000);
+        recentToasts.add(msg); setTimeout(()=>recentToasts.delete(msg),5200);
         const stack=document.getElementById('toast-stack'); if(!stack) return;
         const el=document.createElement('div'); el.className='toast'; el.textContent=msg;
         stack.appendChild(el);
         requestAnimationFrame(()=>el.classList.add('show'));
-        setTimeout(()=>{ el.classList.remove('show'); el.classList.add('leaving'); setTimeout(()=>el.remove(),260); },3400);
+        setTimeout(()=>{ el.classList.remove('show'); el.classList.add('leaving'); setTimeout(()=>el.remove(),280); },4600);
     }
     function showModerationNotice(msg){
         const old=document.getElementById('mod-notice'); if(old) old.remove();
         const el=document.createElement('div'); el.id='mod-notice'; el.className='moderation-notice'; el.textContent=msg;
         document.body.appendChild(el);
         requestAnimationFrame(()=>el.classList.add('show'));
-        setTimeout(()=>el.classList.remove('show'),3200);
-        setTimeout(()=>el.remove(),3600);
+        setTimeout(()=>el.classList.remove('show'),4300);
+        setTimeout(()=>el.remove(),4700);
     }
 
     installAudioPlaybackUnlock();
@@ -866,8 +1091,22 @@
     }
     async function triggerAutoEnd(){
         if(autoEndTriggered) return; autoEndTriggered=true;
+        leftNotified=true;
         showToast('⏰ Meeting time has ended.');
-        setTimeout(()=>{ cleanup(); window.location.href=LEAVE_URL; },1800);
+        try{
+            await Promise.race([
+                fetch(MARK_LEFT_URL,{
+                    method:'POST',
+                    headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':CSRF},
+                    body:JSON.stringify({reason:'timeout'}),
+                    keepalive:true
+                }),
+                new Promise(resolve=>setTimeout(resolve,900))
+            ]);
+        }catch(e){
+            try{ await sendSignal('all','meeting-ended',{auto:true,reason:'timeout'}); }catch(_){}
+        }
+        setTimeout(()=>{ cleanup(); window.location.href=END_URL+'?reason=timeout'; },900);
     }
 
     /* ---------- Online count / people list ---------- */
@@ -909,7 +1148,7 @@
         uid=String(uid);
         const body=document.getElementById('people-body'); if(!body) return;
         const isMe = uid===String(MY_USER_ID);
-        const info = isMe ? { name: MY_NAME, initials: MY_INITIALS, avatarUrl: MY_AVATAR_URL, isOrganizer: false } : knownParticipants[uid];
+        const info = isMe ? { name: MY_NAME, initials: MY_INITIALS, avatarUrl: MY_AVATAR_URL, isOrganizer: true } : knownParticipants[uid];
         if(!info) return;
         const isLeft = !isMe && leftUsers.has(uid);
         const isOnline = !isLeft && (isMe || onlineUsers.has(uid));
@@ -917,6 +1156,7 @@
         if(!row){ row=document.createElement('div'); row.id='person-row-'+uid; body.appendChild(row); }
         row.className='person-row '+(isOnline?'joined':'pending');
         const color=colorFor(uid, info.isOrganizer);
+        const canMute = IS_ORGANIZER && !isMe && isOnline;
         const presenceLabel = isLeft ? 'Left' : (isOnline ? 'Joined' : 'Not joined yet');
         row.innerHTML = `
         <div class="person-avatar" style="background:linear-gradient(135deg,${color})">${avatarContent(info.avatarUrl,info.initials||initialsOf(info.name))}</div>
@@ -925,7 +1165,72 @@
             <div class="person-status ${isOnline?'on':''}" ${isLeft?'style="color:#fca5a5"':''}>${info.isOrganizer?'Organizer':'Participant'} • ${presenceLabel}</div>
         </div>
         ${raisedHands.has(uid) ? `<i class="fa-solid fa-hand hand-raised" title="Hand raised"></i>` : ''}
+        ${canMute ? `<div class="person-actions">
+            <button class="person-action" onclick="muteParticipant('${uid}')" title="Mute participant"><i class="fa-solid fa-microphone-slash"></i></button>
+            <button class="person-action allow" onclick="requestParticipantMedia('${uid}','camera')" title="Request camera on"><i class="fa-solid fa-video"></i></button>
+            <button class="person-action camera-off" onclick="turnParticipantCameraOff('${uid}')" title="Turn camera off"><i class="fa-solid fa-video-slash"></i></button>
+            <button class="person-action remove" onclick="removeParticipantFromMeeting('${uid}')" title="Remove participant"><i class="fa-solid fa-user-minus"></i></button>
+        </div>` : ''}
         <span class="person-dot ${isOnline?'on':''}" ${isLeft?'style="background:#ef4444"':''}></span>`;
+    }
+
+    function muteParticipant(uid){
+        uid=String(uid);
+        const info=knownParticipants[uid];
+        sendSignal(uid, 'mute', {});
+        showToast(`🎙️ ${escapeHtml(info?info.name:'Participant')}'s microphone has been muted.`);
+    }
+
+    async function muteAllParticipants(){
+        const ids=[...onlineUsers].filter(uid=>String(uid)!==String(MY_USER_ID));
+        if(!ids.length){ showToast('No active participants to mute.'); return; }
+        await Promise.allSettled(ids.map(uid=>sendSignal(String(uid),'mute',{})));
+        showToast(`🎙️ Muted ${ids.length} participant${ids.length===1?'':'s'}.`);
+    }
+
+    async function moderateParticipant(uid, action){
+        uid=String(uid);
+        try{
+            const res=await fetch(MODERATION_URL,{
+                method:'POST',
+                headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':CSRF},
+                body:JSON.stringify({user_id:uid,action})
+            });
+            const data=await res.json().catch(()=>({}));
+            if(!res.ok) throw new Error(data.message||`HTTP ${res.status}`);
+            return true;
+        }catch(e){
+            console.error('[SmartMeet] moderation failed',action,uid,e);
+            showToast('Moderation action failed. Please try again.');
+            return false;
+        }
+    }
+
+    async function requestParticipantMedia(uid, kind){
+        if(kind!=='camera') return;
+        const ok=await moderateParticipant(uid,'request-camera');
+        if(ok) showToast('📹 Camera request sent to the participant.');
+    }
+
+    async function turnParticipantCameraOff(uid){
+        uid=String(uid);
+        const info=knownParticipants[uid];
+        const ok=await moderateParticipant(uid,'camera-off');
+        if(ok) showToast(`📷 ${escapeHtml(info?info.name:'Participant')}'s camera has been turned off.`);
+    }
+
+    async function removeParticipantFromMeeting(uid){
+        uid=String(uid);
+        const info=knownParticipants[uid];
+        if(!window.confirm(`Remove ${info?.name||'this participant'} from this meeting? They will not be able to rejoin unless invited again.`)) return;
+        const ok=await moderateParticipant(uid,'remove');
+        if(!ok) return;
+        raisedHands.delete(uid);
+        markUserLeft(uid);
+        removeParticipantTile(uid,true);
+        delete knownParticipants[uid];
+        document.getElementById('person-row-'+uid)?.remove();
+        showToast(`🚫 ${info?.name||'Participant'} removed from the meeting.`);
     }
 
     function renderMyOwnTile(){
@@ -939,7 +1244,7 @@
             <button class="tile-expand-btn" onclick="toggleMaximize('${MY_USER_ID}')"><i class="fa fa-expand" id="expand-icon-${MY_USER_ID}"></i></button>
         </div>
         <div class="tile-info">
-            <div class="tile-name">${escapeHtml(MY_NAME)}<span class="role-badge participant">You</span></div>
+            <div class="tile-name"><i class="fa fa-crown" style="color:#fbbf24;font-size:10px;"></i> ${escapeHtml(MY_NAME)}<span class="role-badge organizer">You</span></div>
             <div class="tile-icons">
                 <div class="speaking-indicator" id="speaking-${MY_USER_ID}" style="display:none;"><div class="speaking-bar"></div><div class="speaking-bar"></div><div class="speaking-bar"></div></div>
                 <div class="mic-off" id="micoff-${MY_USER_ID}" style="display:flex;"><i class="fa fa-microphone-slash"></i></div>
@@ -949,6 +1254,22 @@
     }
 
     function refreshEmptyStage(){ /* empty-stage overlay removed by request */ }
+
+    function syncRaisedHandIndicator(uid){
+        uid=String(uid);
+        const tile=document.getElementById('tile-'+uid);
+        if(!tile) return;
+        let badge=tile.querySelector('.tile-hand-raised');
+        const raised=raisedHands.has(uid);
+        if(raised && !badge){
+            badge=document.createElement('div');
+            badge.className='tile-hand-raised';
+            badge.innerHTML='<i class="fa-solid fa-hand"></i><span>Hand raised</span>';
+            tile.appendChild(badge);
+        }else if(!raised && badge){
+            badge.remove();
+        }
+    }
 
     /* ---------- Tiles ---------- */
     function addParticipantTile(uid, name, initials, isOrganizer){
@@ -975,6 +1296,7 @@
             </div>
         </div>`;
         if(isOrganizer) grid.prepend(tile); else grid.appendChild(tile);
+        syncRaisedHandIndicator(uid);
         refreshEmptyStage();
     }
     function removeParticipantTile(uid, announce){
@@ -988,7 +1310,7 @@
         refreshEmptyStage();
         if(announce){
             const info=knownParticipants[uid];
-            showToast(`👋 ${escapeHtml(info?info.name:'A participant')} has left the meeting.`);
+            showToast(`👋 ${escapeHtml(info?info.name:'A participant')} left the meeting.`);
         }
     }
 
@@ -2251,13 +2573,15 @@
         if(isSelf && !['meeting-cancelled','meeting-ended'].includes(data.type)) return;
 
         if(data.type==='meeting-cancelled'){
-            showToast('🚫 The organizer cancelled this meeting.');
-            setTimeout(()=>{ cleanup(); window.location.href=LEAVE_URL; },2200);
+            showToast('🚫 This meeting was ended by the organizer.');
+            setTimeout(()=>{ cleanup(); window.location.href=END_URL+'?reason=cancelled'; },4650);
             return;
         }
         if(data.type==='meeting-ended'){
-            showToast(data.data?.auto ? '⏰ Meeting time has ended.' : '📞 The meeting has ended.');
-            setTimeout(()=>{ cleanup(); window.location.href=LEAVE_URL; },2200);
+            const endReason=String(data.data?.reason || (data.data?.auto ? 'timeout' : 'organizer-left'));
+            const isTimeout=endReason==='timeout' || Boolean(data.data?.auto);
+            showToast(isTimeout ? '⏰ Meeting time has ended.' : '📞 The organizer ended the meeting.');
+            setTimeout(()=>{ cleanup(); window.location.href=END_URL+'?reason='+(isTimeout?'timeout':'organizer-left'); },4650);
             return;
         }
         if(data.type==='presence-request'){
@@ -2280,6 +2604,10 @@
             if(Boolean(data.data?.cameraOn)) camStatus[uid]=true;
             else if(!(remoteStreams[uid]?.getVideoTracks?.()||[]).some(t=>t.readyState==='live')) camStatus[uid]=false;
             micStatus[uid]=!Boolean(data.data?.micOn);
+            if(Boolean(data.data?.handRaised)) raisedHands.add(uid);
+            else raisedHands.delete(uid);
+            renderPersonRow(uid);
+            syncRaisedHandIndicator(uid);
             const micEl=document.getElementById('micoff-'+uid);
             if(micEl) micEl.style.display=micStatus[uid] ? 'flex' : 'none';
             attachRemoteStream(uid);
@@ -2351,39 +2679,16 @@
             if(control==='raise-hand'){
                 raisedHands.add(controlUser);
                 renderPersonRow(controlUser);
+                syncRaisedHandIndicator(controlUser);
+                const who=knownParticipants[controlUser]?.name || data.data?.name || 'Participant';
+                showToast(`✋ ${escapeHtml(who)} raised a hand.`);
                 return;
             }
             if(control==='lower-hand'){
                 raisedHands.delete(controlUser);
                 renderPersonRow(controlUser);
+                syncRaisedHandIndicator(controlUser);
                 return;
-            }
-
-            // Only the real organizer may issue moderation controls.
-            if(String(from)===String(ORGANIZER_ID)){
-                if(control==='participant-removed' && controlUser===String(MY_USER_ID)){
-                    showModerationNotice('🚫 You were removed from this meeting by the organizer.');
-                    try{ cleanup(); }catch(e){}
-                    setTimeout(()=>{ window.location.href=LEAVE_URL; },900);
-                    return;
-                }
-                if(control==='request-mic' && controlUser===String(MY_USER_ID)){
-                    showModerationNotice('🎙️ Organizer requested your microphone. Tap Mic to turn it on.');
-                    return;
-                }
-                if(control==='request-camera' && controlUser===String(MY_USER_ID)){
-                    showModerationNotice('📷 Organizer requested your camera. Tap Camera to turn it on.');
-                    return;
-                }
-                if(control==='camera-off' && controlUser===String(MY_USER_ID)){
-                    if(isCameraOn){
-                        await toggleCamera();
-                    }else{
-                        setCameraButton(false);
-                    }
-                    showModerationNotice('📷 Your camera was turned off by the organizer.');
-                    return;
-                }
             }
 
             const text=data.data?.text||''; if(!text) return;
@@ -3115,30 +3420,6 @@
         return false;
     }
 
-    async function toggleRaiseHand(){
-        myHandRaised=!myHandRaised;
-        const btn=document.getElementById('ctrl-hand');
-        if(btn){
-            btn.classList.toggle('active',myHandRaised);
-            btn.innerHTML=myHandRaised?'<i class="fa-solid fa-hand"></i>':'<i class="fa-regular fa-hand"></i>';
-        }
-        if(myHandRaised) raisedHands.add(String(MY_USER_ID));
-        else raisedHands.delete(String(MY_USER_ID));
-        renderPersonRow(String(MY_USER_ID));
-        const ok=await sendSignal('all','chat',{
-            smartmeetControl:myHandRaised?'raise-hand':'lower-hand',
-            userId:MY_USER_ID,
-            name:MY_NAME,
-            text:''
-        });
-        if(!ok){
-            myHandRaised=!myHandRaised;
-            showToast('Raise hand update could not be sent.');
-        }else{
-            showToast(myHandRaised?'✋ Hand raised.':'Hand lowered.');
-        }
-    }
-
     /* ---------- Chat ---------- */
     function addChatBubble(name, text, isMe){
         const body=document.getElementById('chat-body'); if(!body) return;
@@ -3175,6 +3456,29 @@
         rec.onresult=(e)=>{ let spoken=''; for(let i=e.resultIndex;i<e.results.length;i++) spoken+=e.results[i][0].transcript; input.value=[baseText,spoken.trim()].filter(Boolean).join(' '); };
         rec.onend=()=>btn.classList.remove('listening');
         rec.onerror=()=>btn.classList.remove('listening');
+    }
+
+    /* ---------- Cancel meeting (organizer only) ---------- */
+    let cancelling=false;
+    async function cancelMeeting(){
+        if(cancelling) return;
+        if(!window.confirm('End this meeting for everyone? This cannot be undone.')) return;
+        cancelling=true; leftNotified=true;
+        if(autoEndTimer) clearTimeout(autoEndTimer);
+
+        try{
+            const res=await fetch(CANCEL_URL,{
+                method:'PATCH',
+                headers:{'Accept':'application/json','X-CSRF-TOKEN':CSRF}
+            });
+            if(!res.ok) throw new Error(`HTTP ${res.status}`);
+            showToast('🚫 Meeting ended for everyone.');
+            setTimeout(()=>{ cleanup(); window.location.href=END_URL+'?reason=cancelled'; },900);
+        }catch(e){
+            console.error('[SmartMeet] cancel failed',e);
+            cancelling=false;
+            showToast('Meeting could not be ended. Please try again.');
+        }
     }
 
 
@@ -3235,7 +3539,7 @@
                         'Content-Type':'application/json',
                         'X-CSRF-TOKEN':CSRF
                     },
-                    body:JSON.stringify({}),
+                    body:JSON.stringify({reason:'organizer-left'}),
                     keepalive:true
                 }),
                 new Promise(resolve=>setTimeout(resolve,650))
@@ -3243,12 +3547,12 @@
         }catch(e){}
 
         try{ cleanup(); }catch(e){}
-        window.location.href=LEAVE_URL;
+        window.location.href=END_URL+'?reason=organizer-left';
     }
     function notifyDisconnectBeacon(){
         if(leftNotified) return;
         leftNotified=true;
-        const payload=JSON.stringify({});
+        const payload=JSON.stringify({reason:'organizer-left'});
 
         // One keepalive request is enough. Sending both fetch() and sendBeacon()
         // could mark the same user left twice and cause unnecessary peer churn.
@@ -3453,7 +3757,6 @@
         setupPanelResize();
         renderPeopleList();
 
-        if(ORGANIZER_JOINED){ addParticipantTile(ORGANIZER_ID, ORGANIZER_NAME, ORGANIZER_INITIALS, true); markOnline(ORGANIZER_ID); }
         // Live roster comes only from current Reverb presence.
         // Historical database join flags must not create ghost tiles/people.
         renderPeopleList();
