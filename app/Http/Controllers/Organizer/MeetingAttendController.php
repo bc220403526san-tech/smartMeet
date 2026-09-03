@@ -207,39 +207,26 @@ class MeetingAttendController extends Controller
         $this->authorizeOrganizer($meeting);
 
         $user = auth()->user();
-        $reason = (string) $request->input('reason', 'organizer-left');
-        $reason = $reason === 'timeout' ? 'timeout' : 'organizer-left';
 
-        $updates = [
+        // Presence only: Leave / refresh / tab close must NOT end the meeting.
+        $meeting->update([
             'organizer_left_at' => now(),
-        ];
-
-        // Organizer leaving an active room ends the session for everyone.
-        // "completed" is already part of the existing project status lifecycle,
-        // so no migration/new enum value is introduced.
-        if ($meeting->status === 'active') {
-            $updates['status'] = 'completed';
-        }
-
-        $meeting->update($updates);
+        ]);
 
         $this->broadcastSignal(
             meeting: $meeting,
             fromUserId: (string) $user->id,
             toUserId: 'all',
-            type: 'meeting-ended',
+            type: 'user-left',
             data: [
                 'userId' => (string) $user->id,
                 'name' => $user->name,
                 'isOrganizer' => true,
-                'reason' => $reason,
-                'auto' => $reason === 'timeout',
             ]
         );
 
         return response()->json([
-            'status' => 'ended',
-            'reason' => $reason,
+            'status' => 'left',
         ]);
     }
 

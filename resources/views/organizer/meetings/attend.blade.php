@@ -73,6 +73,7 @@
             display:flex; align-items:center; gap:7px; border:1px solid rgba(239,68,68,.4); cursor:pointer;
             color:#fecaca; font-weight:700; font-size:11.5px; padding:8px 14px; border-radius:11px;
             background:rgba(239,68,68,.1); transition:background .15s ease;
+            white-space:nowrap; flex-shrink:0;
         }
         .btn-cancel:hover{background:rgba(239,68,68,.2)}
 
@@ -785,7 +786,7 @@
     <div class="ctrl-btn" onclick="toggleSidePanel('people')"><div class="ctrl-icon" id="ctrl-people"><i class="fa fa-users"></i></div><span class="ctrl-label">People</span></div>
     <div class="ctrl-btn" onclick="muteAllParticipants()"><div class="ctrl-icon"><i class="fa-solid fa-microphone-slash"></i></div><span class="ctrl-label">Mute all</span></div>
     <div class="ctrl-divider"></div>
-    <div class="ctrl-btn"><button class="btn-end" style="background:linear-gradient(135deg,#7f1d1d,#450a0a);" onclick="endMeeting()" title="End meeting for everyone"><i class="fa-solid fa-circle-stop"></i></button><span class="ctrl-label" style="color:var(--red);">End Meeting</span></div>
+    <div class="ctrl-btn"><button class="btn-end" style="background:linear-gradient(135deg,#7f1d1d,#450a0a);" onclick="endMeeting()" title="End meeting for everyone"><i class="fa-solid fa-circle-stop"></i></button><span class="ctrl-label" style="color:var(--red);white-space:nowrap;">End</span></div>
     <div class="ctrl-btn"><button class="btn-end" onclick="safeLeaveMeeting()"><i class="fa fa-phone-slash"></i></button><span class="ctrl-label" style="color:var(--red);">Leave</span></div>
 </div>
 
