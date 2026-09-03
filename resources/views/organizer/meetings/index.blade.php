@@ -571,4 +571,3 @@
     </script>
 
 </x-layouts.app>
-
