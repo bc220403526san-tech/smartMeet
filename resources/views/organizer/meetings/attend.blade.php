@@ -324,6 +324,19 @@
         .ctrl-btn:hover .ctrl-icon{transform:translateY(-2px)}
         .ctrl-icon.active{background:linear-gradient(135deg,rgba(37,99,235,.4),rgba(8,145,178,.32)); border-color:rgba(96,165,250,.45)}
         .ctrl-icon.off{background:rgba(51,65,85,.7)}
+        .ctrl-icon.mute-all-fired{
+            color:#fff;
+            background:linear-gradient(135deg,rgba(239,68,68,.88),rgba(245,158,11,.78));
+            border-color:rgba(251,191,36,.72);
+            box-shadow:0 0 0 4px rgba(245,158,11,.10),0 8px 20px rgba(239,68,68,.20);
+            animation:muteAllFeedback .55s ease;
+        }
+        @keyframes muteAllFeedback{
+            0%{transform:scale(1)}
+            40%{transform:scale(1.13) rotate(-5deg)}
+            75%{transform:scale(.98) rotate(3deg)}
+            100%{transform:scale(1) rotate(0)}
+        }
         .ctrl-label{font-size:8.5px; color:var(--muted); font-weight:600}
         .ctrl-divider{width:1px; height:30px; background:var(--line); margin:0 2px; flex-shrink:0}
         .btn-end{width:38px; height:38px; border-radius:12px; border:none; background:linear-gradient(135deg,#ef4444,#b91c1c); color:#fff; display:flex; align-items:center; justify-content:center; font-size:14px; cursor:pointer}
@@ -792,7 +805,7 @@
     <div class="ctrl-btn" onclick="toggleSidePanel('transcript')"><div class="ctrl-icon" id="ctrl-transcript"><i class="fa fa-closed-captioning"></i></div><span class="ctrl-label">Captions</span></div>
     <div class="ctrl-btn" onclick="toggleSidePanel('chat')"><div class="ctrl-icon" id="ctrl-chat"><i class="fa fa-comment"></i><span id="chat-badge">0</span></div><span class="ctrl-label">Chat</span></div>
     <div class="ctrl-btn" onclick="toggleSidePanel('people')"><div class="ctrl-icon" id="ctrl-people"><i class="fa fa-users"></i></div><span class="ctrl-label">People</span></div>
-    <div class="ctrl-btn" onclick="muteAllParticipants()"><div class="ctrl-icon"><i class="fa-solid fa-volume-xmark"></i></div><span class="ctrl-label">Mute all</span></div>
+    <div class="ctrl-btn" onclick="muteAllParticipants()"><div class="ctrl-icon" id="ctrl-mute-all"><i class="fa-solid fa-volume-xmark"></i></div><span class="ctrl-label">Mute all</span></div>
     <div class="ctrl-divider"></div>
     <div class="ctrl-btn"><button class="btn-end" style="background:linear-gradient(135deg,#7f1d1d,#450a0a);" onclick="endMeeting()" title="End meeting for everyone"><i class="fa-solid fa-circle-stop"></i></button><span class="ctrl-label" style="color:var(--red);white-space:nowrap;">End</span></div>
     <div class="ctrl-btn"><button class="btn-end" onclick="safeLeaveMeeting()"><i class="fa fa-phone-slash"></i></button><span class="ctrl-label" style="color:var(--red);">Leave</span></div>
@@ -1206,14 +1219,16 @@
                 <i class="fa-solid ${muted?'fa-microphone-slash':'fa-microphone'}"></i>
             </button>
 
+            ${cameraOn ? `
             <button
-                class="person-action ${cameraOn?'is-on':'is-off'}"
+                class="person-action is-on"
                 data-media-action="camera"
                 onclick="toggleParticipantCamera('${uid}')"
-                title="${cameraOn?'Turn camera off':'Turn camera on'}"
-                aria-label="${cameraOn?'Turn camera off':'Turn camera on'}">
-                <i class="fa-solid ${cameraOn?'fa-video':'fa-video-slash'}"></i>
+                title="Turn camera off"
+                aria-label="Turn camera off">
+                <i class="fa-solid fa-video-slash"></i>
             </button>
+            ` : ''}
 
             <button
                 class="person-action remove"
@@ -1250,11 +1265,22 @@
     }
 
     async function muteAllParticipants(){
+        const muteAllIcon=document.getElementById('ctrl-mute-all');
+
+        const flashMuteAll=()=>{
+            if(!muteAllIcon) return;
+            muteAllIcon.classList.remove('mute-all-fired');
+            void muteAllIcon.offsetWidth;
+            muteAllIcon.classList.add('mute-all-fired');
+            setTimeout(()=>muteAllIcon.classList.remove('mute-all-fired'),1250);
+        };
+
         const ids=[...onlineUsers]
             .map(String)
             .filter(uid=>uid!==String(MY_USER_ID));
 
         if(!ids.length){
+            flashMuteAll();
             showToast('There are no active participants to mute.');
             return;
         }
@@ -1262,15 +1288,18 @@
         const unmutedIds=ids.filter(uid=>micStatus[uid]===false);
 
         if(!unmutedIds.length){
+            flashMuteAll();
             showToast('🔇 All active participants are already muted.');
             return;
         }
+
+        flashMuteAll();
 
         await Promise.allSettled(
             unmutedIds.map(uid=>sendSignal(uid,'mute',{}))
         );
 
-        showToast(`🔇 Muting ${unmutedIds.length} participant${unmutedIds.length===1?'':'s'}…`);
+        showToast(`🔇 Mute All applied to ${unmutedIds.length} participant${unmutedIds.length===1?'':'s'}.`);
     }
 
     async function moderateParticipant(uid, action){
@@ -1297,21 +1326,21 @@
 
         const info=knownParticipants[uid];
         const name=info?.name || 'Participant';
-        const cameraOn=camStatus[uid]===true;
-        const action=cameraOn?'camera-off':'camera-on';
 
         /*
-         * Existing moderation path performs the real participant-side camera
-         * action. Do not modify peer connections/tracks here.
+         * People panel intentionally exposes only "camera off".
+         * If the participant camera is already off, the button is hidden.
+         * Existing moderation/participant media logic performs the real action.
          */
-        const ok=await moderateParticipant(uid,action);
+        if(camStatus[uid] !== true){
+            renderPersonRow(uid);
+            return;
+        }
+
+        const ok=await moderateParticipant(uid,'camera-off');
         if(!ok) return;
 
-        showToast(
-            cameraOn
-                ? `📷 Turning off ${name}'s camera…`
-                : `📹 Camera-on request sent to ${name}.`
-        );
+        showToast(`📷 Turning off ${name}'s camera…`);
     }
 
     async function restrictParticipant(uid){
@@ -2325,7 +2354,7 @@
 
             // Actual received frames are the source of truth.
             // A stale camera-status signal must not hide a real unmuted track.
-            const show=Boolean(bestVideo && bestVideo.readyState==='live' && !bestVideo.muted);
+            const show=Boolean(bestVideo && bestVideo.readyState==='live' && !bestVideo.muted && camStatus[uid] !== false);
             video.style.display=show?'block':'none';
             if(avatar) avatar.style.display=show?'none':'flex';
 
@@ -2346,7 +2375,7 @@
             // A muted remote track can stay muted indefinitely when the remote camera
             // is OFF. Never poll attachRemoteStream() recursively here: that created
             // an endless ~180ms DOM/media loop per peer and could freeze Chromium.
-            if(!bestVideo.muted) camStatus[uid]=true;
+            if(!bestVideo.muted && camStatus[uid] !== false) camStatus[uid]=true;
         }
     }
 

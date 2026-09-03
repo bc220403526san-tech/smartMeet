@@ -1934,7 +1934,7 @@
 
             // Actual received frames are the source of truth.
             // A stale camera-status signal must not hide a real unmuted track.
-            const show=Boolean(bestVideo && bestVideo.readyState==='live' && !bestVideo.muted);
+            const show=Boolean(bestVideo && bestVideo.readyState==='live' && !bestVideo.muted && camStatus[uid] !== false);
             video.style.display=show?'block':'none';
             if(avatar) avatar.style.display=show?'none':'flex';
 
@@ -1955,7 +1955,7 @@
             // A muted remote track can stay muted indefinitely when the remote camera
             // is OFF. Never poll attachRemoteStream() recursively here: that created
             // an endless ~180ms DOM/media loop per peer and could freeze Chromium.
-            if(!bestVideo.muted) camStatus[uid]=true;
+            if(!bestVideo.muted && camStatus[uid] !== false) camStatus[uid]=true;
         }
     }
 
