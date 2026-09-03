@@ -113,14 +113,6 @@
                             {{ $organizer->role }}
                         </span>
                     @endif
-
-                    @if($organizer)
-                        <a href="{{ route('participant.organizers.show', $organizer) }}"
-                           class="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 transition">
-                            <i class="fa-regular fa-id-badge"></i>
-                            View Organizer Profile
-                        </a>
-                    @endif
                 </div>
             </div>
         </div>
