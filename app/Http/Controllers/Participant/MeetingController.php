@@ -16,7 +16,8 @@ class MeetingController extends Controller
         $timezone = config('app.timezone', 'Asia/Karachi');
         $today = Carbon::now($timezone)->toDateString();
 
-        // Keep Upcoming -> Active -> Completed synchronized from server time.
+        // Keep only time-based Upcoming -> Active -> Completed synchronized from server time.
+        // "ended" is reserved for the organizer's explicit End Meeting action.
         $this->syncParticipantMeetingStatuses($userId);
 
         /*
@@ -142,8 +143,8 @@ class MeetingController extends Controller
                     $remainingMinutes = (int) $now->diffInMinutes($endTime, false);
 
                     if ($remainingMinutes <= 0) {
-                        $meeting->time_label = 'Ended';
-                        $meeting->time_type = 'ended';
+                        $meeting->time_label = 'Completed';
+                        $meeting->time_type = 'completed';
                     } elseif ($remainingMinutes <= 10) {
                         $meeting->time_label = "{$remainingMinutes}m remaining";
                         $meeting->time_type = 'ending_soon';
@@ -225,12 +226,16 @@ class MeetingController extends Controller
         $meeting->refresh();
 
         if ($meeting->status !== 'active') {
+            $message = match ($meeting->status) {
+                'ended' => 'This meeting was ended by the organizer.',
+                'cancelled' => 'This meeting was cancelled by the organizer.',
+                'completed' => 'This meeting has been completed.',
+                default => "This meeting isn't active right now. You'll be able to join only during its scheduled time.",
+            };
+
             return redirect()
                 ->route('participant.meetings.index')
-                ->with(
-                    'info',
-                    "This meeting isn't active right now. You'll be able to join only during its scheduled time."
-                );
+                ->with('info', $message);
         }
 
         $isOrganizer = false;
@@ -357,8 +362,11 @@ class MeetingController extends Controller
     }
 
     /**
+     * Time-based lifecycle only:
      * Upcoming -> Active exactly at start.
      * Upcoming/Active -> Completed exactly at scheduled end.
+     *
+     * Ended/Cancelled are terminal manual statuses and are never overwritten here.
      */
     private function syncSingleMeetingStatus(Meeting $meeting): void
     {
