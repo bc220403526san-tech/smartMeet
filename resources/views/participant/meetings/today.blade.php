@@ -157,24 +157,6 @@
 
         const ids = [...new Set(rows.map(row => row.dataset.todayMeetingId))];
 
-        // Exact server-time sync — same pattern as My Meetings / Dashboard.
-        let serverClockOffsetMs = Number(@json($serverNowMs)) - Date.now();
-        let nextTransitionMs = @json($nextTransitionMs);
-        let exactTransitionTimer = null;
-        let requestRunning = false;
-        let pendingRefresh = false;
-
-        function currentServerTimeMs() {
-            return Date.now() + serverClockOffsetMs;
-        }
-
-        function updateServerClock(serverNowMs) {
-            const timestamp = Number(serverNowMs);
-            if (Number.isFinite(timestamp)) {
-                serverClockOffsetMs = timestamp - Date.now();
-            }
-        }
-
         function statusHtml(status) {
             if (status === 'active') {
                 return `<span class="inline-flex items-center gap-2 bg-red-50 text-red-600 text-xs font-semibold px-3 py-1.5 rounded-full border border-red-200"><span class="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>LIVE NOW</span>`;
@@ -201,57 +183,13 @@
             return `<button disabled class="bg-gray-100 text-gray-400 px-5 py-2.5 rounded-xl text-sm font-semibold cursor-not-allowed border border-gray-200"><i class="fa-solid fa-video-slash mr-1.5"></i>Closed</button>`;
         }
 
-        function scheduleExactRefresh() {
-            if (exactTransitionTimer) {
-                clearTimeout(exactTransitionTimer);
-                exactTransitionTimer = null;
-            }
-
-            const transitionTimestamp = Number(nextTransitionMs);
-
-            if (!Number.isFinite(transitionTimestamp) || transitionTimestamp <= 0) {
-                return;
-            }
-
-            const delay = Math.max(0, transitionTimestamp - currentServerTimeMs() + 50);
-            const maximumTimeout = 2_147_000_000;
-
-            if (delay > maximumTimeout) {
-                exactTransitionTimer = setTimeout(scheduleExactRefresh, maximumTimeout);
-                return;
-            }
-
-            exactTransitionTimer = setTimeout(() => poll('exact-meeting-time'), delay);
-        }
-
-        async function poll(reason = 'manual') {
-            if (requestRunning) {
-                pendingRefresh = true;
-                return;
-            }
-
-            requestRunning = true;
-
+        async function poll() {
             try {
-                const url = new URL(@json(route('participant.meetings.status-check')), window.location.origin);
-                url.searchParams.set('ids', ids.join(','));
-                url.searchParams.set('_', Date.now().toString());
-
-                const response = await fetch(url.toString(), {
-                    cache: 'no-store',
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Accept': 'application/json'
-                    }
-                });
-
+                const url = `{{ route('participant.meetings.status-check') }}?ids=${ids.join(',')}`;
+                const response = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
                 if (!response.ok) return;
 
                 const data = await response.json();
-
-                updateServerClock(data.server_now_ms);
-                nextTransitionMs = data.next_transition_ms;
-
                 Object.entries(data.meetings || {}).forEach(([id, status]) => {
                     const row = document.querySelector(`[data-today-meeting-id="${id}"]`);
                     if (!row || row.dataset.currentStatus === status) return;
@@ -262,28 +200,11 @@
                     if (badge) badge.innerHTML = statusHtml(status);
                     if (action) action.innerHTML = actionHtml(status, id);
                 });
-
-                scheduleExactRefresh();
             } catch (error) {
-                console.error(`Today meetings status refresh failed (${reason}):`, error);
-            } finally {
-                requestRunning = false;
-
-                if (pendingRefresh) {
-                    pendingRefresh = false;
-                    poll('queued-refresh');
-                }
+                console.error('Today meetings status poll failed:', error);
             }
         }
 
-        poll('initial-load');
-        setInterval(() => poll('backup-check'), 30_000);
-        window.addEventListener('focus', () => poll('window-focus'));
-        document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) poll('tab-visible');
-        });
-        window.addEventListener('online', () => poll('network-online'));
-
-        scheduleExactRefresh();
+        setInterval(poll, 5000);
     })();
 </script>

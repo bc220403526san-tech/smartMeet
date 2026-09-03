@@ -221,7 +221,7 @@ class MeetingController extends Controller
         $this->syncSingleMeetingStatus($meeting);
 
         $meeting->refresh()->load([
-            'organizer',
+            'organizers',
             'participants.user',
         ]);
 
