@@ -111,6 +111,10 @@
                                 class="meeting-filter-btn px-3 py-2 rounded-xl text-xs font-semibold border transition">
                             Completed
                         </button>
+                        <button type="button" data-status-filter="ended"
+                                class="meeting-filter-btn px-3 py-2 rounded-xl text-xs font-semibold border transition">
+                            Ended
+                        </button>
                         <button type="button" data-status-filter="cancelled"
                                 class="meeting-filter-btn px-3 py-2 rounded-xl text-xs font-semibold border transition">
                             Cancelled
@@ -208,12 +212,14 @@
                             {{ $meeting->status == 'upcoming'   ? 'bg-blue-50 text-blue-700 border-blue-200'     : '' }}
                             {{ $meeting->status == 'active'     ? 'bg-orange-50 text-orange-600 border-orange-200' : '' }}
                             {{ $meeting->status == 'completed'  ? 'bg-emerald-50 text-emerald-600 border-emerald-200'   : '' }}
+                            {{ $meeting->status == 'ended'      ? 'bg-slate-100 text-slate-700 border-slate-200'          : '' }}
                             {{ $meeting->status == 'cancelled'  ? 'bg-red-50 text-red-500 border-red-200'       : '' }}
                             {{ $meeting->status == 'flagged'    ? 'bg-yellow-50 text-yellow-600 border-yellow-200' : '' }}">
                             <span class="w-1.5 h-1.5 rounded-full
                                 {{ $meeting->status == 'upcoming'   ? 'bg-blue-500'     : '' }}
                                 {{ $meeting->status == 'active'     ? 'bg-orange-500 animate-pulse' : '' }}
                                 {{ $meeting->status == 'completed'  ? 'bg-emerald-500'   : '' }}
+                                {{ $meeting->status == 'ended'      ? 'bg-slate-500'     : '' }}
                                 {{ $meeting->status == 'cancelled'  ? 'bg-red-500'       : '' }}
                                 {{ $meeting->status == 'flagged'    ? 'bg-yellow-500' : '' }}">
                             </span>
@@ -761,6 +767,7 @@
                 upcoming:  'bg-blue-50 text-blue-700 border-blue-200',
                 active:    'bg-orange-50 text-orange-600 border-orange-200',
                 completed: 'bg-emerald-50 text-emerald-600 border-emerald-200',
+                ended:     'bg-slate-100 text-slate-700 border-slate-200',
                 cancelled: 'bg-red-50 text-red-500 border-red-200',
                 flagged:   'bg-yellow-50 text-yellow-600 border-yellow-200',
             };
@@ -768,6 +775,7 @@
                 upcoming:  'bg-blue-500',
                 active:    'bg-orange-500 animate-pulse',
                 completed: 'bg-emerald-500',
+                ended:     'bg-slate-500',
                 cancelled: 'bg-red-500',
                 flagged:   'bg-yellow-500',
             };

@@ -1,10 +1,10 @@
 <?php
 
 namespace App\Models;
-use Illuminate\Support\Str;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class Meeting extends Model
 {
@@ -28,9 +28,6 @@ class Meeting extends Model
         'organizer_left_at',
     ];
 
-
-    // app/Models/Meeting.php
-
     public function organizer()
     {
         return $this->belongsTo(User::class, 'organizer_id');
@@ -43,12 +40,13 @@ class Meeting extends Model
 
     public function isJoinable(): bool
     {
-        return in_array($this->status, ['upcoming', 'active']);
+        return in_array($this->status, ['upcoming', 'active'], true);
     }
+
     protected $casts = [
-        'agenda'       => 'array',
+        'agenda' => 'array',
         'actual_start' => 'datetime',
-        'is_flagged'   => 'boolean',
+        'is_flagged' => 'boolean',
     ];
 
     protected static function boot()

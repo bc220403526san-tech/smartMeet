@@ -2232,8 +2232,8 @@
             return;
         }
         if(data.type==='meeting-ended'){
-            showToast(data.data?.auto ? '⏰ Meeting time has ended.' : '📞 The meeting has ended.');
-            setTimeout(()=>{ cleanup(); window.location.href=LEAVE_URL; },2200);
+            showToast('📞 The organizer ended this meeting.');
+            setTimeout(()=>{ cleanup(); window.location.href=CANCELLED_PAGE_URL; },4500);
             return;
         }
         if(data.type==='presence-request'){
@@ -2353,6 +2353,18 @@
                     return;
                 }
 
+                if(control==='camera-on' && controlUser===String(MY_USER_ID)){
+                    try{
+                        if(!isCameraOn) await toggleCamera();
+                        else setCameraButton(true);
+                        showModerationNotice('📹 Your camera was turned on by the organizer.');
+                    }catch(e){
+                        console.warn('[SmartMeet] organizer camera-on failed',e);
+                        showModerationNotice('Please allow camera access to turn it on.');
+                    }
+                    return;
+                }
+
                 if(control==='participant-removed' && controlUser===String(MY_USER_ID)){
                     showModerationNotice('🚫 You were restricted from this meeting by the organizer.');
                     setTimeout(()=>{ try{ cleanup(); }catch(e){} window.location.href=LEAVE_URL; },1700);
@@ -2414,7 +2426,19 @@
             if(localStream) broadcastMyMicStatus();
             return;
         }
-        if(data.type==='unmute'){ showModerationNotice('🎙️ The organizer allowed your microphone. Tap Mic to speak.'); return; }
+        if(data.type==='unmute'){
+            if(from===String(ORGANIZER_ID)){
+                try{
+                    if(!isMicOn) await toggleMic();
+                    else setMicButton(true);
+                    showModerationNotice('🎙️ Your microphone was unmuted by the organizer.');
+                }catch(e){
+                    console.warn('[SmartMeet] organizer unmute failed',e);
+                    showModerationNotice('Please allow microphone access to unmute.');
+                }
+            }
+            return;
+        }
     }
 
     /* ---------- Media ---------- */

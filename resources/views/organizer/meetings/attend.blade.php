@@ -712,7 +712,7 @@
     <div class="header-center"><i class="fa fa-clock"></i><span id="timer">00:00:00</span></div>
     <div class="header-right">
         <div class="participants-count"><i class="fa fa-circle" style="color:var(--green);font-size:8px;"></i><span data-online-count>1</span> online</div>
-        <button class="btn-cancel" onclick="cancelMeeting()"><i class="fa fa-ban"></i><span>Cancel</span></button>
+        <button class="btn-cancel" onclick="endMeeting()"><i class="fa-solid fa-circle-stop"></i><span>End Meeting</span></button>
         <button class="btn-leave" onclick="safeLeaveMeeting()"><i class="fa fa-phone-slash"></i><span>Leave</span></button>
     </div>
 </div>
@@ -785,7 +785,7 @@
     <div class="ctrl-btn" onclick="toggleSidePanel('people')"><div class="ctrl-icon" id="ctrl-people"><i class="fa fa-users"></i></div><span class="ctrl-label">People</span></div>
     <div class="ctrl-btn" onclick="muteAllParticipants()"><div class="ctrl-icon"><i class="fa-solid fa-microphone-slash"></i></div><span class="ctrl-label">Mute all</span></div>
     <div class="ctrl-divider"></div>
-    <div class="ctrl-btn"><button class="btn-end" style="background:linear-gradient(135deg,#7f1d1d,#450a0a);" onclick="cancelMeeting()" title="Cancel meeting for everyone"><i class="fa fa-ban"></i></button><span class="ctrl-label" style="color:var(--red);">Cancel</span></div>
+    <div class="ctrl-btn"><button class="btn-end" style="background:linear-gradient(135deg,#7f1d1d,#450a0a);" onclick="endMeeting()" title="End meeting for everyone"><i class="fa-solid fa-circle-stop"></i></button><span class="ctrl-label" style="color:var(--red);">End Meeting</span></div>
     <div class="ctrl-btn"><button class="btn-end" onclick="safeLeaveMeeting()"><i class="fa fa-phone-slash"></i></button><span class="ctrl-label" style="color:var(--red);">Leave</span></div>
 </div>
 
@@ -856,6 +856,7 @@
     const MARK_LEFT_URL   = @json(route('organizer.meetings.markLeft', $meeting));
     const LEAVE_URL       = @json(route('organizer.meetings.index'));
     const CANCEL_URL      = @json(route('organizer.meetings.cancel', $meeting));
+    const END_MEETING_URL = @json(route('organizer.meetings.end', $meeting));
     const MODERATION_URL  = @json(route('organizer.meetings.moderate', $meeting));
     const CANCELLED_PAGE_URL = @json(route('meetings.cancelled', $meeting));
     const CSRF            = @json(csrf_token());
@@ -1149,25 +1150,36 @@
             <div class="person-status ${isOnline?'on':''}" ${isLeft?'style="color:#fca5a5"':''}>${info.isOrganizer?'Organizer':'Participant'} • ${presenceLabel}</div>
         </div>
         ${canMute ? `<div class="person-actions">
-            <button class="person-action" onclick="muteParticipant('${uid}')" title="Mute participant"><i class="fa-solid fa-microphone-slash"></i></button>
-            <button class="person-action camera-off" onclick="turnParticipantCameraOff('${uid}')" title="Turn participant camera off"><i class="fa-solid fa-video-slash"></i></button>
+            <button class="person-action" onclick="toggleParticipantMic('${uid}')" title="${micStatus[uid] ? 'Unmute participant' : 'Mute participant'}">
+                <i class="fa-solid ${micStatus[uid] ? 'fa-microphone' : 'fa-microphone-slash'}"></i>
+            </button>
+            <button class="person-action camera-off" onclick="toggleParticipantCamera('${uid}')" title="${camStatus[uid] ? 'Turn camera off' : 'Turn camera on'}">
+                <i class="fa-solid ${camStatus[uid] ? 'fa-video-slash' : 'fa-video'}"></i>
+            </button>
             <button class="person-action remove" onclick="restrictParticipant('${uid}')" title="Restrict participant from this meeting"><i class="fa-solid fa-user-lock"></i></button>
         </div>` : ''}
         ${raisedHands.has(uid) ? '<i class="fa-solid fa-hand people-hand" title="Hand raised"></i>' : ''}
         <span class="person-dot ${isOnline?'on':''}" ${isLeft?'style="background:#ef4444"':''}></span>`;
     }
-    function muteParticipant(uid){
+    async function toggleParticipantMic(uid){
         uid=String(uid);
         const info=knownParticipants[uid];
-        sendSignal(uid, 'mute', {});
-        showToast(`🎙️ ${escapeHtml(info?info.name:'Participant')}'s microphone has been muted.`);
+        const currentlyMuted=Boolean(micStatus[uid]);
+
+        if(currentlyMuted){
+            await sendSignal(uid,'unmute',{});
+            showToast(`🎙️ ${escapeHtml(info?info.name:'Participant')} can now unmute.`);
+        }else{
+            await sendSignal(uid,'mute',{});
+            showToast(`🔇 ${escapeHtml(info?info.name:'Participant')} has been muted.`);
+        }
     }
 
     async function muteAllParticipants(){
         const ids=[...onlineUsers].filter(uid=>String(uid)!==String(MY_USER_ID));
         if(!ids.length){ showToast('No active participants to mute.'); return; }
         await Promise.allSettled(ids.map(uid=>sendSignal(String(uid),'mute',{})));
-        showToast(`🎙️ All active participants have been muted.`);
+        showToast('🔇 All active participants have been muted.');
     }
 
     async function moderateParticipant(uid, action){
@@ -1188,11 +1200,17 @@
         }
     }
 
-    async function turnParticipantCameraOff(uid){
+    async function toggleParticipantCamera(uid){
         uid=String(uid);
         const info=knownParticipants[uid];
-        const ok=await moderateParticipant(uid,'camera-off');
-        if(ok) showToast(`📹 ${escapeHtml(info?info.name:'Participant')}'s camera has been turned off.`);
+        const cameraOn=Boolean(camStatus[uid]);
+        const action=cameraOn?'camera-off':'camera-on';
+        const ok=await moderateParticipant(uid,action);
+        if(ok){
+            showToast(cameraOn
+                ? `📹 ${escapeHtml(info?info.name:'Participant')}'s camera has been turned off.`
+                : `📹 Camera-on request sent to ${escapeHtml(info?info.name:'Participant')}.`);
+        }
     }
 
     async function restrictParticipant(uid){
@@ -2504,8 +2522,8 @@
             return;
         }
         if(data.type==='meeting-ended'){
-            showToast(data.data?.auto ? '⏰ Meeting time has ended.' : '📞 The meeting has ended.');
-            setTimeout(()=>{ cleanup(); window.location.href=LEAVE_URL; },2200);
+            showToast('📞 The organizer ended this meeting.');
+            setTimeout(()=>{ cleanup(); window.location.href=CANCELLED_PAGE_URL; },4500);
             return;
         }
         if(data.type==='presence-request'){
@@ -3393,36 +3411,38 @@
         rec.onerror=()=>btn.classList.remove('listening');
     }
 
-    /* ---------- Cancel meeting (organizer only) ---------- */
-    let cancelling=false;
-    async function cancelMeeting(){
-        if(cancelling) return;
-        if(!window.confirm('Cancel this meeting for everyone? This cannot be undone.')) return;
-        cancelling=true;
+    /* ---------- End meeting (organizer only) ---------- */
+    let endingMeeting=false;
+    async function endMeeting(){
+        if(endingMeeting) return;
+        if(!window.confirm('End this meeting for everyone? This cannot be undone.')) return;
+
+        endingMeeting=true;
         if(autoEndTimer) clearTimeout(autoEndTimer);
 
         try{
-            const formData=new FormData();
-            formData.append('_token',CSRF);
-            formData.append('_method','PATCH');
-
-            const res=await fetch(CANCEL_URL,{
+            const res=await fetch(END_MEETING_URL,{
                 method:'POST',
-                headers:{'Accept':'text/html'},
-                body:formData
+                headers:{
+                    'Accept':'application/json',
+                    'Content-Type':'application/json',
+                    'X-CSRF-TOKEN':CSRF
+                },
+                body:JSON.stringify({})
             });
 
-            if(!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data=await res.json().catch(()=>({}));
+            if(!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
 
-            showToast('🚫 Meeting cancelled for everyone.');
+            showToast('📞 Meeting ended for everyone.');
             setTimeout(()=>{
                 try{ cleanup(); }catch(e){}
                 window.location.href=CANCELLED_PAGE_URL;
             },700);
         }catch(e){
-            console.error('[SmartMeet] cancel failed',e);
-            cancelling=false;
-            showToast('Meeting could not be cancelled. Please try again.');
+            console.error('[SmartMeet] end meeting failed',e);
+            endingMeeting=false;
+            showToast('Meeting could not be ended. Please try again.');
         }
     }
 

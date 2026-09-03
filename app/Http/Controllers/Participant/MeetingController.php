@@ -50,6 +50,9 @@ class MeetingController extends Controller
             case 'cancelled':
                 $query->where('status', 'cancelled');
                 break;
+            case 'ended':
+                $query->where('status', 'ended');
+                break;
         }
 
         // Active first, then upcoming, then history.
@@ -57,10 +60,11 @@ class MeetingController extends Controller
             ->orderByRaw("CASE status
                 WHEN 'active' THEN 1
                 WHEN 'upcoming' THEN 2
-                WHEN 'completed' THEN 3
-                WHEN 'cancelled' THEN 4
-                WHEN 'flagged' THEN 5
-                ELSE 6
+                WHEN 'ended' THEN 3
+                WHEN 'completed' THEN 4
+                WHEN 'cancelled' THEN 5
+                WHEN 'flagged' THEN 6
+                ELSE 7
             END")
             ->orderBy('date', 'desc')
             ->orderBy('time', 'desc')
@@ -115,10 +119,11 @@ class MeetingController extends Controller
             ->orderByRaw("CASE status
                 WHEN 'active' THEN 1
                 WHEN 'upcoming' THEN 2
-                WHEN 'completed' THEN 3
-                WHEN 'cancelled' THEN 4
-                WHEN 'flagged' THEN 5
-                ELSE 6
+                WHEN 'ended' THEN 3
+                WHEN 'completed' THEN 4
+                WHEN 'cancelled' THEN 5
+                WHEN 'flagged' THEN 6
+                ELSE 7
             END")
             ->orderBy('time', 'asc')
             ->get()

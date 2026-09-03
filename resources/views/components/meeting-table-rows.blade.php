@@ -2,8 +2,9 @@
     @php
         $statusConfig = [
             'upcoming'   => ['bg' => 'bg-blue-50 text-blue-700 border-blue-100',   'dot' => 'bg-blue-500',                      'label' => 'Upcoming'],
-            'active'     => ['bg' => 'bg-green-50 text-green-700 border-green-100', 'dot' => 'bg-green-500 animate-pulse',        'label' => 'Active'],
+            'active'     => ['bg' => 'bg-green-50 text-green-700 border-green-100', 'dot' => 'bg-green-500 animate-pulse',       'label' => 'Active'],
             'completed'  => ['bg' => 'bg-gray-100 text-gray-600 border-gray-200',   'dot' => 'bg-gray-400',                      'label' => 'Completed'],
+            'ended'      => ['bg' => 'bg-slate-100 text-slate-700 border-slate-200','dot' => 'bg-slate-500',                     'label' => 'Ended'],
             'cancelled'  => ['bg' => 'bg-red-50 text-red-600 border-red-100',       'dot' => 'bg-red-400',                       'label' => 'Cancelled'],
             'flagged'    => ['bg' => 'bg-orange-50 text-orange-600 border-orange-100', 'dot' => 'bg-orange-400',                 'label' => 'Flagged'],
         ];

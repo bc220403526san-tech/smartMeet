@@ -346,6 +346,53 @@ class MeetingController extends Controller
             ->with('success', 'Meeting updated successfully!');
     }
 
+    /**
+     * Explicit organizer action from the live room.
+     * Normal Leave / refresh / tab close MUST NOT call this method.
+     */
+    public function end(Meeting $meeting)
+    {
+        $this->authorizeOrganizer($meeting);
+        $this->syncSingleMeetingStatus($meeting);
+        $meeting->refresh();
+
+        if ($meeting->status === 'ended') {
+            return request()->expectsJson()
+                ? response()->json(['status' => 'ended'])
+                : redirect()->route('organizer.meetings.index');
+        }
+
+        if ($meeting->status !== 'active') {
+            $message = 'Only an active meeting can be ended from the meeting room.';
+
+            return request()->expectsJson()
+                ? response()->json(['message' => $message], 422)
+                : back()->with('error', $message);
+        }
+
+        // "ended" is reserved ONLY for the organizer pressing End Meeting.
+        $meeting->update([
+            'status' => 'ended',
+        ]);
+
+        broadcast(new MeetingSignal(
+            meetingId: (string) $meeting->id,
+            fromUserId: (string) auth()->id(),
+            toUserId: 'all',
+            type: 'meeting-ended',
+            data: [
+                'by' => auth()->user()->name,
+                'reason' => 'organizer-ended',
+            ]
+        ))->toOthers();
+
+        return request()->expectsJson()
+            ? response()->json(['status' => 'ended'])
+            : redirect()
+                ->route('organizer.meetings.index')
+                ->with('success', 'Meeting ended successfully.');
+    }
+
     public function cancel(Meeting $meeting)
     {
         $this->authorizeOrganizer($meeting);
@@ -414,10 +461,10 @@ class MeetingController extends Controller
         $this->syncSingleMeetingStatus($meeting);
         $meeting->refresh();
 
-        if (!in_array($meeting->status, ['cancelled', 'completed'], true)) {
+        if (!in_array($meeting->status, ['cancelled', 'completed', 'ended'], true)) {
             return back()->with(
                 'error',
-                'Only cancelled or completed meetings can be deleted.'
+                'Only cancelled, completed or ended meetings can be deleted.'
             );
         }
 
@@ -697,7 +744,7 @@ class MeetingController extends Controller
 
     private function syncSingleMeetingStatus(Meeting $meeting): void
     {
-        if (in_array($meeting->status, ['cancelled', 'completed'], true)) {
+        if (in_array($meeting->status, ['cancelled', 'completed', 'ended'], true)) {
             return;
         }
 
@@ -810,4 +857,3 @@ class MeetingController extends Controller
         );
     }
 }
-

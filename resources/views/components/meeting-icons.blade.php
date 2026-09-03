@@ -1,124 +1,72 @@
 @props(['meeting'])
 
 @php
-    $ended = $meeting->status === 'completed' || !empty($meeting->organizer_left_at);
-    $closed = $ended || $meeting->status === 'cancelled';
+    $closed = in_array($meeting->status, ['completed', 'ended', 'cancelled'], true);
 @endphp
 
-<div class="flex gap-2 items-center">
-
-    <!-- VIEW is always available -->
+<div class="flex items-center gap-2">
     <a href="{{ route('organizer.meetings.show', $meeting) }}"
-       class="p-2 rounded-lg bg-gray-100 hover:bg-blue-100 transition group shadow-sm hover:shadow"
-       title="View meeting">
-        <i class="fa-regular fa-eye w-4 text-center text-gray-600 group-hover:text-blue-600 transition"></i>
+       title="View meeting"
+       class="w-10 h-10 rounded-xl bg-gray-100 hover:bg-blue-100 text-gray-500 hover:text-blue-600 transition flex items-center justify-center shadow-sm">
+        <i class="fa-regular fa-eye text-sm"></i>
     </a>
 
     @unless($closed)
-        <!-- EMAIL -->
-        <button onclick="event.stopPropagation(); openEmailModal(
-                    {{ $meeting->id }},
-                    '{{ addslashes($meeting->title) }}',
-                    '{{ addslashes($meeting->participants->pluck('user.email')->filter()->implode(', ')) }}'
-                 )"
-                class="p-2 rounded-lg bg-gray-100 hover:bg-purple-100 transition group shadow-sm hover:shadow"
-                title="Email participants">
-            <i class="fa-regular fa-envelope w-4 text-center text-gray-600 group-hover:text-purple-600 transition"></i>
+        <button type="button"
+                title="Send email invite"
+                onclick="window.dispatchEvent(new CustomEvent('smartmeet-email-invite', { detail: { meetingId: '{{ $meeting->id }}' } }))"
+                class="w-10 h-10 rounded-xl bg-gray-100 hover:bg-blue-100 text-gray-500 hover:text-blue-600 transition flex items-center justify-center shadow-sm">
+            <i class="fa-regular fa-envelope text-sm"></i>
         </button>
 
-        <!-- INVITE LINK -->
-        <div class="relative inline-block">
-            <button onclick="event.stopPropagation(); copyLinkFromTable('{{ $meeting->unique_code }}', this)"
-                    class="p-2 rounded-lg bg-gray-100 hover:bg-indigo-100 transition group shadow-sm hover:shadow"
-                    title="Copy invite link">
-                <i class="fa-solid fa-link w-4 text-center text-gray-600 group-hover:text-indigo-600 transition"></i>
+        <button type="button"
+                title="Copy invite link"
+                onclick="copyLinkFromTable(@js(route('meetings.join.link', $meeting->unique_code)), this)"
+                class="w-10 h-10 rounded-xl bg-gray-100 hover:bg-blue-100 text-gray-500 hover:text-blue-600 transition flex items-center justify-center shadow-sm">
+            <i class="fa-solid fa-link text-sm"></i>
+        </button>
+    @endunless
+
+    @if($meeting->status === 'upcoming')
+        <a href="{{ route('organizer.meetings.edit', $meeting) }}"
+           title="Edit meeting"
+           class="w-10 h-10 rounded-xl bg-gray-100 hover:bg-blue-100 text-gray-500 hover:text-blue-600 transition flex items-center justify-center shadow-sm">
+            <i class="fa-regular fa-pen-to-square text-sm"></i>
+        </a>
+    @endif
+
+    @if(in_array($meeting->status, ['upcoming', 'active'], true))
+        <form method="POST"
+              action="{{ route('organizer.meetings.cancel', $meeting) }}"
+              onsubmit="return confirm('Cancel this meeting? Participants will no longer be able to join.');">
+            @csrf
+            @method('PATCH')
+            <button type="submit"
+                    title="Cancel meeting"
+                    class="w-10 h-10 rounded-xl bg-red-50 hover:bg-red-100 text-red-500 hover:text-red-700 transition flex items-center justify-center shadow-sm border border-red-100">
+                <i class="fa-solid fa-xmark text-base"></i>
             </button>
-            <span class="copy-toast absolute -top-9 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-xs px-3 py-1.5 rounded-lg opacity-0 pointer-events-none transition-opacity duration-300 whitespace-nowrap z-50">
-                Link copied
-            </span>
-        </div>
-
-        <!-- EDIT -->
-        @if($meeting->status === 'upcoming')
-            <a href="{{ route('organizer.meetings.edit', $meeting) }}"
-               class="p-2 rounded-lg bg-gray-100 hover:bg-green-100 transition group shadow-sm hover:shadow inline-flex"
-               title="Edit meeting">
-                <i class="fa-regular fa-pen-to-square w-4 text-center text-gray-600 group-hover:text-green-600 transition"></i>
-            </a>
-        @endif
-
-        <!-- CANCEL -->
-        @if(in_array($meeting->status, ['upcoming', 'active'], true))
-            <form action="{{ route('organizer.meetings.cancel', $meeting) }}"
-                  method="POST"
-                  data-end-url="{{ route('meetings.ended', $meeting) }}"
-                  onsubmit="return cancelMeetingFromTable(event, this)">
-                @csrf
-                @method('PATCH')
-                <button type="submit"
-                        class="p-2 rounded-lg bg-gray-100 hover:bg-red-100 transition group shadow-sm hover:shadow"
-                        title="End meeting">
-                    <i class="fa-solid fa-circle-stop w-4 text-center text-red-500 group-hover:text-red-700 transition"></i>
-                </button>
-            </form>
-        @endif
-    @else
-        <span class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px] font-semibold text-slate-500">
-            <i class="fa-solid fa-lock"></i>
+        </form>
+    @elseif($closed)
+        <span class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 text-gray-500 text-xs font-semibold">
+            <i class="fa-solid fa-lock text-[11px]"></i>
             Closed
         </span>
-    @endunless
+    @endif
 </div>
 
-<script>
-    function copyLinkFromTable(code, btn) {
-        const link = `{{ url('/meetings/join') }}/${code}`;
-
-        navigator.clipboard.writeText(link).then(() => {
-            const toast = btn.parentElement.querySelector('.copy-toast');
-            toast.classList.remove('opacity-0');
-            toast.classList.add('opacity-100');
-
-            setTimeout(() => {
-                toast.classList.remove('opacity-100');
-                toast.classList.add('opacity-0');
-            }, 1600);
-        }).catch(() => {
-            alert('Failed to copy link. Please copy manually: ' + link);
-        });
-    }
-
-    async function cancelMeetingFromTable(event, form) {
-        event.preventDefault();
-
-        if (!confirm('End this meeting for everyone? This cannot be undone.')) {
-            return false;
-        }
-
-        const button = form.querySelector('button[type="submit"]');
-        if (button) button.disabled = true;
-
-        try {
-            const response = await fetch(form.action, {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': form.querySelector('input[name="_token"]').value,
-                },
-                body: new FormData(form),
+@once
+    <script>
+        function copyLinkFromTable(url, button) {
+            navigator.clipboard.writeText(url).then(() => {
+                const icon = button?.querySelector('i');
+                if (!icon) return;
+                const old = icon.className;
+                icon.className = 'fa-solid fa-check text-green-600';
+                setTimeout(() => icon.className = old, 1600);
+            }).catch(() => {
+                window.prompt('Copy meeting link:', url);
             });
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-
-            window.location.href = form.dataset.endUrl + '?reason=cancelled';
-        } catch (error) {
-            console.error('[SmartMeet] meeting cancel failed', error);
-            if (button) button.disabled = false;
-            alert('Meeting could not be ended. Please try again.');
         }
-
-        return false;
-    }
-</script>
+    </script>
+@endonce

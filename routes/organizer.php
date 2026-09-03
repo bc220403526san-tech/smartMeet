@@ -71,7 +71,8 @@ Route::middleware(['auth', 'role:organizer'])
             Route::put('/{meeting}', [MeetingController::class, 'update'])->name('update');
             Route::patch('/{meeting}/cancel', [MeetingController::class, 'cancel'])->name('cancel');
             Route::post('/{meeting}/send-invite', [MeetingController::class, 'sendInvite'])->name('sendInvite');
-
+            Route::post('/{meeting}/end', [MeetingController::class, 'end'])
+                ->name('end');
 
             // Live session
             Route::get('/{meeting}/attend', [MeetingAttendController::class, 'attend'])->name('attend');
@@ -81,6 +82,7 @@ Route::middleware(['auth', 'role:organizer'])
                 ->name('markLeft');
             Route::post('/{meeting}/moderate', [MeetingModerationController::class, 'moderate'])
                 ->name('moderate');
+
         });
 
     });
