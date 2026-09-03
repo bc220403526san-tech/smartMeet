@@ -3,32 +3,63 @@
 namespace App\Console\Commands;
 
 use App\Models\Meeting;
+use Carbon\Carbon;
 use Illuminate\Console\Command;
 
 class UpdateMeetingStatuses extends Command
 {
-    protected $signature   = 'meetings:update-status';
-    protected $description = 'Auto update meeting statuses based on date and time';
+    protected $signature = 'meetings:update-status';
+    protected $description = 'Auto update only upcoming/active meeting statuses based on date and time';
 
     public function handle()
     {
-        Meeting::where('status', 'upcoming')
-            ->orWhere('status', 'active')
+        /*
+         * This command is a backup time synchronizer.
+         * Final statuses are NEVER touched:
+         * ended, cancelled, completed.
+         */
+        Meeting::query()
+            ->whereIn('status', ['upcoming', 'active'])
             ->get()
-            ->each(function ($meeting) {
+            ->each(function (Meeting $meeting) {
+                $meeting->refresh();
 
-                $tz    = $meeting->timezone ?? 'Asia/Karachi';
-                $now   = \Carbon\Carbon::now($tz);
-                $start = \Carbon\Carbon::parse($meeting->date . ' ' . $meeting->time, $tz);
-                $end   = $start->copy()->addMinutes($meeting->duration);
-
-                if ($meeting->status === 'upcoming' && $now->gte($start)) {
-                    $meeting->update(['status' => 'active']);
-                } elseif ($meeting->status === 'active' && $now->gte($end)) {
-                    $meeting->update(['status' => 'completed']);
+                if (!in_array($meeting->status, ['upcoming', 'active'], true)) {
+                    return;
                 }
+
+                $timezone = $meeting->timezone ?: config('app.timezone', 'Asia/Karachi');
+                $now = Carbon::now($timezone);
+                $start = Carbon::parse(
+                    trim($meeting->date . ' ' . $meeting->time),
+                    $timezone
+                );
+                $end = $start->copy()->addMinutes((int) $meeting->duration);
+
+                if ($now->gte($end)) {
+                    $newStatus = 'completed';
+                } elseif ($now->gte($start)) {
+                    $newStatus = 'active';
+                } else {
+                    $newStatus = 'upcoming';
+                }
+
+                if ($meeting->status === $newStatus) {
+                    return;
+                }
+
+                /*
+                 * Atomic guard is essential because organizer End/Cancel may run
+                 * at the same moment as this scheduled command.
+                 */
+                Meeting::query()
+                    ->whereKey($meeting->id)
+                    ->whereIn('status', ['upcoming', 'active'])
+                    ->update([
+                        'status' => $newStatus,
+                    ]);
             });
 
-        $this->info('Meeting statuses updated!');
+        $this->info('Meeting statuses updated safely.');
     }
 }

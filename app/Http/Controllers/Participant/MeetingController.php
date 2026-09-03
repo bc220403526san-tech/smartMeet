@@ -371,10 +371,8 @@ class MeetingController extends Controller
     private function syncSingleMeetingStatus(Meeting $meeting): void
     {
         /*
-         * ended / cancelled / completed are FINAL statuses.
-         *
-         * Refresh first so this request does not act on an old in-memory
-         * "active" value after the organizer has already ended/cancelled it.
+         * Only UPCOMING and ACTIVE may change with time.
+         * ENDED, CANCELLED and COMPLETED are permanent final statuses.
          */
         $meeting->refresh();
 
@@ -385,8 +383,6 @@ class MeetingController extends Controller
         $now = now('UTC');
         $startTime = $this->meetingStartUtc($meeting);
         $endTime = $startTime->copy()->addMinutes((int) $meeting->duration);
-
-        $newStatus = $meeting->status;
 
         if ($now->greaterThanOrEqualTo($endTime)) {
             $newStatus = 'completed';
@@ -401,9 +397,8 @@ class MeetingController extends Controller
         }
 
         /*
-         * Atomic terminal-status protection.
-         * A stale participant refresh/poll can NEVER turn:
-         * ended -> completed, cancelled -> completed, or completed -> anything.
+         * Atomic protection:
+         * a stale participant refresh can never overwrite ended/cancelled/completed.
          */
         Meeting::query()
             ->whereKey($meeting->id)

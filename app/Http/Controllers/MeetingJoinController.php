@@ -20,10 +20,12 @@ class MeetingJoinController extends Controller
         $this->syncMeetingStatus($meeting);
         $meeting->refresh();
 
-        if (in_array($meeting->status, ['cancelled', 'completed'], true)) {
-            $message = $meeting->status === 'cancelled'
-                ? 'This meeting has been cancelled by the organizer.'
-                : 'This meeting has already ended.';
+        if (in_array($meeting->status, ['cancelled', 'completed', 'ended'], true)) {
+            $message = match ($meeting->status) {
+                'cancelled' => 'This meeting has been cancelled by the organizer.',
+                'ended' => 'This meeting was ended by the organizer.',
+                default => 'This meeting has already completed.',
+            };
 
             return view('organizer.meetings.link-invalid', compact('message'));
         }
@@ -47,7 +49,6 @@ class MeetingJoinController extends Controller
                 ->with('error', 'Meeting invite links can only be joined with a Participant account.');
         }
 
-        // Critical fix: membership is guaranteed before any redirect.
         $meeting->participants()->firstOrCreate(
             ['user_id' => $user->id],
             ['status' => 'invited']
@@ -71,6 +72,8 @@ class MeetingJoinController extends Controller
 
     private function syncMeetingStatus(Meeting $meeting): void
     {
+        $meeting->refresh();
+
         if (!in_array($meeting->status, ['upcoming', 'active'], true)) {
             return;
         }
@@ -87,8 +90,15 @@ class MeetingJoinController extends Controller
             ? 'completed'
             : ($now->gte($start) ? 'active' : 'upcoming');
 
-        if ($meeting->status !== $status) {
-            $meeting->update(['status' => $status]);
+        if ($meeting->status === $status) {
+            return;
         }
+
+        Meeting::query()
+            ->whereKey($meeting->id)
+            ->whereIn('status', ['upcoming', 'active'])
+            ->update(['status' => $status]);
+
+        $meeting->refresh();
     }
 }

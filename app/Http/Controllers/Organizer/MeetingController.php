@@ -385,22 +385,35 @@ class MeetingController extends Controller
         }
 
         /*
-         * "completed" is accepted only for the tiny exact-time race where the
-         * index/status synchronizer reaches the scheduled boundary at the same
-         * instant the organizer presses End from an already-open room.
+         * Permanent-status rule:
+         * - End Meeting may only change ACTIVE/LIVE -> ENDED.
+         * - COMPLETED is final and can never become ENDED.
+         * - The conditional DB update prevents a scheduler/refresh race.
          */
-        if (!in_array($meeting->status, ['active', 'live', 'completed'], true)) {
-            return response()->json([
-                'message' => 'This meeting cannot be ended from the meeting room.',
-            ], 422);
-        }
-
         try {
-            $meeting->update([
-                'status' => 'ended',
-            ]);
+            $updated = Meeting::query()
+                ->whereKey($meeting->id)
+                ->whereIn('status', ['active', 'live'])
+                ->update([
+                    'status' => 'ended',
+                ]);
 
             $meeting->refresh();
+
+            if ($updated === 0) {
+                $message = match ($meeting->status) {
+                    'ended' => 'Meeting has already been ended.',
+                    'cancelled' => 'A cancelled meeting cannot be ended.',
+                    'completed' => 'This meeting has already completed because its scheduled time ended.',
+                    'upcoming' => 'This meeting has not started yet.',
+                    default => 'This meeting cannot be ended from the meeting room.',
+                };
+
+                return response()->json([
+                    'status' => $meeting->status,
+                    'message' => $message,
+                ], $meeting->status === 'ended' ? 200 : 422);
+            }
         } catch (\Throwable $exception) {
             Log::error('Explicit meeting end status update failed', [
                 'meeting_id' => $meeting->id,
@@ -416,7 +429,7 @@ class MeetingController extends Controller
         }
 
         return response()->json([
-            'status' => $meeting->status,
+            'status' => 'ended',
             'message' => 'Meeting ended successfully.',
         ]);
     }
@@ -424,21 +437,37 @@ class MeetingController extends Controller
     public function cancel(Meeting $meeting)
     {
         $this->authorizeOrganizer($meeting);
+
+        // Keep normal upcoming -> active/completed timing correct first.
         $this->syncSingleMeetingStatus($meeting);
         $meeting->refresh();
 
-        if (!in_array($meeting->status, ['upcoming', 'active'], true)) {
+        /*
+         * Cross icon means CANCEL only.
+         * It may only change UPCOMING/ACTIVE -> CANCELLED.
+         * ended/completed/cancelled are permanent and can never be overwritten.
+         */
+        $updated = Meeting::query()
+            ->whereKey($meeting->id)
+            ->whereIn('status', ['upcoming', 'active'])
+            ->update([
+                'status' => 'cancelled',
+            ]);
+
+        $meeting->refresh();
+
+        if ($updated === 0) {
             return back()->with(
                 'error',
-                'This meeting cannot be cancelled.'
+                match ($meeting->status) {
+                    'cancelled' => 'Meeting has already been cancelled.',
+                    'ended' => 'An ended meeting cannot be cancelled.',
+                    'completed' => 'A completed meeting cannot be cancelled.',
+                    default => 'This meeting cannot be cancelled.',
+                }
             );
         }
 
-        /*
-         * Broadcast BEFORE the DB write so anyone currently sitting in the
-         * live room (organizer_attend / participant_attend blade) is kicked
-         * out immediately, even if something below throws.
-         */
         broadcast(new MeetingSignal(
             meetingId: (string) $meeting->id,
             fromUserId: (string) auth()->id(),
@@ -448,10 +477,6 @@ class MeetingController extends Controller
                 'by' => auth()->user()->name,
             ]
         ))->toOthers();
-
-        $meeting->update([
-            'status' => 'cancelled',
-        ]);
 
         return redirect()
             ->route('organizer.meetings.index')
@@ -773,12 +798,8 @@ class MeetingController extends Controller
     private function syncSingleMeetingStatus(Meeting $meeting): void
     {
         /*
-         * IMPORTANT:
-         * ended / cancelled / completed are FINAL statuses.
-         *
-         * Always refresh first, then use an atomic conditional UPDATE below.
-         * This prevents a stale request that loaded the meeting as "active"
-         * from later overwriting a newer organizer action such as ended/cancelled.
+         * Only UPCOMING and ACTIVE are time-managed.
+         * ENDED, CANCELLED and COMPLETED are permanent final values.
          */
         $meeting->refresh();
 
@@ -805,10 +826,8 @@ class MeetingController extends Controller
         }
 
         /*
-         * Atomic guard:
-         * Update ONLY when the database row is still upcoming/active.
-         * If another request has already set ended/cancelled/completed,
-         * this UPDATE affects 0 rows and the final status stays untouched.
+         * Atomic guard protects against stale refresh/poll/scheduler requests.
+         * If another request has already finalized the meeting, 0 rows update.
          */
         Meeting::query()
             ->whereKey($meeting->id)
