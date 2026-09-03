@@ -29,6 +29,8 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/meetings/{meeting}/ended', [MeetingEndController::class, 'show'])
         ->name('meetings.ended');
+    Route::get('/meetings/{meeting}/cancelled', [MeetingEndController::class, 'cancelled'])
+        ->name('meetings.cancelled');
 });
 
 // Public invite route

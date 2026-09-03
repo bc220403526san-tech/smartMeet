@@ -124,16 +124,17 @@
         .speaking-bar:nth-child(2){animation-delay:.15s} .speaking-bar:nth-child(3){animation-delay:.3s}
         @keyframes speak{0%,100%{height:4px}50%{height:13px}}
         .you-badge{position:absolute; top:8px; left:8px; z-index:5; font-size:9px; font-weight:700; padding:3px 8px; border-radius:99px; background:rgba(59,130,246,.35); border:1px solid rgba(96,165,250,.4)}
-        .tile-hand-raised{
-            position:absolute; top:9px; left:50%; transform:translateX(-50%); z-index:8;
-            display:flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px;
-            color:#fff7cc; background:linear-gradient(135deg,rgba(245,158,11,.96),rgba(234,88,12,.96));
-            border:1px solid rgba(253,230,138,.7); box-shadow:0 10px 25px rgba(245,158,11,.28);
-            font-size:10px; font-weight:800; letter-spacing:.15px; pointer-events:none;
-            animation:raisedHandFloat 1.7s ease-in-out infinite;
+        .raised-hand-badge{
+            position:absolute; top:9px; left:50%; transform:translateX(-50%);
+            z-index:8; display:inline-flex; align-items:center; gap:5px;
+            padding:5px 9px; border-radius:999px;
+            background:rgba(245,158,11,.94); color:#fff;
+            border:1px solid rgba(253,230,138,.75);
+            box-shadow:0 8px 20px rgba(245,158,11,.20);
+            font-size:10px; font-weight:800; pointer-events:none;
         }
-        .tile-hand-raised i{font-size:12px}
-        @keyframes raisedHandFloat{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,-3px)}}
+        .raised-hand-badge i{font-size:11px}
+        .people-hand{color:#fbbf24;font-size:13px;flex-shrink:0}
         .tile-expand-btn{
             position:absolute; top:8px; right:8px; z-index:6; width:28px; height:28px; border-radius:8px;
             background:rgba(8,13,26,.65); border:1px solid rgba(255,255,255,.14); color:#fff; display:flex;
@@ -204,7 +205,7 @@
         .btn-send{background:linear-gradient(135deg,#2563eb,#0891b2); border:none; color:#fff}
         .chat-voice-btn.listening{color:#ef4444; border-color:rgba(239,68,68,.5); background:rgba(239,68,68,.14)}
 
-        .people-body{flex:1; min-height:0; max-height:100%; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; padding:12px; display:flex; flex-direction:column; gap:8px}
+        .people-body{flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; padding:12px; display:flex; flex-direction:column; gap:8px}
         .person-row{display:flex; align-items:center; gap:10px; padding:10px; border-radius:13px; border:1px solid var(--line); background:rgba(255,255,255,.02); transition:opacity .2s, filter .2s, background .2s, border-color .2s}
         .person-row.joined{opacity:1; filter:none; background:rgba(34,197,94,.07); border-color:rgba(34,197,94,.22)}
         .person-row.pending{opacity:.5; filter:grayscale(.5) saturate(.4)}
@@ -219,8 +220,6 @@
         .person-dot.on{background:var(--green)}
         .person-action{border:1px solid var(--line); background:rgba(255,255,255,.04); color:var(--muted); font-size:10px; padding:5px 9px; border-radius:8px; cursor:pointer; flex-shrink:0}
         .person-action:hover{background:rgba(239,68,68,.16); color:#fecaca; border-color:rgba(239,68,68,.3)}
-        .hand-raised{color:#fbbf24;font-size:13px;animation:handPulse 1.2s ease-in-out infinite}
-        @keyframes handPulse{50%{transform:translateY(-2px)}}
 
 
         /* ---------- IN-ROOM INVITE (isolated; existing responsive layout untouched) ---------- */
@@ -745,7 +744,7 @@
     const TRANSCRIPT_URL  = @json(route('participant.meetings.transcript', $meeting));
     const MARK_LEFT_URL   = @json(route('participant.meetings.markLeft', $meeting));
     const LEAVE_URL       = @json(route('participant.meetings.index'));
-    const END_URL         = @json(route('meetings.ended', $meeting));
+    const CANCELLED_PAGE_URL = @json(route('meetings.cancelled', $meeting));
     const CSRF            = @json(csrf_token());
     const ALL_PARTICIPANTS = @json($allParticipants);
     const ORGANIZER_ID    = "{{ $organizer->id }}";
@@ -773,7 +772,6 @@
     const negotiationTimers = {};
     const makingOffer   = {};
     const ignoreOffer   = {};
-    const offerHandling = {};
     const pendingCandidates = {};
     const micStatus     = {};
     const camStatus     = {};
@@ -835,15 +833,15 @@
         const el=document.createElement('div'); el.className='toast'; el.textContent=msg;
         stack.appendChild(el);
         requestAnimationFrame(()=>el.classList.add('show'));
-        setTimeout(()=>{ el.classList.remove('show'); el.classList.add('leaving'); setTimeout(()=>el.remove(),280); },4600);
+        setTimeout(()=>{ el.classList.remove('show'); el.classList.add('leaving'); setTimeout(()=>el.remove(),260); },4500);
     }
     function showModerationNotice(msg){
         const old=document.getElementById('mod-notice'); if(old) old.remove();
         const el=document.createElement('div'); el.id='mod-notice'; el.className='moderation-notice'; el.textContent=msg;
         document.body.appendChild(el);
         requestAnimationFrame(()=>el.classList.add('show'));
-        setTimeout(()=>el.classList.remove('show'),4300);
-        setTimeout(()=>el.remove(),4700);
+        setTimeout(()=>el.classList.remove('show'),3200);
+        setTimeout(()=>el.remove(),3600);
     }
 
     installAudioPlaybackUnlock();
@@ -877,20 +875,8 @@
     }
     async function triggerAutoEnd(){
         if(autoEndTriggered) return; autoEndTriggered=true;
-        leftNotified=true;
         showToast('⏰ Meeting time has ended.');
-        try{
-            await Promise.race([
-                fetch(MARK_LEFT_URL,{
-                    method:'POST',
-                    headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':CSRF},
-                    body:JSON.stringify({reason:'timeout'}),
-                    keepalive:true
-                }),
-                new Promise(resolve=>setTimeout(resolve,700))
-            ]);
-        }catch(e){}
-        setTimeout(()=>{ cleanup(); window.location.href=END_URL+'?reason=timeout'; },900);
+        setTimeout(()=>{ cleanup(); window.location.href=LEAVE_URL; },1800);
     }
 
     /* ---------- Online count / people list ---------- */
@@ -947,7 +933,7 @@
             <div class="person-name">${escapeHtml(info.name)}${isMe?' <span style="color:var(--blue);font-weight:600;">(You)</span>':''}${info.isOrganizer?'<i class="fa fa-crown" style="color:#fbbf24;font-size:10px;"></i>':''}</div>
             <div class="person-status ${isOnline?'on':''}" ${isLeft?'style="color:#fca5a5"':''}>${info.isOrganizer?'Organizer':'Participant'} • ${presenceLabel}</div>
         </div>
-        ${raisedHands.has(uid) ? `<i class="fa-solid fa-hand hand-raised" title="Hand raised"></i>` : ''}
+        ${raisedHands.has(uid) ? '<i class="fa-solid fa-hand people-hand" title="Hand raised"></i>' : ''}
         <span class="person-dot ${isOnline?'on':''}" ${isLeft?'style="background:#ef4444"':''}></span>`;
     }
 
@@ -969,23 +955,25 @@
             </div>
         </div>`;
         grid.appendChild(tile);
+        syncRaisedHandBadge(String(MY_USER_ID));
     }
 
     function refreshEmptyStage(){ /* empty-stage overlay removed by request */ }
 
-    function syncRaisedHandIndicator(uid){
+    function syncRaisedHandBadge(uid){
         uid=String(uid);
         const tile=document.getElementById('tile-'+uid);
         if(!tile) return;
-        let badge=tile.querySelector('.tile-hand-raised');
-        const raised=raisedHands.has(uid);
-        if(raised && !badge){
-            badge=document.createElement('div');
-            badge.className='tile-hand-raised';
-            badge.innerHTML='<i class="fa-solid fa-hand"></i><span>Hand raised</span>';
-            tile.appendChild(badge);
-        }else if(!raised && badge){
-            badge.remove();
+        let badge=tile.querySelector('.raised-hand-badge');
+        if(raisedHands.has(uid)){
+            if(!badge){
+                badge=document.createElement('div');
+                badge.className='raised-hand-badge';
+                badge.innerHTML='<i class="fa-solid fa-hand"></i><span>Hand raised</span>';
+                tile.appendChild(badge);
+            }
+        }else{
+            badge?.remove();
         }
     }
 
@@ -1014,7 +1002,7 @@
             </div>
         </div>`;
         if(isOrganizer) grid.prepend(tile); else grid.appendChild(tile);
-        syncRaisedHandIndicator(uid);
+        syncRaisedHandBadge(uid);
         refreshEmptyStage();
     }
     function removeParticipantTile(uid, announce){
@@ -1028,7 +1016,7 @@
         refreshEmptyStage();
         if(announce){
             const info=knownParticipants[uid];
-            showToast(`👋 ${escapeHtml(info?info.name:'A participant')} left the meeting.`);
+            showToast(`👋 ${escapeHtml(info?info.name:'A participant')} has left the meeting.`);
         }
     }
 
@@ -1128,7 +1116,7 @@
         document.querySelectorAll('.ctrl-icon').forEach(i=>i.classList.remove('active'));
         document.querySelectorAll('.panel-tabbtn').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
         const active=document.getElementById('tab-'+tab);
-        if(active) active.style.display='flex';
+        if(active) active.style.display = tab==='people' ? 'block' : 'flex';
         activeTab=tab;
         document.getElementById('ctrl-'+tab)?.classList.add('active');
         if(tab==='chat'){ unreadChat=0; updateChatBadge(); }
@@ -2034,90 +2022,38 @@
     function decodeSdp(sdp){ if(!sdp) return ''; try{ return decodeURIComponent(escape(atob(sdp))); }catch(e){ return sdp; } }
 
     async function handleOffer(from, data){
-        from=String(from);
-        if(offerHandling[from]){
-            console.log('[SmartMeet] duplicate/concurrent offer ignored while handling <-', from);
-            return;
-        }
-        offerHandling[from]=true;
         console.log('[SmartMeet] received offer <-', from);
-        const pc=createPeerConnection(from);
-        if(!pc){ offerHandling[from]=false; return; }
-
+        const pc=createPeerConnection(from); if(!pc) return;
         const polite=isPolite(from);
         const offerCollision = makingOffer[from] || pc.signalingState!=='stable';
         ignoreOffer[from] = !polite && offerCollision;
-
-        if(ignoreOffer[from]){
-            console.log('[SmartMeet] ignoring colliding offer from', from);
-            offerHandling[from]=false;
-            return;
-        }
-
+        if(ignoreOffer[from]){ console.log('[SmartMeet] ignoring colliding offer from', from); return; }
         try{
-            // Perfect-negotiation collision handling. A polite peer rolls back
-            // its own unfinished offer before accepting the remote offer.
-            if(offerCollision && polite && pc.signalingState==='have-local-offer'){
-                await pc.setLocalDescription({type:'rollback'});
-            }
-
-            if(pc.signalingState!=='stable'){
-                console.log('[SmartMeet] offer deferred; peer not stable <-',from,pc.signalingState);
-                return;
-            }
-
-            await pc.setRemoteDescription({
-                type:data.type||'offer',
-                sdp:decodeSdp(data.sdp)
-            });
-
+            await pc.setRemoteDescription({ type:data.type||'offer', sdp:decodeSdp(data.sdp) });
             bindPeerTransceivers(pc);
             await syncLocalTracksToPeer(from);
-
-            if(pendingCandidates[from]?.length){
-                for(const c of pendingCandidates[from]){
-                    await pc.addIceCandidate(c).catch(()=>{});
-                }
-                delete pendingCandidates[from];
-            }
-
-            // Another async negotiation may already have resolved this offer.
-            // Never apply an answer unless the peer still owns a remote offer.
-            if(pc.signalingState!=='have-remote-offer'){
-                console.log('[SmartMeet] stale offer resolved before answer <-',from,pc.signalingState);
-                return;
-            }
-
+            if(pendingCandidates[from]?.length){ for(const c of pendingCandidates[from]) await pc.addIceCandidate(c).catch(()=>{}); delete pendingCandidates[from]; }
             const answer=await pc.createAnswer();
-
-            if(pc.signalingState!=='have-remote-offer'){
-                console.log('[SmartMeet] answer no longer needed <-',from,pc.signalingState);
-                return;
-            }
-
             await pc.setLocalDescription(answer);
 
+            // Send the answer immediately; TURN candidates are trickled by
+            // onicecandidate. This removes the multi-second cross-device delay
+            // that previously left ICE connected while connectionState was still
+            // stuck on connecting.
             console.log('[SmartMeet] sending answer ->', from);
             await sendSignal(from,'answer',{
                 type:pc.localDescription.type,
                 sdp:btoa(unescape(encodeURIComponent(pc.localDescription.sdp)))
             });
 
+            // Mobile Chrome may expose the remote-created transceiver sender only
+            // after the answer is applied. Sync once more so our mic/camera are
+            // definitely attached to this participant-to-participant connection.
             bindPeerTransceivers(pc);
             await syncLocalTracksToPeer(from);
             setTimeout(()=>ensureOutboundMediaNegotiated(from),160);
             if(isMicOn) setTimeout(()=>verifyPeerAudioOutbound(from),850);
-        }catch(err){
-            // InvalidStateError here is normally a stale duplicate negotiation.
-            // It is safe to ignore; bounded recovery will renegotiate if needed.
-            if(err?.name==='InvalidStateError'){
-                console.log('[SmartMeet] stale offer ignored <-',from,pc.signalingState);
-            }else{
-                console.warn('[SmartMeet] offer handling failed', from, err);
-            }
-        }finally{
-            offerHandling[from]=false;
-        }
+        }catch(err){ console.warn('[SmartMeet] offer handling failed', from, err); }
     }
     async function handleAnswer(from, data){
         console.log('[SmartMeet] received answer <-', from);
@@ -2291,15 +2227,13 @@
         if(isSelf && !['meeting-cancelled','meeting-ended'].includes(data.type)) return;
 
         if(data.type==='meeting-cancelled'){
-            showToast('🚫 This meeting was ended by the organizer.');
-            setTimeout(()=>{ cleanup(); window.location.href=END_URL+'?reason=cancelled'; },4650);
+            showToast('🚫 The organizer ended this meeting.');
+            setTimeout(()=>{ cleanup(); window.location.href=CANCELLED_PAGE_URL; },4500);
             return;
         }
         if(data.type==='meeting-ended'){
-            const endReason=String(data.data?.reason || (data.data?.auto ? 'timeout' : 'organizer-left'));
-            const isTimeout=endReason==='timeout' || Boolean(data.data?.auto);
-            showToast(isTimeout ? '⏰ Meeting time has ended.' : '📞 The organizer ended the meeting.');
-            setTimeout(()=>{ cleanup(); window.location.href=END_URL+'?reason='+(isTimeout?'timeout':'organizer-left'); },4650);
+            showToast(data.data?.auto ? '⏰ Meeting time has ended.' : '📞 The meeting has ended.');
+            setTimeout(()=>{ cleanup(); window.location.href=LEAVE_URL; },2200);
             return;
         }
         if(data.type==='presence-request'){
@@ -2322,10 +2256,9 @@
             if(Boolean(data.data?.cameraOn)) camStatus[uid]=true;
             else if(!(remoteStreams[uid]?.getVideoTracks?.()||[]).some(t=>t.readyState==='live')) camStatus[uid]=false;
             micStatus[uid]=!Boolean(data.data?.micOn);
-            if(Boolean(data.data?.handRaised)) raisedHands.add(uid);
-            else raisedHands.delete(uid);
+            if(Boolean(data.data?.handRaised)) raisedHands.add(uid); else raisedHands.delete(uid);
             renderPersonRow(uid);
-            syncRaisedHandIndicator(uid);
+            syncRaisedHandBadge(uid);
             const micEl=document.getElementById('micoff-'+uid);
             if(micEl) micEl.style.display=micStatus[uid] ? 'flex' : 'none';
             attachRemoteStream(uid);
@@ -2391,45 +2324,47 @@
         if(data.type==='chat'){
             if(isSelf) return;
 
-            const control=String(data.data?.smartmeetControl||'');
-            const controlUser=String(data.data?.userId||from);
+            const control=String(data.data?.smartmeetControl || '');
+            const controlUser=String(data.data?.userId || from);
 
             if(control==='raise-hand'){
                 raisedHands.add(controlUser);
                 renderPersonRow(controlUser);
-                syncRaisedHandIndicator(controlUser);
-                return;
-            }
-            if(control==='lower-hand'){
-                raisedHands.delete(controlUser);
-                renderPersonRow(controlUser);
-                syncRaisedHandIndicator(controlUser);
+                syncRaisedHandBadge(controlUser);
                 return;
             }
 
-            // Only the real organizer may issue moderation controls.
-            if(String(from)===String(ORGANIZER_ID)){
-                if(control==='participant-removed' && controlUser===String(MY_USER_ID)){
-                    showModerationNotice('🚫 You were removed from this meeting by the organizer.');
-                    try{ cleanup(); }catch(e){}
-                    setTimeout(()=>{ window.location.href=LEAVE_URL; },900);
-                    return;
-                }
-                if(control==='request-mic' && controlUser===String(MY_USER_ID)){
-                    showModerationNotice('🎙️ Organizer requested your microphone. Tap Mic to turn it on.');
-                    return;
-                }
-                if(control==='request-camera' && controlUser===String(MY_USER_ID)){
-                    showModerationNotice('📷 Organizer requested your camera. Tap Camera to turn it on.');
-                    return;
-                }
+            if(control==='lower-hand'){
+                raisedHands.delete(controlUser);
+                renderPersonRow(controlUser);
+                syncRaisedHandBadge(controlUser);
+                return;
+            }
+
+            // Moderation commands are trusted only when sent by the real organizer.
+            if(from===String(ORGANIZER_ID)){
                 if(control==='camera-off' && controlUser===String(MY_USER_ID)){
                     if(isCameraOn){
-                        await toggleCamera();
+                        try{ await toggleCamera(); }catch(e){}
                     }else{
                         setCameraButton(false);
                     }
-                    showModerationNotice('📷 Your camera was turned off by the organizer.');
+                    showModerationNotice('📹 Your camera was turned off by the organizer.');
+                    return;
+                }
+
+                if(control==='participant-removed' && controlUser===String(MY_USER_ID)){
+                    showModerationNotice('🚫 You were restricted from this meeting by the organizer.');
+                    setTimeout(()=>{ try{ cleanup(); }catch(e){} window.location.href=LEAVE_URL; },1700);
+                    return;
+                }
+
+                if(control==='participant-removed'){
+                    raisedHands.delete(controlUser);
+                    markUserLeft(controlUser);
+                    removeParticipantTile(controlUser,false);
+                    document.getElementById('person-row-'+controlUser)?.remove();
+                    delete knownParticipants[controlUser];
                     return;
                 }
             }
@@ -3164,32 +3099,43 @@
     }
 
     async function toggleRaiseHand(){
+        const previous=myHandRaised;
         myHandRaised=!myHandRaised;
+
+        if(myHandRaised) raisedHands.add(String(MY_USER_ID));
+        else raisedHands.delete(String(MY_USER_ID));
+
         const btn=document.getElementById('ctrl-hand');
         if(btn){
             btn.classList.toggle('active',myHandRaised);
             btn.innerHTML=myHandRaised?'<i class="fa-solid fa-hand"></i>':'<i class="fa-regular fa-hand"></i>';
         }
-        if(myHandRaised) raisedHands.add(String(MY_USER_ID));
-        else raisedHands.delete(String(MY_USER_ID));
+
         renderPersonRow(String(MY_USER_ID));
-        syncRaisedHandIndicator(String(MY_USER_ID));
+        syncRaisedHandBadge(String(MY_USER_ID));
+
         const ok=await sendSignal('all','chat',{
             smartmeetControl:myHandRaised?'raise-hand':'lower-hand',
             userId:MY_USER_ID,
             name:MY_NAME,
             text:''
         });
+
         if(!ok){
-            myHandRaised=!myHandRaised;
+            myHandRaised=previous;
             if(myHandRaised) raisedHands.add(String(MY_USER_ID));
             else raisedHands.delete(String(MY_USER_ID));
+            if(btn){
+                btn.classList.toggle('active',myHandRaised);
+                btn.innerHTML=myHandRaised?'<i class="fa-solid fa-hand"></i>':'<i class="fa-regular fa-hand"></i>';
+            }
             renderPersonRow(String(MY_USER_ID));
-            syncRaisedHandIndicator(String(MY_USER_ID));
+            syncRaisedHandBadge(String(MY_USER_ID));
             showToast('Raise hand update could not be sent.');
-        }else{
-            showToast(myHandRaised?'✋ Hand raised.':'Hand lowered.');
+            return;
         }
+
+        showToast(myHandRaised?'✋ Your hand is raised.':'Your hand is lowered.');
     }
 
     /* ---------- Chat ---------- */
@@ -3370,7 +3316,8 @@
         return sendSignal(to,'presence-response',{
             userId:MY_USER_ID, name:MY_NAME, initials:MY_INITIALS, avatarUrl:MY_AVATAR_URL,
             isOrganizer:String(MY_USER_ID)===String(ORGANIZER_ID),
-            micOn:Boolean(isMicOn), cameraOn:Boolean(isCameraOn)
+            micOn:Boolean(isMicOn), cameraOn:Boolean(isCameraOn),
+            handRaised:Boolean(myHandRaised)
         });
     }
     function connectToAll(){

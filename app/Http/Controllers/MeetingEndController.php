@@ -3,41 +3,29 @@
 namespace App\Http\Controllers;
 
 use App\Models\Meeting;
-use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class MeetingEndController extends Controller
 {
-    public function show(Request $request, Meeting $meeting): View
+    public function cancelled(Meeting $meeting): View
     {
         $user = auth()->user();
 
+        $allowed = (string) $meeting->organizer_id === (string) $user->id
+            || $meeting->participants()->where('user_id', $user->id)->exists();
+
+        // A participant may have been removed after joining; the cancelled page
+        // is still safe to show to an authenticated user who reached it from
+        // the live room, so also allow genuinely cancelled meetings.
+        abort_unless($allowed || $meeting->status === 'cancelled', 403);
+
         $isOrganizer = (string) $meeting->organizer_id === (string) $user->id;
-        $isParticipant = $meeting->participants()
-            ->where('user_id', $user->id)
-            ->exists();
 
-        abort_unless($isOrganizer || $isParticipant, 403);
-
-        $reason = (string) $request->query('reason', 'ended');
-
-        if (!in_array($reason, ['cancelled', 'timeout', 'organizer-left', 'ended'], true)) {
-            $reason = 'ended';
-        }
-
-        if ($isOrganizer) {
-            $dashboardUrl = route('organizer.dashboard');
-            $meetingsUrl = route('organizer.meetings.index');
-        } else {
-            $dashboardUrl = route('participant.dashboard');
-            $meetingsUrl = route('participant.meetings.index');
-        }
-
-        return view('meetings.ended', compact(
-            'meeting',
-            'reason',
-            'dashboardUrl',
-            'meetingsUrl'
-        ));
+        return view('meetings.ended', [
+            'meeting' => $meeting,
+            'backUrl' => $isOrganizer
+                ? route('organizer.meetings.index')
+                : route('participant.meetings.index'),
+        ]);
     }
 }

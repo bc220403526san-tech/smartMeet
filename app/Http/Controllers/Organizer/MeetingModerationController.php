@@ -13,17 +13,24 @@ class MeetingModerationController extends Controller
 {
     public function moderate(Request $request, Meeting $meeting): JsonResponse
     {
-        abort_unless((string) auth()->id() === (string) $meeting->organizer_id, 403);
+        abort_unless(
+            (string) auth()->id() === (string) $meeting->organizer_id,
+            403
+        );
 
         $validated = $request->validate([
             'user_id' => ['required', 'integer', 'exists:users,id'],
-            'action' => ['required', 'in:remove,request-mic,request-camera'],
+            'action' => ['required', 'in:remove,camera-off'],
         ]);
 
         $userId = (string) $validated['user_id'];
-        $action = $validated['action'];
+        $action = (string) $validated['action'];
 
-        abort_if($userId === (string) $meeting->organizer_id, 422, 'Organizer cannot moderate itself.');
+        abort_if(
+            $userId === (string) $meeting->organizer_id,
+            422,
+            'Organizer cannot moderate itself.'
+        );
 
         $participant = MeetingParticipant::where('meeting_id', $meeting->id)
             ->where('user_id', $userId)
@@ -32,8 +39,7 @@ class MeetingModerationController extends Controller
         abort_if(!$participant, 404, 'Participant is not part of this meeting.');
 
         if ($action === 'remove') {
-            // Remove membership first: participant attend authorization will now
-            // reject any attempt to re-enter from another tab/device.
+            // Removing membership also prevents re-entry through participant attend authorization.
             $participant->delete();
 
             broadcast(new MeetingSignal(
@@ -57,12 +63,12 @@ class MeetingModerationController extends Controller
             toUserId: 'all',
             type: 'chat',
             data: [
-                'smartmeetControl' => $action,
+                'smartmeetControl' => 'camera-off',
                 'userId' => $userId,
                 'text' => '',
             ]
         ))->toOthers();
 
-        return response()->json(['status' => 'request-sent']);
+        return response()->json(['status' => 'camera-off-sent']);
     }
 }
