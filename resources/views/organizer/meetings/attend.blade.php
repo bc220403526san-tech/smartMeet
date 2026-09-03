@@ -881,6 +881,7 @@
     const END_MEETING_URL = @json(route('organizer.meetings.end', $meeting));
     const MODERATION_URL  = @json(route('organizer.meetings.moderate', $meeting));
     const CANCELLED_PAGE_URL = @json(route('meetings.cancelled', $meeting));
+    const ENDED_PAGE_URL     = @json(route('meetings.ended', $meeting));
     const CSRF            = @json(csrf_token());
     const ALL_PARTICIPANTS = @json($allParticipants);
     const MEETING_END_TIME   = @json($meetingEnd);
@@ -2653,7 +2654,10 @@
         }
         if(data.type==='meeting-ended'){
             showToast('📞 The organizer ended this meeting.');
-            setTimeout(()=>{ cleanup(); window.location.href=CANCELLED_PAGE_URL; },4500);
+            setTimeout(()=>{
+                try{ cleanup(); }catch(e){}
+                window.location.href=ENDED_PAGE_URL;
+            },1200);
             return;
         }
         if(data.type==='presence-request'){
@@ -3596,28 +3600,76 @@
         if(autoEndTimer) clearTimeout(autoEndTimer);
 
         try{
+            /*
+             * Step 1: persist the final meeting status first.
+             * This endpoint must return status = ended before we close anyone's room.
+             */
             const res=await fetch(END_MEETING_URL,{
                 method:'POST',
+                credentials:'same-origin',
                 headers:{
                     'Accept':'application/json',
                     'Content-Type':'application/json',
+                    'X-Requested-With':'XMLHttpRequest',
                     'X-CSRF-TOKEN':CSRF
                 },
                 body:JSON.stringify({})
             });
 
-            const data=await res.json().catch(()=>({}));
-            if(!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
+            const raw=await res.text();
+            let data={};
+            try{ data=raw ? JSON.parse(raw) : {}; }catch(e){}
+
+            if(!res.ok){
+                throw new Error(
+                    data.message ||
+                    raw ||
+                    `End meeting failed (HTTP ${res.status})`
+                );
+            }
+
+            if(String(data.status||'')!=='ended'){
+                throw new Error(
+                    data.message ||
+                    'Server did not confirm the Ended status.'
+                );
+            }
+
+            /*
+             * Step 2: notify all connected users through the same signaling endpoint
+             * already used successfully by SmartMeet WebRTC/presence.
+             *
+             * If this realtime notification has a transient problem, the DB is still
+             * already "ended"; room clients will not be able to re-enter as active.
+             */
+            try{
+                await sendSignal('all','meeting-ended',{
+                    by:MY_NAME,
+                    reason:'organizer-ended'
+                });
+            }catch(signalError){
+                console.error('[SmartMeet] meeting-ended realtime signal failed',signalError);
+            }
 
             showToast('📞 Meeting ended for everyone.');
+
             setTimeout(()=>{
                 try{ cleanup(); }catch(e){}
-                window.location.href=CANCELLED_PAGE_URL;
-            },700);
+                window.location.href=ENDED_PAGE_URL;
+            },900);
+
         }catch(e){
             console.error('[SmartMeet] end meeting failed',e);
             endingMeeting=false;
-            showToast('Meeting could not be ended. Please try again.');
+
+            /*
+             * Show the real backend reason. This is important for a missing
+             * "ended" enum migration or CSRF/server error.
+             */
+            showToast(
+                e?.message ||
+                'Meeting could not be ended. Please try again.'
+            );
         }
     }
 

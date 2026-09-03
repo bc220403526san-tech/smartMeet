@@ -745,6 +745,7 @@
     const MARK_LEFT_URL   = @json(route('participant.meetings.markLeft', $meeting));
     const LEAVE_URL       = @json(route('participant.meetings.index'));
     const CANCELLED_PAGE_URL = @json(route('meetings.cancelled', $meeting));
+    const ENDED_PAGE_URL     = @json(route('meetings.ended', $meeting));
     const CSRF            = @json(csrf_token());
     const ALL_PARTICIPANTS = @json($allParticipants);
     const ORGANIZER_ID    = "{{ $organizer->id }}";
@@ -2233,7 +2234,10 @@
         }
         if(data.type==='meeting-ended'){
             showToast('📞 The organizer ended this meeting.');
-            setTimeout(()=>{ cleanup(); window.location.href=CANCELLED_PAGE_URL; },4500);
+            setTimeout(()=>{
+                try{ cleanup(); }catch(e){}
+                window.location.href=ENDED_PAGE_URL;
+            },1200);
             return;
         }
         if(data.type==='presence-request'){
