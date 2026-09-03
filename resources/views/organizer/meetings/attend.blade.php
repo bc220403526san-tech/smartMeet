@@ -226,6 +226,14 @@
         .person-action.remove{color:#fda4af;border-color:rgba(244,63,94,.28)}
         .person-action.remove:hover{background:rgba(244,63,94,.18);color:#fff;border-color:rgba(244,63,94,.42)}
         .person-action:hover{background:rgba(239,68,68,.16); color:#fecaca; border-color:rgba(239,68,68,.3)}
+        .person-action.is-on{color:#86efac;border-color:rgba(34,197,94,.30);background:rgba(34,197,94,.08)}
+        .person-action.is-off{color:#fca5a5;border-color:rgba(239,68,68,.30);background:rgba(239,68,68,.08)}
+        .person-action.media-state-pulse{animation:mediaStatePulse .42s ease}
+        @keyframes mediaStatePulse{
+            0%{transform:scale(1)}
+            45%{transform:scale(1.12)}
+            100%{transform:scale(1)}
+        }
 
 
         /* ---------- IN-ROOM INVITE (isolated; existing responsive layout untouched) ---------- */
@@ -784,7 +792,7 @@
     <div class="ctrl-btn" onclick="toggleSidePanel('transcript')"><div class="ctrl-icon" id="ctrl-transcript"><i class="fa fa-closed-captioning"></i></div><span class="ctrl-label">Captions</span></div>
     <div class="ctrl-btn" onclick="toggleSidePanel('chat')"><div class="ctrl-icon" id="ctrl-chat"><i class="fa fa-comment"></i><span id="chat-badge">0</span></div><span class="ctrl-label">Chat</span></div>
     <div class="ctrl-btn" onclick="toggleSidePanel('people')"><div class="ctrl-icon" id="ctrl-people"><i class="fa fa-users"></i></div><span class="ctrl-label">People</span></div>
-    <div class="ctrl-btn" onclick="muteAllParticipants()"><div class="ctrl-icon"><i class="fa-solid fa-microphone-slash"></i></div><span class="ctrl-label">Mute all</span></div>
+    <div class="ctrl-btn" onclick="muteAllParticipants()"><div class="ctrl-icon"><i class="fa-solid fa-volume-xmark"></i></div><span class="ctrl-label">Mute all</span></div>
     <div class="ctrl-divider"></div>
     <div class="ctrl-btn"><button class="btn-end" style="background:linear-gradient(135deg,#7f1d1d,#450a0a);" onclick="endMeeting()" title="End meeting for everyone"><i class="fa-solid fa-circle-stop"></i></button><span class="ctrl-label" style="color:var(--red);white-space:nowrap;">End</span></div>
     <div class="ctrl-btn"><button class="btn-end" onclick="safeLeaveMeeting()"><i class="fa fa-phone-slash"></i></button><span class="ctrl-label" style="color:var(--red);">Leave</span></div>
@@ -1130,57 +1138,139 @@
         });
         ids.forEach(uid=>renderPersonRow(String(uid)));
     }
+    function flashParticipantMediaState(uid, type){
+        uid=String(uid);
+        const row=document.getElementById('person-row-'+uid);
+        if(!row) return;
+        const selector=type==='camera'
+            ? '[data-media-action="camera"]'
+            : '[data-media-action="mic"]';
+        const button=row.querySelector(selector);
+        if(!button) return;
+        button.classList.remove('media-state-pulse');
+        void button.offsetWidth;
+        button.classList.add('media-state-pulse');
+        setTimeout(()=>button.classList.remove('media-state-pulse'),480);
+    }
+
     function renderPersonRow(uid){
         uid=String(uid);
         const body=document.getElementById('people-body'); if(!body) return;
+
         const isMe = uid===String(MY_USER_ID);
-        const info = isMe ? { name: MY_NAME, initials: MY_INITIALS, avatarUrl: MY_AVATAR_URL, isOrganizer: true } : knownParticipants[uid];
+        const info = isMe
+            ? { name: MY_NAME, initials: MY_INITIALS, avatarUrl: MY_AVATAR_URL, isOrganizer: true }
+            : knownParticipants[uid];
+
         if(!info) return;
+
         const isLeft = !isMe && leftUsers.has(uid);
         const isOnline = !isLeft && (isMe || onlineUsers.has(uid));
+
+        /*
+         * micStatus true  = muted
+         * micStatus false = unmuted
+         * camStatus true  = camera ON
+         * camStatus false = camera OFF
+         */
+        const muted = micStatus[uid] !== false;
+        const cameraOn = camStatus[uid] === true;
+
         let row=document.getElementById('person-row-'+uid);
-        if(!row){ row=document.createElement('div'); row.id='person-row-'+uid; body.appendChild(row); }
+        if(!row){
+            row=document.createElement('div');
+            row.id='person-row-'+uid;
+            body.appendChild(row);
+        }
+
         row.className='person-row '+(isOnline?'joined':'pending');
+
         const color=colorFor(uid, info.isOrganizer);
-        const canMute = IS_ORGANIZER && !isMe && isOnline;
+        const canModerate = IS_ORGANIZER && !isMe && isOnline;
         const presenceLabel = isLeft ? 'Left' : (isOnline ? 'Joined' : 'Not joined yet');
+
         row.innerHTML = `
         <div class="person-avatar" style="background:linear-gradient(135deg,${color})">${avatarContent(info.avatarUrl,info.initials||initialsOf(info.name))}</div>
         <div class="person-info">
             <div class="person-name">${escapeHtml(info.name)}${isMe?' <span style="color:var(--blue);font-weight:600;">(You)</span>':''}${info.isOrganizer?'<i class="fa fa-crown" style="color:#fbbf24;font-size:10px;"></i>':''}</div>
             <div class="person-status ${isOnline?'on':''}" ${isLeft?'style="color:#fca5a5"':''}>${info.isOrganizer?'Organizer':'Participant'} • ${presenceLabel}</div>
         </div>
-        ${canMute ? `<div class="person-actions">
-            <button class="person-action" onclick="toggleParticipantMic('${uid}')" title="${micStatus[uid] ? 'Unmute participant' : 'Mute participant'}">
-                <i class="fa-solid ${micStatus[uid] ? 'fa-microphone' : 'fa-microphone-slash'}"></i>
+
+        ${canModerate ? `<div class="person-actions">
+            <button
+                class="person-action ${muted?'is-off':'is-on'}"
+                data-media-action="mic"
+                onclick="toggleParticipantMic('${uid}')"
+                title="${muted?'Unmute participant':'Mute participant'}"
+                aria-label="${muted?'Unmute participant':'Mute participant'}">
+                <i class="fa-solid ${muted?'fa-microphone-slash':'fa-microphone'}"></i>
             </button>
-            <button class="person-action camera-off" onclick="toggleParticipantCamera('${uid}')" title="${camStatus[uid] ? 'Turn camera off' : 'Turn camera on'}">
-                <i class="fa-solid ${camStatus[uid] ? 'fa-video-slash' : 'fa-video'}"></i>
+
+            <button
+                class="person-action ${cameraOn?'is-on':'is-off'}"
+                data-media-action="camera"
+                onclick="toggleParticipantCamera('${uid}')"
+                title="${cameraOn?'Turn camera off':'Turn camera on'}"
+                aria-label="${cameraOn?'Turn camera off':'Turn camera on'}">
+                <i class="fa-solid ${cameraOn?'fa-video':'fa-video-slash'}"></i>
             </button>
-            <button class="person-action remove" onclick="restrictParticipant('${uid}')" title="Restrict participant from this meeting"><i class="fa-solid fa-user-lock"></i></button>
+
+            <button
+                class="person-action remove"
+                onclick="restrictParticipant('${uid}')"
+                title="Restrict participant from this meeting"
+                aria-label="Restrict participant">
+                <i class="fa-solid fa-user-xmark"></i>
+            </button>
         </div>` : ''}
+
         ${raisedHands.has(uid) ? '<i class="fa-solid fa-hand people-hand" title="Hand raised"></i>' : ''}
         <span class="person-dot ${isOnline?'on':''}" ${isLeft?'style="background:#ef4444"':''}></span>`;
     }
+
     async function toggleParticipantMic(uid){
         uid=String(uid);
-        const info=knownParticipants[uid];
-        const currentlyMuted=Boolean(micStatus[uid]);
+        if(!onlineUsers.has(uid)) return;
 
+        const info=knownParticipants[uid];
+        const name=info?.name || 'Participant';
+        const currentlyMuted = micStatus[uid] !== false;
+
+        /*
+         * Do not fake state here. The participant changes the real microphone
+         * and then broadcasts mic-status; that confirmed state updates all UI.
+         */
         if(currentlyMuted){
             await sendSignal(uid,'unmute',{});
-            showToast(`🎙️ ${escapeHtml(info?info.name:'Participant')} can now unmute.`);
+            showToast(`🎙️ Unmute request sent to ${name}.`);
         }else{
             await sendSignal(uid,'mute',{});
-            showToast(`🔇 ${escapeHtml(info?info.name:'Participant')} has been muted.`);
+            showToast(`🔇 Muting ${name}…`);
         }
     }
 
     async function muteAllParticipants(){
-        const ids=[...onlineUsers].filter(uid=>String(uid)!==String(MY_USER_ID));
-        if(!ids.length){ showToast('No active participants to mute.'); return; }
-        await Promise.allSettled(ids.map(uid=>sendSignal(String(uid),'mute',{})));
-        showToast('🔇 All active participants have been muted.');
+        const ids=[...onlineUsers]
+            .map(String)
+            .filter(uid=>uid!==String(MY_USER_ID));
+
+        if(!ids.length){
+            showToast('There are no active participants to mute.');
+            return;
+        }
+
+        const unmutedIds=ids.filter(uid=>micStatus[uid]===false);
+
+        if(!unmutedIds.length){
+            showToast('🔇 All active participants are already muted.');
+            return;
+        }
+
+        await Promise.allSettled(
+            unmutedIds.map(uid=>sendSignal(uid,'mute',{}))
+        );
+
+        showToast(`🔇 Muting ${unmutedIds.length} participant${unmutedIds.length===1?'':'s'}…`);
     }
 
     async function moderateParticipant(uid, action){
@@ -1203,15 +1293,25 @@
 
     async function toggleParticipantCamera(uid){
         uid=String(uid);
+        if(!onlineUsers.has(uid)) return;
+
         const info=knownParticipants[uid];
-        const cameraOn=Boolean(camStatus[uid]);
+        const name=info?.name || 'Participant';
+        const cameraOn=camStatus[uid]===true;
         const action=cameraOn?'camera-off':'camera-on';
+
+        /*
+         * Existing moderation path performs the real participant-side camera
+         * action. Do not modify peer connections/tracks here.
+         */
         const ok=await moderateParticipant(uid,action);
-        if(ok){
-            showToast(cameraOn
-                ? `📹 ${escapeHtml(info?info.name:'Participant')}'s camera has been turned off.`
-                : `📹 Camera-on request sent to ${escapeHtml(info?info.name:'Participant')}.`);
-        }
+        if(!ok) return;
+
+        showToast(
+            cameraOn
+                ? `📷 Turning off ${name}'s camera…`
+                : `📹 Camera-on request sent to ${name}.`
+        );
     }
 
     async function restrictParticipant(uid){
@@ -2651,18 +2751,63 @@
             return;
         }
         if(data.type==='mic-status'){
-            const uid=String(data.data.userId||from); if(uid===String(MY_USER_ID)) return;
-            micStatus[uid]=data.data.muted;
-            const el=document.getElementById('micoff-'+uid); if(el) el.style.display=data.data.muted?'flex':'none';
+            const uid=String(data.data?.userId||from);
+            if(uid===String(MY_USER_ID)) return;
+
+            const muted=Boolean(data.data?.muted);
+            const changed=micStatus[uid]!==muted;
+            micStatus[uid]=muted;
+
+            const el=document.getElementById('micoff-'+uid);
+            if(el) el.style.display=muted?'flex':'none';
+
+            renderPersonRow(uid);
+            if(changed){
+                flashParticipantMediaState(uid,'mic');
+                const name=knownParticipants[uid]?.name || 'Participant';
+                showToast(muted ? `🔇 ${name} is now muted.` : `🎙️ ${name} is now unmuted.`);
+            }
             return;
         }
+
         if(data.type==='camera-status'){
-            const uid=String(data.data.userId||from); if(uid===String(MY_USER_ID)) return;
-            if(Boolean(data.data.cameraOn)) camStatus[uid]=true;
-            else if(!(remoteStreams[uid]?.getVideoTracks?.()||[]).some(t=>t.readyState==='live')) camStatus[uid]=false;
+            const uid=String(data.data?.userId||from);
+            if(uid===String(MY_USER_ID)) return;
+
+            const cameraOn=Boolean(data.data?.cameraOn);
+            const changed=camStatus[uid]!==cameraOn;
+            camStatus[uid]=cameraOn;
+
+            /*
+             * Keep the existing WebRTC attachment path. We only synchronize the
+             * confirmed visual state after the participant reports camera-status.
+             */
             attachRemoteStream(uid);
+
+            const video=document.getElementById('rvideo-'+uid);
+            const avatar=document.getElementById('avatar-'+uid);
+
+            if(!cameraOn){
+                if(video) video.style.display='none';
+                if(avatar) avatar.style.display='flex';
+            }else{
+                const liveVideo=(remoteStreams[uid]?.getVideoTracks?.()||[])
+                    .some(track=>track.readyState==='live' && !track.muted);
+                if(liveVideo){
+                    if(video) video.style.display='block';
+                    if(avatar) avatar.style.display='none';
+                }
+            }
+
+            renderPersonRow(uid);
+            if(changed){
+                flashParticipantMediaState(uid,'camera');
+                const name=knownParticipants[uid]?.name || 'Participant';
+                showToast(cameraOn ? `📹 ${name}'s camera is now on.` : `📷 ${name}'s camera is now off.`);
+            }
             return;
         }
+
         if(String(data.toUserId)!==String(MY_USER_ID)) return;
         if(!data.data) return;
         if(leftUsers.has(from) && ['offer','ice-candidate'].includes(data.type)) return;

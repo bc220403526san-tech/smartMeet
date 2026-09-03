@@ -2387,18 +2387,45 @@
             return;
         }
         if(data.type==='mic-status'){
-            const uid=String(data.data.userId||from); if(uid===String(MY_USER_ID)) return;
-            micStatus[uid]=data.data.muted;
-            const el=document.getElementById('micoff-'+uid); if(el) el.style.display=data.data.muted?'flex':'none';
+            const uid=String(data.data?.userId||from);
+            if(uid===String(MY_USER_ID)) return;
+
+            micStatus[uid]=Boolean(data.data?.muted);
+
+            const el=document.getElementById('micoff-'+uid);
+            if(el) el.style.display=micStatus[uid]?'flex':'none';
+
+            renderPersonRow(uid);
             return;
         }
+
         if(data.type==='camera-status'){
-            const uid=String(data.data.userId||from); if(uid===String(MY_USER_ID)) return;
-            if(Boolean(data.data.cameraOn)) camStatus[uid]=true;
-            else if(!(remoteStreams[uid]?.getVideoTracks?.()||[]).some(t=>t.readyState==='live')) camStatus[uid]=false;
+            const uid=String(data.data?.userId||from);
+            if(uid===String(MY_USER_ID)) return;
+
+            camStatus[uid]=Boolean(data.data?.cameraOn);
+
             attachRemoteStream(uid);
+
+            const video=document.getElementById('rvideo-'+uid);
+            const avatar=document.getElementById('avatar-'+uid);
+
+            if(!camStatus[uid]){
+                if(video) video.style.display='none';
+                if(avatar) avatar.style.display='flex';
+            }else{
+                const liveVideo=(remoteStreams[uid]?.getVideoTracks?.()||[])
+                    .some(track=>track.readyState==='live' && !track.muted);
+                if(liveVideo){
+                    if(video) video.style.display='block';
+                    if(avatar) avatar.style.display='none';
+                }
+            }
+
+            renderPersonRow(uid);
             return;
         }
+
         if(String(data.toUserId)!==String(MY_USER_ID)) return;
         if(!data.data) return;
         if(leftUsers.has(from) && ['offer','ice-candidate'].includes(data.type)) return;
