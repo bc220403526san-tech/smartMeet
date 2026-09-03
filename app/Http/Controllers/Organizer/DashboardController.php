@@ -11,18 +11,30 @@ class DashboardController extends Controller
 {
     public function index()
     {
-        $user        = Auth::user();
+        $user = Auth::user();
         $organizerId = $user->id;
-        $today       = Carbon::today()->toDateString();
+        $timezone = config('app.timezone', 'Asia/Karachi');
+        $now = Carbon::now($timezone);
+        $today = $now->toDateString();
+
+        /*
+         * Dashboard refresh may ONLY activate meetings whose scheduled
+         * start time has arrived.
+         *
+         * It must NEVER change active -> completed.
+         * Ended / Cancelled / Completed are permanent final statuses.
+         */
+        $this->syncOrganizerMeetingStatuses($organizerId);
 
         // STATS
-        $totalMeetings    = Meeting::where('organizer_id', $organizerId)->count();
+        $totalMeetings = Meeting::where('organizer_id', $organizerId)
+            ->count();
 
-        $activeMeetings   = Meeting::where('organizer_id', $organizerId)
+        $activeMeetings = Meeting::where('organizer_id', $organizerId)
             ->where('status', 'active')
             ->count();
 
-        $todayMeetings    = Meeting::where('organizer_id', $organizerId)
+        $todayMeetings = Meeting::where('organizer_id', $organizerId)
             ->whereDate('date', $today)
             ->count();
 
@@ -43,5 +55,55 @@ class DashboardController extends Controller
             'upcomingMeetings',
             'agenda'
         ));
+    }
+
+    private function syncOrganizerMeetingStatuses(int|string $organizerId): void
+    {
+        Meeting::query()
+            ->where('organizer_id', $organizerId)
+            ->where('status', 'upcoming')
+            ->get()
+            ->each(function (Meeting $meeting) {
+                $this->syncSingleMeetingStatus($meeting);
+            });
+    }
+
+    private function syncSingleMeetingStatus(Meeting $meeting): void
+    {
+        /*
+         * Only upcoming -> active is allowed from dashboard refresh.
+         * No active -> completed logic is intentionally present here.
+         */
+        $meeting->refresh();
+
+        if ($meeting->status !== 'upcoming') {
+            return;
+        }
+
+        $startTime = $this->meetingStartUtc($meeting);
+
+        if (now('UTC')->lt($startTime)) {
+            return;
+        }
+
+        Meeting::query()
+            ->whereKey($meeting->id)
+            ->where('status', 'upcoming')
+            ->update([
+                'status' => 'active',
+            ]);
+
+        $meeting->refresh();
+    }
+
+    private function meetingStartUtc(Meeting $meeting): Carbon
+    {
+        $timezone = $meeting->timezone
+            ?: config('app.timezone', 'Asia/Karachi');
+
+        return Carbon::parse(
+            trim($meeting->date . ' ' . $meeting->time),
+            $timezone
+        )->utc();
     }
 }
