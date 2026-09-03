@@ -223,7 +223,11 @@
                                 {{ $meeting->status == 'cancelled'  ? 'bg-red-500'       : '' }}
                                 {{ $meeting->status == 'flagged'    ? 'bg-yellow-500' : '' }}">
                             </span>
-                            {{ strtoupper($meeting->status) }}
+                            {{ $meeting->status === 'cancelled'
+    ? 'Cancelled by Organizer'
+    : ($meeting->status === 'ended'
+        ? 'Ended by Organizer'
+        : ucfirst($meeting->status)) }}
                         </span>
                     </div>
                     <!-- ACTIONS -->
@@ -782,9 +786,15 @@
             const cls = map[status] || 'bg-gray-100 text-gray-500 border-gray-200';
             const dot = dotMap[status] || 'bg-gray-400';
 
+            const labelMap = {
+                cancelled: 'Cancelled by Organizer',
+                ended: 'Ended by Organizer',
+            };
+            const label = labelMap[status] || (status.charAt(0).toUpperCase() + status.slice(1));
+
             return `<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${cls}">
                 <span class="w-1.5 h-1.5 rounded-full ${dot}"></span>
-                ${status.toUpperCase()}
+                ${label}
             </span>`;
         }
 
