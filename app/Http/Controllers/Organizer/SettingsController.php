@@ -50,7 +50,7 @@ class SettingsController extends Controller
 
     private function getTotalMeetings($user): int
     {
-        if ($user->role === 'organizers') {
+        if ($user->role === 'organizer') {
             return Meeting::where('organizer_id', $user->id)->count();
         }
 

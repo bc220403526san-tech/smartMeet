@@ -275,7 +275,7 @@
                                 </svg>
                             </button>
                         </div>
-                        <form id="role-request-form" method="POST" action="{{ route('organizers.settings.role-request') }}" class="p-5" onsubmit="return submitRoleRequest(event)">
+                        <form id="role-request-form" method="POST" action="{{ route('organizer.settings.role-request') }}" class="p-5" onsubmit="return submitRoleRequest(event)">
                             @csrf
                             <div class="grid grid-cols-2 gap-3 mb-3 pb-3 border-b border-gray-100">
                                 <div>
@@ -643,4 +643,3 @@
     </script>
 
 </x-layouts.app>
-
