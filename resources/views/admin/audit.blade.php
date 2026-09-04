@@ -1,4 +1,4 @@
-
+<x-layouts.app>
 <x-slot name="header">
     <div class="flex items-center justify-between gap-4 w-full">
         <x-header.page-title title="Meeting Audit Logs"/>
