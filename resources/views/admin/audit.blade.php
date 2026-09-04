@@ -5,37 +5,34 @@
 
     <div class="p-3 sm:p-4 bg-gray-50 rounded-2xl m-2 mt-0 min-h-screen">
 
-        <div class="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+        {{-- Section heading outside table --}}
+        <div class="mb-3 px-1 sm:px-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600
+                            text-white flex items-center justify-center shadow-sm">
+                    <i class="fa-solid fa-shield-halved text-sm"></i>
+                </div>
 
-            {{-- Content header --}}
-            <div class="px-5 sm:px-6 py-5 border-b border-gray-100
-                        bg-gradient-to-r from-blue-50 via-white to-indigo-50">
-                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-sm">
-                            <i class="fa-solid fa-shield-halved text-sm"></i>
-                        </div>
-
-                        <div>
-                            <h1 class="text-lg sm:text-xl font-semibold text-gray-900">
-                                Participant Sessions
-                            </h1>
-                            <p class="text-sm text-gray-500 mt-0.5">
-                                Recorded participant access, device, network and session activity.
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="inline-flex items-center self-start sm:self-auto gap-2 px-3 py-1.5 rounded-full
-                                border border-blue-100 bg-white text-blue-700 text-xs font-semibold shadow-sm">
-                        <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                        {{ $logs->total() }}
-                        {{ \Illuminate\Support\Str::plural('record', $logs->total()) }}
-                    </div>
+                <div>
+                    <h1 class="text-lg sm:text-xl font-semibold text-gray-900">
+                        Participant Sessions
+                    </h1>
+                    <p class="text-sm text-gray-500 mt-0.5">
+                        Recorded participant access, device, network and session activity.
+                    </p>
                 </div>
             </div>
 
-            {{-- Table --}}
+            <div class="inline-flex items-center self-start sm:self-auto gap-2 px-3 py-1.5 rounded-full
+                        border border-blue-100 bg-blue-50 text-blue-700 text-xs font-semibold">
+                <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                {{ $logs->total() }}
+                {{ \Illuminate\Support\Str::plural('record', $logs->total()) }}
+            </div>
+        </div>
+
+        {{-- Table card --}}
+        <div class="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="min-w-[1180px] w-full text-sm">
                     <thead>
