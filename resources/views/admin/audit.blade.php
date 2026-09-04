@@ -34,9 +34,9 @@
         {{-- Table card --}}
         <div class="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
             <div class="overflow-x-auto">
-                <table class="min-w-[1180px] w-full text-sm p-10">
+                <table class="min-w-[1180px] w-full text-sm">
                     <thead>
-                    <tr class="bg-slate-50 border-b border-gray-200 ">
+                    <tr class="bg-slate-50 border-b border-gray-200 p-10">
                         <th class="px-5 py-3.5 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                             Participant
                         </th>
