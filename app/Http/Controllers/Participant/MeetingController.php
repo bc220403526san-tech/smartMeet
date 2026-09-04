@@ -57,19 +57,14 @@ class MeetingController extends Controller
                 break;
         }
 
-        // Active first, then upcoming, then history.
+        /*
+         * Keep My Meetings in the SAME order as the organizer index.
+         * Organizer uses latest() (created_at DESC), so the same newly-created
+         * meeting appears at the top for both organizer and participant.
+         * Status filters still work, but status itself never changes ordering.
+         */
         $meetings = $query
-            ->orderByRaw("CASE status
-                WHEN 'active' THEN 1
-                WHEN 'upcoming' THEN 2
-                WHEN 'ended' THEN 3
-                WHEN 'completed' THEN 4
-                WHEN 'cancelled' THEN 5
-                WHEN 'flagged' THEN 6
-                ELSE 7
-            END")
-            ->orderBy('date', 'desc')
-            ->orderBy('time', 'desc')
+            ->latest()
             ->paginate(4)
             ->withQueryString();
 
