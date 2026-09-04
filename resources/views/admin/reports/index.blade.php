@@ -152,7 +152,7 @@
                                             NA
                                         @endif
                                     </div>
-                                    <span class="text-sm text-gray-700 truncate">{{ $meeting->organizer->name ?? 'Unassigned' }}</span>
+                                    <span class="text-sm text-gray-700 truncate">{{ $meeting->organizer?->name ?? 'Unassigned' }}</span>
                                 </div>
                             </td>
                             <td class="px-5 py-4 whitespace-nowrap">
@@ -261,7 +261,7 @@
                                         NA
                                     @endif
                                 </div>
-                                <span class="truncate">{{ $meeting->organizer->name ?? 'Unassigned' }}</span>
+                                <span class="truncate">{{ $meeting->organizer?->name ?? 'Unassigned' }}</span>
                             </div>
                             <div class="flex items-center gap-1">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5 text-gray-300 shrink-0">

@@ -5,9 +5,9 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="icon" href="{{ asset('images/s-logo.png') }}">
     <title>{{ env('APP_NAME') }}</title>
-     <style>
-     {!! file_get_contents(resource_path('css/admin/export-pdf.css')) !!}
-     </style>
+    <style>
+        {!! file_get_contents(resource_path('css/admin/export-pdf.css')) !!}
+    </style>
 </head>
 <body>
 
@@ -17,10 +17,11 @@
             <img class="brand-logo" src="data:image/png;base64,{{ $logoBase64 }}" alt="SmartMeet">
         @endif
         <span class="brand-text">
-            <div class="name">SmartMeet</div>
-            <div class="tagline">Meeting Suite</div>
+            <span class="name">SmartMeet</span>
+            <span class="tagline">Meeting Suite</span>
         </span>
     </div>
+
     <div class="meta">
         <div class="title">Meetings Report</div>
         <div class="generated">Generated on {{ now()->format('M d, Y h:i A') }}</div>
@@ -30,12 +31,15 @@
 @if(!empty($filters) && (($filters['status'] ?? 'All Status') !== 'All Status' || !empty($filters['search']) || !empty($filters['flagged'])))
     <div class="filters-bar">
         <span>Filters applied:</span>
+
         @if(($filters['status'] ?? 'All Status') !== 'All Status')
             <span>Status: <b>{{ $filters['status'] }}</b></span>
         @endif
+
         @if(!empty($filters['search']))
             <span>Search: <b>{{ $filters['search'] }}</b></span>
         @endif
+
         @if(!empty($filters['flagged']))
             <span>Flagged only</span>
         @endif
@@ -44,6 +48,7 @@
 
 @if(!empty($stats))
     <h2 class="section-title">Platform Summary</h2>
+
     <table class="stats-table">
         <tr>
             <td>
@@ -71,6 +76,7 @@
                 <div class="stat-label">Total Users</div>
             </td>
         </tr>
+
         <tr>
             <td>
                 <div class="stat-value">{{ $stats['active_users'] ?? 0 }}</div>
@@ -101,6 +107,7 @@
 @endif
 
 <h2 class="section-title">Meeting Details ({{ $meetings->count() }})</h2>
+
 <table class="meetings-table">
     <thead>
     <tr>
@@ -114,11 +121,12 @@
         <th>Flagged</th>
     </tr>
     </thead>
+
     <tbody>
     @forelse($meetings as $meeting)
         <tr>
             <td>{{ $meeting->title }}</td>
-            <td>{{ $meeting->organizer->name ?? 'Unassigned' }}</td>
+            <td>{{ $meeting->organizer?->name ?? 'Unassigned' }}</td>
             <td>{{ \Carbon\Carbon::parse($meeting->date)->format('M d, Y') }}</td>
             <td>{{ \Carbon\Carbon::parse($meeting->time)->format('h:i A') }}</td>
             <td>{{ $meeting->duration }} min</td>
@@ -134,13 +142,17 @@
         </tr>
     @empty
         <tr>
-            <td colspan="8" style="text-align:center; color:#999;">No meetings found.</td>
+            <td colspan="8" style="text-align:center; color:#999;">
+                No meetings found.
+            </td>
         </tr>
     @endforelse
     </tbody>
 </table>
 
-<div class="footer-note">SmartMeet &mdash; Meeting Suite &middot; Confidential platform report</div>
+<div class="footer-note">
+    SmartMeet &mdash; Meeting Suite &middot; Confidential platform report
+</div>
 
 </body>
 </html>

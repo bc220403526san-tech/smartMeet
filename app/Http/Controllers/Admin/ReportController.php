@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
@@ -11,21 +12,20 @@ class ReportController extends Controller
 {
     public function index(Request $request)
     {
-        // ── Filters (date range removed — status + search + flagged remain) ──
         $status  = $request->input('status');
         $search  = $request->input('search');
         $flagged = $request->boolean('flagged');
 
-        // ── Base query with filters applied ──
-        $meetingsQuery = Meeting::with(['organizers', 'participants'])
+        $meetingsQuery = Meeting::with(['organizer', 'participants'])
             ->when($status && $status !== 'All Status', fn($q) => $q->where('status', strtolower($status)))
             ->when($flagged, fn($q) => $q->where('is_flagged', true))
             ->when($search, function ($q) use ($search) {
-                $q->where('title', 'like', "%{$search}%")
-                    ->orWhereHas('organizers', fn($q2) => $q2->where('name', 'like', "%{$search}%"));
+                $q->where(function ($subQuery) use ($search) {
+                    $subQuery->where('title', 'like', "%{$search}%")
+                        ->orWhereHas('organizer', fn($q2) => $q2->where('name', 'like', "%{$search}%"));
+                });
             });
 
-        // ── Stats ──
         $today       = Carbon::today();
         $weekAgo     = Carbon::today()->subDays(7);
         $twoWeeksAgo = Carbon::today()->subDays(14);
@@ -39,18 +39,27 @@ class ReportController extends Controller
             'total_users'      => User::count(),
             'active_users'     => User::where('is_active', 1)->count(),
             'inactive_users'   => User::where('is_active', 0)->count(),
-            'organizers'       => User::where('role', 'organizers')->count(),
+            'organizers'       => User::where('role', 'organizer')->count(),
             'participants'     => User::where('role', 'participant')->count(),
             'created_today'    => Meeting::whereDate('created_at', $today)->count(),
             'completed_today'  => Meeting::where('status', 'completed')->whereDate('updated_at', $today)->count(),
         ];
 
-        // ── % change helper ──
         $change = function ($model, array $conditions = []) use ($weekAgo, $twoWeeksAgo, $today) {
-            $thisWeek = $model::where($conditions)->whereBetween('created_at', [$weekAgo, $today])->count();
-            $lastWeek = $model::where($conditions)->whereBetween('created_at', [$twoWeeksAgo, $weekAgo])->count();
-            if ($lastWeek == 0) return $thisWeek > 0 ? '+100%' : '0%';
+            $thisWeek = $model::where($conditions)
+                ->whereBetween('created_at', [$weekAgo, $today])
+                ->count();
+
+            $lastWeek = $model::where($conditions)
+                ->whereBetween('created_at', [$twoWeeksAgo, $weekAgo])
+                ->count();
+
+            if ($lastWeek == 0) {
+                return $thisWeek > 0 ? '+100%' : '0%';
+            }
+
             $percent = round((($thisWeek - $lastWeek) / $lastWeek) * 100);
+
             return ($percent >= 0 ? '+' : '') . $percent . '%';
         };
 
@@ -62,12 +71,14 @@ class ReportController extends Controller
             'total_users'     => $change(User::class),
             'active_users'    => $change(User::class, ['is_active' => 1]),
             'inactive_users'  => $change(User::class, ['is_active' => 0]),
-            'organizers'      => $change(User::class, ['role' => 'organizers']),
+            'organizers'      => $change(User::class, ['role' => 'organizer']),
             'participants'    => $change(User::class, ['role' => 'participant']),
         ];
 
-        // ── Paginated meetings table ──
-        $meetings = $meetingsQuery->latest('date')->paginate(5)->withQueryString();
+        $meetings = $meetingsQuery
+            ->latest('date')
+            ->paginate(5)
+            ->withQueryString();
 
         return view('admin.reports.index', compact('stats', 'changes', 'meetings'));
     }
@@ -78,18 +89,20 @@ class ReportController extends Controller
         $search  = $request->input('search');
         $flagged = $request->boolean('flagged');
 
-        $meetings = Meeting::with(['organizers', 'participants'])
+        $meetings = Meeting::with(['organizer', 'participants'])
             ->when($status && $status !== 'All Status', fn($q) => $q->where('status', strtolower($status)))
             ->when($flagged, fn($q) => $q->where('is_flagged', true))
             ->when($search, function ($q) use ($search) {
-                $q->where('title', 'like', "%{$search}%")
-                    ->orWhereHas('organizers', fn($q2) => $q2->where('name', 'like', "%{$search}%"));
+                $q->where(function ($subQuery) use ($search) {
+                    $subQuery->where('title', 'like', "%{$search}%")
+                        ->orWhereHas('organizer', fn($q2) => $q2->where('name', 'like', "%{$search}%"));
+                });
             })
             ->latest('date')
             ->get();
 
-        // ── Full stats, same as the index page cards ──
         $today = Carbon::today();
+
         $stats = [
             'total_meetings'   => Meeting::count(),
             'active_now'       => Meeting::where('status', 'active')->count(),
@@ -99,7 +112,7 @@ class ReportController extends Controller
             'total_users'      => User::count(),
             'active_users'     => User::where('is_active', 1)->count(),
             'inactive_users'   => User::where('is_active', 0)->count(),
-            'organizers'       => User::where('role', 'organizers')->count(),
+            'organizers'       => User::where('role', 'organizer')->count(),
             'participants'     => User::where('role', 'participant')->count(),
             'created_today'    => Meeting::whereDate('created_at', $today)->count(),
             'completed_today'  => Meeting::where('status', 'completed')->whereDate('updated_at', $today)->count(),
@@ -111,9 +124,9 @@ class ReportController extends Controller
             'flagged' => $flagged,
         ];
 
-        // ── Logo as base64 so dompdf renders it reliably ──
         $logoBase64 = null;
         $logoPath = public_path('images/s-logo.png');
+
         if (file_exists($logoPath)) {
             $logoBase64 = base64_encode(file_get_contents($logoPath));
         }
