@@ -16,8 +16,9 @@ class MeetingController extends Controller
         $timezone = config('app.timezone', 'Asia/Karachi');
         $today = Carbon::now($timezone)->toDateString();
 
-        // Keep only time-based Upcoming -> Active -> Completed synchronized from server time.
-        // "ended" is reserved for the organizer's explicit End Meeting action.
+        // Refresh/polling may persist ONLY Upcoming -> Active.
+        // Completed is persisted only by the live-room scheduled timer.
+        // Ended/Cancelled/Completed are terminal and are never rewritten here.
         $this->syncParticipantMeetingStatuses($userId);
 
         /*
@@ -143,8 +144,10 @@ class MeetingController extends Controller
                     $remainingMinutes = (int) $now->diffInMinutes($endTime, false);
 
                     if ($remainingMinutes <= 0) {
-                        $meeting->time_label = 'Completed';
-                        $meeting->time_type = 'completed';
+                        // Do not fake a Completed UI state from the clock.
+                        // The database remains the single source of truth.
+                        $meeting->time_label = 'Meeting time ended';
+                        $meeting->time_type = 'active';
                     } elseif ($remainingMinutes <= 10) {
                         $meeting->time_label = "{$remainingMinutes}m remaining";
                         $meeting->time_type = 'ending_soon';
@@ -182,7 +185,14 @@ class MeetingController extends Controller
                 return $meeting;
             });
 
-        return view('participant.meetings.today', compact('todayMeetings'));
+        $serverNowMs = now('UTC')->valueOf();
+        $nextTransitionMs = $this->getNextParticipantMeetingTransition($userId)?->valueOf();
+
+        return view('participant.meetings.today', compact(
+            'todayMeetings',
+            'serverNowMs',
+            'nextTransitionMs'
+        ));
     }
 
     // ── SHOW ──
@@ -247,7 +257,7 @@ class MeetingController extends Controller
     /**
      * Return only the state needed by the participant meetings dashboard.
      * Called through the normal index route with ?status_sync=1, so no extra
-     * route is required for live Upcoming -> Active -> Completed transitions.
+     * route is required for the exact Upcoming -> Active transition.
      */
     private function participantStatusSyncResponse(
         Request $request,
@@ -303,9 +313,9 @@ class MeetingController extends Controller
             explode(',', (string) $request->query('ids', ''))
         ));
 
-        // Exact server-side status synchronization:
-        // Upcoming -> Active at start time
-        // Active -> Completed at end time
+        // Exact server-side synchronization:
+        // ONLY Upcoming -> Active at the scheduled start time.
+        // Active -> Completed is intentionally NOT performed by polling/refresh.
         $this->syncParticipantMeetingStatuses($userId);
 
         $meetings = Meeting::whereIn('id', $ids)
@@ -353,7 +363,7 @@ class MeetingController extends Controller
             'participants',
             fn ($q) => $q->where('user_id', $userId)
         )
-            ->whereIn('status', ['upcoming', 'active'])
+            ->where('status', 'upcoming')
             ->get();
 
         foreach ($meetings as $meeting) {
@@ -362,11 +372,11 @@ class MeetingController extends Controller
     }
 
     /**
-     * Time-based lifecycle only:
-     * Upcoming -> Active exactly at start.
-     * Upcoming/Active -> Completed exactly at scheduled end.
-     *
-     * Ended/Cancelled are terminal manual statuses and are never overwritten here.
+     * Exact refresh lifecycle:
+     * - Upcoming -> Active exactly at scheduled start.
+     * - Active is left untouched by index/today/dashboard refresh.
+     * - Completed is persisted only by the live-room timer.
+     * - Ended/Cancelled/Completed are permanent terminal statuses.
      */
     private function syncSingleMeetingStatus(Meeting $meeting): void
     {
@@ -398,8 +408,8 @@ class MeetingController extends Controller
     }
 
     /**
-     * Return the next start/end boundary so the browser can refresh at the
-     * exact scheduled moment instead of relying on a 2-second polling delay.
+     * Return the next UPCOMING start boundary so the browser can synchronize
+     * exactly at meeting start without mutating active/final statuses.
      */
     private function getNextParticipantMeetingTransition(
         int|string $userId
@@ -440,3 +450,4 @@ class MeetingController extends Controller
         )->utc();
     }
 }
+

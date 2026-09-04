@@ -18,12 +18,9 @@ class DashboardController extends Controller
         $scheduleEnd = $now->copy()->addHours(48);
 
         /*
-         * IMPORTANT:
-         * Dashboard refresh may ONLY change upcoming -> active.
-         * It must NEVER change active -> completed.
-         *
-         * Natural completion is handled by the live meeting room when
-         * the scheduled meeting time actually ends.
+         * Dashboard refresh may ONLY persist UPCOMING -> ACTIVE.
+         * ACTIVE -> COMPLETED is never done here. Natural completion is
+         * persisted only by the live-room scheduled-time endpoint.
          */
         $this->syncParticipantMeetingStatuses($user->id);
 
@@ -69,10 +66,7 @@ class DashboardController extends Controller
             ->take(10)
             ->get();
 
-        /*
-         * Only the next UPCOMING -> ACTIVE boundary is needed here.
-         * Completed is not calculated from dashboard refresh/polling.
-         */
+        /* Exact server clock + next UPCOMING -> ACTIVE boundary. */
         $serverNowMs = now('UTC')->valueOf();
         $nextTransitionMs = $this->getNextParticipantMeetingTransition($user->id)?->valueOf();
 
@@ -102,12 +96,6 @@ class DashboardController extends Controller
 
     private function syncSingleMeetingStatus(Meeting $meeting): void
     {
-        /*
-         * Permanent status rule:
-         * - upcoming -> active is allowed here
-         * - active -> completed is NOT allowed here
-         * - completed / ended / cancelled are never touched
-         */
         $meeting->refresh();
 
         if ($meeting->status !== 'upcoming') {
@@ -123,9 +111,7 @@ class DashboardController extends Controller
         Meeting::query()
             ->whereKey($meeting->id)
             ->where('status', 'upcoming')
-            ->update([
-                'status' => 'active',
-            ]);
+            ->update(['status' => 'active']);
 
         $meeting->refresh();
     }

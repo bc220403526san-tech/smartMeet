@@ -157,6 +157,24 @@
 
         const ids = [...new Set(rows.map(row => row.dataset.todayMeetingId))];
 
+        // Same exact server-clock strategy used by Organizer / Participant index.
+        let serverClockOffsetMs = Number(@json($serverNowMs)) - Date.now();
+        let nextTransitionMs = @json($nextTransitionMs);
+        let exactTransitionTimer = null;
+        let requestRunning = false;
+        let pendingRefresh = false;
+
+        function currentServerTimeMs() {
+            return Date.now() + serverClockOffsetMs;
+        }
+
+        function updateServerClock(serverNowMs) {
+            const timestamp = Number(serverNowMs);
+            if (Number.isFinite(timestamp)) {
+                serverClockOffsetMs = timestamp - Date.now();
+            }
+        }
+
         function statusHtml(status) {
             if (status === 'active') {
                 return `<span class="inline-flex items-center gap-2 bg-red-50 text-red-600 text-xs font-semibold px-3 py-1.5 rounded-full border border-red-200"><span class="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>LIVE NOW</span>`;
@@ -166,6 +184,12 @@
             }
             if (status === 'completed') {
                 return `<span class="inline-flex items-center gap-2 bg-emerald-50 text-emerald-600 text-xs font-semibold px-3 py-1.5 rounded-full border border-emerald-200"><span class="w-2 h-2 bg-emerald-500 rounded-full"></span>COMPLETED</span>`;
+            }
+            if (status === 'ended') {
+                return `<span class="inline-flex items-center gap-2 bg-slate-100 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-200"><span class="w-2 h-2 bg-slate-500 rounded-full"></span>ENDED BY ORGANIZER</span>`;
+            }
+            if (status === 'cancelled') {
+                return `<span class="inline-flex items-center gap-2 bg-red-50 text-red-600 text-xs font-semibold px-3 py-1.5 rounded-full border border-red-200"><span class="w-2 h-2 bg-red-500 rounded-full"></span>CANCELLED BY ORGANIZER</span>`;
             }
             return `<span class="inline-flex items-center gap-2 bg-gray-100 text-gray-500 text-xs font-semibold px-3 py-1.5 rounded-full border border-gray-200"><span class="w-2 h-2 bg-gray-400 rounded-full"></span>${String(status).toUpperCase()}</span>`;
         }
@@ -183,28 +207,93 @@
             return `<button disabled class="bg-gray-100 text-gray-400 px-5 py-2.5 rounded-xl text-sm font-semibold cursor-not-allowed border border-gray-200"><i class="fa-solid fa-video-slash mr-1.5"></i>Closed</button>`;
         }
 
-        async function poll() {
+        function scheduleExactStatusRefresh() {
+            if (exactTransitionTimer) {
+                clearTimeout(exactTransitionTimer);
+                exactTransitionTimer = null;
+            }
+
+            const transitionTimestamp = Number(nextTransitionMs);
+            if (!Number.isFinite(transitionTimestamp) || transitionTimestamp <= 0) return;
+
+            const delay = Math.max(0, transitionTimestamp - currentServerTimeMs() + 50);
+            const maximumTimeout = 2_147_000_000;
+
+            if (delay > maximumTimeout) {
+                exactTransitionTimer = setTimeout(scheduleExactStatusRefresh, maximumTimeout);
+                return;
+            }
+
+            exactTransitionTimer = setTimeout(() => poll('exact-meeting-time'), delay);
+        }
+
+        async function poll(reason = 'manual') {
+            if (requestRunning) {
+                pendingRefresh = true;
+                return;
+            }
+
+            requestRunning = true;
+
             try {
-                const url = `{{ route('participant.meetings.status-check') }}?ids=${ids.join(',')}`;
-                const response = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
-                if (!response.ok) return;
+                const url = new URL(@json(route('participant.meetings.status-check')), window.location.origin);
+                url.searchParams.set('ids', ids.join(','));
+                url.searchParams.set('_', Date.now().toString());
+
+                const response = await fetch(url.toString(), {
+                    method: 'GET',
+                    cache: 'no-store',
+                    credentials: 'same-origin',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json',
+                        'Cache-Control': 'no-cache'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Today status sync failed with HTTP ${response.status}`);
+                }
 
                 const data = await response.json();
+                updateServerClock(data.server_now_ms);
+                nextTransitionMs = data.next_transition_ms;
+
                 Object.entries(data.meetings || {}).forEach(([id, status]) => {
                     const row = document.querySelector(`[data-today-meeting-id="${id}"]`);
                     if (!row || row.dataset.currentStatus === status) return;
 
+                    // Change the UI only when the DATABASE status actually changed.
                     row.dataset.currentStatus = status;
+
                     const badge = document.getElementById('today-status-' + id);
                     const action = document.getElementById('today-action-' + id);
                     if (badge) badge.innerHTML = statusHtml(status);
                     if (action) action.innerHTML = actionHtml(status, id);
                 });
+
+                scheduleExactStatusRefresh();
             } catch (error) {
-                console.error('Today meetings status poll failed:', error);
+                console.error(`Today meetings status sync failed (${reason}):`, error);
+            } finally {
+                requestRunning = false;
+                if (pendingRefresh) {
+                    pendingRefresh = false;
+                    poll('queued-refresh');
+                }
             }
         }
 
-        setInterval(poll, 5000);
+        poll('initial-load');
+        scheduleExactStatusRefresh();
+
+        // Safety check only. Exact Upcoming -> Active uses the scheduled timeout above.
+        setInterval(() => poll('backup-check'), 30_000);
+        window.addEventListener('focus', () => poll('window-focus'));
+        window.addEventListener('online', () => poll('network-online'));
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) poll('tab-visible');
+        });
     })();
 </script>
+

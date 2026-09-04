@@ -358,7 +358,9 @@
                 @endphp
 
 
-                <div class="grid grid-cols-4 items-center px-5 py-4 border-b border-gray-100 last:border-b-0 hover:bg-blue-50/30 transition duration-200 group">
+                <div class="grid grid-cols-4 items-center px-5 py-4 border-b border-gray-100 last:border-b-0 hover:bg-blue-50/30 transition duration-200 group"
+                     data-dashboard-meeting-id="{{ $meeting->id }}"
+                     data-current-status="{{ $meeting->status }}">
 
                     <!-- Meeting Name -->
                     <div class="flex items-center gap-2 min-w-0">
@@ -507,3 +509,120 @@
     </div>
 
 </x-layouts.app>
+
+<script>
+    (function () {
+        const rows = Array.from(document.querySelectorAll('[data-dashboard-meeting-id]'));
+        if (!rows.length) return;
+
+        const ids = [...new Set(rows.map(row => row.dataset.dashboardMeetingId))];
+        let serverClockOffsetMs = Number(@json($serverNowMs)) - Date.now();
+        let nextTransitionMs = @json($nextTransitionMs);
+        let exactTransitionTimer = null;
+        let requestRunning = false;
+        let pendingRefresh = false;
+
+        function currentServerTimeMs() {
+            return Date.now() + serverClockOffsetMs;
+        }
+
+        function updateServerClock(serverNowMs) {
+            const timestamp = Number(serverNowMs);
+            if (Number.isFinite(timestamp)) {
+                serverClockOffsetMs = timestamp - Date.now();
+            }
+        }
+
+        function scheduleExactStatusRefresh() {
+            if (exactTransitionTimer) {
+                clearTimeout(exactTransitionTimer);
+                exactTransitionTimer = null;
+            }
+
+            const transitionTimestamp = Number(nextTransitionMs);
+            if (!Number.isFinite(transitionTimestamp) || transitionTimestamp <= 0) return;
+
+            const delay = Math.max(0, transitionTimestamp - currentServerTimeMs() + 50);
+            const maximumTimeout = 2_147_000_000;
+
+            if (delay > maximumTimeout) {
+                exactTransitionTimer = setTimeout(scheduleExactStatusRefresh, maximumTimeout);
+                return;
+            }
+
+            exactTransitionTimer = setTimeout(() => syncStatuses('exact-meeting-time'), delay);
+        }
+
+        async function syncStatuses(reason = 'manual') {
+            if (requestRunning) {
+                pendingRefresh = true;
+                return;
+            }
+
+            requestRunning = true;
+
+            try {
+                const url = new URL(@json(route('participant.meetings.status-check')), window.location.origin);
+                url.searchParams.set('ids', ids.join(','));
+                url.searchParams.set('_', Date.now().toString());
+
+                const response = await fetch(url.toString(), {
+                    method: 'GET',
+                    cache: 'no-store',
+                    credentials: 'same-origin',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json',
+                        'Cache-Control': 'no-cache'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Dashboard status sync failed with HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                updateServerClock(data.server_now_ms);
+                nextTransitionMs = data.next_transition_ms;
+
+                let realStatusChanged = false;
+
+                Object.entries(data.meetings || {}).forEach(([id, status]) => {
+                    const row = document.querySelector(`[data-dashboard-meeting-id="${id}"]`);
+                    if (!row || row.dataset.currentStatus === status) return;
+
+                    // Reload only after a real database status transition.
+                    row.dataset.currentStatus = status;
+                    realStatusChanged = true;
+                });
+
+                if (realStatusChanged) {
+                    window.location.reload();
+                    return;
+                }
+
+                scheduleExactStatusRefresh();
+            } catch (error) {
+                console.error(`Participant dashboard status sync failed (${reason}):`, error);
+            } finally {
+                requestRunning = false;
+                if (pendingRefresh) {
+                    pendingRefresh = false;
+                    syncStatuses('queued-refresh');
+                }
+            }
+        }
+
+        syncStatuses('initial-load');
+        scheduleExactStatusRefresh();
+
+        // Backup only; page reloads solely when the database status actually changed.
+        setInterval(() => syncStatuses('backup-check'), 30_000);
+        window.addEventListener('focus', () => syncStatuses('window-focus'));
+        window.addEventListener('online', () => syncStatuses('network-online'));
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) syncStatuses('tab-visible');
+        });
+    })();
+</script>
+
