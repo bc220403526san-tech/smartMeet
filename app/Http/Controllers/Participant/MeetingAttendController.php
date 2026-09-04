@@ -12,6 +12,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 
@@ -42,14 +43,29 @@ class MeetingAttendController extends Controller
         // Public IP and user-agent are captured server-side and are never trusted from JavaScript.
         $auditSessionUuid = (string) Str::uuid();
 
-        MeetingParticipantLog::create([
-            'meeting_id' => $meeting->id,
-            'user_id' => $user->id,
-            'session_uuid' => $auditSessionUuid,
-            'public_ip' => $request->ip(),
-            'user_agent' => $request->userAgent(),
-            'joined_at' => $now,
-        ]);
+        /*
+         * Audit logging must never block the participant from entering the room.
+         * If the audit table/migration is temporarily unavailable or a schema
+         * mismatch exists, log the exception and continue with the meeting.
+         */
+        try {
+            MeetingParticipantLog::create([
+                'meeting_id' => $meeting->id,
+                'user_id' => $user->id,
+                'session_uuid' => $auditSessionUuid,
+                'public_ip' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'joined_at' => $now,
+            ]);
+        } catch (\Throwable $exception) {
+            Log::error('Participant meeting audit log creation failed', [
+                'meeting_id' => $meeting->id,
+                'user_id' => $user->id,
+                'session_uuid' => $auditSessionUuid,
+                'error' => $exception->getMessage(),
+                'exception' => get_class($exception),
+            ]);
+        }
 
         $meeting->participants()
             ->where('user_id', $user->id)
@@ -58,19 +74,32 @@ class MeetingAttendController extends Controller
                 'left_at' => null,
             ]);
 
-        $this->broadcastSignal(
-            meeting: $meeting,
-            fromUserId: (string) $user->id,
-            toUserId: 'all',
-            type: 'user-joined',
-            data: [
-                'userId' => (string) $user->id,
-                'name' => $user->name,
-                'initials' => $this->initials($user->name),
-                'avatarUrl' => $this->avatarUrl($user),
-                'isOrganizer' => false,
-            ]
-        );
+        /*
+         * The first server-side presence broadcast is best-effort.
+         * A temporary Reverb/broadcast problem must not turn Attend into HTTP 500.
+         */
+        try {
+            $this->broadcastSignal(
+                meeting: $meeting,
+                fromUserId: (string) $user->id,
+                toUserId: 'all',
+                type: 'user-joined',
+                data: [
+                    'userId' => (string) $user->id,
+                    'name' => $user->name,
+                    'initials' => $this->initials($user->name),
+                    'avatarUrl' => $this->avatarUrl($user),
+                    'isOrganizer' => false,
+                ]
+            );
+        } catch (\Throwable $exception) {
+            Log::warning('Participant initial room presence broadcast failed', [
+                'meeting_id' => $meeting->id,
+                'user_id' => $user->id,
+                'error' => $exception->getMessage(),
+                'exception' => get_class($exception),
+            ]);
+        }
 
         $meeting->loadMissing([
             'participants.user',
