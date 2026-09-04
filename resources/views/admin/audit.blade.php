@@ -1,29 +1,6 @@
 <x-layouts.app>
     <x-slot name="header">
-        <div class="flex items-center justify-between gap-4 w-full">
-            <div class="shrink-0">
-                <x-header.page-title title="Meeting Audit Logs"/>
-            </div>
-
-            <form method="GET"
-                  action="{{ route('admin.audit') }}"
-                  class="w-full max-w-xl">
-                <div class="relative">
-                    <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
-
-                    <input
-                        type="search"
-                        name="search"
-                        value="{{ request('search') }}"
-                        placeholder="Search participant, email, meeting, IP, device..."
-                        autocomplete="off"
-                        class="w-full h-11 pl-11 pr-4 rounded-xl border border-gray-200 bg-gray-50
-                               text-sm text-gray-700 placeholder:text-gray-400 shadow-sm
-                               focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition"
-                    >
-                </div>
-            </form>
-        </div>
+        <x-header.search-bar placeholder="Search participant, email, meeting, IP, device..." />
     </x-slot>
 
     <div class="p-3 sm:p-4 bg-gray-50 rounded-2xl m-2 mt-0 min-h-screen">
