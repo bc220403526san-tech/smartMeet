@@ -36,32 +36,32 @@
             <div class="overflow-x-auto">
                 <table class="min-w-[1180px] w-full text-sm">
                     <thead>
-                    <tr class="bg-blue-50/80 border-b border-blue-100">
-                        <th class="px-5 py-3.5 text-left text-[11px] font-semibold text-blue-700 uppercase tracking-wider">
+                    <tr class="bg-slate-50 border-b border-gray-200">
+                        <th class="px-5 py-3.5 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                             Participant
                         </th>
-                        <th class="px-4 py-3.5 text-left text-[11px] font-semibold text-blue-700 uppercase tracking-wider">
+                        <th class="px-4 py-3.5 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                             Meeting
                         </th>
-                        <th class="px-4 py-3.5 text-left text-[11px] font-semibold text-blue-700 uppercase tracking-wider">
+                        <th class="px-4 py-3.5 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                             Public IP
                         </th>
-                        <th class="px-4 py-3.5 text-left text-[11px] font-semibold text-blue-700 uppercase tracking-wider">
+                        <th class="px-4 py-3.5 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                             Device / System
                         </th>
-                        <th class="px-4 py-3.5 text-left text-[11px] font-semibold text-blue-700 uppercase tracking-wider">
+                        <th class="px-4 py-3.5 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                             Browser
                         </th>
-                        <th class="px-4 py-3.5 text-left text-[11px] font-semibold text-blue-700 uppercase tracking-wider">
+                        <th class="px-4 py-3.5 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                             Network
                         </th>
-                        <th class="px-4 py-3.5 text-left text-[11px] font-semibold text-blue-700 uppercase tracking-wider">
+                        <th class="px-4 py-3.5 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                             Joined
                         </th>
-                        <th class="px-4 py-3.5 text-left text-[11px] font-semibold text-blue-700 uppercase tracking-wider">
+                        <th class="px-4 py-3.5 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                             Left
                         </th>
-                        <th class="px-4 py-3.5 text-left text-[11px] font-semibold text-blue-700 uppercase tracking-wider">
+                        <th class="px-4 py-3.5 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                             Duration
                         </th>
                     </tr>
