@@ -9,7 +9,6 @@ use Illuminate\Http\Request;
 
 class MeetingController extends Controller
 {
-    // ── INDEX ──
     public function index(Request $request)
     {
         $userId = auth()->id();
@@ -21,11 +20,6 @@ class MeetingController extends Controller
         // Ended/Cancelled/Completed are terminal and are never rewritten here.
         $this->syncParticipantMeetingStatuses($userId);
 
-        /*
-         * Lightweight live-status endpoint using the EXISTING participant
-         * meetings index route. This avoids depending on a second route and
-         * mirrors the organizer dashboard's server-time synchronization.
-         */
         if ($request->boolean('status_sync')) {
             return $this->participantStatusSyncResponse($request, $userId, $today);
         }
@@ -35,7 +29,6 @@ class MeetingController extends Controller
                 $q->where('user_id', $userId);
             });
 
-        // Optional dashboard filters.
         switch ($request->query('filter')) {
             case 'today':
                 $query->whereDate('date', $today);
@@ -58,10 +51,13 @@ class MeetingController extends Controller
         }
 
         /*
-         * Keep My Meetings in the SAME order as the organizer index.
-         * Organizer uses latest() (created_at DESC), so the same newly-created
-         * meeting appears at the top for both organizer and participant.
-         * Status filters still work, but status itself never changes ordering.
+         * IMPORTANT:
+         * Never order My Meetings by status.
+         * Otherwise a meeting jumps to another pagination page as soon as
+         * it becomes cancelled/ended/completed, which makes it look as if
+         * another meeting's details/status replaced it after refresh.
+         *
+         * Keep the same newest-created-first order as Organizer My Meetings.
          */
         $meetings = $query
             ->latest()
@@ -83,8 +79,6 @@ class MeetingController extends Controller
             ->where('status', 'completed')
             ->count();
 
-        // Fixes the previous "Undefined variable $serverNowMs" Blade error
-        // and lets the browser schedule status refreshes against server time.
         $serverNowMs = now('UTC')->valueOf();
         $nextTransitionMs = $this->getNextParticipantMeetingTransition($userId)?->valueOf();
 
@@ -98,7 +92,6 @@ class MeetingController extends Controller
         ));
     }
 
-    // ── TODAY ──
     public function today()
     {
         $userId = auth()->id();
@@ -139,8 +132,6 @@ class MeetingController extends Controller
                     $remainingMinutes = (int) $now->diffInMinutes($endTime, false);
 
                     if ($remainingMinutes <= 0) {
-                        // Do not fake a Completed UI state from the clock.
-                        // The database remains the single source of truth.
                         $meeting->time_label = 'Meeting time ended';
                         $meeting->time_type = 'active';
                     } elseif ($remainingMinutes <= 10) {
@@ -190,7 +181,6 @@ class MeetingController extends Controller
         ));
     }
 
-    // ── SHOW ──
     public function show(Meeting $meeting)
     {
         $isParticipant = $meeting->participants()
@@ -216,7 +206,6 @@ class MeetingController extends Controller
         return view('participant.meetings.show', compact('meeting', 'startTime', 'endTime'));
     }
 
-    // ── ATTEND ──
     public function attend(Meeting $meeting)
     {
         $isParticipant = $meeting->participants()
@@ -249,11 +238,6 @@ class MeetingController extends Controller
         return view('participant.meetings.attend', compact('meeting', 'isOrganizer'));
     }
 
-    /**
-     * Return only the state needed by the participant meetings dashboard.
-     * Called through the normal index route with ?status_sync=1, so no extra
-     * route is required for the exact Upcoming -> Active transition.
-     */
     private function participantStatusSyncResponse(
         Request $request,
         int|string $userId,
@@ -297,7 +281,6 @@ class MeetingController extends Controller
         ]);
     }
 
-    // ── STATUS CHECK ──
     public function statusCheck(Request $request)
     {
         $userId = auth()->id();
@@ -308,9 +291,6 @@ class MeetingController extends Controller
             explode(',', (string) $request->query('ids', ''))
         ));
 
-        // Exact server-side synchronization:
-        // ONLY Upcoming -> Active at the scheduled start time.
-        // Active -> Completed is intentionally NOT performed by polling/refresh.
         $this->syncParticipantMeetingStatuses($userId);
 
         $meetings = Meeting::whereIn('id', $ids)
@@ -331,9 +311,7 @@ class MeetingController extends Controller
                     ->whereDate('date', $today)
                     ->where('status', 'upcoming')
                     ->count(),
-
                 'total' => (clone $participantMeetings)->count(),
-
                 'completed' => (clone $participantMeetings)
                     ->where('status', 'completed')
                     ->count(),
@@ -348,10 +326,6 @@ class MeetingController extends Controller
         ]);
     }
 
-    /**
-     * Synchronize all meetings visible to this participant against exact
-     * server time. This mirrors the organizer-side status behavior.
-     */
     private function syncParticipantMeetingStatuses(int|string $userId): void
     {
         $meetings = Meeting::whereHas(
@@ -366,13 +340,6 @@ class MeetingController extends Controller
         }
     }
 
-    /**
-     * Exact refresh lifecycle:
-     * - Upcoming -> Active exactly at scheduled start.
-     * - Active is left untouched by index/today/dashboard refresh.
-     * - Completed is persisted only by the live-room timer.
-     * - Ended/Cancelled/Completed are permanent terminal statuses.
-     */
     private function syncSingleMeetingStatus(Meeting $meeting): void
     {
         /*
@@ -402,10 +369,6 @@ class MeetingController extends Controller
         $meeting->refresh();
     }
 
-    /**
-     * Return the next UPCOMING start boundary so the browser can synchronize
-     * exactly at meeting start without mutating active/final statuses.
-     */
     private function getNextParticipantMeetingTransition(
         int|string $userId
     ): ?Carbon {
@@ -445,4 +408,3 @@ class MeetingController extends Controller
         )->utc();
     }
 }
-
