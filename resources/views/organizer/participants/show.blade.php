@@ -8,14 +8,14 @@
         <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div>
                 <div class="flex items-center gap-1.5 text-xs text-slate-400 mb-1.5 flex-wrap">
-                    <a href="{{ route('organizers.participants.index') }}" class="text-blue-500 font-medium hover:underline">Participants</a>
+                    <a href="{{ route('organizer.participants.index') }}" class="text-blue-500 font-medium hover:underline">Participants</a>
                     <span>›</span>
                     <span class="text-blue-500">{{ $participant->name }}</span>
                 </div>
                 <h1 class="text-lg sm:text-2xl font-bold text-slate-900 tracking-tight">Participant Details</h1>
             </div>
             <div class="flex items-center gap-3 sm:mt-1 flex-shrink-0">
-                <a href="{{ route('organizers.participants.index') }}"
+                <a href="{{ route('organizer.participants.index') }}"
                    class="flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 border border-slate-200 rounded-xl bg-white text-slate-500 text-sm font-semibold hover:bg-slate-50 hover:border-slate-300 transition whitespace-nowrap">
                     ← Back
                 </a>
