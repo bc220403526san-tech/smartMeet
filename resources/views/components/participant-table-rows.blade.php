@@ -54,7 +54,7 @@
         </td>
         <td class="px-5 py-4">
             <div class="flex items-center gap-2">
-                <a href="{{ route('organizers.participants.show', $participant->id) }}"
+                <a href="{{ route('organizer.participants.show', $participant->id) }}"
                    class="p-2 rounded-lg bg-gray-100 hover:bg-blue-100 transition group shadow-sm hover:shadow inline-flex"
                    title="View Participant">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-600 group-hover:text-blue-600 transition">
