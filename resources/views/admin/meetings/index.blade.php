@@ -50,9 +50,9 @@
                             ''           => ['label' => 'All',         'active' => 'bg-blue-600 text-white',   'inactive' => 'border border-gray-200 text-gray-500 hover:bg-blue-50 hover:text-blue-600'],
                             'upcoming'   => ['label' => 'Upcoming',    'active' => 'bg-blue-600 text-white',   'inactive' => 'border border-gray-200 text-gray-500 hover:bg-blue-50 hover:text-blue-600'],
                             'active'     => ['label' => 'Active',      'active' => 'bg-green-600 text-white',  'inactive' => 'border border-gray-200 text-gray-500 hover:bg-green-50 hover:text-green-600'],
-                            'completed'  => ['label' => 'Completed',   'active' => 'bg-gray-600 text-white',   'inactive' => 'border border-gray-200 text-gray-500 hover:bg-gray-100'],
-                            'incomplete' => ['label' => 'Incomplete',  'active' => 'bg-red-600 text-white',    'inactive' => 'border border-gray-200 text-gray-500 hover:bg-red-50 hover:text-red-600'],
-                            'cancelled'  => ['label' => 'Cancelled',   'active' => 'bg-red-600 text-white',    'inactive' => 'border border-gray-200 text-gray-500 hover:bg-red-50 hover:text-red-600'],
+                            'completed'  => ['label' => 'Completed',  'active' => 'bg-gray-600 text-white',   'inactive' => 'border border-gray-200 text-gray-500 hover:bg-gray-100'],
+                            'ended'      => ['label' => 'Ended',      'active' => 'bg-purple-600 text-white', 'inactive' => 'border border-gray-200 text-gray-500 hover:bg-purple-50 hover:text-purple-600'],
+                            'cancelled'  => ['label' => 'Cancelled',  'active' => 'bg-red-600 text-white',    'inactive' => 'border border-gray-200 text-gray-500 hover:bg-red-50 hover:text-red-600'],
                         ];
                     @endphp
 
@@ -108,10 +108,10 @@
                             $statusConfig = [
                                 'upcoming'   => ['bg' => 'bg-blue-50 text-blue-700 border-blue-100',   'dot' => 'bg-blue-500',                      'label' => 'Upcoming'],
                                 'active'     => ['bg' => 'bg-green-50 text-green-700 border-green-100', 'dot' => 'bg-green-500 animate-pulse',        'label' => 'Active'],
-                                'completed'  => ['bg' => 'bg-gray-100 text-gray-600 border-gray-200',   'dot' => 'bg-gray-400',                      'label' => 'Completed'],
-                                'incomplete' => ['bg' => 'bg-red-50 text-red-600 border-red-100',       'dot' => 'bg-red-400',                       'label' => 'Incomplete'],
-                                'cancelled'  => ['bg' => 'bg-red-50 text-red-600 border-red-100',       'dot' => 'bg-red-400',                       'label' => 'Cancelled'],
-                                'flagged'    => ['bg' => 'bg-orange-50 text-orange-600 border-orange-100', 'dot' => 'bg-orange-400',                 'label' => 'Flagged'],
+                                'completed'  => ['bg' => 'bg-gray-100 text-gray-600 border-gray-200',     'dot' => 'bg-gray-400',   'label' => 'Completed'],
+                                'ended'      => ['bg' => 'bg-purple-50 text-purple-700 border-purple-100', 'dot' => 'bg-purple-500', 'label' => 'Ended'],
+                                'cancelled'  => ['bg' => 'bg-red-50 text-red-600 border-red-100',         'dot' => 'bg-red-400',    'label' => 'Cancelled'],
+                                'flagged'    => ['bg' => 'bg-orange-50 text-orange-600 border-orange-100', 'dot' => 'bg-orange-400', 'label' => 'Flagged'],
                             ];
                             $s = $statusConfig[$meeting->status] ?? ['bg' => 'bg-gray-100 text-gray-500 border-gray-200', 'dot' => 'bg-gray-400', 'label' => ucfirst($meeting->status)];
 
@@ -133,7 +133,7 @@
                             <!-- ORGANIZER -->
                             <td class="px-5 py-4">
                                 <div class="flex items-center gap-3">
-                                    <img src="{{ optional($meeting->organizer)->image_url }}"
+                                    <img src="{{ optional($meeting->organizer)->image_url ?: asset('images/default-avatar.png') }}"
                                          class="w-10 h-10 rounded-full object-cover"
                                          alt="{{ $name }}">
                                     <div>
@@ -203,3 +203,4 @@
     </div>
 
 </x-layouts.app>
+
