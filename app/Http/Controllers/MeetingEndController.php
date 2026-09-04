@@ -11,8 +11,6 @@ class MeetingEndController extends Controller
     {
         $user = auth()->user();
 
-        abort_unless($user, 401);
-
         $allowed = (string) $meeting->organizer_id === (string) $user->id
             || $meeting->participants()
                 ->where('user_id', $user->id)
@@ -21,15 +19,15 @@ class MeetingEndController extends Controller
         abort_unless($allowed, 403);
         abort_unless($meeting->status === 'ended', 404);
 
-        // Meeting model defines organizer() (singular), not organizers().
-        $meeting->loadMissing('organizer');
+        $meeting->loadMissing('organizers');
 
-        $isOrganizer = (string) $meeting->organizer_id === (string) $user->id;
+        $isOrganizer =
+            (string) $meeting->organizer_id === (string) $user->id;
 
         return view('meetings.ended', [
             'meeting' => $meeting,
             'backUrl' => $isOrganizer
-                ? route('organizer.meetings.index')
+                ? route('organizers.meetings.index')
                 : route('participant.meetings.index'),
         ]);
     }
@@ -38,20 +36,22 @@ class MeetingEndController extends Controller
     {
         $user = auth()->user();
 
-        abort_unless($user, 401);
-
         $allowed = (string) $meeting->organizer_id === (string) $user->id
             || $meeting->participants()
                 ->where('user_id', $user->id)
                 ->exists();
 
-        abort_unless($allowed, 403);
-        abort_unless($meeting->status === 'cancelled', 404);
+        // Preserve the existing cancelled-page access behavior.
+        abort_unless($allowed || $meeting->status === 'cancelled', 403);
 
-        $meeting->loadMissing('organizer');
-
-        $isOrganizer = (string) $meeting->organizer_id === (string) $user->id;
+        $isOrganizer =
+            (string) $meeting->organizer_id === (string) $user->id;
 
         return view('meetings.ended', [
             'meeting' => $meeting,
             'backUrl' => $isOrganizer
+                ? route('organizers.meetings.index')
+                : route('participant.meetings.index'),
+        ]);
+    }
+}

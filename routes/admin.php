@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\MeetingController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ReportController;
@@ -8,21 +9,12 @@ use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\RoleRequestController;
 use Illuminate\Support\Facades\Route;
 
-/*
-|--------------------------------------------------------------------------
-| Admin Panel Routes
-|--------------------------------------------------------------------------
-*/
 Route::middleware(['auth', 'role:admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
 
-        /*
-        | Dashboard
-        */
-        Route::get('/dashboard', [DashboardController::class, 'index'])
-            ->name('dashboard');
+        Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
         Route::delete('/activities/{key}', [DashboardController::class, 'removeActivity'])
             ->name('activities.remove');
@@ -30,17 +22,14 @@ Route::middleware(['auth', 'role:admin'])
         Route::get('/activities/fetch', [DashboardController::class, 'fetchActivities'])
             ->name('activities.fetch');
 
-        /*
-        | Reports
-        */
+        // Direct Admin Audit page: resources/views/admin/audit.blade.php
+        Route::get('/audit', [AuditLogController::class, 'index'])->name('audit');
+
         Route::prefix('reports')->name('reports.')->group(function () {
             Route::get('/', [ReportController::class, 'index'])->name('index');
             Route::get('/export', [ReportController::class, 'export'])->name('export');
         });
 
-        /*
-        | Settings — profile, avatar, password, notifications, deactivation
-        */
         Route::prefix('settings')->name('settings.')->group(function () {
             Route::get('/', [SettingsController::class, 'index'])->name('index');
             Route::patch('/profile', [SettingsController::class, 'updateProfile'])->name('profile.update');
@@ -51,9 +40,6 @@ Route::middleware(['auth', 'role:admin'])
             Route::post('/flash', [SettingsController::class, 'storeFlash'])->name('flash');
         });
 
-        /*
-        | Role Requests — approve/reject organizers role change requests
-        */
         Route::prefix('role-requests')->name('role-requests.')->group(function () {
             Route::get('/', [RoleRequestController::class, 'index'])->name('index');
             Route::patch('/{roleRequest}/approve', [RoleRequestController::class, 'approve'])->name('approve');
@@ -61,9 +47,6 @@ Route::middleware(['auth', 'role:admin'])
             Route::delete('/{roleRequest}', [RoleRequestController::class, 'destroy'])->name('destroy');
         });
 
-        /*
-        | Meetings — read + moderate only (no create/edit by admin)
-        */
         Route::prefix('meetings')->name('meetings.')->group(function () {
             Route::get('/', [MeetingController::class, 'index'])->name('index');
             Route::get('/{meeting}', [MeetingController::class, 'show'])->name('show');
@@ -73,9 +56,6 @@ Route::middleware(['auth', 'role:admin'])
             Route::patch('/{meeting}/flag', [MeetingController::class, 'flag'])->name('flag');
         });
 
-        /*
-        | Users — full CRUD + role change + status toggle
-        */
         Route::prefix('users')->name('users.')->group(function () {
             Route::get('/', [UserController::class, 'index'])->name('index');
             Route::get('/create', [UserController::class, 'create'])->name('create');
