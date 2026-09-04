@@ -438,7 +438,7 @@ class MeetingController extends Controller
     {
         $this->authorizeOrganizer($meeting);
 
-        // Keep normal upcoming -> active/completed timing correct first.
+        // Keep exact upcoming -> active timing correct first.
         $this->syncSingleMeetingStatus($meeting);
         $meeting->refresh();
 
@@ -786,8 +786,15 @@ class MeetingController extends Controller
 
     private function syncMeetingStatuses(int|string $organizerId): void
     {
+        /*
+         * Outside the live room the automatic lifecycle is ONLY:
+         * upcoming -> active.
+         *
+         * Natural completion is persisted by the live-room timer through
+         * completeByTime(). Index/dashboard/polling must never write completed.
+         */
         $meetings = Meeting::where('organizer_id', $organizerId)
-            ->whereIn('status', ['upcoming', 'active'])
+            ->where('status', 'upcoming')
             ->get();
 
         foreach ($meetings as $meeting) {
@@ -798,42 +805,32 @@ class MeetingController extends Controller
     private function syncSingleMeetingStatus(Meeting $meeting): void
     {
         /*
-         * Only UPCOMING and ACTIVE are time-managed.
-         * ENDED, CANCELLED and COMPLETED are permanent final values.
+         * Terminal values are permanently locked.
+         * ACTIVE is also left untouched here because only the live-room timer
+         * is allowed to persist natural completion.
          */
         $meeting->refresh();
 
-        if (!in_array($meeting->status, ['upcoming', 'active'], true)) {
+        if ($meeting->status !== 'upcoming') {
             return;
         }
 
         $now = now('UTC');
         $startTime = $this->getMeetingStartTime($meeting);
-        $endTime = $startTime
-            ->copy()
-            ->addMinutes((int) $meeting->duration);
 
         if ($now->lt($startTime)) {
-            $correctStatus = 'upcoming';
-        } elseif ($now->gte($endTime)) {
-            $correctStatus = 'completed';
-        } else {
-            $correctStatus = 'active';
-        }
-
-        if ($meeting->status === $correctStatus) {
             return;
         }
 
         /*
-         * Atomic guard protects against stale refresh/poll/scheduler requests.
-         * If another request has already finalized the meeting, 0 rows update.
+         * Atomic guard prevents a stale request from overwriting a terminal
+         * status if another request changed the meeting meanwhile.
          */
         Meeting::query()
             ->whereKey($meeting->id)
-            ->whereIn('status', ['upcoming', 'active'])
+            ->where('status', 'upcoming')
             ->update([
-                'status' => $correctStatus,
+                'status' => 'active',
             ]);
 
         $meeting->refresh();
@@ -862,36 +859,30 @@ class MeetingController extends Controller
     private function getNextMeetingTransition(
         int|string $organizerId
     ): ?Carbon {
+        /*
+         * The organizer index only schedules exact-time activation.
+         * It must not schedule active -> completed; completion belongs to the
+         * live-room timer.
+         */
         $now = now('UTC');
         $nextTransition = null;
 
         $meetings = Meeting::where('organizer_id', $organizerId)
-            ->whereIn('status', ['upcoming', 'active'])
+            ->where('status', 'upcoming')
             ->get();
 
         foreach ($meetings as $meeting) {
             $startTime = $this->getMeetingStartTime($meeting);
 
-            $endTime = $startTime
-                ->copy()
-                ->addMinutes((int) $meeting->duration);
-
-            if ($now->lt($startTime)) {
-                $candidate = $startTime;
-            } elseif ($now->lt($endTime)) {
-                $candidate = $endTime;
-            } else {
-                $candidate = null;
+            if ($now->gte($startTime)) {
+                continue;
             }
 
             if (
-                $candidate !== null &&
-                (
-                    $nextTransition === null ||
-                    $candidate->lt($nextTransition)
-                )
+                $nextTransition === null ||
+                $startTime->lt($nextTransition)
             ) {
-                $nextTransition = $candidate;
+                $nextTransition = $startTime;
             }
         }
 
