@@ -29,7 +29,7 @@ class MeetingInviteMail extends Mailable
                 'meeting'       => $this->meeting,
                 'link'          => $this->link,
                 'isNewUser'     => $this->isNewUser,
-                'organizers'     => $this->meeting->organizer,
+                'organizer'     => $this->meeting->organizer,
                 'customMessage' => $this->customMessage,
             ]);
     }
