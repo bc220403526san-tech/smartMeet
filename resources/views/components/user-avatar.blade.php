@@ -5,9 +5,16 @@
 ])
 
 @php
-    $rawProfileImage = $user->avatar ?: $user->image;
+    /*
+     * IMPORTANT:
+     * Uploaded/local image gets first priority.
+     * Social/provider avatar is only fallback.
+     * If neither exists, show initials avatar.
+     */
+    $rawProfileImage = $user->image ?: $user->avatar;
 
     $nameParts = preg_split('/\s+/', trim($user->name ?: 'User'));
+
     $initials = collect($nameParts)
         ->filter()
         ->take(2)
