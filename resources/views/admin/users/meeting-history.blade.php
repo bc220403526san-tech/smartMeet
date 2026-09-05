@@ -3,18 +3,6 @@
         <x-header.page-title title="Admin Dashboard" />
     </x-slot:header>
 
-    @php
-        $nameParts = preg_split('/\s+/', trim($user->name ?? ''));
-        $initials = collect($nameParts)
-            ->filter()
-            ->take(2)
-            ->map(fn ($part) => mb_strtoupper(mb_substr($part, 0, 1)))
-            ->implode('');
-
-        $initials = $initials ?: 'U';
-        $hasProfileImage = !empty($user->image);
-    @endphp
-
     <div class="p-3 sm:p-4 bg-gray-50 rounded-2xl m-2 mt-0 space-y-4">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
@@ -29,22 +17,12 @@
                 </h1>
 
                 <p class="mt-1 text-sm text-gray-400">
-                    View recorded meeting activity for this user.
+                    Recorded meeting activity for this user.
                 </p>
             </div>
 
             <div class="flex items-center gap-3 px-4 py-3 bg-white border border-gray-200 rounded-2xl shadow-sm">
-                @if($hasProfileImage)
-                    <div class="w-12 h-12 rounded-full overflow-hidden border-2 border-white shadow-sm bg-white shrink-0">
-                        <img src="{{ $user->image_url }}"
-                             alt="{{ $user->name }}"
-                             class="w-full h-full object-cover rounded-full">
-                    </div>
-                @else
-                    <div class="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0">
-                        <span class="text-sm font-semibold tracking-wide">{{ $initials }}</span>
-                    </div>
-                @endif
+                <x-user-avatar :user="$user" size="md" />
 
                 <div class="min-w-0">
                     <p class="font-semibold text-gray-800 truncate">{{ $user->name }}</p>
@@ -58,9 +36,7 @@
                 <div class="px-4 py-16 text-center">
                     <i class="fa-regular fa-calendar-xmark text-3xl text-gray-300"></i>
                     <p class="mt-3 font-semibold text-gray-700">No meeting history found</p>
-                    <p class="mt-1 text-sm text-gray-400">
-                        There are no meetings recorded for this user yet.
-                    </p>
+                    <p class="mt-1 text-sm text-gray-400">There are no meetings recorded for this user yet.</p>
                 </div>
             @else
                 <div class="overflow-x-auto">
@@ -101,12 +77,8 @@
 
                             <tr class="hover:bg-gray-50/70 transition">
                                 <td class="px-5 py-4">
-                                    <p class="font-semibold text-gray-800">
-                                        {{ $meeting->title ?? 'Untitled Meeting' }}
-                                    </p>
-                                    <p class="mt-1 text-xs text-gray-400">
-                                        Meeting #{{ $meeting->id }}
-                                    </p>
+                                    <p class="font-semibold text-gray-800">{{ $meeting->title ?? 'Untitled Meeting' }}</p>
+                                    <p class="mt-1 text-xs text-gray-400">Meeting #{{ $meeting->id }}</p>
                                 </td>
 
                                 <td class="px-4 py-4 whitespace-nowrap text-gray-600">
@@ -125,12 +97,8 @@
 
                                 <td class="px-4 py-4 whitespace-nowrap">
                                     @if($item->first_joined_at)
-                                        <div class="font-semibold text-gray-700">
-                                            {{ $item->first_joined_at->format('h:i:s A') }}
-                                        </div>
-                                        <div class="mt-0.5 text-xs text-gray-400">
-                                            {{ $item->first_joined_at->format('M d, Y') }}
-                                        </div>
+                                        <div class="font-semibold text-gray-700">{{ $item->first_joined_at->format('h:i:s A') }}</div>
+                                        <div class="mt-0.5 text-xs text-gray-400">{{ $item->first_joined_at->format('M d, Y') }}</div>
                                     @else
                                         <span class="text-gray-400">Not recorded</span>
                                     @endif
@@ -138,12 +106,8 @@
 
                                 <td class="px-4 py-4 whitespace-nowrap">
                                     @if($item->last_left_at)
-                                        <div class="font-semibold text-gray-700">
-                                            {{ $item->last_left_at->format('h:i:s A') }}
-                                        </div>
-                                        <div class="mt-0.5 text-xs text-gray-400">
-                                            {{ $item->last_left_at->format('M d, Y') }}
-                                        </div>
+                                        <div class="font-semibold text-gray-700">{{ $item->last_left_at->format('h:i:s A') }}</div>
+                                        <div class="mt-0.5 text-xs text-gray-400">{{ $item->last_left_at->format('M d, Y') }}</div>
                                     @else
                                         <span class="text-gray-400">Not recorded</span>
                                     @endif
@@ -162,13 +126,11 @@
 
                                 <td class="px-4 py-4">
                                     @if($user->role === 'organizer')
-                                        <span class="inline-flex px-2.5 py-1 rounded-full
-                                                         text-xs font-semibold bg-gray-100 text-gray-600">
+                                        <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">
                                                 {{ ucfirst($meeting->status ?? 'unknown') }}
                                             </span>
                                     @else
-                                        <span class="inline-flex px-2.5 py-1 rounded-full
-                                                         text-xs font-semibold bg-blue-50 text-blue-600">
+                                        <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-600">
                                                 {{ $sessionCount }}
                                             {{ \Illuminate\Support\Str::plural('session', $sessionCount) }}
                                             </span>
