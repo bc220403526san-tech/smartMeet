@@ -5,15 +5,6 @@
 ])
 
 @php
-    /*
-     * Single source of truth:
-     * User::image_url already resolves:
-     * image -> avatar -> generated initials avatar.
-     *
-     * So always render image_url as <img>.
-     * This also correctly displays photos uploaded from Settings,
-     * because Settings stores them in the `avatar` column.
-     */
     $sizeClasses = match ($size) {
         'xs' => 'w-8 h-8',
         'sm' => 'w-10 h-10',

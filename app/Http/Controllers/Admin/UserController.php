@@ -264,8 +264,8 @@ class UserController extends Controller
 
     public function destroy(User $user)
     {
-        if ($user->role === 'admin') {
-            return back()->with('error', 'Admin accounts cannot be removed.');
+        if (auth()->check() && auth()->user()->is($user)) {
+            return back()->with('error', 'You cannot remove your own account.');
         }
 
         if ($user->image && !str_starts_with($user->image, 'http')) {
@@ -281,8 +281,8 @@ class UserController extends Controller
 
     public function toggleStatus(User $user)
     {
-        if ($user->role === 'admin') {
-            return back()->with('error', 'Admin accounts cannot be deactivated.');
+        if (auth()->check() && auth()->user()->is($user)) {
+            return back()->with('error', 'You cannot deactivate your own account.');
         }
 
         $newStatus = !$user->is_active;
@@ -305,8 +305,8 @@ class UserController extends Controller
 
     public function changeRole(Request $request, User $user)
     {
-        if (auth()->user()->is($user)) {
-            return back()->with('error', 'You cannot change your own admin role.');
+        if (auth()->check() && auth()->user()->is($user)) {
+            return back()->with('error', 'You cannot change your own role.');
         }
 
         $request->validate([

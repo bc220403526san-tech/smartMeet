@@ -38,30 +38,20 @@ class User extends Authenticatable
         ];
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Profile Image URL
-    |--------------------------------------------------------------------------
-    |
-    | Priority:
-    | 1. Uploaded/local image column
-    | 2. Social/provider avatar column
-    | 3. Generated initials avatar
-    |
-    */
-
     public function getImageUrlAttribute(): string
     {
         /*
          * IMPORTANT:
-         * If an uploaded image exists, always show it first.
-         * Only fall back to avatar when image is empty.
+         * Settings saves the uploaded admin photo in `avatar`.
+         * If avatar exists, it must win over a stale Google/social `image`.
+         *
+         * Priority:
+         * 1. avatar  (Settings/uploaded profile photo)
+         * 2. image   (Google/Facebook/legacy image)
+         * 3. generated initials avatar
          */
-        $profileImage = $this->image ?: $this->avatar;
+        $profileImage = $this->avatar ?: $this->image;
 
-        /*
-         * No image/avatar exists: generate initials avatar.
-         */
         if (empty($profileImage)) {
             $colors = [
                 '3b82f6',
@@ -75,11 +65,7 @@ class User extends Authenticatable
             ];
 
             $name = trim($this->name ?: 'User');
-
-            $firstCharacter = strtoupper(
-                mb_substr($name, 0, 1)
-            );
-
+            $firstCharacter = strtoupper(mb_substr($name, 0, 1));
             $index = ord($firstCharacter) % count($colors);
             $color = $colors[$index];
 
@@ -90,9 +76,6 @@ class User extends Authenticatable
                 . '&color=fff&size=128';
         }
 
-        /*
-         * Google / Facebook / external image.
-         */
         if (
             str_starts_with($profileImage, 'http://') ||
             str_starts_with($profileImage, 'https://')
@@ -100,55 +83,28 @@ class User extends Authenticatable
             return $profileImage;
         }
 
-        /*
-         * Already starts with /storage/.
-         */
         if (str_starts_with($profileImage, '/storage/')) {
             return url($profileImage);
         }
 
-        /*
-         * Already starts with storage/.
-         */
         if (str_starts_with($profileImage, 'storage/')) {
             return asset($profileImage);
         }
 
-        /*
-         * Local Laravel public storage image.
-         */
         return Storage::disk('public')->url(
             ltrim($profileImage, '/')
         );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Relationships
-    |--------------------------------------------------------------------------
-    */
-
     public function organizedMeetings()
     {
-        return $this->hasMany(
-            Meeting::class,
-            'organizer_id'
-        );
+        return $this->hasMany(Meeting::class, 'organizer_id');
     }
 
     public function joinedMeetings()
     {
-        return $this->hasMany(
-            MeetingParticipant::class,
-            'user_id'
-        );
+        return $this->hasMany(MeetingParticipant::class, 'user_id');
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Role Helpers
-    |--------------------------------------------------------------------------
-    */
 
     public function isAdmin(): bool
     {
@@ -172,35 +128,18 @@ class User extends Authenticatable
 
     public function hasAnyRole(array $roles): bool
     {
-        return in_array(
-            $this->role,
-            $roles,
-            true
-        );
+        return in_array($this->role, $roles, true);
     }
 
     public function getRoleBadgeColor(): string
     {
         return match ($this->role) {
-            'admin' =>
-            'bg-blue-100 text-blue-700',
-
-            'organizer' =>
-            'bg-gray-200 text-gray-700',
-
-            'participant' =>
-            'bg-green-100 text-green-700',
-
-            default =>
-            'bg-gray-100 text-gray-600',
+            'admin' => 'bg-blue-100 text-blue-700',
+            'organizer' => 'bg-gray-200 text-gray-700',
+            'participant' => 'bg-green-100 text-green-700',
+            default => 'bg-gray-100 text-gray-600',
         };
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Status Helpers
-    |--------------------------------------------------------------------------
-    */
 
     public function isActive(): bool
     {
@@ -216,44 +155,28 @@ class User extends Authenticatable
 
     public function getStatusText(): string
     {
-        return $this->is_active
-            ? 'Active'
-            : 'Inactive';
+        return $this->is_active ? 'Active' : 'Inactive';
     }
 
     public function getStatusDotColor(): string
     {
-        return $this->is_active
-            ? 'bg-green-500'
-            : 'bg-red-400';
+        return $this->is_active ? 'bg-green-500' : 'bg-red-400';
     }
 
     public function activate(): void
     {
-        $this->update([
-            'is_active' => true,
-        ]);
+        $this->update(['is_active' => true]);
     }
 
     public function deactivate(): void
     {
-        $this->update([
-            'is_active' => false,
-        ]);
+        $this->update(['is_active' => false]);
     }
 
     public function toggleStatus(): void
     {
-        $this->update([
-            'is_active' => !$this->is_active,
-        ]);
+        $this->update(['is_active' => !$this->is_active]);
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Notifications
-    |--------------------------------------------------------------------------
-    */
 
     public function notifications()
     {
