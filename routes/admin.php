@@ -60,6 +60,9 @@ Route::middleware(['auth', 'role:admin'])
             Route::get('/', [UserController::class, 'index'])->name('index');
             Route::get('/create', [UserController::class, 'create'])->name('create');
             Route::post('/', [UserController::class, 'store'])->name('store');
+            // Participant Meeting History
+            Route::get('/{user}/meetings', [UserController::class, 'meetingHistory'])
+                ->name('meetings');
             Route::get('/{user}', [UserController::class, 'show'])->name('show');
             Route::get('/{user}/edit', [UserController::class, 'edit'])->name('edit');
             Route::put('/{user}', [UserController::class, 'update'])->name('update');

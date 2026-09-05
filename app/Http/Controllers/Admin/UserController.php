@@ -1,18 +1,17 @@
 <?php
+
 namespace App\Http\Controllers\Admin;
 
-use App\Models\Notification;
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
+use App\Models\MeetingParticipantLog;
+use App\Models\Notification;
 use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 
 class UserController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
     public function index(Request $request)
     {
         $query = User::query();
@@ -30,33 +29,27 @@ class UserController extends Controller
             });
         }
 
-        $users         = $query->latest()->paginate(6)->withQueryString();
-        $totalUsers    = User::count();
-        $activeUsers   = User::where('is_active', 1)->count();
+        $users = $query->latest()->paginate(6)->withQueryString();
+        $totalUsers = User::count();
+        $activeUsers = User::where('is_active', 1)->count();
         $inactiveUsers = User::where('is_active', 0)->count();
 
         return view('admin.users.index', compact('users', 'totalUsers', 'activeUsers', 'inactiveUsers'));
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
     public function create()
     {
         return view('admin.users.create');
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
         $request->validate([
-            'name'     => 'required|string|max:255',
-            'email'    => 'required|email|unique:users',
+            'name' => 'required|string|max:255',
+            'email' => ['required', 'email:rfc', 'regex:/^.+@.+\..+$/', 'unique:users,email'],
             'password' => 'required|min:6',
-            'role'     => 'required|in:admin,organizers,participant',
-            'image'    => 'nullable|mimes:jpg,jpeg,png,webp,avif|max:2048',
+            'role' => 'required|in:admin,organizer,participant',
+            'image' => 'nullable|mimes:jpg,jpeg,png,webp,avif|max:2048',
         ]);
 
         $imagePath = null;
@@ -65,60 +58,94 @@ class UserController extends Controller
         }
 
         User::create([
-            'name'      => $request->name,
-            'email'     => $request->email,
-            'password'  => Hash::make($request->password),
-            'role'      => $request->role,
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+            'role' => $request->role,
             'is_active' => $request->boolean('is_active'),
-            'image'     => $imagePath,
+            'image' => $imagePath,
         ]);
 
-        return redirect()->route('admin.users.index')
-            ->with('success', 'User created successfully!');
+        return redirect()->route('admin.users.index')->with('success', 'User created successfully!');
     }
 
-    /**
-     * Display the specified resource.
-     */
     public function show(User $user)
     {
         $user->image_url = $user->image
-            ? (str_starts_with($user->image, 'http')
-                ? $user->image
-                : Storage::url($user->image))
+            ? (str_starts_with($user->image, 'http') ? $user->image : Storage::url($user->image))
             : asset('images/default-avatar.png');
 
-        return view('admin.users.show', compact('user'));
+        $meetingCount = $user->role === 'participant'
+            ? MeetingParticipantLog::where('user_id', $user->id)->distinct()->count('meeting_id')
+            : 0;
+
+        return view('admin.users.show', compact('user', 'meetingCount'));
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
+    public function meetingHistory(User $user)
+    {
+        abort_unless($user->role === 'participant', 404);
+
+        $user->image_url = $user->image
+            ? (str_starts_with($user->image, 'http') ? $user->image : Storage::url($user->image))
+            : asset('images/default-avatar.png');
+
+        $logs = MeetingParticipantLog::query()
+            ->with(['meeting.organizer'])
+            ->where('user_id', $user->id)
+            ->orderByDesc('joined_at')
+            ->get();
+
+        $meetings = $logs
+            ->groupBy('meeting_id')
+            ->map(function ($sessions) {
+                $first = $sessions->sortBy('joined_at')->first();
+                $last = $sessions->sortByDesc(function ($session) {
+                    return $session->left_at?->timestamp ?? $session->joined_at?->timestamp ?? 0;
+                })->first();
+
+                $totalSeconds = $sessions->sum(function ($session) {
+                    if (!$session->joined_at || !$session->left_at) {
+                        return 0;
+                    }
+                    return $session->joined_at->diffInSeconds($session->left_at);
+                });
+
+                return (object) [
+                    'meeting' => $first?->meeting,
+                    'first_joined_at' => $first?->joined_at,
+                    'last_left_at' => $last?->left_at,
+                    'total_seconds' => $totalSeconds,
+                    'sessions' => $sessions->sortBy('joined_at')->values(),
+                ];
+            })
+            ->filter(fn ($item) => $item->meeting)
+            ->values();
+
+        return view('admin.users.meeting-history', compact('user', 'meetings'));
+    }
+
     public function edit(User $user)
     {
         return view('admin.users.edit', compact('user'));
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(Request $request, User $user)
     {
         $request->validate([
-            'name'  => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email,' . $user->id,
-            'role'  => 'required|in:admin,organizers,participant',
+            'name' => 'required|string|max:255',
+            'email' => ['required', 'email:rfc', 'regex:/^.+@.+\..+$/', 'unique:users,email,' . $user->id],
+            'role' => 'required|in:admin,organizer,participant',
             'image' => 'nullable|mimes:jpg,jpeg,png,webp,avif|max:2048',
         ]);
 
         $data = [
-            'name'      => $request->name,
-            'email'     => $request->email,
-            'role'      => $request->role,
+            'name' => $request->name,
+            'email' => $request->email,
+            'role' => $request->role,
             'is_active' => $request->boolean('is_active'),
         ];
 
-        // IMAGE REMOVE
         if ($request->remove_image) {
             if ($user->image && !str_starts_with($user->image, 'http')) {
                 Storage::disk('public')->delete($user->image);
@@ -126,7 +153,6 @@ class UserController extends Controller
             $data['image'] = null;
         }
 
-        // IMAGE UPDATE
         if ($request->hasFile('image')) {
             if ($user->image && !str_starts_with($user->image, 'http')) {
                 Storage::disk('public')->delete($user->image);
@@ -139,12 +165,8 @@ class UserController extends Controller
         return back()->with('success', 'User updated successfully!');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(User $user)
     {
-        // Check — admin apna aap ko delete na kare
         if ($user->id === auth()->id()) {
             return back()->with('error', 'You cannot delete your own account!');
         }
@@ -155,8 +177,7 @@ class UserController extends Controller
 
         $user->delete();
 
-        return redirect()->route('admin.users.index')
-            ->with('success', 'User removed successfully!');
+        return redirect()->route('admin.users.index')->with('success', 'User removed successfully!');
     }
 
     public function toggleStatus(User $user)
@@ -170,29 +191,24 @@ class UserController extends Controller
 
         Notification::create([
             'user_id' => $user->id,
-            'title'   => $newStatus ? 'Account Activated' : 'Account Deactivated',
+            'title' => $newStatus ? 'Account Activated' : 'Account Deactivated',
             'message' => $newStatus
                 ? 'Your account has been activated by an administrator. You now have full access again.'
                 : 'Your account has been deactivated by an administrator.',
-            'link'    => null,
+            'link' => null,
         ]);
 
         return back()->with('success', 'User status updated.');
     }
 
-    /**
-     * Change a user's role and notify them.
-     * Admin cannot change their own role.
-     */
     public function changeRole(Request $request, User $user)
     {
-        // Admin apna khud ka role change nahi kar sakta
         if ($user->id === auth()->id()) {
             return back()->with('error', 'You cannot change your own role!');
         }
 
         $request->validate([
-            'role' => 'required|in:admin,organizers,participant',
+            'role' => 'required|in:admin,organizer,participant',
         ]);
 
         $oldRole = $user->role;
@@ -206,11 +222,11 @@ class UserController extends Controller
 
         Notification::create([
             'user_id' => $user->id,
-            'title'   => 'Your Role Has Been Updated',
+            'title' => 'Your Role Has Been Updated',
             'message' => 'Your role has been changed from ' . ucfirst($oldRole) . ' to ' . ucfirst($newRole) . '.',
-            'link'    => null,
+            'link' => null,
         ]);
 
-        return back()->with('success', "User role changed to " . ucfirst($newRole) . " successfully!");
+        return back()->with('success', 'User role changed to ' . ucfirst($newRole) . ' successfully!');
     }
 }

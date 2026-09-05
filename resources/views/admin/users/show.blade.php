@@ -56,7 +56,7 @@
 
                     <span class="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full
                         {{ $user->role == 'admin'       ? 'bg-blue-100 text-blue-600'   : '' }}
-                        {{ $user->role == 'organizers'   ? 'bg-gray-200 text-gray-600'   : '' }}
+                        {{ $user->role == 'organizer'   ? 'bg-gray-200 text-gray-600'   : '' }}
                         {{ $user->role == 'participant' ? 'bg-green-100 text-green-600' : '' }}">
                         {{ strtoupper($user->role) }}
                     </span>
@@ -138,6 +138,38 @@
                 </div>
             </div>
 
+
+            @if($user->role === 'participant')
+                <!-- PARTICIPANT MEETING ACTIVITY -->
+                <div class="px-5 sm:px-8 py-6 border-t border-gray-100">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4
+                                bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100
+                                rounded-2xl p-4 sm:p-5">
+                        <div class="flex items-center gap-3">
+                            <div class="w-11 h-11 rounded-xl bg-white text-blue-600 shadow-sm
+                                        flex items-center justify-center shrink-0">
+                                <i class="fa-solid fa-video text-sm"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs font-semibold text-blue-500 uppercase tracking-wider">Meeting Activity</p>
+                                <div class="flex items-baseline gap-2 mt-0.5">
+                                    <span class="text-2xl font-bold text-gray-800">{{ $meetingCount }}</span>
+                                    <span class="text-sm text-gray-500">{{ Str::plural('meeting', $meetingCount) }} attended</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <a href="{{ route('admin.users.meetings', $user) }}"
+                           class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
+                                  bg-blue-600 text-white text-sm font-semibold shadow-sm
+                                  hover:bg-blue-700 transition">
+                            View Meeting History
+                            <i class="fa-solid fa-arrow-right text-xs"></i>
+                        </a>
+                    </div>
+                </div>
+            @endif
+
             <!-- REMOVE USER -->
             <div class="px-5 sm:px-8 py-5 border-t border-gray-100 bg-gray-50/50">
                 <form action="{{ route('admin.users.destroy', $user) }}" method="POST"
@@ -156,3 +188,4 @@
 
     </div>
 </x-layouts.app>
+
