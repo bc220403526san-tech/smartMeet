@@ -259,8 +259,7 @@ class UserController extends Controller
                 Storage::disk('public')->delete($user->image);
             }
 
-            $data['image'] = $request->file('image')
-                ->store('user_images', 'public');
+            $data['image'] = $request->file('image')->store('user_images', 'public');
         }
 
         $user->update($data);
@@ -270,8 +269,8 @@ class UserController extends Controller
 
     public function destroy(User $user)
     {
-        if ($user->id === auth()->id()) {
-            return back()->with('error', 'You cannot delete your own account!');
+        if (auth()->user()->is($user)) {
+            return back()->with('error', 'You cannot remove your own admin account.');
         }
 
         if ($user->image && !str_starts_with($user->image, 'http')) {
@@ -287,13 +286,15 @@ class UserController extends Controller
 
     public function toggleStatus(User $user)
     {
-        if ($user->id === auth()->id()) {
-            return back()->with('error', 'You cannot deactivate your own account!');
+        if (auth()->user()->is($user)) {
+            return back()->with('error', 'You cannot deactivate your own admin account.');
         }
 
         $newStatus = !$user->is_active;
 
-        $user->update(['is_active' => $newStatus]);
+        $user->update([
+            'is_active' => $newStatus,
+        ]);
 
         Notification::create([
             'user_id' => $user->id,
@@ -309,8 +310,8 @@ class UserController extends Controller
 
     public function changeRole(Request $request, User $user)
     {
-        if ($user->id === auth()->id()) {
-            return back()->with('error', 'You cannot change your own role!');
+        if (auth()->user()->is($user)) {
+            return back()->with('error', 'You cannot change your own admin role.');
         }
 
         $request->validate([
@@ -324,7 +325,9 @@ class UserController extends Controller
             return back()->with('success', 'No change — user already has this role.');
         }
 
-        $user->update(['role' => $newRole]);
+        $user->update([
+            'role' => $newRole,
+        ]);
 
         Notification::create([
             'user_id' => $user->id,
