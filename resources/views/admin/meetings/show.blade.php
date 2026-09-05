@@ -6,6 +6,29 @@
     @php
         $organizer = $meeting->organizer;
 
+        // Organizer attendance is recorded directly on the meeting.
+        $organizerHasJoined = !empty($meeting->organizer_joined_at)
+            || !empty($meeting->actual_start);
+
+        // Participants section must contain ONLY participant users.
+        // If the organizer also exists in the meeting_participants table,
+        // exclude that organizer record from this UI.
+        $displayParticipants = $meeting->participants
+            ->filter(function ($participant) use ($organizer) {
+                $participantUser = $participant->user;
+
+                if (!$participantUser) {
+                    return true;
+                }
+
+                if ($organizer && (int) $participantUser->id === (int) $organizer->id) {
+                    return false;
+                }
+
+                return $participantUser->role === 'participant';
+            })
+            ->values();
+
         // Actual participant attendance comes from MeetingParticipantLog.
         // A participant is "Joined" only if at least one real join session was recorded.
         $joinedParticipantIds = \App\Models\MeetingParticipantLog::query()
@@ -94,7 +117,7 @@
 
                         <div class="bg-white border border-gray-200 rounded-2xl px-4 py-3 min-w-[130px]">
                             <p class="text-xs text-gray-400">Participants</p>
-                            <p class="mt-1 font-semibold text-gray-800">{{ $meeting->participants->count() }}</p>
+                            <p class="mt-1 font-semibold text-gray-800">{{ $displayParticipants->count() }}</p>
                         </div>
                     </div>
                 </div>
@@ -169,13 +192,29 @@
                             </div>
                         </div>
 
-                        <a href="{{ route('admin.users.show', $organizer) }}"
-                           class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl
-                                  bg-white border border-gray-200 text-sm font-medium text-gray-600
-                                  hover:text-blue-600 hover:border-blue-200 transition shrink-0">
-                            <i class="fa-regular fa-eye text-xs"></i>
-                            View User
-                        </a>
+                        <div class="flex items-center gap-2 shrink-0">
+                            @if($organizerHasJoined)
+                                <span class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl
+                                             bg-green-50 border border-green-200 text-xs font-semibold text-green-700">
+                                    <i class="fa-solid fa-circle-check"></i>
+                                    Joined
+                                </span>
+                            @else
+                                <span class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl
+                                             bg-gray-50 border border-gray-200 text-xs font-semibold text-gray-500">
+                                    <i class="fa-solid fa-circle-xmark"></i>
+                                    Not Joined
+                                </span>
+                            @endif
+
+                            <a href="{{ route('admin.users.show', $organizer) }}"
+                               class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl
+                                      bg-white border border-gray-200 text-sm font-medium text-gray-600
+                                      hover:text-blue-600 hover:border-blue-200 transition">
+                                <i class="fa-regular fa-eye text-xs"></i>
+                                View User
+                            </a>
+                        </div>
                     </div>
                 @else
                     <div class="p-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm text-gray-400">
@@ -214,13 +253,13 @@
             <div class="px-5 sm:px-7 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-100">
                 <h2 class="font-semibold text-gray-800 text-lg">Participants</h2>
                 <p class="mt-0.5 text-xs text-gray-400">
-                    {{ $meeting->participants->count() }}
-                    {{ \Illuminate\Support\Str::plural('participant', $meeting->participants->count()) }}
+                    {{ $displayParticipants->count() }}
+                    {{ \Illuminate\Support\Str::plural('participant', $displayParticipants->count()) }}
                 </p>
             </div>
 
             <div class="divide-y divide-gray-100">
-                @forelse($meeting->participants as $participant)
+                @forelse($displayParticipants as $participant)
                     @php
                         $participantUser = $participant->user;
                         $hasJoinedMeeting = $participantUser
