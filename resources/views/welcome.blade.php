@@ -1,1160 +1,854 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<html lang="en">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#0b1220">
-
-    <title>SmartMeet — Simple Online Meetings & Collaboration</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="{{ asset('images/s-logo.png') }}">
+    <title>SmartMeet — Simple Online Meetings &amp; Collaboration</title>
     <meta name="description" content="SmartMeet makes online meetings simple with video, audio, scheduling, real-time chat and live transcription.">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 
     <style>
+        /* ============================================================
+           1. VARIABLES & RESET
+           ============================================================ */
         :root{
-            --bg:#f7f9fc;
-            --surface:#ffffff;
-            --surface-2:#eef4ff;
-            --surface-3:#f1f5f9;
-            --text:#0f172a;
-            --muted:#64748b;
-            --line:#dbe4f0;
-            --primary:#2563eb;
-            --primary-2:#1d4ed8;
-            --primary-soft:#dbeafe;
-            --navy:#0b1220;
-            --success:#16a34a;
-            --danger:#ef4444;
-            --shadow-sm:0 10px 30px rgba(15,23,42,.06);
-            --shadow:0 24px 70px rgba(15,23,42,.12);
-            --radius:18px;
-            --radius-lg:28px;
-            --container:1180px;
+            --navy:#0b1424;
+            --navy-2:#0f1b31;
+            --text:#0f1b2e;
+            --muted:#5c6b82;
+            --muted-soft:#8391a6;
+            --blue:#2563eb;
+            --blue-dark:#1846b3;
+            --blue-soft:#eaf1ff;
+            --bg:#ffffff;
+            --bg-soft:#f5f9ff;
+            --border:#e6edf7;
+            --border-soft:#eef3fa;
+            --radius-lg:22px;
+            --radius-md:16px;
+            --radius-sm:10px;
+            --shadow-sm:0 2px 10px rgba(15,27,46,.05);
+            --shadow-md:0 12px 32px rgba(15,27,46,.08);
+            --shadow-lg:0 24px 60px rgba(15,27,46,.12);
+            --ease:cubic-bezier(0.22,1,0.36,1);
+            --dur:750ms;
         }
-
-        *{box-sizing:border-box}
+        *,*::before,*::after{box-sizing:border-box}
         html{scroll-behavior:smooth}
         body{
             margin:0;
-            font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
             color:var(--text);
             background:var(--bg);
+            font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+            line-height:1.6;
+            -webkit-font-smoothing:antialiased;
             overflow-x:hidden;
         }
-
-        a{color:inherit;text-decoration:none}
-        button{font:inherit}
+        h1,h2,h3,h4{
+            font-family:'Manrope',sans-serif;
+            color:var(--navy);
+            margin:0;
+            letter-spacing:-0.02em;
+        }
+        p{margin:0}
+        a{text-decoration:none;color:inherit}
         img{max-width:100%;display:block}
-        .container{width:min(calc(100% - 40px),var(--container));margin-inline:auto}
-        .section{padding:100px 0}
-        .section-label{
-            display:inline-flex;
-            align-items:center;
-            gap:8px;
-            color:var(--primary);
-            font-size:.78rem;
-            font-weight:800;
-            letter-spacing:.14em;
-            text-transform:uppercase;
-            margin-bottom:14px;
+        ul{list-style:none;margin:0;padding:0}
+        button{font-family:inherit;cursor:pointer}
+        .container{
+            width:100%;
+            max-width:1240px;
+            margin:0 auto;
+            padding:0 24px;
         }
-        .section-label::before{
-            content:"";
-            width:26px;
-            height:2px;
-            border-radius:999px;
-            background:var(--primary);
+        section{scroll-margin-top:90px}
+        .eyebrow{
+            display:inline-flex;align-items:center;gap:8px;
+            font-size:12.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+            color:var(--blue);background:var(--blue-soft);
+            padding:7px 14px;border-radius:99px;border:1px solid #d7e6ff;
         }
+        .section-head{max-width:640px;margin-bottom:52px}
+        .section-head h2{font-size:clamp(28px,3.4vw,42px);line-height:1.15;margin:14px 0 14px}
+        .section-head p{color:var(--muted);font-size:16px;max-width:560px}
+        .section-head.centered{margin-left:auto;margin-right:auto;text-align:center}
 
-        h1,h2,h3{font-family:Manrope,Inter,sans-serif;margin:0;color:var(--text)}
-        h1{font-size:clamp(3rem,6vw,5.9rem);line-height:.98;letter-spacing:-.06em}
-        h2{font-size:clamp(2.2rem,4vw,3.75rem);line-height:1.05;letter-spacing:-.045em}
-        h3{font-size:1.08rem;line-height:1.3}
-        p{margin:0;color:var(--muted);line-height:1.75}
-        .section-copy{max-width:650px;font-size:1.05rem;margin-top:18px}
-        .center{text-align:center}
-        .center .section-copy{margin-inline:auto}
-
+        /* Buttons */
         .btn{
-            display:inline-flex;
-            align-items:center;
-            justify-content:center;
-            gap:10px;
-            min-height:50px;
-            padding:0 22px;
-            border-radius:13px;
-            border:1px solid transparent;
-            font-weight:700;
-            transition:.22s ease;
-            cursor:pointer;
-        }
-        .btn svg{width:18px;height:18px}
-        .btn-primary{
-            color:#fff;
-            background:var(--primary);
-            box-shadow:0 10px 24px rgba(37,99,235,.24);
-        }
-        .btn-primary:hover{background:var(--primary-2);transform:translateY(-2px)}
-        .btn-secondary{
-            background:#fff;
-            border-color:var(--line);
-            color:var(--text);
-        }
-        .btn-secondary:hover{border-color:#b7c7dc;transform:translateY(-2px);box-shadow:var(--shadow-sm)}
-
-        /* Navbar */
-        .navbar{
-            position:fixed;
-            inset:0 0 auto;
-            z-index:50;
-            padding:17px 0;
-            transition:.25s ease;
-        }
-        .navbar.scrolled{
-            background:rgba(247,249,252,.9);
-            backdrop-filter:blur(18px);
-            border-bottom:1px solid rgba(219,228,240,.9);
-            padding:11px 0;
-        }
-        .nav-inner{
-            display:flex;
-            align-items:center;
-            justify-content:space-between;
-            gap:24px;
-        }
-        .brand{display:flex;align-items:center;gap:11px;font-family:Manrope,sans-serif;font-weight:800;font-size:1.12rem}
-        .brand-mark{
-            width:38px;height:38px;border-radius:12px;
-            display:grid;place-items:center;
-            background:linear-gradient(145deg,#2563eb,#0f3e9f);
-            color:#fff;
-            box-shadow:0 8px 24px rgba(37,99,235,.26);
-        }
-        .brand-mark svg{width:22px;height:22px}
-        .nav-links{display:flex;align-items:center;gap:8px}
-        .nav-links a{
-            padding:10px 13px;
-            border-radius:10px;
-            color:#475569;
-            font-size:.92rem;
-            font-weight:600;
-            transition:.2s;
-        }
-        .nav-links a:hover{color:var(--text);background:#fff}
-        .nav-actions{display:flex;align-items:center;gap:10px}
-        .nav-login{font-size:.92rem;font-weight:700;color:#334155;padding:10px 12px}
-        .menu-btn{
-            width:44px;height:44px;border-radius:11px;border:1px solid var(--line);
-            background:#fff;display:none;place-items:center;cursor:pointer;
-        }
-        .menu-btn svg{width:21px}
-        .mobile-menu{
-            display:none;
-            position:absolute;
-            top:74px;left:20px;right:20px;
-            background:#fff;border:1px solid var(--line);border-radius:18px;
-            padding:10px;box-shadow:var(--shadow);
-        }
-        .mobile-menu.open{display:block}
-        .mobile-menu a{display:block;padding:13px 14px;border-radius:10px;font-weight:650;color:#475569}
-        .mobile-menu a:hover{background:var(--surface-3);color:var(--text)}
-        .mobile-menu .mobile-cta{margin-top:8px;background:var(--primary);color:#fff;text-align:center}
-
-        /* Hero */
-        .hero{
-            min-height:100vh;
-            display:flex;
-            align-items:center;
-            position:relative;
-            padding:138px 0 90px;
-            background:
-                radial-gradient(circle at 84% 18%,rgba(37,99,235,.12),transparent 25%),
-                radial-gradient(circle at 3% 42%,rgba(14,165,233,.08),transparent 21%),
-                linear-gradient(180deg,#fbfdff 0%,#f7f9fc 100%);
-        }
-        .hero::before{
-            content:"";
-            position:absolute;inset:0;
-            background-image:
-                linear-gradient(rgba(148,163,184,.08) 1px,transparent 1px),
-                linear-gradient(90deg,rgba(148,163,184,.08) 1px,transparent 1px);
-            background-size:42px 42px;
-            mask-image:linear-gradient(to bottom,rgba(0,0,0,.55),transparent 77%);
-            pointer-events:none;
-        }
-        .hero-grid{
-            position:relative;
-            display:grid;
-            grid-template-columns:1.02fr .98fr;
-            align-items:center;
-            gap:66px;
-        }
-        .hero-badge{
             display:inline-flex;align-items:center;gap:9px;
-            padding:8px 12px;border:1px solid #bfdbfe;border-radius:999px;
-            background:rgba(239,246,255,.86);color:#1d4ed8;
-            font-size:.82rem;font-weight:750;margin-bottom:24px;
+            padding:14px 26px;border-radius:12px;font-weight:600;font-size:15px;
+            border:1px solid transparent;transition:transform .25s var(--ease),box-shadow .25s var(--ease),background .25s var(--ease),color .25s var(--ease);
+            white-space:nowrap;
         }
-        .hero-badge .dot{
-            width:8px;height:8px;border-radius:50%;background:#22c55e;
-            box-shadow:0 0 0 5px rgba(34,197,94,.12)
-        }
-        .hero-title .accent{color:var(--primary)}
-        .hero-copy{max-width:600px;font-size:1.11rem;margin-top:24px}
-        .hero-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:32px}
-        .hero-points{
-            display:flex;align-items:center;flex-wrap:wrap;gap:12px;
-            margin-top:22px;color:#64748b;font-size:.82rem;font-weight:600;
-        }
-        .hero-points span{display:flex;align-items:center;gap:7px}
-        .hero-points svg{width:15px;height:15px;color:#16a34a}
+        .btn svg{transition:transform .25s var(--ease)}
+        .btn:hover svg{transform:translateX(3px)}
+        .btn-primary{background:var(--blue);color:#fff;box-shadow:0 10px 24px rgba(37,99,235,.28)}
+        .btn-primary:hover{background:var(--blue-dark);transform:translateY(-2px);box-shadow:0 16px 34px rgba(37,99,235,.34)}
+        .btn-secondary{background:#fff;color:var(--navy);border-color:var(--border)}
+        .btn-secondary:hover{transform:translateY(-2px);box-shadow:var(--shadow-md);border-color:#d7e2f3}
+        .btn-ghost{background:transparent;color:var(--navy)}
+        .btn-ghost:hover{color:var(--blue)}
+        .btn-block{width:100%;justify-content:center}
 
-        /* Product mockup */
-        .hero-visual{position:relative}
-        .mock-glow{
-            position:absolute;width:74%;height:74%;border-radius:50%;
-            background:rgba(37,99,235,.16);filter:blur(70px);
-            top:16%;left:12%;z-index:0
-        }
-        .meeting-window{
-            position:relative;z-index:2;
-            border:1px solid rgba(203,213,225,.9);
-            background:#0c1323;
-            border-radius:24px;
-            overflow:hidden;
-            box-shadow:0 34px 90px rgba(15,23,42,.25);
-            transform:perspective(1500px) rotateY(-5deg) rotateX(2deg);
-        }
-        .window-top{
-            height:50px;display:flex;align-items:center;justify-content:space-between;
-            padding:0 16px;background:#111a2c;border-bottom:1px solid rgba(255,255,255,.06);
-        }
-        .window-dots{display:flex;gap:6px}.window-dots i{width:9px;height:9px;border-radius:50%;background:#475569}
-        .window-title{font-size:.78rem;color:#cbd5e1;font-weight:650}
-        .live-pill{
-            display:flex;align-items:center;gap:6px;color:#dcfce7;background:rgba(22,163,74,.15);
-            border:1px solid rgba(74,222,128,.18);padding:5px 8px;border-radius:999px;font-size:.68rem;font-weight:700
-        }
-        .meeting-body{display:grid;grid-template-columns:1fr 190px;min-height:360px}
-        .video-area{padding:13px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
-        .video-tile{
-            position:relative;min-height:150px;border-radius:15px;overflow:hidden;
-            background:linear-gradient(145deg,#1e293b,#0f172a);
-            border:1px solid rgba(255,255,255,.06);
-        }
-        .avatar-bg-1{background:linear-gradient(145deg,#334155,#172033)}
-        .avatar-bg-2{background:linear-gradient(145deg,#233151,#111827)}
-        .avatar-bg-3{background:linear-gradient(145deg,#27364a,#101827)}
-        .avatar-bg-4{background:linear-gradient(145deg,#20344f,#111827)}
-        .avatar{
-            width:70px;height:70px;border-radius:50%;display:grid;place-items:center;
-            color:#e2e8f0;font-size:1.1rem;font-weight:800;letter-spacing:.02em;
-            background:linear-gradient(145deg,#475569,#1e293b);
-            position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-            border:3px solid rgba(255,255,255,.08)
-        }
-        .tile-foot{
-            position:absolute;left:9px;right:9px;bottom:9px;
-            display:flex;align-items:center;justify-content:space-between;
-        }
-        .tile-name{font-size:.68rem;color:#f8fafc;font-weight:650;background:rgba(15,23,42,.65);padding:5px 7px;border-radius:7px}
-        .mic-mini{
-            width:25px;height:25px;border-radius:8px;display:grid;place-items:center;
-            background:rgba(15,23,42,.66);color:#e2e8f0
-        }.mic-mini svg{width:12px;height:12px}
-        .side-panel{background:#f8fafc;border-left:1px solid #dbe4f0;padding:14px 12px}
-        .side-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
-        .side-head strong{font-size:.76rem;color:#0f172a}.side-head span{font-size:.62rem;color:#64748b}
-        .transcript-line{display:grid;grid-template-columns:26px 1fr;gap:7px;margin-bottom:12px}
-        .mini-avatar{
-            width:26px;height:26px;border-radius:8px;display:grid;place-items:center;
-            background:#dbeafe;color:#1d4ed8;font-size:.55rem;font-weight:800
-        }
-        .transcript-line b{display:block;font-size:.59rem;color:#334155;margin-bottom:3px}
-        .transcript-line p{font-size:.57rem;line-height:1.45;color:#64748b}
-        .meeting-controls{
-            display:flex;justify-content:center;align-items:center;gap:8px;
-            padding:12px;background:#111a2c;border-top:1px solid rgba(255,255,255,.05)
-        }
-        .control{
-            width:36px;height:36px;border-radius:10px;border:1px solid rgba(255,255,255,.08);
-            display:grid;place-items:center;color:#cbd5e1;background:#1b263b
-        }.control svg{width:15px;height:15px}
-        .control.leave{width:60px;background:#dc2626;color:#fff;border-color:transparent}
-        .float-card{
-            position:absolute;z-index:4;background:rgba(255,255,255,.96);border:1px solid var(--line);
-            border-radius:14px;box-shadow:var(--shadow-sm);padding:11px 13px;
-            display:flex;align-items:center;gap:10px;font-size:.75rem;font-weight:700;color:#334155
-        }
-        .float-card svg{width:17px;height:17px;color:var(--primary)}
-        .float-one{top:9%;left:-8%;animation:float 5s ease-in-out infinite}
-        .float-two{right:-7%;bottom:16%;animation:float 5s ease-in-out 1.4s infinite}
-        @keyframes float{50%{transform:translateY(-8px)}}
-
-        /* Logos / trust */
-        .trustbar{padding:28px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:#fff}
-        .trust-inner{display:flex;align-items:center;justify-content:center;gap:38px;flex-wrap:wrap;color:#64748b;font-size:.84rem;font-weight:700}
-        .trust-item{display:flex;align-items:center;gap:9px}.trust-item svg{width:18px;color:#2563eb}
-
-        /* Features */
-        .features-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:46px}
-        .feature-card{
-            background:#fff;border:1px solid var(--line);border-radius:18px;padding:24px;
-            min-height:194px;transition:.22s ease;position:relative;overflow:hidden
-        }
-        .feature-card:hover{transform:translateY(-5px);box-shadow:var(--shadow-sm);border-color:#c8d5e6}
-        .feature-card::after{
-            content:"";position:absolute;right:-36px;bottom:-36px;width:100px;height:100px;border-radius:50%;
-            background:#eff6ff;transition:.22s
-        }
-        .feature-card:hover::after{transform:scale(1.15)}
-        .icon-box{
-            width:43px;height:43px;border-radius:12px;background:#eff6ff;color:#2563eb;
-            display:grid;place-items:center;margin-bottom:20px;position:relative;z-index:2
-        }.icon-box svg{width:20px;height:20px}
-        .feature-card h3,.feature-card p{position:relative;z-index:2}
-        .feature-card p{font-size:.88rem;margin-top:9px;line-height:1.6}
-
-        /* Product section */
-        .showcase{background:#0b1220;color:#fff;position:relative;overflow:hidden}
-        .showcase::before{
-            content:"";position:absolute;width:520px;height:520px;border-radius:50%;
-            background:rgba(37,99,235,.18);filter:blur(100px);right:-180px;top:-150px
-        }
-        .showcase h2{color:#fff}.showcase p{color:#94a3b8}
-        .dashboard-shell{
-            margin-top:52px;background:#eaf0f8;border:1px solid rgba(255,255,255,.08);
-            border-radius:22px;overflow:hidden;box-shadow:0 35px 90px rgba(0,0,0,.3)
-        }
-        .browserbar{height:46px;background:#dce5f0;display:flex;align-items:center;gap:6px;padding:0 15px}
-        .browserbar i{width:9px;height:9px;border-radius:50%;background:#94a3b8}
-        .browser-url{
-            margin-left:12px;width:240px;height:26px;border-radius:8px;background:#f8fafc;
-            display:flex;align-items:center;padding:0 10px;color:#94a3b8;font-size:.62rem
-        }
-        .dashboard{display:grid;grid-template-columns:205px 1fr;min-height:470px;background:#f8fafc}
-        .sidebar{background:#0f172a;color:#fff;padding:18px 14px}
-        .side-brand{display:flex;align-items:center;gap:8px;font-weight:800;font-size:.82rem;padding:4px 7px 18px}
-        .side-brand span{width:28px;height:28px;border-radius:8px;background:#2563eb;display:grid;place-items:center}
-        .side-brand svg{width:15px}
-        .side-nav{display:grid;gap:5px}.side-nav div{
-                                           padding:10px;border-radius:9px;color:#94a3b8;font-size:.69rem;font-weight:600;display:flex;align-items:center;gap:8px
-                                       }.side-nav svg{width:14px}.side-nav .active{background:#1e293b;color:#fff}
-        .dash-main{padding:24px}
-        .dash-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
-        .dash-top h3{font-size:1rem}.dash-top p{font-size:.65rem;margin-top:4px}
-        .user-chip{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);padding:6px 9px;border-radius:10px;font-size:.66rem;color:#475569}
-        .user-circle{width:26px;height:26px;border-radius:8px;background:#dbeafe;color:#1d4ed8;display:grid;place-items:center;font-weight:800}
-        .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-        .stat-card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:13px}
-        .stat-card span{font-size:.57rem;color:#64748b}.stat-card strong{display:block;font-size:1.1rem;color:#0f172a;margin-top:7px}
-        .meeting-list{margin-top:16px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:15px}
-        .meeting-list-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:11px}
-        .meeting-list-head strong{font-size:.73rem}.meeting-list-head span{font-size:.58rem;color:#2563eb}
-        .meeting-row{
-            display:grid;grid-template-columns:1.2fr .7fr .7fr auto;align-items:center;gap:10px;
-            padding:10px 0;border-top:1px solid #eef2f7;font-size:.62rem;color:#64748b
-        }
-        .meeting-row:first-of-type{border-top:0}.meeting-row b{color:#1e293b}
-        .status{padding:5px 7px;border-radius:999px;font-size:.52rem;font-weight:800;width:max-content}
-        .status.live{background:#dcfce7;color:#15803d}.status.upcoming{background:#dbeafe;color:#1d4ed8}
-        .join-btn{background:#2563eb;color:#fff;padding:6px 9px;border-radius:7px;font-weight:700}
-
-        /* How it works */
-        .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;margin-top:50px;position:relative}
-        .steps::before{content:"";position:absolute;top:31px;left:16%;right:16%;height:1px;background:#dbe4f0}
-        .step{position:relative;text-align:center}
-        .step-num{
-            width:64px;height:64px;border-radius:50%;margin:0 auto 22px;background:#fff;border:1px solid var(--line);
-            display:grid;place-items:center;color:#2563eb;font-family:Manrope,sans-serif;font-weight:800;box-shadow:0 8px 22px rgba(15,23,42,.06)
-        }
-        .step h3{font-size:1.18rem}.step p{max-width:275px;margin:9px auto 0;font-size:.9rem}
-
-        /* Why */
-        .why-wrap{
-            display:grid;grid-template-columns:.88fr 1.12fr;gap:58px;align-items:center;
-            padding:48px;border-radius:30px;background:#fff;border:1px solid var(--line)
-        }
-        .benefits{display:grid;gap:13px;margin-top:26px}
-        .benefit{display:flex;gap:12px;align-items:flex-start}
-        .check{
-            width:28px;height:28px;flex:0 0 28px;border-radius:9px;background:#dcfce7;color:#16a34a;display:grid;place-items:center
-        }.check svg{width:15px}
-        .benefit h3{font-size:.93rem}.benefit p{font-size:.82rem;margin-top:4px}
-        .mini-product{
-            background:#0f172a;border-radius:22px;padding:18px;box-shadow:var(--shadow);position:relative;overflow:hidden
-        }
-        .mini-product::before{content:"";position:absolute;width:180px;height:180px;background:#2563eb33;border-radius:50%;filter:blur(50px);right:-30px;top:-40px}
-        .mini-head{position:relative;display:flex;justify-content:space-between;align-items:center;color:#fff;font-size:.72rem;margin-bottom:15px}
-        .mini-grid{position:relative;display:grid;grid-template-columns:repeat(2,1fr);gap:9px}
-        .mini-tile{height:105px;border-radius:12px;background:linear-gradient(145deg,#26354d,#172033);display:grid;place-items:center;color:#dbeafe;font-weight:800}
-        .mini-toolbar{position:relative;display:flex;justify-content:center;gap:7px;margin-top:12px}
-        .mini-control{width:31px;height:31px;border-radius:9px;background:#1e293b;color:#cbd5e1;display:grid;place-items:center}.mini-control svg{width:13px}
-        .mini-control.red{background:#dc2626;color:#fff}
-
-        /* Experience */
-        .experience-grid{display:grid;grid-template-columns:1.12fr .88fr;gap:64px;align-items:center}
-        .experience-card{background:#111827;border-radius:24px;padding:16px;box-shadow:var(--shadow)}
-        .exp-top{display:flex;justify-content:space-between;color:#cbd5e1;font-size:.72rem;margin-bottom:13px}
-        .exp-layout{display:grid;grid-template-columns:1fr 160px;gap:10px}
-        .exp-videos{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}
-        .exp-video{height:125px;border-radius:13px;background:linear-gradient(145deg,#273449,#151e2c);position:relative;overflow:hidden}
-        .exp-video .avatar{width:50px;height:50px;font-size:.78rem}
-        .exp-chat{background:#f8fafc;border-radius:13px;padding:11px}
-        .exp-chat strong{font-size:.65rem}.msg{background:#fff;border:1px solid #e2e8f0;border-radius:9px;padding:8px;margin-top:8px;font-size:.54rem;color:#64748b;line-height:1.4}
-        .exp-controls{display:flex;justify-content:center;gap:7px;margin-top:11px}
-        .exp-ctrl{width:32px;height:32px;border-radius:9px;background:#1f2937;color:#cbd5e1;display:grid;place-items:center}.exp-ctrl svg{width:13px}
-        .exp-ctrl.red{background:#dc2626;color:#fff}
-        .experience-list{display:grid;gap:12px;margin-top:26px}
-        .experience-item{display:flex;align-items:center;gap:11px;color:#334155;font-weight:650;font-size:.9rem}
-        .experience-item span{width:34px;height:34px;border-radius:10px;background:#eff6ff;color:#2563eb;display:grid;place-items:center}.experience-item svg{width:16px}
-
-        /* CTA */
-        .cta{padding:90px 0}
-        .cta-box{
-            position:relative;overflow:hidden;text-align:center;
-            background:linear-gradient(135deg,#0b1220,#172554 70%,#1d4ed8);
-            border-radius:30px;padding:70px 30px;color:#fff
-        }
-        .cta-box::before,.cta-box::after{
-            content:"";position:absolute;border-radius:50%;background:rgba(255,255,255,.08);filter:blur(1px)
-        }
-        .cta-box::before{width:260px;height:260px;left:-100px;top:-120px}.cta-box::after{width:180px;height:180px;right:-50px;bottom:-80px}
-        .cta-box h2{color:#fff;position:relative}.cta-box p{color:#cbd5e1;max-width:590px;margin:18px auto 0;position:relative}
-        .cta-actions{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin-top:28px;position:relative}
-        .cta .btn-secondary{background:rgba(255,255,255,.08);color:#fff;border-color:rgba(255,255,255,.18)}
-        .cta .btn-secondary:hover{background:rgba(255,255,255,.13)}
-
-        /* Footer */
-        footer{background:#fff;border-top:1px solid var(--line);padding:52px 0 24px}
-        .footer-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:40px;align-items:start}
-        .footer-about p{max-width:390px;font-size:.86rem;margin-top:14px}
-        .footer-links{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
-        .footer-links a{padding:8px 10px;color:#64748b;font-size:.83rem;font-weight:650}
-        .footer-links a:hover{color:#2563eb}
-        .footer-bottom{margin-top:34px;padding-top:20px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:20px;color:#94a3b8;font-size:.76rem}
-
-        /* Reveal */
-        .reveal{opacity:0;transform:translateY(18px);transition:opacity .65s ease,transform .65s ease}
-        .reveal.visible{opacity:1;transform:none}
-
-        @media (prefers-reduced-motion:reduce){
+        /* Reveal animations */
+        .reveal,.reveal-up,.reveal-left,.reveal-right{opacity:0;transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease)}
+        .reveal-up{transform:translateY(30px)}
+        .reveal-left{transform:translateX(-30px)}
+        .reveal-right{transform:translateX(30px)}
+        .reveal{transform:translateY(16px)}
+        .reveal.in-view,.reveal-up.in-view,.reveal-left.in-view,.reveal-right.in-view{opacity:1;transform:translate(0,0)}
+        @media (prefers-reduced-motion: reduce){
             html{scroll-behavior:auto}
-            *,*::before,*::after{animation:none!important;transition:none!important}
-            .reveal{opacity:1;transform:none}
+            .reveal,.reveal-up,.reveal-left,.reveal-right{opacity:1!important;transform:none!important;transition:none!important}
+            .float,.hero-badge,.hero-title span,.hero-text,.hero-cta,.hero-mock{animation:none!important}
         }
 
-        @media(max-width:1024px){
-            .nav-links{display:none}.menu-btn{display:grid}
-            .nav-actions .nav-login,.nav-actions .btn{display:none}
-            .hero-grid{grid-template-columns:1fr;gap:54px}
-            .hero-copy{max-width:690px}
-            .hero-visual{max-width:820px}
-            .meeting-window{transform:none}
-            .features-grid{grid-template-columns:repeat(2,1fr)}
-            .why-wrap,.experience-grid{grid-template-columns:1fr}
-            .dashboard{grid-template-columns:170px 1fr}
-            .stat-grid{grid-template-columns:repeat(2,1fr)}
+        /* ============================================================
+           2. NAVBAR
+           ============================================================ */
+        .navbar{
+            position:fixed;top:0;left:0;right:0;z-index:100;
+            padding:20px 0;transition:background .3s var(--ease),box-shadow .3s var(--ease),border-color .3s var(--ease),padding .3s var(--ease);
+            border-bottom:1px solid transparent;
+            animation:navIn .7s var(--ease) both;
         }
+        @keyframes navIn{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:translateY(0)}}
+        .navbar.scrolled{
+            background:rgba(255,255,255,.86);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+            border-bottom-color:var(--border);box-shadow:0 6px 24px rgba(15,27,46,.05);padding:14px 0;
+        }
+        .nav-inner{display:flex;align-items:center;justify-content:space-between;gap:20px}
+        .brand{display:flex;align-items:center;gap:10px;font-family:'Manrope',sans-serif;font-weight:800;font-size:19px;color:var(--navy)}
+        .brand img{width:32px;height:32px;object-fit:contain}
+        .nav-links{display:flex;align-items:center;gap:36px}
+        .nav-links a{font-size:14.5px;font-weight:600;color:var(--muted);transition:color .2s}
+        .nav-links a:hover{color:var(--navy)}
+        .nav-actions{display:flex;align-items:center;gap:10px}
+        .hamburger{display:none;flex-direction:column;gap:5px;background:none;border:none;padding:6px}
+        .hamburger span{width:22px;height:2px;background:var(--navy);border-radius:2px;transition:transform .3s var(--ease),opacity .3s var(--ease)}
+        .hamburger.active span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+        .hamburger.active span:nth-child(2){opacity:0}
+        .hamburger.active span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+        .mobile-menu{
+            display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:99;
+            background:#fff;padding:96px 24px 40px;
+            transform:translateY(-100%);transition:transform .35s var(--ease);
+            overflow-y:auto;
+        }
+        .mobile-menu.open{transform:translateY(0)}
+        .mobile-menu a{display:block;padding:16px 4px;font-size:17px;font-weight:600;color:var(--navy);border-bottom:1px solid var(--border-soft)}
+        .mobile-menu .nav-actions{flex-direction:column;margin-top:24px;gap:12px}
+        .mobile-menu .btn{width:100%;justify-content:center}
 
-        @media(max-width:768px){
-            .container{width:min(calc(100% - 28px),var(--container))}
-            .section{padding:76px 0}
-            h1{font-size:clamp(2.75rem,13vw,4.25rem)}
-            h2{font-size:clamp(2rem,8vw,3rem)}
-            .hero{padding-top:120px;min-height:auto}
-            .hero-actions .btn{flex:1 1 180px}
-            .float-card{display:none}
-            .meeting-body{grid-template-columns:1fr}
-            .side-panel{display:none}
-            .features-grid{grid-template-columns:1fr}
-            .feature-card{min-height:0}
-            .dashboard{grid-template-columns:1fr}
-            .sidebar{display:none}
-            .dash-main{padding:15px}
-            .meeting-row{grid-template-columns:1fr auto}
-            .meeting-row > :nth-child(2),.meeting-row > :nth-child(3){display:none}
+        /* ============================================================
+           3. HERO
+           ============================================================ */
+        .hero{
+            position:relative;padding:168px 0 100px;
+            background:
+                radial-gradient(560px 320px at 88% -6%, #eaf1ff 0%, transparent 60%),
+                radial-gradient(500px 320px at 6% 10%, #f3f7ff 0%, transparent 55%),
+                var(--bg);
+            overflow:hidden;
+        }
+        .hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center}
+        .hero-badge{animation:fadeUp .7s var(--ease) both;animation-delay:.05s}
+        .hero-title{font-size:clamp(40px,5.6vw,64px);line-height:1.06;margin:22px 0 20px}
+        .hero-title span{display:block;animation:fadeUp .7s var(--ease) both}
+        .hero-title span:nth-child(1){animation-delay:.15s}
+        .hero-title span:nth-child(2){animation-delay:.27s}
+        .hero-title span:nth-child(3){animation-delay:.39s;color:var(--blue)}
+        .hero-text{font-size:17.5px;color:var(--muted);max-width:480px;animation:fadeUp .7s var(--ease) both;animation-delay:.5s}
+        .hero-cta{display:flex;flex-wrap:wrap;gap:14px;margin-top:30px;animation:fadeUp .7s var(--ease) both;animation-delay:.62s}
+        .hero-mini{display:flex;flex-wrap:wrap;gap:22px;margin-top:30px;animation:fadeUp .7s var(--ease) both;animation-delay:.74s}
+        .hero-mini div{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;color:var(--muted)}
+        .hero-mini svg{color:var(--blue);flex-shrink:0}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}
+
+        /* Meeting mockup */
+        .hero-mock-wrap{position:relative;animation:fadeUp .8s var(--ease) both;animation-delay:.4s}
+        .hero-blob{position:absolute;border-radius:50%;filter:blur(60px);z-index:0;opacity:.55}
+        .hero-blob.b1{width:280px;height:280px;background:#bcd6ff;top:-40px;right:-40px}
+        .hero-blob.b2{width:220px;height:220px;background:#dcecff;bottom:-30px;left:-30px}
+        .meeting-mock{
+            position:relative;z-index:1;background:#fff;border-radius:var(--radius-lg);
+            border:1px solid var(--border);box-shadow:var(--shadow-lg);overflow:hidden;
+            animation:floatY 6s ease-in-out infinite;
+        }
+        @keyframes floatY{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+        .mock-top{
+            display:flex;align-items:center;justify-content:space-between;padding:14px 18px;
+            border-bottom:1px solid var(--border-soft);background:#fbfcff;
+        }
+        .mock-top-left{display:flex;align-items:center;gap:10px;font-weight:700;font-size:13px;color:var(--navy)}
+        .mock-dot{width:8px;height:8px;border-radius:50%;background:#22c55e}
+        .mock-live{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#dc2626;background:#fee2e2;padding:4px 10px;border-radius:99px}
+        .mock-body{display:grid;grid-template-columns:1fr 168px}
+        .mock-tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px}
+        .mock-tile{
+            position:relative;aspect-ratio:4/3;border-radius:12px;background:linear-gradient(150deg,#eef3fc,#e3ecfb);
+            border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;
+        }
+        .mock-tile.active{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.14)}
+        .mock-avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff}
+        .mock-tile-name{position:absolute;left:8px;bottom:8px;font-size:10.5px;font-weight:700;color:#fff;background:rgba(15,27,46,.55);padding:3px 8px;border-radius:99px;display:flex;align-items:center;gap:5px}
+        .mock-side{border-left:1px solid var(--border-soft);display:flex;flex-direction:column}
+        .mock-tabs{display:flex;border-bottom:1px solid var(--border-soft)}
+        .mock-tab{flex:1;text-align:center;padding:10px 4px;font-size:11px;font-weight:700;color:var(--muted-soft);border-bottom:2px solid transparent;transition:.2s}
+        .mock-tab.active{color:var(--blue);border-color:var(--blue)}
+        .mock-panel{padding:10px;font-size:11px;flex:1}
+        .mock-chat-msg{margin-bottom:9px}
+        .mock-chat-msg b{display:block;font-size:10px;color:var(--navy);margin-bottom:2px}
+        .mock-chat-msg span{color:var(--muted);display:block;background:var(--bg-soft);padding:6px 8px;border-radius:8px 8px 8px 3px}
+        .mock-transcript p{color:var(--muted);font-size:10.5px;line-height:1.5;margin-bottom:8px;padding-left:8px;border-left:2px solid var(--border)}
+        .mock-controls{display:flex;align-items:center;justify-content:center;gap:10px;padding:12px;border-top:1px solid var(--border-soft);background:#fbfcff}
+        .mock-ctrl{width:34px;height:34px;border-radius:10px;background:#eef2f8;display:flex;align-items:center;justify-content:center;color:var(--navy)}
+        .mock-ctrl.leave{background:#fee2e2;color:#dc2626}
+
+        /* ============================================================
+           4. BENEFIT STRIP
+           ============================================================ */
+        .strip{border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--bg-soft)}
+        .strip-inner{display:flex;flex-wrap:wrap;justify-content:space-between;gap:20px;padding:26px 0}
+        .strip-item{display:flex;align-items:center;gap:10px;font-weight:700;font-size:14px;color:var(--navy)}
+        .strip-item svg{color:var(--blue);flex-shrink:0}
+
+        /* ============================================================
+           5. FEATURES (bento)
+           ============================================================ */
+        .features{padding:120px 0}
+        .bento{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
+        .feature-card{
+            grid-column:span 1;padding:28px;border-radius:var(--radius-md);border:1px solid var(--border);
+            background:#fff;transition:transform .3s var(--ease),box-shadow .3s var(--ease),border-color .3s var(--ease);
+        }
+        .feature-card:hover{transform:translateY(-6px);box-shadow:var(--shadow-md);border-color:#d7e2f3}
+        .feature-card.wide{grid-column:span 2}
+        .feature-icon{
+            width:46px;height:46px;border-radius:12px;background:var(--blue-soft);color:var(--blue);
+            display:flex;align-items:center;justify-content:center;margin-bottom:18px;
+        }
+        .feature-card h3{font-size:17px;margin-bottom:8px}
+        .feature-card p{color:var(--muted);font-size:14px}
+
+        /* ============================================================
+           6. PRODUCT SHOWCASE
+           ============================================================ */
+        .showcase{padding:0 0 120px}
+        .showcase-grid{display:grid;grid-template-columns:.85fr 1.15fr;gap:60px;align-items:center}
+        .showcase-text p{color:var(--muted);font-size:16px;margin:16px 0 26px}
+        .showcase-list{display:flex;flex-direction:column;gap:14px}
+        .showcase-list li{display:flex;align-items:center;gap:12px;font-size:14.5px;font-weight:600;color:var(--navy)}
+        .showcase-list svg{color:var(--blue);flex-shrink:0}
+
+        .dash-mock{background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);overflow:hidden;display:grid;grid-template-columns:180px 1fr}
+        .dash-side{background:var(--navy);color:#fff;padding:22px 16px}
+        .dash-brand{display:flex;align-items:center;gap:8px;font-weight:800;font-size:14px;margin-bottom:26px}
+        .dash-brand img{width:22px;height:22px}
+        .dash-nav a{display:flex;align-items:center;gap:10px;padding:10px 10px;border-radius:9px;font-size:12.5px;font-weight:600;color:#9fb0cc;margin-bottom:4px}
+        .dash-nav a.active{background:rgba(255,255,255,.08);color:#fff}
+        .dash-main{padding:24px}
+        .dash-main h4{font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+        .dash-main h3{font-size:19px;margin-bottom:18px}
+        .dash-row{display:flex;align-items:center;justify-content:space-between;padding:13px 14px;border:1px solid var(--border-soft);border-radius:12px;margin-bottom:10px}
+        .dash-row-left{display:flex;align-items:center;gap:12px}
+        .dash-avatar{width:32px;height:32px;border-radius:9px;background:var(--blue-soft);color:var(--blue);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px}
+        .dash-row-title{font-size:13.5px;font-weight:700;color:var(--navy)}
+        .dash-row-sub{font-size:11.5px;color:var(--muted-soft)}
+        .pill{font-size:10.5px;font-weight:700;padding:4px 10px;border-radius:99px}
+        .pill.upcoming{background:#eaf1ff;color:#2563eb}
+        .pill.active{background:#fff4e5;color:#d97706}
+        .pill.completed{background:#e9f9ef;color:#16a34a}
+
+        /* ============================================================
+           7. HOW IT WORKS
+           ============================================================ */
+        .how{padding:100px 0;background:var(--bg-soft);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+        .steps{position:relative;display:grid;grid-template-columns:repeat(3,1fr);gap:30px}
+        .steps::before{content:"";position:absolute;top:34px;left:12%;right:12%;height:1px;background:linear-gradient(90deg,transparent,var(--border) 15%,var(--border) 85%,transparent)}
+        .step{position:relative;z-index:1}
+        .step-num{
+            width:68px;height:68px;border-radius:18px;background:#fff;border:1px solid var(--border);
+            display:flex;align-items:center;justify-content:center;font-family:'Manrope',sans-serif;font-weight:800;
+            font-size:22px;color:var(--blue);margin-bottom:20px;box-shadow:var(--shadow-sm);
+        }
+        .step h3{font-size:18px;margin-bottom:8px}
+        .step p{color:var(--muted);font-size:14.5px}
+
+        /* ============================================================
+           8. WHY SMARTMEET
+           ============================================================ */
+        .why{padding:120px 0}
+        .why-grid{display:grid;grid-template-columns:.9fr 1.1fr;gap:60px;align-items:start}
+        .why-grid h2{font-size:clamp(28px,3.4vw,40px);line-height:1.18;margin-bottom:16px}
+        .why-grid > div:first-child p{color:var(--muted);font-size:16px;max-width:420px}
+        .why-list{display:flex;flex-direction:column;gap:16px}
+        .why-row{display:flex;gap:16px;padding:22px;border:1px solid var(--border);border-radius:var(--radius-md);transition:box-shadow .3s var(--ease),transform .3s var(--ease),border-color .3s}
+        .why-row:hover{box-shadow:var(--shadow-md);transform:translateY(-4px);border-color:#d7e2f3}
+        .why-row .feature-icon{margin-bottom:0;flex-shrink:0}
+        .why-row h4{font-size:15.5px;margin-bottom:4px}
+        .why-row p{font-size:13.5px;color:var(--muted)}
+
+        /* ============================================================
+           9. EXPERIENCE
+           ============================================================ */
+        .experience{padding:120px 0;background:linear-gradient(170deg,var(--navy),var(--navy-2));color:#fff}
+        .experience .section-head h2{color:#fff}
+        .experience .section-head p{color:#93a3bf}
+        .experience .eyebrow{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.16);color:#bcd0ff}
+        .exp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+        .exp-panel{background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.09);border-radius:var(--radius-md);padding:20px;backdrop-filter:blur(6px)}
+        .exp-panel h4{color:#fff;font-size:13.5px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+        .exp-panel h4 svg{color:#7ba7ff}
+        .exp-line{display:flex;gap:10px;margin-bottom:11px;font-size:12px}
+        .exp-line time{color:#7486a3;flex-shrink:0;font-variant-numeric:tabular-nums}
+        .exp-line span{color:#cbd7ec}
+        .exp-bubble{background:rgba(255,255,255,.07);padding:8px 11px;border-radius:9px 9px 9px 3px;font-size:12px;color:#dbe5f5;margin-bottom:9px;max-width:88%}
+        .exp-bubble b{display:block;color:#8fb2ff;font-size:10.5px;margin-bottom:2px}
+        .exp-person{display:flex;align-items:center;gap:10px;margin-bottom:13px}
+        .exp-person .mock-avatar{width:32px;height:32px;font-size:11px}
+        .exp-person div span{display:block;font-size:12.5px;font-weight:600;color:#fff}
+        .exp-person div small{color:#7486a3;font-size:10.5px}
+        .exp-status{width:7px;height:7px;border-radius:50%;background:#22c55e;margin-left:auto}
+
+        /* ============================================================
+           10. FINAL CTA
+           ============================================================ */
+        .final-cta{position:relative;padding:110px 0;text-align:center;overflow:hidden}
+        .final-cta::before{content:"";position:absolute;inset:0;background:radial-gradient(600px 300px at 50% 0%,#eaf1ff,transparent 70%);z-index:0}
+        .final-cta-inner{position:relative;z-index:1;max-width:620px;margin:0 auto}
+        .final-cta h2{font-size:clamp(30px,4vw,44px);margin-bottom:14px}
+        .final-cta p{color:var(--muted);font-size:16.5px;margin-bottom:34px}
+        .final-cta .hero-cta{justify-content:center}
+
+        /* ============================================================
+           11. FOOTER
+           ============================================================ */
+        footer{border-top:1px solid var(--border);padding:56px 0 28px}
+        .footer-grid{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:40px;padding-bottom:36px}
+        .footer-brand .brand{margin-bottom:10px}
+        .footer-brand p{color:var(--muted);font-size:14px;max-width:280px}
+        .footer-col h5{font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--navy);margin-bottom:14px}
+        .footer-col a{display:block;color:var(--muted);font-size:14px;margin-bottom:10px;transition:color .2s}
+        .footer-col a:hover{color:var(--blue)}
+        .footer-bottom{border-top:1px solid var(--border);padding-top:22px;font-size:13px;color:var(--muted-soft);text-align:center}
+
+        /* ============================================================
+           12. RESPONSIVE
+           ============================================================ */
+        @media (max-width:1024px){
+            .hero-grid{grid-template-columns:1fr;gap:48px}
+            .hero-mock-wrap{max-width:520px;margin:0 auto}
+            .bento{grid-template-columns:repeat(2,1fr)}
+            .feature-card.wide{grid-column:span 2}
+            .showcase-grid{grid-template-columns:1fr;gap:40px}
+            .dash-mock{max-width:560px;margin:0 auto}
+            .why-grid{grid-template-columns:1fr;gap:36px}
+            .exp-grid{grid-template-columns:1fr;gap:16px}
+            .footer-grid{grid-template-columns:1fr 1fr}
+            .footer-brand{grid-column:span 2}
+        }
+        @media (max-width:900px){
+            .nav-links{display:none}
+            .nav-actions{display:none}
+            .hamburger{display:flex}
+            .mobile-menu{display:block}
+        }
+        @media (max-width:768px){
+            .hero{padding:130px 0 70px}
+            .features,.showcase,.why,.experience{padding:76px 0}
+            .how{padding:70px 0}
+            .final-cta{padding:80px 0}
             .steps{grid-template-columns:1fr;gap:34px}
             .steps::before{display:none}
-            .why-wrap{padding:28px 20px}
-            .exp-layout{grid-template-columns:1fr}
-            .exp-chat{display:none}
-            .footer-grid{grid-template-columns:1fr}
-            .footer-links{justify-content:flex-start}
-            .footer-bottom{flex-direction:column}
+            .bento{grid-template-columns:1fr}
+            .feature-card.wide{grid-column:span 1}
+            .strip-inner{justify-content:flex-start;gap:22px 34px}
         }
-
-        @media(max-width:480px){
-            .navbar{padding:12px 0}
-            .brand-mark{width:34px;height:34px}.brand{font-size:1rem}
-            .hero{padding-top:105px}
-            .hero-badge{font-size:.72rem}
-            .hero-copy{font-size:1rem}
-            .hero-points{gap:9px;font-size:.75rem}
-            .video-area{gap:7px;padding:9px}
-            .video-tile{min-height:116px}
-            .avatar{width:54px;height:54px;font-size:.85rem}
-            .meeting-controls{gap:6px}
-            .control{width:32px;height:32px}
-            .stat-grid{grid-template-columns:1fr 1fr}
-            .cta-box{padding:54px 18px}
+        @media (max-width:430px){
+            .container{padding:0 18px}
+            .hero-cta{flex-direction:column;align-items:stretch}
+            .hero-cta .btn{width:100%;justify-content:center}
+            .mock-body{grid-template-columns:1fr}
+            .mock-side{display:none}
+            .mock-tiles{grid-template-columns:1fr 1fr}
+            .dash-mock{grid-template-columns:1fr}
+            .dash-side{display:none}
+            .footer-grid{grid-template-columns:1fr}
+            .footer-brand{grid-column:span 1}
+            .section-head{margin-bottom:36px}
+        }
+        @media (max-width:360px){
+            .hero-title{font-size:34px}
+            .btn{padding:13px 20px;font-size:14px}
+            .mock-tiles{padding:10px;gap:8px}
         }
     </style>
 </head>
 <body>
-@php
-    $loginUrl = \Illuminate\Support\Facades\Route::has('login') ? route('login') : url('/login');
-    $registerUrl = \Illuminate\Support\Facades\Route::has('register') ? route('register') : url('/register');
-    $dashboardUrl = \Illuminate\Support\Facades\Route::has('dashboard') ? route('dashboard') : url('/dashboard');
-@endphp
 
-<nav class="navbar" id="navbar">
+{{-- ================= NAVBAR ================= --}}
+<header class="navbar" id="navbar">
     <div class="container nav-inner">
-        <a href="#home" class="brand" aria-label="SmartMeet home">
-            <span class="brand-mark">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M15 10l4.55-2.28A1 1 0 0 1 21 8.62v6.76a1 1 0 0 1-1.45.9L15 14"/>
-                    <rect x="3" y="6" width="12" height="12" rx="3"/>
-                </svg>
-            </span>
+        <a href="/" class="brand">
+            <img src="{{ asset('images/s-logo.png') }}" alt="SmartMeet">
             SmartMeet
         </a>
 
-        <div class="nav-links">
-            <a href="#home">Home</a>
+        <nav class="nav-links">
             <a href="#features">Features</a>
             <a href="#how-it-works">How It Works</a>
-            <a href="#why-smartmeet">Why SmartMeet</a>
-        </div>
+            <a href="#experience">Experience</a>
+        </nav>
 
         <div class="nav-actions">
             @auth
-                <a class="nav-login" href="{{ $dashboardUrl }}">Dashboard</a>
-                <a class="btn btn-primary" href="{{ $dashboardUrl }}">Open SmartMeet</a>
-            @else
-                <a class="nav-login" href="{{ $loginUrl }}">Login</a>
-                <a class="btn btn-primary" href="{{ $registerUrl }}">Get Started</a>
-            @endauth
-
-            <button class="menu-btn" id="menuBtn" aria-label="Open navigation menu" aria-expanded="false">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M4 7h16M4 12h16M4 17h16"/>
-                </svg>
-            </button>
-        </div>
-
-        <div class="mobile-menu" id="mobileMenu">
-            <a href="#home">Home</a>
-            <a href="#features">Features</a>
-            <a href="#how-it-works">How It Works</a>
-            <a href="#why-smartmeet">Why SmartMeet</a>
-            @auth
-                <a class="mobile-cta" href="{{ $dashboardUrl }}">Open Dashboard</a>
-            @else
-                <a href="{{ $loginUrl }}">Login</a>
-                <a class="mobile-cta" href="{{ $registerUrl }}">Get Started</a>
-            @endauth
-        </div>
-    </div>
-</nav>
-
-<main>
-    <section class="hero" id="home">
-        <div class="container hero-grid">
-            <div class="hero-content">
-                <div class="hero-badge">
-                    <span class="dot"></span>
-                    Smarter online meetings
-                </div>
-
-                <h1 class="hero-title">
-                    Meet. Connect.<br>
-                    <span class="accent">Collaborate.</span>
-                </h1>
-
-                <p class="hero-copy">
-                    SmartMeet brings video meetings, real-time chat, scheduling and live transcription together in one simple workspace.
-                </p>
-
-                <div class="hero-actions">
-                    @auth
-                        <a class="btn btn-primary" href="{{ $dashboardUrl }}">
-                            Open Dashboard
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M5 12h14M13 6l6 6-6 6"/>
-                            </svg>
-                        </a>
-                    @else
-                        <a class="btn btn-primary" href="{{ $registerUrl }}">
-                            Get Started
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M5 12h14M13 6l6 6-6 6"/>
-                            </svg>
-                        </a>
-                    @endauth
-
-                    <a class="btn btn-secondary" href="#features">
-                        Explore Features
-                    </a>
-                </div>
-
-                <div class="hero-points">
-                    <span>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 4 4L19 6"/></svg>
-                        Browser Based
-                    </span>
-                    <span>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 4 4L19 6"/></svg>
-                        Simple Scheduling
-                    </span>
-                    <span>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 4 4L19 6"/></svg>
-                        Real-Time Collaboration
-                    </span>
-                </div>
-            </div>
-
-            <div class="hero-visual">
-                <div class="mock-glow"></div>
-
-                <div class="float-card float-one">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M4 4h16v12H7l-3 3V4Z"/>
-                        <path d="M8 8h8M8 11h5"/>
-                    </svg>
-                    Live Transcript
-                </div>
-
-                <div class="float-card float-two">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
-                        <circle cx="9" cy="7" r="4"/>
-                        <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
-                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                    </svg>
-                    8 Participants
-                </div>
-
-                <div class="meeting-window">
-                    <div class="window-top">
-                        <div class="window-dots"><i></i><i></i><i></i></div>
-                        <div class="window-title">Weekly Product Sync</div>
-                        <div class="live-pill"><span>●</span> LIVE</div>
-                    </div>
-
-                    <div class="meeting-body">
-                        <div class="video-area">
-                            <div class="video-tile avatar-bg-1">
-                                <div class="avatar">AM</div>
-                                <div class="tile-foot">
-                                    <span class="tile-name">Areeb Malik</span>
-                                    <span class="mic-mini">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5"/></svg>
-                                    </span>
-                                </div>
-                            </div>
-
-                            <div class="video-tile avatar-bg-2">
-                                <div class="avatar">SK</div>
-                                <div class="tile-foot">
-                                    <span class="tile-name">Sara Khan</span>
-                                    <span class="mic-mini">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5"/></svg>
-                                    </span>
-                                </div>
-                            </div>
-
-                            <div class="video-tile avatar-bg-3">
-                                <div class="avatar">HA</div>
-                                <div class="tile-foot">
-                                    <span class="tile-name">Hassan Ali</span>
-                                    <span class="mic-mini">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m2 2 20 20"/><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 11.9 5"/></svg>
-                                    </span>
-                                </div>
-                            </div>
-
-                            <div class="video-tile avatar-bg-4">
-                                <div class="avatar">ZA</div>
-                                <div class="tile-foot">
-                                    <span class="tile-name">Zoya Ahmed</span>
-                                    <span class="mic-mini">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5"/></svg>
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <aside class="side-panel">
-                            <div class="side-head">
-                                <strong>Live Transcript</strong>
-                                <span>English</span>
-                            </div>
-
-                            <div class="transcript-line">
-                                <div class="mini-avatar">AM</div>
-                                <div>
-                                    <b>Areeb Malik</b>
-                                    <p>Let's review the next milestone and make sure everyone is aligned.</p>
-                                </div>
-                            </div>
-                            <div class="transcript-line">
-                                <div class="mini-avatar">SK</div>
-                                <div>
-                                    <b>Sara Khan</b>
-                                    <p>The design handoff is ready and we can begin implementation today.</p>
-                                </div>
-                            </div>
-                            <div class="transcript-line">
-                                <div class="mini-avatar">HA</div>
-                                <div>
-                                    <b>Hassan Ali</b>
-                                    <p>Perfect. I'll share the updated schedule after this meeting.</p>
-                                </div>
-                            </div>
-                        </aside>
-                    </div>
-
-                    <div class="meeting-controls">
-                        <span class="control">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5"/></svg>
-                        </span>
-                        <span class="control">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 10l4.55-2.28A1 1 0 0 1 21 8.62v6.76a1 1 0 0 1-1.45.9L15 14"/><rect x="3" y="6" width="12" height="12" rx="3"/></svg>
-                        </span>
-                        <span class="control">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z"/></svg>
-                        </span>
-                        <span class="control">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M21 8v6M18 11h6"/></svg>
-                        </span>
-                        <span class="control leave">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.78.62 2.63a2 2 0 0 1-.45 2.11L8 9.73a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.85.29 1.73.5 2.63.62A2 2 0 0 1 22 16.92Z"/></svg>
-                        </span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <div class="trustbar">
-        <div class="container trust-inner">
-            <div class="trust-item">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>
-                Smart Scheduling
-            </div>
-            <div class="trust-item">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 10l4.55-2.28A1 1 0 0 1 21 8.62v6.76a1 1 0 0 1-1.45.9L15 14"/><rect x="3" y="6" width="12" height="12" rx="3"/></svg>
-                Video & Audio Meetings
-            </div>
-            <div class="trust-item">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z"/></svg>
-                Real-Time Chat
-            </div>
-            <div class="trust-item">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16M4 10h16M4 15h10M4 20h7"/></svg>
-                Live Transcription
-            </div>
-        </div>
-    </div>
-
-    <section class="section" id="features">
-        <div class="container">
-            <div class="center reveal">
-                <div class="section-label">SmartMeet Features</div>
-                <h2>Everything you need for better meetings</h2>
-                <p class="section-copy">A focused workspace that keeps online meetings simple, organized and easy to manage from start to finish.</p>
-            </div>
-
-            <div class="features-grid">
                 @php
-                    $features = [
-                        ['Video Meetings','Connect face-to-face directly from your browser.','video'],
-                        ['Audio Meetings','Join conversations even when you do not need your camera.','mic'],
-                        ['Live Transcription','Follow conversations with real-time meeting transcription.','text'],
-                        ['Real-Time Chat','Keep the conversation moving alongside your meeting.','chat'],
-                        ['Smart Scheduling','Plan and organize upcoming meetings with ease.','calendar'],
-                        ['Easy Invitations','Invite participants through simple meeting links.','link'],
-                        ['Participant Management','See and manage people joining your meeting.','users'],
-                        ['Meeting Dashboard','Keep upcoming, active and completed meetings organized.','grid'],
-                    ];
+                    $role = auth()->user()->role;
+                    $dashboardUrl = match ($role) {
+                        'organizer' => '/organizer/dashboard',
+                        'participant' => '/participant/dashboard',
+                        'admin' => '/admin/dashboard',
+                        default => '/',
+                    };
                 @endphp
+                <a href="{{ $dashboardUrl }}" class="btn btn-primary">Go to Dashboard</a>
+            @else
+                <a href="{{ route('login') }}" class="btn btn-ghost">Log In</a>
+                <a href="{{ route('register') }}" class="btn btn-primary">Get Started</a>
+            @endauth
+        </div>
 
-                @foreach($features as $feature)
-                    <article class="feature-card reveal">
-                        <div class="icon-box">
-                            @switch($feature[2])
-                                @case('video')
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 10l4.55-2.28A1 1 0 0 1 21 8.62v6.76a1 1 0 0 1-1.45.9L15 14"/><rect x="3" y="6" width="12" height="12" rx="3"/></svg>
-                                    @break
-                                @case('mic')
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5"/></svg>
-                                    @break
-                                @case('text')
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16M4 10h16M4 15h10M4 20h7"/></svg>
-                                    @break
-                                @case('chat')
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z"/></svg>
-                                    @break
-                                @case('calendar')
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>
-                                    @break
-                                @case('link')
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-                                    @break
-                                @case('users')
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                                    @break
-                                @default
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-                            @endswitch
-                        </div>
-                        <h3>{{ $feature[0] }}</h3>
-                        <p>{{ $feature[1] }}</p>
-                    </article>
-                @endforeach
+        <button class="hamburger" id="hamburger" aria-label="Toggle menu">
+            <span></span><span></span><span></span>
+        </button>
+    </div>
+</header>
+
+<div class="mobile-menu" id="mobileMenu">
+    <a href="#features">Features</a>
+    <a href="#how-it-works">How It Works</a>
+    <a href="#experience">Experience</a>
+    <div class="nav-actions">
+        @auth
+            <a href="{{ $dashboardUrl }}" class="btn btn-primary btn-block">Go to Dashboard</a>
+        @else
+            <a href="{{ route('login') }}" class="btn btn-secondary btn-block">Log In</a>
+            <a href="{{ route('register') }}" class="btn btn-primary btn-block">Get Started</a>
+        @endauth
+    </div>
+</div>
+
+{{-- ================= HERO ================= --}}
+<section class="hero">
+    <div class="container hero-grid">
+        <div>
+            <span class="eyebrow hero-badge">Smarter online collaboration</span>
+            <h1 class="hero-title">
+                <span>Meet.</span>
+                <span>Connect.</span>
+                <span>Collaborate.</span>
+            </h1>
+            <p class="hero-text">SmartMeet brings video meetings, real-time chat, scheduling and live transcription together in one simple workspace.</p>
+
+            <div class="hero-cta">
+                @auth
+                    <a href="{{ $dashboardUrl }}" class="btn btn-primary">Go to Dashboard
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                    </a>
+                @else
+                    <a href="{{ route('register') }}" class="btn btn-primary">Get Started Free
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                    </a>
+                @endauth
+                <a href="#features" class="btn btn-secondary">Explore Features</a>
+            </div>
+
+            <div class="hero-mini">
+                <div><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg> Browser Based</div>
+                <div><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg> Simple Setup</div>
+                <div><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg> Real-Time Collaboration</div>
             </div>
         </div>
-    </section>
 
-    <section class="section showcase">
-        <div class="container">
-            <div class="center reveal">
-                <div class="section-label" style="color:#60a5fa">Product Experience</div>
-                <h2>One place for all your meetings</h2>
-                <p class="section-copy">Stay organized, see what is happening now and keep your next meeting only a click away.</p>
-            </div>
+        <div class="hero-mock-wrap">
+            <div class="hero-blob b1"></div>
+            <div class="hero-blob b2"></div>
 
-            <div class="dashboard-shell reveal">
-                <div class="browserbar">
-                    <i></i><i></i><i></i>
-                    <div class="browser-url">smartmeet.app/dashboard</div>
+            <div class="meeting-mock">
+                <div class="mock-top">
+                    <div class="mock-top-left"><span class="mock-dot"></span> SmartMeet — Weekly Sync</div>
+                    <span class="mock-live">● LIVE</span>
                 </div>
-
-                <div class="dashboard">
-                    <aside class="sidebar">
-                        <div class="side-brand">
-                            <span>
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 10l4.55-2.28A1 1 0 0 1 21 8.62v6.76a1 1 0 0 1-1.45.9L15 14"/><rect x="3" y="6" width="12" height="12" rx="3"/></svg>
-                            </span>
-                            SmartMeet
+                <div class="mock-body">
+                    <div class="mock-tiles">
+                        <div class="mock-tile active">
+                            <div class="mock-avatar" style="background:linear-gradient(135deg,#2563eb,#38bdf8)">A</div>
+                            <span class="mock-tile-name"><svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Z"/></svg> Alex</span>
                         </div>
+                        <div class="mock-tile">
+                            <div class="mock-avatar" style="background:linear-gradient(135deg,#8b5cf6,#ec4899)">S</div>
+                            <span class="mock-tile-name">Sarah</span>
+                        </div>
+                        <div class="mock-tile">
+                            <div class="mock-avatar" style="background:linear-gradient(135deg,#22c55e,#06b6d4)">D</div>
+                            <span class="mock-tile-name">David</span>
+                        </div>
+                        <div class="mock-tile">
+                            <div class="mock-avatar" style="background:linear-gradient(135deg,#f59e0b,#ef4444)">E</div>
+                            <span class="mock-tile-name">Emma</span>
+                        </div>
+                    </div>
+                    <div class="mock-side">
+                        <div class="mock-tabs">
+                            <div class="mock-tab active" data-tab="chat">Chat</div>
+                            <div class="mock-tab" data-tab="transcript">Transcript</div>
+                        </div>
+                        <div class="mock-panel" data-panel="chat">
+                            <div class="mock-chat-msg"><b>Sarah</b><span>Sounds good to me!</span></div>
+                            <div class="mock-chat-msg"><b>David</b><span>Sharing the doc now.</span></div>
+                            <div class="mock-chat-msg"><b>Emma</b><span>Great, thanks 👍</span></div>
+                        </div>
+                        <div class="mock-panel" data-panel="transcript" style="display:none">
+                            <p>"Let's review the project milestones for this week..."</p>
+                            <p>"Next, David will walk us through the timeline."</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="mock-controls">
+                    <div class="mock-ctrl"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0M12 19v3"/></svg></div>
+                    <div class="mock-ctrl"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m23 7-7 5 7 5V7Z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></div>
+                    <div class="mock-ctrl"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+                    <div class="mock-ctrl"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+                    <div class="mock-ctrl leave"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m10.68 13.31 8.32-2.68M3 21l2.5-6.5c.3-.8 1.1-1.3 1.9-1.3h9.2c.8 0 1.6.5 1.9 1.3L21 21l-9-4-9 4Z"/></svg></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
 
-                        <div class="side-nav">
-                            <div class="active">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-                                Dashboard
-                            </div>
+{{-- ================= BENEFIT STRIP ================= --}}
+<div class="strip">
+    <div class="container strip-inner">
+        <div class="strip-item"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m23 7-7 5 7 5V7Z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg> Video &amp; Audio</div>
+        <div class="strip-item"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v12H7l-3 3V4Z"/><path d="M8 9h8M8 12h5"/></svg> Live Transcription</div>
+        <div class="strip-item"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/></svg> Real-Time Chat</div>
+        <div class="strip-item"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg> Smart Scheduling</div>
+    </div>
+</div>
+
+{{-- ================= FEATURES ================= --}}
+<section id="features" class="features">
+    <div class="container">
+        <div class="section-head reveal-up">
+            <span class="eyebrow">Everything you need</span>
+            <h2>One workspace for better meetings.</h2>
+            <p>Keep your meetings, conversations and collaboration organized without unnecessary complexity.</p>
+        </div>
+
+        <div class="bento">
+            <div class="feature-card wide reveal-up">
+                <div class="feature-icon"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m23 7-7 5 7 5V7Z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></div>
+                <h3>Video Meetings</h3>
+                <p>High-quality browser-based video meeting experience with no downloads required.</p>
+            </div>
+            <div class="feature-card reveal-up">
+                <div class="feature-icon"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0M12 19v3"/></svg></div>
+                <h3>Audio Meetings</h3>
+                <p>Join and collaborate even when video isn't needed.</p>
+            </div>
+            <div class="feature-card reveal-up">
+                <div class="feature-icon"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v12H7l-3 3V4Z"/><path d="M8 9h8M8 12h5"/></svg></div>
+                <h3>Live Transcription</h3>
+                <p>Follow the conversation with live meeting transcription.</p>
+            </div>
+            <div class="feature-card reveal-up">
+                <div class="feature-icon"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/></svg></div>
+                <h3>Real-Time Chat</h3>
+                <p>Share messages with participants during meetings.</p>
+            </div>
+            <div class="feature-card wide reveal-up">
+                <div class="feature-icon"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div>
+                <h3>Smart Scheduling</h3>
+                <p>Plan meetings and keep upcoming sessions organized in one calendar-friendly view.</p>
+            </div>
+            <div class="feature-card reveal-up">
+                <div class="feature-icon"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div>
+                <h3>Easy Invitations</h3>
+                <p>Invite participants using simple meeting links.</p>
+            </div>
+            <div class="feature-card reveal-up">
+                <div class="feature-icon"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+                <h3>Participant Management</h3>
+                <p>See and manage people participating in your meetings.</p>
+            </div>
+            <div class="feature-card reveal-up">
+                <div class="feature-icon"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg></div>
+                <h3>Meeting Dashboard</h3>
+                <p>Keep upcoming, active and completed meetings organized.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+{{-- ================= PRODUCT SHOWCASE ================= --}}
+<section class="showcase">
+    <div class="container showcase-grid">
+        <div class="showcase-text reveal-left">
+            <span class="eyebrow">Stay organized</span>
+            <h2 style="font-size:clamp(28px,3.4vw,40px);line-height:1.18;margin:16px 0">Your meetings. One clear dashboard.</h2>
+            <p>Quickly see your upcoming meetings, what's live right now, meeting status, participants and your full schedule — all from a single organized view.</p>
+            <ul class="showcase-list">
+                <li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg> Upcoming meetings at a glance</li>
+                <li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg> Live status, updated automatically</li>
+                <li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg> Full participant &amp; schedule visibility</li>
+            </ul>
+        </div>
+
+        <div class="reveal-right">
+            <div class="dash-mock">
+                <div class="dash-side">
+                    <div class="dash-brand"><img src="{{ asset('images/s-logo.png') }}" alt=""> SmartMeet</div>
+                    <nav class="dash-nav">
+                        <a class="active"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg> Dashboard</a>
+                        <a><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m23 7-7 5 7 5V7Z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg> My Meetings</a>
+                        <a><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg> Schedule</a>
+                        <a><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> Notifications</a>
+                    </nav>
+                </div>
+                <div class="dash-main">
+                    <h4>Welcome back</h4>
+                    <h3>Upcoming Meetings</h3>
+
+                    <div class="dash-row">
+                        <div class="dash-row-left">
+                            <div class="dash-avatar">PR</div>
                             <div>
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>
-                                My Meetings
+                                <div class="dash-row-title">Project Review</div>
+                                <div class="dash-row-sub">Today · 3:00 PM</div>
                             </div>
+                        </div>
+                        <span class="pill upcoming">Upcoming</span>
+                    </div>
+
+                    <div class="dash-row">
+                        <div class="dash-row-left">
+                            <div class="dash-avatar" style="background:#fff4e5;color:#d97706">TS</div>
                             <div>
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-                                Today
+                                <div class="dash-row-title">Team Sync</div>
+                                <div class="dash-row-sub">Live now · 41 participants</div>
                             </div>
+                        </div>
+                        <span class="pill active">Active</span>
+                    </div>
+
+                    <div class="dash-row">
+                        <div class="dash-row-left">
+                            <div class="dash-avatar" style="background:#e9f9ef;color:#16a34a">WP</div>
                             <div>
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-                                Schedule Meeting
+                                <div class="dash-row-title">Weekly Planning</div>
+                                <div class="dash-row-sub">Yesterday · 10:00 AM</div>
                             </div>
                         </div>
-                    </aside>
-
-                    <div class="dash-main">
-                        <div class="dash-top">
-                            <div>
-                                <h3>Good morning, Areeb 👋</h3>
-                                <p>Here is what is happening with your meetings today.</p>
-                            </div>
-                            <div class="user-chip">
-                                <span class="user-circle">AM</span>
-                                Areeb Malik
-                            </div>
-                        </div>
-
-                        <div class="stat-grid">
-                            <div class="stat-card"><span>Total Meetings</span><strong>24</strong></div>
-                            <div class="stat-card"><span>Today</span><strong>4</strong></div>
-                            <div class="stat-card"><span>Live</span><strong style="color:#16a34a">1</strong></div>
-                            <div class="stat-card"><span>Upcoming</span><strong>7</strong></div>
-                        </div>
-
-                        <div class="meeting-list">
-                            <div class="meeting-list-head">
-                                <strong>Upcoming Meetings</strong>
-                                <span>View all</span>
-                            </div>
-                            <div class="meeting-row">
-                                <b>Weekly Product Sync</b>
-                                <span>Today · 3:00 PM</span>
-                                <span class="status live">LIVE NOW</span>
-                                <span class="join-btn">Join</span>
-                            </div>
-                            <div class="meeting-row">
-                                <b>Client Project Review</b>
-                                <span>Today · 5:30 PM</span>
-                                <span class="status upcoming">UPCOMING</span>
-                                <span class="join-btn">Details</span>
-                            </div>
-                            <div class="meeting-row">
-                                <b>Design Planning</b>
-                                <span>Tomorrow · 11:00 AM</span>
-                                <span class="status upcoming">UPCOMING</span>
-                                <span class="join-btn">Details</span>
-                            </div>
-                            <div class="meeting-row">
-                                <b>Development Standup</b>
-                                <span>Tomorrow · 2:00 PM</span>
-                                <span class="status upcoming">UPCOMING</span>
-                                <span class="join-btn">Details</span>
-                            </div>
-                        </div>
+                        <span class="pill completed">Completed</span>
                     </div>
                 </div>
             </div>
         </div>
-    </section>
+    </div>
+</section>
 
-    <section class="section" id="how-it-works">
-        <div class="container">
-            <div class="center reveal">
-                <div class="section-label">How It Works</div>
-                <h2>Start meeting in three simple steps</h2>
-                <p class="section-copy">No complicated setup. Create your meeting, share the invitation and start collaborating.</p>
+{{-- ================= HOW IT WORKS ================= --}}
+<section id="how-it-works" class="how">
+    <div class="container">
+        <div class="section-head centered reveal-up" style="margin-left:auto;margin-right:auto">
+            <span class="eyebrow">Simple from the start</span>
+            <h2>From schedule to conversation in three steps.</h2>
+        </div>
+
+        <div class="steps">
+            <div class="step reveal-up">
+                <div class="step-num">01</div>
+                <h3>Schedule</h3>
+                <p>Choose the meeting date and time that works for everyone.</p>
             </div>
-
-            <div class="steps">
-                <div class="step reveal">
-                    <div class="step-num">01</div>
-                    <h3>Schedule</h3>
-                    <p>Create your meeting and choose the date and time.</p>
-                </div>
-                <div class="step reveal">
-                    <div class="step-num">02</div>
-                    <h3>Invite</h3>
-                    <p>Share the meeting invitation with your participants.</p>
-                </div>
-                <div class="step reveal">
-                    <div class="step-num">03</div>
-                    <h3>Meet</h3>
-                    <p>Join from your browser and start collaborating.</p>
-                </div>
+            <div class="step reveal-up" style="transition-delay:.12s">
+                <div class="step-num">02</div>
+                <h3>Invite</h3>
+                <p>Share the meeting link with participants in a click.</p>
+            </div>
+            <div class="step reveal-up" style="transition-delay:.24s">
+                <div class="step-num">03</div>
+                <h3>Meet</h3>
+                <p>Start your meeting and collaborate in real time.</p>
             </div>
         </div>
-    </section>
+    </div>
+</section>
 
-    <section class="section" id="why-smartmeet">
-        <div class="container">
-            <div class="why-wrap reveal">
-                <div>
-                    <div class="section-label">Why SmartMeet</div>
-                    <h2>Meetings without the complexity</h2>
-                    <p class="section-copy">SmartMeet keeps the essentials together so you can focus on the conversation instead of the setup.</p>
+{{-- ================= WHY SMARTMEET ================= --}}
+<section class="why">
+    <div class="container why-grid">
+        <div class="reveal-left">
+            <h2>Meetings shouldn't feel complicated.</h2>
+            <p>SmartMeet keeps the essential collaboration tools you actually need in one focused, uncluttered experience — nothing more, nothing less.</p>
+        </div>
 
-                    <div class="benefits">
-                        <div class="benefit">
-                            <span class="check">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="m5 12 4 4L19 6"/></svg>
-                            </span>
-                            <div><h3>Browser Based</h3><p>Join meetings directly through the web.</p></div>
-                        </div>
-                        <div class="benefit">
-                            <span class="check">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="m5 12 4 4L19 6"/></svg>
-                            </span>
-                            <div><h3>Simple Experience</h3><p>A clean interface designed to make meetings easy.</p></div>
-                        </div>
-                        <div class="benefit">
-                            <span class="check">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="m5 12 4 4L19 6"/></svg>
-                            </span>
-                            <div><h3>Real-Time Collaboration</h3><p>Video, audio, chat and transcription work together.</p></div>
-                        </div>
-                        <div class="benefit">
-                            <span class="check">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="m5 12 4 4L19 6"/></svg>
-                            </span>
-                            <div><h3>Organized Meetings</h3><p>Keep scheduled, live and completed meetings in one place.</p></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="mini-product">
-                    <div class="mini-head">
-                        <span>Team Collaboration</span>
-                        <span style="color:#86efac">● Meeting active</span>
-                    </div>
-                    <div class="mini-grid">
-                        <div class="mini-tile">AM</div>
-                        <div class="mini-tile">SK</div>
-                        <div class="mini-tile">HA</div>
-                        <div class="mini-tile">ZA</div>
-                    </div>
-                    <div class="mini-toolbar">
-                        <span class="mini-control"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5"/></svg></span>
-                        <span class="mini-control"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 10l4.55-2.28A1 1 0 0 1 21 8.62v6.76a1 1 0 0 1-1.45.9L15 14"/><rect x="3" y="6" width="12" height="12" rx="3"/></svg></span>
-                        <span class="mini-control"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z"/></svg></span>
-                        <span class="mini-control red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3"/></svg></span>
-                    </div>
-                </div>
+        <div class="why-list">
+            <div class="why-row reveal-up">
+                <div class="feature-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
+                <div><h4>Browser Based</h4><p>Join directly from a modern browser — no installs.</p></div>
+            </div>
+            <div class="why-row reveal-up" style="transition-delay:.08s">
+                <div class="feature-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h7l-1 8 11-14h-7l1-6Z"/></svg></div>
+                <div><h4>Simple Experience</h4><p>Clean workflows without unnecessary complexity.</p></div>
+            </div>
+            <div class="why-row reveal-up" style="transition-delay:.16s">
+                <div class="feature-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/></svg></div>
+                <div><h4>Real-Time Collaboration</h4><p>Chat and communicate while the meeting is happening.</p></div>
+            </div>
+            <div class="why-row reveal-up" style="transition-delay:.24s">
+                <div class="feature-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg></div>
+                <div><h4>Organized Meetings</h4><p>Keep scheduled and previous meetings easier to manage.</p></div>
             </div>
         </div>
-    </section>
+    </div>
+</section>
 
-    <section class="section">
-        <div class="container experience-grid">
-            <div class="experience-card reveal">
-                <div class="exp-top">
-                    <span>Project Review Meeting</span>
-                    <span style="color:#86efac">● Live</span>
-                </div>
-                <div class="exp-layout">
-                    <div class="exp-videos">
-                        <div class="exp-video"><div class="avatar">AM</div></div>
-                        <div class="exp-video"><div class="avatar">SK</div></div>
-                        <div class="exp-video"><div class="avatar">HA</div></div>
-                        <div class="exp-video"><div class="avatar">ZA</div></div>
-                    </div>
-                    <div class="exp-chat">
-                        <strong>Meeting Chat</strong>
-                        <div class="msg"><b>Sara:</b><br>I've shared the latest update.</div>
-                        <div class="msg"><b>Areeb:</b><br>Perfect, let's review it now.</div>
-                        <div class="msg"><b>Hassan:</b><br>Looks good from my side.</div>
-                    </div>
-                </div>
-                <div class="exp-controls">
-                    <span class="exp-ctrl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5"/></svg></span>
-                    <span class="exp-ctrl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 10l4.55-2.28A1 1 0 0 1 21 8.62v6.76a1 1 0 0 1-1.45.9L15 14"/><rect x="3" y="6" width="12" height="12" rx="3"/></svg></span>
-                    <span class="exp-ctrl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z"/></svg></span>
-                    <span class="exp-ctrl red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3"/></svg></span>
-                </div>
+{{-- ================= EXPERIENCE ================= --}}
+<section id="experience" class="experience">
+    <div class="container">
+        <div class="section-head centered reveal-up" style="margin-left:auto;margin-right:auto">
+            <span class="eyebrow">Up close</span>
+            <h2>Built around the conversation.</h2>
+            <p>A closer look at the tools that keep every meeting productive.</p>
+        </div>
+
+        <div class="exp-grid">
+            <div class="exp-panel reveal-up">
+                <h4><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v12H7l-3 3V4Z"/></svg> Live Transcript</h4>
+                <div class="exp-line"><time>09:41</time><span>"Let's review the milestones for this week."</span></div>
+                <div class="exp-line"><time>09:42</time><span>"David will walk us through the timeline."</span></div>
+                <div class="exp-line"><time>09:43</time><span>"Sounds good — sharing my screen now."</span></div>
             </div>
 
-            <div class="reveal">
-                <div class="section-label">Meeting Experience</div>
-                <h2>Focus on the conversation</h2>
-                <p class="section-copy">The controls you need stay close at hand while the interface keeps the meeting itself front and center.</p>
+            <div class="exp-panel reveal-up" style="transition-delay:.1s">
+                <h4><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/></svg> Meeting Chat</h4>
+                <div class="exp-bubble"><b>Sarah</b>Can you share the slides?</div>
+                <div class="exp-bubble"><b>Alex</b>Sending them now 👍</div>
+                <div class="exp-bubble"><b>Emma</b>Got it, thanks!</div>
+            </div>
 
-                <div class="experience-list">
-                    <div class="experience-item">
-                        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5"/></svg></span>
-                        Simple audio & video controls
-                    </div>
-                    <div class="experience-item">
-                        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></span>
-                        Live participant visibility
-                    </div>
-                    <div class="experience-item">
-                        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z"/></svg></span>
-                        Built-in meeting chat
-                    </div>
-                    <div class="experience-item">
-                        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16M4 10h16M4 15h10M4 20h7"/></svg></span>
-                        Real-time transcription
-                    </div>
-                    <div class="experience-item">
-                        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg></span>
-                        Easy meeting management
-                    </div>
-                </div>
+            <div class="exp-panel reveal-up" style="transition-delay:.2s">
+                <h4><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg> Participants</h4>
+                <div class="exp-person"><div class="mock-avatar" style="background:linear-gradient(135deg,#2563eb,#38bdf8)">A</div><div><span>Alex</span><small>Organizer</small></div><span class="exp-status"></span></div>
+                <div class="exp-person"><div class="mock-avatar" style="background:linear-gradient(135deg,#8b5cf6,#ec4899)">S</div><div><span>Sarah</span><small>Participant</small></div><span class="exp-status"></span></div>
+                <div class="exp-person"><div class="mock-avatar" style="background:linear-gradient(135deg,#22c55e,#06b6d4)">D</div><div><span>David</span><small>Participant</small></div><span class="exp-status"></span></div>
             </div>
         </div>
-    </section>
+    </div>
+</section>
 
-    <section class="cta">
-        <div class="container">
-            <div class="cta-box reveal">
-                <h2>Ready to make meetings simpler?</h2>
-                <p>Bring your conversations, participants and collaboration together with SmartMeet.</p>
-                <div class="cta-actions">
-                    @auth
-                        <a href="{{ $dashboardUrl }}" class="btn btn-primary">Open SmartMeet</a>
-                    @else
-                        <a href="{{ $registerUrl }}" class="btn btn-primary">Get Started</a>
-                        <a href="{{ $loginUrl }}" class="btn btn-secondary">Sign In</a>
-                    @endauth
-                </div>
-            </div>
+{{-- ================= FINAL CTA ================= --}}
+<section class="final-cta">
+    <div class="container final-cta-inner reveal-up">
+        <h2>Ready to make meetings simpler?</h2>
+        <p>Bring scheduling, conversations and collaboration together with SmartMeet.</p>
+        <div class="hero-cta">
+            @auth
+                <a href="{{ $dashboardUrl }}" class="btn btn-primary">Go to Dashboard</a>
+            @else
+                <a href="{{ route('register') }}" class="btn btn-primary">Get Started Free</a>
+                <a href="{{ route('login') }}" class="btn btn-secondary">Log In</a>
+            @endauth
         </div>
-    </section>
-</main>
+    </div>
+</section>
 
+{{-- ================= FOOTER ================= --}}
 <footer>
     <div class="container">
         <div class="footer-grid">
-            <div class="footer-about">
-                <a href="#home" class="brand">
-                    <span class="brand-mark">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M15 10l4.55-2.28A1 1 0 0 1 21 8.62v6.76a1 1 0 0 1-1.45.9L15 14"/>
-                            <rect x="3" y="6" width="12" height="12" rx="3"/>
-                        </svg>
-                    </span>
+            <div class="footer-brand">
+                <a href="/" class="brand">
+                    <img src="{{ asset('images/s-logo.png') }}" alt="SmartMeet">
                     SmartMeet
                 </a>
-                <p>Simple online meetings for modern collaboration.</p>
+                <p>Simple online meetings and real-time collaboration.</p>
             </div>
-
-            <div class="footer-links">
-                <a href="#home">Home</a>
+            <div class="footer-col">
+                <h5>Product</h5>
                 <a href="#features">Features</a>
                 <a href="#how-it-works">How It Works</a>
-                <a href="{{ $loginUrl }}">Login</a>
-                <a href="{{ $registerUrl }}">Register</a>
+                <a href="#experience">Experience</a>
+            </div>
+            <div class="footer-col">
+                <h5>Legal</h5>
+                @if(Route::has('privacy-policy'))<a href="{{ route('privacy-policy') }}">Privacy Policy</a>@endif
+                @if(Route::has('terms'))<a href="{{ route('terms') }}">Terms</a>@endif
+                @if(Route::has('data-deletion'))<a href="{{ route('data-deletion') }}">Data Deletion</a>@endif
             </div>
         </div>
-
-        <div class="footer-bottom">
-            <span>© {{ date('Y') }} SmartMeet. All rights reserved.</span>
-            <span>Meet. Connect. Collaborate.</span>
-        </div>
+        <div class="footer-bottom">© {{ date('Y') }} SmartMeet. All rights reserved.</div>
     </div>
 </footer>
 
 <script>
-    (() => {
+    (function(){
+        // Navbar scroll state
         const navbar = document.getElementById('navbar');
-        const menuBtn = document.getElementById('menuBtn');
+        const onScroll = () => navbar.classList.toggle('scrolled', window.scrollY > 20);
+        onScroll();
+        window.addEventListener('scroll', onScroll, { passive:true });
+
+        // Mobile menu
+        const hamburger = document.getElementById('hamburger');
         const mobileMenu = document.getElementById('mobileMenu');
-
-        const handleScroll = () => {
-            navbar.classList.toggle('scrolled', window.scrollY > 16);
-        };
-
-        handleScroll();
-        window.addEventListener('scroll', handleScroll, { passive: true });
-
-        menuBtn?.addEventListener('click', () => {
-            const open = mobileMenu.classList.toggle('open');
-            menuBtn.setAttribute('aria-expanded', String(open));
+        hamburger.addEventListener('click', () => {
+            hamburger.classList.toggle('active');
+            mobileMenu.classList.toggle('open');
+            document.body.style.overflow = mobileMenu.classList.contains('open') ? 'hidden' : '';
         });
+        mobileMenu.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
+            hamburger.classList.remove('active');
+            mobileMenu.classList.remove('open');
+            document.body.style.overflow = '';
+        }));
 
-        mobileMenu?.querySelectorAll('a').forEach(link => {
-            link.addEventListener('click', () => {
-                mobileMenu.classList.remove('open');
-                menuBtn?.setAttribute('aria-expanded', 'false');
-            });
-        });
-
-        const revealItems = document.querySelectorAll('.reveal');
-
-        if ('IntersectionObserver' in window && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-            const observer = new IntersectionObserver((entries) => {
+        // Scroll reveal (fires once)
+        const revealEls = document.querySelectorAll('.reveal, .reveal-up, .reveal-left, .reveal-right');
+        if ('IntersectionObserver' in window) {
+            const io = new IntersectionObserver((entries) => {
                 entries.forEach(entry => {
                     if (entry.isIntersecting) {
-                        entry.target.classList.add('visible');
-                        observer.unobserve(entry.target);
+                        entry.target.classList.add('in-view');
+                        io.unobserve(entry.target);
                     }
                 });
-            }, { threshold: 0.12 });
-
-            revealItems.forEach(item => observer.observe(item));
+            }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+            revealEls.forEach(el => io.observe(el));
         } else {
-            revealItems.forEach(item => item.classList.add('visible'));
+            revealEls.forEach(el => el.classList.add('in-view'));
         }
+
+        // Hero mockup chat/transcript tab toggle
+        document.querySelectorAll('.mock-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const parent = tab.closest('.mock-side');
+                parent.querySelectorAll('.mock-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                const target = tab.dataset.tab;
+                parent.querySelectorAll('.mock-panel').forEach(p => {
+                    p.style.display = (p.dataset.panel === target) ? 'block' : 'none';
+                });
+            });
+        });
     })();
 </script>
+
 </body>
 </html>
