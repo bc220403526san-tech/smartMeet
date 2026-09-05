@@ -15,24 +15,22 @@ class MeetingController extends Controller
     public function index(Request $request)
     {
         /*
-         * Admin pages may activate meetings whose scheduled start time has arrived.
+         * Keep meeting status aligned with the scheduled timer:
          *
-         * IMPORTANT:
-         * This sync is intentionally ONE-WAY only:
-         * upcoming -> active
+         * Before start time                -> upcoming
+         * Start time until scheduled end   -> active
+         * After scheduled end time         -> completed
          *
-         * It never changes active/live to completed and never touches terminal
-         * statuses (completed, ended, cancelled). Natural completion remains
-         * the responsibility of the live meeting-room timer/end flow.
+         * Terminal/manual statuses are never overwritten:
+         * ended, cancelled, flagged
          */
-        $this->syncUpcomingMeetingsToActive();
+        $this->syncScheduledMeetingStatuses();
 
         $totalMeetings = Meeting::count();
         $activeMeetings = Meeting::where('status', 'active')->count();
         $upcomingMeetings = Meeting::where('status', 'upcoming')->count();
 
         // "Issues" should only represent meetings needing attention.
-        // Ended/completed are valid terminal states, not issues.
         $issueMeetings = Meeting::whereIn('status', ['cancelled', 'flagged'])->count();
 
         $query = Meeting::with(['organizer', 'participants']);
@@ -79,11 +77,7 @@ class MeetingController extends Controller
 
     public function show(Meeting $meeting)
     {
-        /*
-         * Opening a specific meeting directly should also correct a stale
-         * upcoming status when its scheduled start time has already arrived.
-         */
-        $this->syncUpcomingMeetingToActive($meeting);
+        $this->syncScheduledMeetingStatus($meeting);
 
         $meeting->refresh();
         $meeting->load(['organizer', 'participants.user']);
@@ -108,38 +102,39 @@ class MeetingController extends Controller
 
         $meeting->update($validated);
 
+        // If schedule was changed, immediately normalize status to the new timer.
+        $meeting->refresh();
+        $this->syncScheduledMeetingStatus($meeting);
+
         return redirect()
             ->route('admin.meetings.show', $meeting->id)
             ->with('success', 'Meeting updated successfully.');
     }
 
     /**
-     * Synchronize all stale upcoming meetings to active when their scheduled
-     * local start time has arrived.
-     *
-     * This method NEVER performs active -> completed.
+     * Synchronize all non-terminal scheduled meetings according to their timer.
      */
-    protected function syncUpcomingMeetingsToActive(): void
+    protected function syncScheduledMeetingStatuses(): void
     {
         Meeting::query()
-            ->where('status', 'upcoming')
-            ->get(['id', 'date', 'time', 'timezone', 'status'])
+            ->whereIn('status', ['upcoming', 'active'])
+            ->get(['id', 'date', 'time', 'duration', 'timezone', 'status'])
             ->each(function (Meeting $meeting) {
-                $this->syncUpcomingMeetingToActive($meeting);
+                $this->syncScheduledMeetingStatus($meeting);
             });
     }
 
     /**
-     * Activate one meeting if and only if:
-     * - its current status is still upcoming, and
-     * - its scheduled start time has arrived.
+     * Status rules:
+     * - now < start                      => upcoming
+     * - start <= now < scheduled end     => active
+     * - now >= scheduled end             => completed
      *
-     * The conditional UPDATE protects terminal/status changes that may happen
-     * between reading the meeting and writing the new status.
+     * ended/cancelled/flagged/completed are not overwritten.
      */
-    protected function syncUpcomingMeetingToActive(Meeting $meeting): void
+    protected function syncScheduledMeetingStatus(Meeting $meeting): void
     {
-        if ($meeting->status !== 'upcoming') {
+        if (! in_array($meeting->status, ['upcoming', 'active'], true)) {
             return;
         }
 
@@ -155,25 +150,41 @@ class MeetingController extends Controller
                 trim($meeting->date . ' ' . $meeting->time),
                 $timezone
             );
+
+            $durationMinutes = max(1, (int) ($meeting->duration ?: 1));
+            $scheduledEnd = $scheduledStart->copy()->addMinutes($durationMinutes);
+            $now = Carbon::now($timezone);
         } catch (\Throwable $exception) {
             report($exception);
             return;
         }
 
-        $now = Carbon::now($timezone);
-
         if ($now->lt($scheduledStart)) {
+            $targetStatus = 'upcoming';
+        } elseif ($now->lt($scheduledEnd)) {
+            $targetStatus = 'active';
+        } else {
+            $targetStatus = 'completed';
+        }
+
+        if ($meeting->status === $targetStatus) {
             return;
         }
 
-        Meeting::query()
+        /*
+         * Only update if DB status is still upcoming/active.
+         * This prevents a concurrent End/Cancel/Flag action from being overwritten.
+         */
+        $updated = Meeting::query()
             ->whereKey($meeting->id)
-            ->where('status', 'upcoming')
+            ->whereIn('status', ['upcoming', 'active'])
             ->update([
-                'status' => 'active',
+                'status' => $targetStatus,
             ]);
 
-        $meeting->status = 'active';
+        if ($updated > 0) {
+            $meeting->status = $targetStatus;
+        }
     }
 
     protected function notifiableUsersFor(Meeting $meeting)
@@ -236,11 +247,9 @@ class MeetingController extends Controller
     {
         $meeting->refresh();
 
-        // Remove an existing flag.
         if ($meeting->status === 'flagged') {
             $restoreStatus = $meeting->previous_status ?: 'upcoming';
 
-            // Never restore into a terminal state through flagging.
             if (in_array($restoreStatus, ['completed', 'ended', 'cancelled'], true)) {
                 return back()->with(
                     'error',
@@ -252,11 +261,9 @@ class MeetingController extends Controller
             $meeting->previous_status = null;
             $meeting->save();
 
-            /*
-             * If the restored status is upcoming but its scheduled start has
-             * already arrived, immediately normalize it to active.
-             */
-            $this->syncUpcomingMeetingToActive($meeting);
+            // Normalize restored status according to the meeting schedule.
+            $meeting->refresh();
+            $this->syncScheduledMeetingStatus($meeting);
 
             return back()->with(
                 'success',
@@ -264,7 +271,6 @@ class MeetingController extends Controller
             );
         }
 
-        // Current admin rule: only upcoming meetings may be flagged.
         if ($meeting->status !== 'upcoming') {
             return back()->with(
                 'error',
@@ -272,8 +278,6 @@ class MeetingController extends Controller
             );
         }
 
-        // Use direct property assignment so previous_status is persisted even
-        // if it is not present in the model's $fillable array.
         $meeting->previous_status = 'upcoming';
         $meeting->status = 'flagged';
         $meeting->save();
