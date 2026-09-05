@@ -37,11 +37,11 @@
                     </div>
                 @else
                     <div class="overflow-x-auto">
-                        <table class="w-full min-w-[980px] text-sm">
+                        <table class="w-full min-w-[1100px] text-sm">
                             <thead class="bg-blue-50 border-b border-blue-100">
                             <tr class="text-left text-xs font-semibold uppercase tracking-wider text-blue-700">
                                 <th class="px-5 py-4">Meeting</th>
-                                <th class="px-4 py-4">Date</th>
+                                <th class="px-4 py-4">Meeting Date</th>
 
                                 <th class="px-4 py-4">
                                     {{ $user->role === 'organizer'
@@ -49,9 +49,9 @@
                                         : 'Organizer' }}
                                 </th>
 
-                                <th class="px-4 py-4">Joined</th>
-                                <th class="px-4 py-4">Left</th>
-                                <th class="px-4 py-4">Duration</th>
+                                <th class="px-4 py-4">Joined At</th>
+                                <th class="px-4 py-4">Left At</th>
+                                <th class="px-4 py-4">Actual Duration</th>
 
                                 <th class="px-4 py-4">
                                     {{ $user->role === 'organizer'
@@ -72,7 +72,7 @@
                                     $remainingSeconds = $seconds % 60;
 
                                     $duration = $hours > 0
-                                        ? "{$hours}h {$minutes}m"
+                                        ? "{$hours}h {$minutes}m {$remainingSeconds}s"
                                         : (
                                             $minutes > 0
                                                 ? "{$minutes}m {$remainingSeconds}s"
@@ -89,34 +89,59 @@
                                         </p>
 
                                         <p class="mt-1 text-xs text-gray-400">
-                                            #{{ $meeting->id }}
+                                            Meeting #{{ $meeting->id }}
                                         </p>
                                     </td>
 
                                     <td class="px-4 py-4 whitespace-nowrap text-gray-600">
                                         {{ $meeting->date
                                             ? \Illuminate\Support\Carbon::parse($meeting->date)->format('M d, Y')
-                                            : '—' }}
+                                            : 'Not recorded' }}
                                     </td>
 
                                     <td class="px-4 py-4 text-gray-600">
                                         @if($user->role === 'organizer')
                                             {{ $item->participants_count ?? 0 }}
                                         @else
-                                            {{ $meeting->organizer?->name ?? '—' }}
+                                            {{ $meeting->organizer?->name ?? 'Not recorded' }}
                                         @endif
                                     </td>
 
-                                    <td class="px-4 py-4 whitespace-nowrap text-gray-600">
-                                        {{ $item->first_joined_at?->format('h:i A') ?? '—' }}
+                                    <td class="px-4 py-4 whitespace-nowrap">
+                                        @if($item->first_joined_at)
+                                            <div class="font-semibold text-gray-700">
+                                                {{ $item->first_joined_at->format('h:i:s A') }}
+                                            </div>
+                                            <div class="mt-0.5 text-xs text-gray-400">
+                                                {{ $item->first_joined_at->format('M d, Y') }}
+                                            </div>
+                                        @else
+                                            <span class="text-gray-400">Not recorded</span>
+                                        @endif
                                     </td>
 
-                                    <td class="px-4 py-4 whitespace-nowrap text-gray-600">
-                                        {{ $item->last_left_at?->format('h:i A') ?? '—' }}
+                                    <td class="px-4 py-4 whitespace-nowrap">
+                                        @if($item->last_left_at)
+                                            <div class="font-semibold text-gray-700">
+                                                {{ $item->last_left_at->format('h:i:s A') }}
+                                            </div>
+                                            <div class="mt-0.5 text-xs text-gray-400">
+                                                {{ $item->last_left_at->format('M d, Y') }}
+                                            </div>
+                                        @else
+                                            <span class="text-gray-400">Not recorded</span>
+                                        @endif
                                     </td>
 
-                                    <td class="px-4 py-4 whitespace-nowrap font-medium text-gray-700">
-                                        {{ $seconds > 0 ? $duration : '—' }}
+                                    <td class="px-4 py-4 whitespace-nowrap">
+                                        @if($seconds > 0)
+                                            <span class="inline-flex items-center px-2.5 py-1 rounded-full
+                                                             text-xs font-semibold bg-green-50 text-green-700">
+                                                    {{ $duration }}
+                                                </span>
+                                        @else
+                                            <span class="text-gray-400">Not recorded</span>
+                                        @endif
                                     </td>
 
                                     <td class="px-4 py-4">

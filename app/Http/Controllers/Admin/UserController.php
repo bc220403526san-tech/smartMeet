@@ -165,11 +165,6 @@ class UserController extends Controller
 
     private function participantMeetingHistory(User $user)
     {
-        /*
-         * MeetingParticipant is the source of truth for membership.
-         * Therefore, every meeting the user joined/was attached to appears,
-         * even if an older meeting has no audit-log session rows.
-         */
         $participantMeetings = Meeting::query()
             ->with('organizer')
             ->whereHas('participants', function ($query) use ($user) {
