@@ -1,4 +1,7 @@
-<aside class="w-64 bg-white shadow-lg flex flex-col h-[calc(100vh-1rem)] m-2 rounded-4xl border border-gray-100">
+<aside class="w-64 bg-white flex flex-col h-[calc(100vh-2rem)] m-4
+              rounded-[2rem] border border-gray-200
+              shadow-[0_10px_40px_rgba(15,23,42,0.10)]
+              overflow-hidden">
     <!-- TOP -->
     <div class="p-5 flex-1 overflow-y-auto">
         {{-- Logo --}}
@@ -90,7 +93,7 @@
     </div>
 
     {{-- BOTTOM --}}
-    <div class="p-5 border-t border-gray-100">
+    <div class="p-5 border-t border-gray-100 bg-white">
         <form method="POST" action="{{ route('logout') }}">
             @csrf
             <button type="submit"
