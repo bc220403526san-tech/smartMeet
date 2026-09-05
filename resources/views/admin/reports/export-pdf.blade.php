@@ -4,9 +4,85 @@
     <meta charset="utf-8">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="icon" href="{{ asset('images/s-logo.png') }}">
-    <title>{{ env('APP_NAME') }}</title>
+    <title>{{ env('APP_NAME') }} - Meetings Report</title>
+
     <style>
         {!! file_get_contents(resource_path('css/admin/export-pdf.css')) !!}
+
+        /* v102 additions - safe for DomPDF */
+        .period-box {
+            margin: 12px 0 16px;
+            padding: 10px 12px;
+            background: #f8fafc;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            font-size: 11px;
+            color: #475569;
+        }
+
+        .period-box strong {
+            color: #111827;
+        }
+
+        .summary-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 8px 0;
+            margin: 0 -8px 18px;
+        }
+
+        .summary-table td {
+            width: 25%;
+            padding: 13px 14px;
+            vertical-align: top;
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+        }
+
+        .summary-number {
+            font-size: 21px;
+            line-height: 1;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 6px;
+        }
+
+        .summary-label {
+            font-size: 10px;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: .4px;
+        }
+
+        .daily-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 18px;
+        }
+
+        .daily-table th,
+        .daily-table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 10px;
+        }
+
+        .daily-table th {
+            background: #f8fafc;
+            color: #475569;
+            text-transform: uppercase;
+            letter-spacing: .35px;
+            text-align: left;
+        }
+
+        .daily-table .center {
+            text-align: center;
+        }
+
+        .muted {
+            color: #94a3b8;
+        }
     </style>
 </head>
 <body>
@@ -14,8 +90,11 @@
 <div class="report-header">
     <div class="brand">
         @if(!empty($logoBase64))
-            <img class="brand-logo" src="data:image/png;base64,{{ $logoBase64 }}" alt="SmartMeet">
+            <img class="brand-logo"
+                 src="data:image/png;base64,{{ $logoBase64 }}"
+                 alt="SmartMeet">
         @endif
+
         <span class="brand-text">
             <span class="name">SmartMeet</span>
             <span class="tagline">Meeting Suite</span>
@@ -24,89 +103,101 @@
 
     <div class="meta">
         <div class="title">Meetings Report</div>
-        <div class="generated">Generated on {{ now()->format('M d, Y h:i A') }}</div>
+        <div class="generated">
+            Generated on {{ now()->format('M d, Y h:i A') }}
+        </div>
     </div>
 </div>
 
-@if(!empty($filters) && (($filters['status'] ?? 'All Status') !== 'All Status' || !empty($filters['search']) || !empty($filters['flagged'])))
-    <div class="filters-bar">
-        <span>Filters applied:</span>
+{{-- Selected reporting period --}}
+@if(!empty($filters['from_date']) && !empty($filters['to_date']))
+    <div class="period-box">
+        Report Period:
+        <strong>{{ \Carbon\Carbon::parse($filters['from_date'])->format('M d, Y') }}</strong>
+        &nbsp;to&nbsp;
+        <strong>{{ \Carbon\Carbon::parse($filters['to_date'])->format('M d, Y') }}</strong>
 
         @if(($filters['status'] ?? 'All Status') !== 'All Status')
-            <span>Status: <b>{{ $filters['status'] }}</b></span>
+            &nbsp;&nbsp; | &nbsp;&nbsp;
+            Status: <strong>{{ $filters['status'] }}</strong>
         @endif
 
         @if(!empty($filters['search']))
-            <span>Search: <b>{{ $filters['search'] }}</b></span>
+            &nbsp;&nbsp; | &nbsp;&nbsp;
+            Search: <strong>{{ $filters['search'] }}</strong>
         @endif
 
         @if(!empty($filters['flagged']))
-            <span>Flagged only</span>
+            &nbsp;&nbsp; | &nbsp;&nbsp;
+            <strong>Flagged only</strong>
         @endif
     </div>
 @endif
 
+{{-- Only selected-range statistics --}}
 @if(!empty($stats))
-    <h2 class="section-title">Platform Summary</h2>
+    <h2 class="section-title">Selected Period Summary</h2>
 
-    <table class="stats-table">
+    <table class="summary-table">
         <tr>
             <td>
-                <div class="stat-value">{{ $stats['total_meetings'] ?? 0 }}</div>
-                <div class="stat-label">Total Meetings</div>
+                <div class="summary-number">{{ $stats['total_meetings'] ?? 0 }}</div>
+                <div class="summary-label">Meetings</div>
             </td>
-            <td>
-                <div class="stat-value">{{ $stats['active_now'] ?? 0 }}</div>
-                <div class="stat-label">Active Now</div>
-            </td>
-            <td>
-                <div class="stat-value">{{ $stats['completed'] ?? 0 }}</div>
-                <div class="stat-label">Completed</div>
-            </td>
-            <td>
-                <div class="stat-value">{{ $stats['cancelled'] ?? 0 }}</div>
-                <div class="stat-label">Cancelled</div>
-            </td>
-            <td>
-                <div class="stat-value">{{ $stats['upcoming'] ?? 0 }}</div>
-                <div class="stat-label">Upcoming</div>
-            </td>
-            <td>
-                <div class="stat-value">{{ $stats['total_users'] ?? 0 }}</div>
-                <div class="stat-label">Total Users</div>
-            </td>
-        </tr>
 
-        <tr>
             <td>
-                <div class="stat-value">{{ $stats['active_users'] ?? 0 }}</div>
-                <div class="stat-label">Active Users</div>
+                <div class="summary-number">{{ $stats['unique_users'] ?? 0 }}</div>
+                <div class="summary-label">Unique Users In Meetings</div>
             </td>
+
             <td>
-                <div class="stat-value">{{ $stats['inactive_users'] ?? 0 }}</div>
-                <div class="stat-label">Inactive Users</div>
+                <div class="summary-number">{{ $stats['completed'] ?? 0 }}</div>
+                <div class="summary-label">Completed</div>
             </td>
+
             <td>
-                <div class="stat-value">{{ $stats['organizers'] ?? 0 }}</div>
-                <div class="stat-label">Organizers</div>
-            </td>
-            <td>
-                <div class="stat-value">{{ $stats['participants'] ?? 0 }}</div>
-                <div class="stat-label">Participants</div>
-            </td>
-            <td>
-                <div class="stat-value">{{ $stats['created_today'] ?? 0 }}</div>
-                <div class="stat-label">Created Today</div>
-            </td>
-            <td>
-                <div class="stat-value">{{ $stats['completed_today'] ?? 0 }}</div>
-                <div class="stat-label">Completed Today</div>
+                <div class="summary-number">{{ $stats['cancelled'] ?? 0 }}</div>
+                <div class="summary-label">Cancelled</div>
             </td>
         </tr>
     </table>
 @endif
 
-<h2 class="section-title">Meeting Details ({{ $meetings->count() }})</h2>
+{{-- Day-wise reporting --}}
+<h2 class="section-title">Daily Activity</h2>
+
+<table class="daily-table">
+    <thead>
+    <tr>
+        <th>Date</th>
+        <th class="center">Meetings</th>
+        <th class="center">Unique Users</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    @forelse($dailyBreakdown ?? [] as $day)
+        <tr>
+            <td>
+                <strong>{{ $day['date']->format('M d, Y') }}</strong>
+                <span class="muted">&nbsp;({{ $day['date']->format('l') }})</span>
+            </td>
+            <td class="center">{{ $day['meetings'] }}</td>
+            <td class="center">{{ $day['users'] }}</td>
+        </tr>
+    @empty
+        <tr>
+            <td colspan="3" style="text-align:center; color:#999;">
+                No meeting activity found for this date range.
+            </td>
+        </tr>
+    @endforelse
+    </tbody>
+</table>
+
+<h2 class="section-title">
+    Meeting Details ({{ $meetings->count() }})
+</h2>
 
 <table class="meetings-table">
     <thead>
@@ -118,7 +209,6 @@
         <th>Duration</th>
         <th>Participants</th>
         <th>Status</th>
-        <th>Flagged</th>
     </tr>
     </thead>
 
@@ -126,24 +216,37 @@
     @forelse($meetings as $meeting)
         <tr>
             <td>{{ $meeting->title }}</td>
-            <td>{{ $meeting->organizer?->name ?? 'Unassigned' }}</td>
-            <td>{{ \Carbon\Carbon::parse($meeting->date)->format('M d, Y') }}</td>
-            <td>{{ \Carbon\Carbon::parse($meeting->time)->format('h:i A') }}</td>
-            <td>{{ $meeting->duration }} min</td>
-            <td>{{ $meeting->participants->count() }}</td>
+
+            <td>
+                {{ $meeting->organizer?->name ?? 'Unassigned' }}
+            </td>
+
+            <td>
+                {{ \Carbon\Carbon::parse($meeting->date)->format('M d, Y') }}
+            </td>
+
+            <td>
+                {{ \Carbon\Carbon::parse($meeting->time)->format('h:i A') }}
+            </td>
+
+            <td>
+                {{ $meeting->duration }} min
+            </td>
+
+            <td>
+                {{ $meeting->participants->count() }}
+            </td>
+
             <td>
                 <span class="status-badge status-{{ $meeting->status }}">
                     {{ ucfirst($meeting->status) }}
                 </span>
             </td>
-            <td class="{{ $meeting->is_flagged ? 'flag-yes' : 'flag-no' }}">
-                {{ $meeting->is_flagged ? 'Yes' : 'No' }}
-            </td>
         </tr>
     @empty
         <tr>
-            <td colspan="8" style="text-align:center; color:#999;">
-                No meetings found.
+            <td colspan="7" style="text-align:center; color:#999;">
+                No meetings found for the selected date range.
             </td>
         </tr>
     @endforelse
