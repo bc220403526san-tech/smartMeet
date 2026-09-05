@@ -370,6 +370,35 @@
                 transition-duration: .01ms !important;
             }
         }
+
+        /* CENTER DIVIDER SHADOW — visible between hero and form side */
+        @media (min-width: 768px) {
+            .auth-visual {
+                position: relative;
+                z-index: 2;
+                overflow: visible;
+                box-shadow:
+                    18px 0 30px -22px rgba(15, 23, 42, 0.34),
+                    10px 0 20px -18px rgba(37, 99, 235, 0.28);
+            }
+
+            /* Keep hero artwork clipped while allowing the center shadow outside */
+            .auth-visual > .hero-orb {
+                pointer-events: none;
+            }
+        }
+
+        /* On mobile the two sections stack, so use a soft bottom divider shadow */
+        @media (max-width: 767px) {
+            .auth-visual {
+                position: relative;
+                z-index: 2;
+                box-shadow:
+                    0 18px 30px -24px rgba(15, 23, 42, 0.30),
+                    0 10px 18px -18px rgba(37, 99, 235, 0.22);
+            }
+        }
+
     </style>
 </head>
 
