@@ -3,6 +3,18 @@
         <x-header.page-title title="Admin Dashboard" />
     </x-slot:header>
 
+    @php
+        $nameParts = preg_split('/\s+/', trim($user->name ?? ''));
+        $initials = collect($nameParts)
+            ->filter()
+            ->take(2)
+            ->map(fn ($part) => mb_strtoupper(mb_substr($part, 0, 1)))
+            ->implode('');
+
+        $initials = $initials ?: 'U';
+        $hasProfileImage = !empty($user->image);
+    @endphp
+
     <div class="p-3 sm:p-4 bg-gray-50 rounded-2xl m-2 mt-0 space-y-4">
         <x-success />
         <x-error />
@@ -25,7 +37,9 @@
             </div>
 
             @if(auth()->id() !== $user->id)
-                <form action="{{ route('admin.users.toggle-status', $user) }}" method="POST" class="w-fit">
+                <form action="{{ route('admin.users.toggle-status', $user) }}"
+                      method="POST"
+                      class="w-fit">
                     @csrf
                     @method('PATCH')
 
@@ -43,12 +57,22 @@
         <div class="max-w-5xl mx-auto overflow-hidden bg-white border border-gray-200 rounded-3xl shadow-sm">
             <div class="px-5 sm:px-8 py-6 sm:py-7 bg-gradient-to-r from-blue-50 to-indigo-50">
                 <div class="flex flex-col sm:flex-row sm:items-center gap-5 sm:gap-6">
+
                     <div class="relative shrink-0 self-center sm:self-auto">
-                        <div class="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden border-4 border-white shadow-md bg-white">
-                            <img src="{{ $user->image_url }}"
-                                 alt="{{ $user->name }}"
-                                 class="w-full h-full object-cover rounded-full">
-                        </div>
+                        @if($hasProfileImage)
+                            <div class="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden border-4 border-white shadow-md bg-white">
+                                <img src="{{ $user->image_url }}"
+                                     alt="{{ $user->name }}"
+                                     class="w-full h-full object-cover rounded-full">
+                            </div>
+                        @else
+                            <div class="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-white shadow-md
+                                        bg-blue-600 text-white flex items-center justify-center">
+                                <span class="text-3xl sm:text-4xl font-semibold tracking-wide">
+                                    {{ $initials }}
+                                </span>
+                            </div>
+                        @endif
 
                         <span class="absolute bottom-0 right-0 flex items-center justify-center w-5 h-5 rounded-full
                                      border-2 border-white {{ $user->is_active ? 'bg-green-500' : 'bg-red-500' }}">
@@ -87,13 +111,6 @@
                                 <span class="inline-flex items-center justify-center sm:justify-start gap-1.5 text-xs font-medium text-red-400">
                                     <i class="fa-solid fa-circle-xmark"></i>
                                     Not Verified
-                                </span>
-                            @endif
-
-                            @if($user->provider)
-                                <span class="inline-flex items-center justify-center sm:justify-start gap-1.5 text-xs text-gray-500">
-                                    <i class="fa-brands fa-{{ $user->provider }}"></i>
-                                    {{ ucfirst($user->provider) }} Account
                                 </span>
                             @endif
                         </div>
