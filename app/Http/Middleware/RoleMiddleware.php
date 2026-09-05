@@ -10,8 +10,11 @@ use Symfony\Component\HttpFoundation\Response;
 
 class RoleMiddleware
 {
-    public function handle(Request $request, Closure $next, string $role): Response
-    {
+    public function handle(
+        Request $request,
+        Closure $next,
+        string $role
+    ): Response {
         if (!Auth::check()) {
             return redirect()->route('login');
         }
@@ -26,11 +29,17 @@ class RoleMiddleware
                 default => null,
             };
 
-            if ($dashboardRoute && Route::has($dashboardRoute)) {
-                return redirect()->route($dashboardRoute);
+            if (
+                $dashboardRoute
+                && Route::has($dashboardRoute)
+            ) {
+                return redirect()->route(
+                    $dashboardRoute
+                );
             }
 
             Auth::logout();
+
             $request->session()->invalidate();
             $request->session()->regenerateToken();
 

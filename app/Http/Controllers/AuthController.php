@@ -19,11 +19,20 @@ class AuthController extends Controller
     {
         $request->validate([
             'name' => 'required',
-            'email' => ['required', 'email:rfc', 'regex:/^.+@.+\..+$/', 'unique:users,email'],
+            'email' => [
+                'required',
+                'email:rfc',
+                'regex:/^.+@.+\..+$/',
+                'unique:users,email',
+            ],
             'password' => [
                 'required',
                 'confirmed',
-                PasswordRule::min(8)->mixedCase()->letters()->numbers()->symbols(),
+                PasswordRule::min(8)
+                    ->mixedCase()
+                    ->letters()
+                    ->numbers()
+                    ->symbols(),
             ],
             'role' => 'required|in:organizer,participant',
             'terms' => 'accepted',
@@ -43,24 +52,25 @@ class AuthController extends Controller
         Auth::login($user);
         $request->session()->regenerate();
 
-        session()->flash('show_welcome_banner', true);
-        session()->flash('welcome_type', 'register');
-        session()->flash('welcome_title', 'Welcome aboard, ' . $user->name . '!');
-        session()->flash('success', 'Registration successful! Welcome to your dashboard.');
+        $this->setWelcomeSession($user, 'register');
 
         if ($redirect = $this->handlePendingMeetingInvite($user)) {
             return $redirect;
         }
 
         return $user->role === 'organizer'
-            ? redirect('/organizer/dashboard')
-            : redirect('/participant/dashboard');
+            ? redirect()->route('organizer.dashboard')
+            : redirect()->route('participant.dashboard');
     }
 
     public function login(Request $request)
     {
         $request->validate([
-            'email' => ['required', 'email:rfc', 'regex:/^.+@.+\..+$/'],
+            'email' => [
+                'required',
+                'email:rfc',
+                'regex:/^.+@.+\..+$/',
+            ],
             'password' => 'required',
         ], [
             'email.email' => 'Please enter a valid email address, for example name@example.com.',
@@ -68,18 +78,28 @@ class AuthController extends Controller
         ]);
 
         $email = strtolower(trim($request->email));
-        $credentials = ['email' => $email, 'password' => $request->password];
+
+        $credentials = [
+            'email' => $email,
+            'password' => $request->password,
+        ];
+
         $user = User::where('email', $email)->first();
 
         if ($user && !is_null($user->provider)) {
             return back()->with(
                 'error',
-                'This account uses ' . ucfirst($user->provider) . ' login. Please use that instead.'
+                'This account uses '
+                . ucfirst($user->provider)
+                . ' login. Please use that instead.'
             );
         }
 
         if ($user && !$user->is_active) {
-            return back()->with('error', 'Your account has been deactivated. Contact admin.');
+            return back()->with(
+                'error',
+                'Your account has been deactivated. Contact admin.'
+            );
         }
 
         if (!Auth::attempt($credentials)) {
@@ -87,41 +107,42 @@ class AuthController extends Controller
         }
 
         $request->session()->regenerate();
+
         $user = Auth::user();
 
-        session()->flash('show_welcome_banner', true);
-        session()->flash('welcome_type', 'login');
-        session()->flash('welcome_title', 'Welcome back, ' . $user->name . '!');
-        session()->flash('success', 'Login successful! Welcome back.');
+        $this->setWelcomeSession($user, 'login');
 
         if ($redirect = $this->handlePendingMeetingInvite($user)) {
             return $redirect;
         }
 
-        if ($user->role === 'admin') {
-            return redirect('/admin/dashboard');
-        }
-
-        if ($user->role === 'organizer') {
-            return redirect('/organizer/dashboard');
-        }
-
-        return redirect('/participant/dashboard');
+        return match ($user->role) {
+            'admin' => redirect()->route('admin.dashboard'),
+            'organizer' => redirect()->route('organizer.dashboard'),
+            'participant' => redirect()->route('participant.dashboard'),
+            default => $this->logoutInvalidRole($request),
+        };
     }
 
     public function logout(Request $request)
     {
         Auth::logout();
+
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect('/login');
+        return redirect()->route('login');
     }
 
     public function sendResetLink(Request $request)
     {
         $request->validate([
-            'email' => ['required', 'email:rfc', 'regex:/^.+@.+\..+$/', 'exists:users,email'],
+            'email' => [
+                'required',
+                'email:rfc',
+                'regex:/^.+@.+\..+$/',
+                'exists:users,email',
+            ],
         ], [
             'email.email' => 'Please enter a valid email address, for example name@example.com.',
             'email.regex' => 'This email address is invalid. Please use a complete email address such as name@example.com.',
@@ -136,7 +157,9 @@ class AuthController extends Controller
                 'mailer' => config('mail.default'),
             ]);
 
-            $status = Password::sendResetLink(['email' => $email]);
+            $status = Password::sendResetLink([
+                'email' => $email,
+            ]);
 
             if ($status === Password::RESET_LINK_SENT) {
                 Log::info('Password reset email accepted by mailer', [
@@ -144,10 +167,15 @@ class AuthController extends Controller
                     'mailer' => config('mail.default'),
                 ]);
 
-                return back()->with('success', 'Reset link has been sent! Please check your email.');
+                return back()->with(
+                    'success',
+                    'Reset link has been sent! Please check your email.'
+                );
             }
 
-            return back()->withErrors(['email' => __($status)]);
+            return back()->withErrors([
+                'email' => __($status),
+            ]);
         } catch (\Throwable $exception) {
             Log::error('Password reset email sending failed', [
                 'email' => $email,
@@ -173,11 +201,20 @@ class AuthController extends Controller
     {
         $request->validate([
             'token' => 'required',
-            'email' => ['required', 'email:rfc', 'regex:/^.+@.+\..+$/', 'exists:users,email'],
+            'email' => [
+                'required',
+                'email:rfc',
+                'regex:/^.+@.+\..+$/',
+                'exists:users,email',
+            ],
             'password' => [
                 'required',
                 'confirmed',
-                PasswordRule::min(8)->mixedCase()->letters()->numbers()->symbols(),
+                PasswordRule::min(8)
+                    ->mixedCase()
+                    ->letters()
+                    ->numbers()
+                    ->symbols(),
             ],
         ], [
             'email.email' => 'Please enter a valid email address, for example name@example.com.',
@@ -187,6 +224,7 @@ class AuthController extends Controller
         ]);
 
         $email = strtolower(trim($request->email));
+
         $user = User::where('email', $email)->first();
 
         if ($user && Hash::check($request->password, $user->password)) {
@@ -203,14 +241,68 @@ class AuthController extends Controller
                 'token' => $request->token,
             ],
             function ($user, $password) {
-                $user->forceFill(['password' => Hash::make($password)])->save();
+                $user->forceFill([
+                    'password' => Hash::make($password),
+                ])->save();
+
                 event(new PasswordReset($user));
             }
         );
 
         return $status === Password::PASSWORD_RESET
-            ? redirect()->route('login')->with('success', 'Password reset successfully! Please log in.')
-            : back()->withErrors(['email' => __($status)]);
+            ? redirect()
+                ->route('login')
+                ->with(
+                    'success',
+                    'Password reset successfully! Please log in.'
+                )
+            : back()->withErrors([
+                'email' => __($status),
+            ]);
+    }
+
+    private function setWelcomeSession(User $user, string $type): void
+    {
+        session()->flash('show_welcome_banner', true);
+        session()->flash('welcome_type', $type);
+
+        session()->flash(
+            'welcome_title',
+            $type === 'register'
+                ? 'Welcome aboard, ' . $user->name . '!'
+                : 'Welcome back, ' . $user->name . '!'
+        );
+
+        session()->flash(
+            'success',
+            $type === 'register'
+                ? 'Registration successful! Welcome to your dashboard.'
+                : 'Login successful! Welcome back.'
+        );
+
+        /*
+         * Organizer gets a persistent one-time marker.
+         * The organizer dashboard consumes it with session()->pull().
+         * This survives an extra redirect but still shows only once.
+         */
+        if ($user->role === 'organizer') {
+            session()->put('organizer_welcome_banner', true);
+        }
+    }
+
+    private function logoutInvalidRole(Request $request)
+    {
+        Auth::logout();
+
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return redirect()
+            ->route('login')
+            ->with(
+                'error',
+                'Your account has an invalid role. Please contact support.'
+            );
     }
 
     /**
@@ -230,14 +322,25 @@ class AuthController extends Controller
         if (!$meeting) {
             session()->forget('pending_meeting_code');
 
-            return redirect()->route('participant.meetings.index')
-                ->with('error', 'The meeting invite link is no longer valid.');
+            return redirect()
+                ->route('participant.meetings.index')
+                ->with(
+                    'error',
+                    'The meeting invite link is no longer valid.'
+                );
         }
 
         $this->syncMeetingStatus($meeting);
+
         $meeting->refresh();
 
-        if (in_array($meeting->status, ['cancelled', 'completed', 'ended'], true)) {
+        if (
+            in_array(
+                $meeting->status,
+                ['cancelled', 'completed', 'ended'],
+                true
+            )
+        ) {
             session()->forget('pending_meeting_code');
 
             $message = match ($meeting->status) {
@@ -246,29 +349,47 @@ class AuthController extends Controller
                 default => 'This meeting has already completed.',
             };
 
-            return redirect()->route('participant.meetings.index')
+            return redirect()
+                ->route('participant.meetings.index')
                 ->with('info', $message);
         }
 
         $meeting->participants()->firstOrCreate(
-            ['user_id' => $user->id],
-            ['status' => 'invited']
+            [
+                'user_id' => $user->id,
+            ],
+            [
+                'status' => 'invited',
+            ]
         );
 
         session()->forget('pending_meeting_code');
 
         if ($meeting->status === 'active') {
             return redirect()
-                ->route('participant.meetings.attend', $meeting->id)
-                ->with('success', 'You have joined the meeting: ' . $meeting->title);
+                ->route(
+                    'participant.meetings.attend',
+                    $meeting->id
+                )
+                ->with(
+                    'success',
+                    'You have joined the meeting: '
+                    . $meeting->title
+                );
         }
 
         return redirect()
-            ->route('participant.meetings.index', ['highlight' => $meeting->id])
+            ->route(
+                'participant.meetings.index',
+                [
+                    'highlight' => $meeting->id,
+                ]
+            )
             ->with(
                 'info',
-                'You have been added to "' . $meeting->title .
-                '". It is upcoming and is now available in My Meetings.'
+                'You have been added to "'
+                . $meeting->title
+                . '". It is upcoming and is now available in My Meetings.'
             );
     }
 
@@ -276,8 +397,10 @@ class AuthController extends Controller
     {
         $meeting->refresh();
 
-        // Login/invite navigation may only activate an UPCOMING meeting.
-        // It can never complete or rewrite a final meeting status.
+        /*
+         * Login/invite navigation may only activate an UPCOMING meeting.
+         * It can never complete or rewrite a final meeting status.
+         */
         if ($meeting->status !== 'upcoming') {
             return;
         }

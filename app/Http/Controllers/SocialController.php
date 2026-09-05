@@ -18,34 +18,39 @@ class SocialController extends Controller
         try {
             $socialUser = Socialite::driver($provider)->user();
         } catch (\Throwable $e) {
-            return redirect('/login')->with(
-                'error',
-                ucfirst($provider) . ' login failed. Try again.'
-            );
+            return redirect()
+                ->route('login')
+                ->with(
+                    'error',
+                    ucfirst($provider)
+                    . ' login failed. Try again.'
+                );
         }
 
         $email = $socialUser->getEmail();
 
-        // 1. First try provider + provider_id.
         $user = User::where('provider', $provider)
-            ->where('provider_id', $socialUser->getId())
+            ->where(
+                'provider_id',
+                $socialUser->getId()
+            )
             ->first();
 
-        // 2. If not linked yet, reuse an existing account with same email.
         if (!$user && $email) {
-            $user = User::where('email', $email)->first();
+            $user = User::where(
+                'email',
+                $email
+            )->first();
         }
 
-        // Remember whether this social login creates a brand-new account.
         $isNewUser = !$user;
 
         if (!$user) {
             $user = new User();
             $user->role = 'participant';
-            $user->is_active = 1;
+            $user->is_active = true;
         }
 
-        // 3. Link/update social account details.
         $user->provider = $provider;
         $user->provider_id = $socialUser->getId();
 
@@ -67,24 +72,28 @@ class SocialController extends Controller
 
         $user->save();
 
-        // 4. Block deactivated accounts.
         if (!$user->is_active) {
-            return redirect('/login')->with(
-                'error',
-                'Your account has been deactivated.'
-            );
+            return redirect()
+                ->route('login')
+                ->with(
+                    'error',
+                    'Your account has been deactivated.'
+                );
         }
 
-        // 5. Login and rotate session ID.
         Auth::login($user);
         request()->session()->regenerate();
 
-        // 6. Set the SAME dashboard welcome session values used by email login/register.
-        request()->session()->flash('show_welcome_banner', true);
+        request()->session()->flash(
+            'show_welcome_banner',
+            true
+        );
+
         request()->session()->flash(
             'welcome_type',
             $isNewUser ? 'register' : 'login'
         );
+
         request()->session()->flash(
             'welcome_title',
             $isNewUser
@@ -92,15 +101,40 @@ class SocialController extends Controller
                 : 'Welcome back, ' . $user->name
         );
 
-        // 7. Role-based dashboard redirect.
-        if ($user->role === 'admin') {
-            return redirect('/admin/dashboard');
+        request()->session()->flash(
+            'success',
+            $isNewUser
+                ? 'Registration successful! Welcome to your dashboard.'
+                : 'Login successful! Welcome back.'
+        );
+
+        if ($user->role === 'organizer') {
+            request()->session()->put(
+                'organizer_welcome_banner',
+                true
+            );
         }
 
-        if ($user->role === 'organizers') {
-            return redirect('/organizers/dashboard');
-        }
+        return match ($user->role) {
+            'admin' => redirect()->route('admin.dashboard'),
+            'organizer' => redirect()->route('organizer.dashboard'),
+            'participant' => redirect()->route('participant.dashboard'),
+            default => $this->logoutInvalidRole(),
+        };
+    }
 
-        return redirect('/participant/dashboard');
+    private function logoutInvalidRole()
+    {
+        Auth::logout();
+
+        request()->session()->invalidate();
+        request()->session()->regenerateToken();
+
+        return redirect()
+            ->route('login')
+            ->with(
+                'error',
+                'Your account has an invalid role. Please contact support.'
+            );
     }
 }

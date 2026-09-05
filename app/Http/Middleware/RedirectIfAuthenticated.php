@@ -10,16 +10,23 @@ use Symfony\Component\HttpFoundation\Response;
 
 class RedirectIfAuthenticated
 {
-    public function handle(Request $request, Closure $next, string ...$guards): Response
-    {
-        $guards = empty($guards) ? [null] : $guards;
+    public function handle(
+        Request $request,
+        Closure $next,
+        string ...$guards
+    ): Response {
+        $guards = empty($guards)
+            ? [null]
+            : $guards;
 
         foreach ($guards as $guard) {
             if (!Auth::guard($guard)->check()) {
                 continue;
             }
 
-            $role = Auth::guard($guard)->user()->role;
+            $role = Auth::guard($guard)
+                ->user()
+                ->role;
 
             $dashboardRoute = match ($role) {
                 'admin' => 'admin.dashboard',
@@ -28,11 +35,17 @@ class RedirectIfAuthenticated
                 default => null,
             };
 
-            if ($dashboardRoute && Route::has($dashboardRoute)) {
-                return redirect()->route($dashboardRoute);
+            if (
+                $dashboardRoute
+                && Route::has($dashboardRoute)
+            ) {
+                return redirect()->route(
+                    $dashboardRoute
+                );
             }
 
             Auth::guard($guard)->logout();
+
             $request->session()->invalidate();
             $request->session()->regenerateToken();
 
