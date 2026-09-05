@@ -13,7 +13,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
 
     <style>
         :root {
@@ -45,7 +45,7 @@
 
         body {
             margin: 0;
-            font-family: "Plus Jakarta Sans", sans-serif;
+            font-family: "DM Sans", sans-serif;
             color: var(--text);
             background: var(--white);
             overflow-x: hidden;
@@ -96,7 +96,7 @@
         }
 
         .section-title {
-            font-family: "Sora", sans-serif;
+            font-family: "Outfit", sans-serif;
             font-size: clamp(36px, 5vw, 56px);
             line-height: 1.05;
             letter-spacing: -.045em;
@@ -146,7 +146,7 @@
             display: inline-flex;
             align-items: center;
             gap: 11px;
-            font-family: "Sora", sans-serif;
+            font-family: "Outfit", sans-serif;
             font-size: 20px;
             font-weight: 800;
             color: var(--navy);
@@ -163,41 +163,33 @@
             height: 40px;
             display: grid;
             place-items: center;
-            border-radius: 13px;
             position: relative;
-            overflow: hidden;
-            background: linear-gradient(145deg, #ffffff, #eef5ff);
-            border: 1px solid #d9e6fb;
-            box-shadow:
-                0 8px 20px rgba(37, 99, 235, .12),
-                inset 0 1px 0 rgba(255,255,255,.9);
-            transition: transform .35s var(--ease), box-shadow .35s var(--ease);
+            background: transparent;
+            border: 0;
+            box-shadow: none;
+            overflow: visible;
+            transition: transform .35s var(--ease);
         }
 
         .brand:hover .brand-mark {
-            transform: rotate(-4deg) scale(1.04);
-            box-shadow: 0 12px 28px rgba(37, 99, 235, .18);
+            transform: rotate(-3deg) scale(1.05);
+            box-shadow: none;
         }
 
-        .brand-mark::after {
-            content: "";
-            position: absolute;
-            inset: -40% 55% -40% -55%;
-            background: linear-gradient(110deg, transparent, rgba(255,255,255,.9), transparent);
-            transform: translateX(-120%);
-            transition: transform .7s var(--ease);
-        }
-
-        .brand:hover .brand-mark::after {
-            transform: translateX(230%);
-        }
 
         .brand-mark img {
-            width: 30px;
-            height: 30px;
+            width: 34px;
+            height: 34px;
             object-fit: contain;
             position: relative;
             z-index: 1;
+            filter: drop-shadow(0 6px 12px rgba(37,99,235,.12));
+            transition: transform .35s var(--ease), filter .35s ease;
+        }
+
+        .brand:hover .brand-mark img {
+            transform: scale(1.05);
+            filter: drop-shadow(0 9px 18px rgba(37,99,235,.18));
         }
 
         .brand-name {
@@ -228,6 +220,45 @@
 
         .nav-links a:hover {
             color: var(--blue);
+        }
+
+        .nav-links a {
+            position: relative;
+            padding: 9px 0;
+        }
+
+        .nav-links a::after {
+            content: "";
+            position: absolute;
+            left: 50%;
+            bottom: 1px;
+            width: 0;
+            height: 2px;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #60a5fa, #2563eb);
+            transform: translateX(-50%);
+            transition: width .3s var(--ease);
+        }
+
+        .nav-links a:hover::after,
+        .nav-links a.active::after {
+            width: 100%;
+        }
+
+        .nav-links a.active {
+            color: var(--blue);
+        }
+
+        .nav-links a.active::after {
+            width: 24px;
+            height: 3px;
+            bottom: -1px;
+            background: linear-gradient(90deg, #60a5fa, #2563eb);
+            box-shadow: 0 4px 10px rgba(37,99,235,.20);
+        }
+
+        .nav-links a:hover::after {
+            width: 100%;
         }
 
         .nav-actions {
@@ -444,8 +475,7 @@
         }
 
         .hero-grid {
-            display: grid;
-            grid-template-columns: .92fr 1.08fr;
+            display: grid;            grid-template-columns: .88fr 1.12fr;
             gap: 64px;
             align-items: center;
             position: relative;
@@ -481,10 +511,10 @@
         }
 
         .hero h1 {
-            font-family: "Sora", sans-serif;
-            font-size: clamp(46px, 5.15vw, 68px);
-            line-height: .97;
-            letter-spacing: -.06em;
+            font-family: "Outfit", sans-serif;
+            font-size: clamp(42px, 4.35vw, 60px);
+            line-height: 1.01;
+            letter-spacing: -.052em;
             color: var(--navy);
             margin: 22px 0;
         }
@@ -872,7 +902,7 @@
             border-radius: 50%;
             background: linear-gradient(145deg,#eef4ff,#bed4ff);
             color: #1d4ed8;
-            font-family: "Sora", sans-serif;
+            font-family: "Outfit", sans-serif;
             font-size: 18px;
             font-weight: 800;
             display: grid;
@@ -992,6 +1022,231 @@
             font-weight: 750;
         }
 
+
+        .hero {
+            isolation: isolate;
+        }
+
+        .hero-ambient {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .hero-ambient.one {
+            width: 240px;
+            height: 240px;
+            left: 3%;
+            top: 36%;
+            background: radial-gradient(circle, rgba(96,165,250,.16), transparent 68%);
+            animation: ambientOne 8s ease-in-out infinite;
+        }
+
+        .hero-ambient.two {
+            width: 320px;
+            height: 320px;
+            right: 2%;
+            bottom: -4%;
+            background: radial-gradient(circle, rgba(37,99,235,.11), transparent 70%);
+            animation: ambientTwo 10s ease-in-out infinite;
+        }
+
+        @keyframes ambientOne {
+            0%,100% { transform: translate3d(0,0,0) scale(1); }
+            50% { transform: translate3d(18px,-14px,0) scale(1.07); }
+        }
+
+        @keyframes ambientTwo {
+            0%,100% { transform: translate3d(0,0,0) scale(1); }
+            50% { transform: translate3d(-22px,16px,0) scale(1.05); }
+        }
+
+        .mockup-shell {
+            position: relative;
+            padding: 16px;
+            border-radius: 32px;
+            background: linear-gradient(145deg, rgba(255,255,255,.95), rgba(239,246,255,.72));
+            border: 1px solid rgba(191,211,238,.82);
+            box-shadow:
+                0 32px 90px rgba(15,23,42,.11),
+                inset 0 1px 0 rgba(255,255,255,.95);
+            transition: transform .55s var(--ease), box-shadow .55s var(--ease);
+        }
+
+        .mockup-wrap:hover .mockup-shell {
+            transform: translateY(-5px) scale(1.008);
+            box-shadow:
+                0 44px 112px rgba(15,23,42,.15),
+                0 16px 38px rgba(37,99,235,.09);
+        }
+
+        .mockup-shine {
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .mockup-shine::after {
+            content: "";
+            position: absolute;
+            top: -35%;
+            left: -60%;
+            width: 34%;
+            height: 180%;
+            transform: rotate(16deg);
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,.42), transparent);
+            animation: mockupShine 6.8s ease-in-out infinite;
+        }
+
+        @keyframes mockupShine {
+            0%,70% { left: -60%; opacity: 0; }
+            77% { opacity: 1; }
+            100% { left: 135%; opacity: 0; }
+        }
+
+        .mini-status-card {
+            position: absolute;
+            z-index: 8;
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            min-width: 155px;
+            padding: 10px 12px;
+            border-radius: 14px;
+            background: rgba(255,255,255,.95);
+            backdrop-filter: blur(14px);
+            border: 1px solid #e1e9f5;
+            box-shadow: 0 16px 40px rgba(15,23,42,.10);
+            color: #344054;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .mini-status-card.top-left {
+            left: -32px;
+            top: 20%;
+            animation: miniFloatA 5.4s ease-in-out infinite;
+        }
+
+        .mini-status-card.bottom-right {
+            right: -28px;
+            bottom: 14%;
+            animation: miniFloatB 5.8s ease-in-out infinite;
+        }
+
+        .mini-status-icon {
+            width: 29px;
+            height: 29px;
+            border-radius: 9px;
+            display: grid;
+            place-items: center;
+            flex: 0 0 auto;
+            background: #eff6ff;
+            color: var(--blue);
+            border: 1px solid #deebff;
+        }
+
+        .mini-status-copy small {
+            display: block;
+            margin-top: 2px;
+            font-size: 8px;
+            color: #98a2b3;
+            font-weight: 700;
+        }
+
+        @keyframes miniFloatA {
+            0%,100% { transform: translateY(0) rotate(-1deg); }
+            50% { transform: translateY(-8px) rotate(1deg); }
+        }
+
+        @keyframes miniFloatB {
+            0%,100% { transform: translateY(0) rotate(1deg); }
+            50% { transform: translateY(8px) rotate(-1deg); }
+        }
+
+        .meeting-card {
+            transform-origin: center;
+        }
+
+        .video-tile {
+            transition: transform .35s var(--ease), border-color .35s ease, box-shadow .35s ease;
+        }
+
+        .video-tile:hover {
+            transform: translateY(-3px);
+            border-color: rgba(96,165,250,.42);
+            box-shadow: 0 14px 32px rgba(2,6,23,.18);
+        }
+
+        .avatar {
+            transition: transform .35s var(--ease), box-shadow .35s var(--ease);
+        }
+
+        .video-tile:hover .avatar {
+            transform: scale(1.06);
+            box-shadow: 0 12px 30px rgba(37,99,235,.16);
+        }
+
+        .mockup-wrap.reveal-ready {
+            opacity: 0;
+            transform: translateY(22px) scale(.98);
+            filter: blur(5px);
+        }
+
+        .mockup-wrap.reveal-ready.mockup-visible {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            filter: blur(0);
+            transition:
+                opacity .95s var(--ease),
+                transform .95s var(--ease),
+                filter .95s var(--ease);
+        }
+
+
+        .hero-badge {
+            transition: transform .3s var(--ease), box-shadow .3s ease, border-color .3s ease;
+        }
+
+        .hero-badge:hover {
+            transform: translateY(-2px);
+            border-color: #c8dbfb;
+            box-shadow: 0 12px 34px rgba(37,99,235,.10);
+        }
+
+        .hero-copy {
+            max-width: 620px;
+        }
+
+        .hero-copy .hero-actions {
+            margin-top: 26px;
+        }
+
+        .hero-copy .hero-benefits {
+            margin-top: 24px;
+        }
+
+        .meeting-title img {
+            background: transparent !important;
+            border-radius: 0 !important;
+        }
+
+        .mockup-wrap {
+            perspective: 1200px;
+        }
+
+        .mockup-wrap:hover .meeting-card {
+            transform: rotateX(1deg) rotateY(-1deg);
+        }
+
+        .meeting-card {
+            transition: transform .45s var(--ease), box-shadow .45s var(--ease);
+        }
+
         /* BENEFITS STRIP */
         .benefit-strip {
             position: relative;
@@ -1092,7 +1347,7 @@
 
         .feature-card h3 {
             margin: 0 0 9px;
-            font-family: "Sora", sans-serif;
+            font-family: "Outfit", sans-serif;
             color: var(--navy);
             font-size: 18px;
         }
@@ -1340,7 +1595,7 @@
             display: grid;
             place-items: center;
             color: var(--blue);
-            font-family: "Sora", sans-serif;
+            font-family: "Outfit", sans-serif;
             font-weight: 800;
             font-size: 20px;
             position: relative;
@@ -1349,7 +1604,7 @@
 
         .step h3 {
             margin: 0 0 8px;
-            font-family: "Sora", sans-serif;
+            font-family: "Outfit", sans-serif;
             font-size: 20px;
             color: var(--navy);
         }
@@ -1396,7 +1651,7 @@
 
         .exp-card h3 {
             margin: 0 0 18px;
-            font-family: "Sora", sans-serif;
+            font-family: "Outfit", sans-serif;
             font-size: 17px;
         }
 
@@ -1490,7 +1745,7 @@
 
         .cta h2 {
             margin: 0;
-            font-family: "Sora", sans-serif;
+            font-family: "Outfit", sans-serif;
             font-size: clamp(34px, 4.4vw, 52px);
             line-height: 1.03;
             letter-spacing: -.045em;
@@ -1712,6 +1967,89 @@
         .cta {
             box-shadow: 0 28px 80px rgba(15,23,42,.16);
             border: 1px solid rgba(255,255,255,.06);
+        }
+
+
+        .features {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .features::before {
+            content: "";
+            position: absolute;
+            width: 420px;
+            height: 420px;
+            left: -220px;
+            top: 80px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(37,99,235,.075), transparent 68%);
+            pointer-events: none;
+        }
+
+        .feature-card {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-card::after {
+            content: "";
+            position: absolute;
+            width: 110px;
+            height: 110px;
+            right: -52px;
+            top: -52px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(37,99,235,.09), transparent 70%);
+            transition: transform .4s var(--ease);
+        }
+
+        .feature-card:hover::after {
+            transform: scale(1.5);
+        }
+
+        .showcase {
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(180deg, #f8fbff, #f4f8ff);
+        }
+
+        .showcase::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(37,99,235,.025) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(37,99,235,.025) 1px, transparent 1px);
+            background-size: 34px 34px;
+            mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 80%, transparent);
+            pointer-events: none;
+        }
+
+        .showcase .container {
+            position: relative;
+            z-index: 1;
+        }
+
+        .dashboard {
+            transition: transform .45s var(--ease), box-shadow .45s var(--ease);
+        }
+
+        .dashboard:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 36px 96px rgba(15,23,42,.14);
+        }
+
+        .step {
+            border-radius: 18px;
+            padding: 26px 18px 22px;
+            transition: transform .35s var(--ease), background .35s ease, box-shadow .35s var(--ease);
+        }
+
+        .step:hover {
+            background: #fff;
+            box-shadow: 0 18px 46px rgba(15,23,42,.07);
+            transform: translateY(-5px);
         }
 
         /* REVEALS */
@@ -2310,6 +2648,52 @@
             }
         }
 
+
+        @media (max-width: 1100px) {
+            .mini-status-card.top-left {
+                left: 8px;
+                top: 17%;
+            }
+
+            .mini-status-card.bottom-right {
+                right: 8px;
+            }
+        }
+
+        @media (max-width: 700px) {
+            .mockup-shell {
+                padding: 10px;
+                border-radius: 24px;
+            }
+
+            .mini-status-card {
+                display: none;
+            }
+        }
+
+
+        @media (max-width: 900px) {
+            .hero h1 {
+                font-size: clamp(40px, 8vw, 54px);
+            }
+        }
+
+        @media (max-width: 620px) {
+            .brand-mark {
+                width: 34px;
+                height: 34px;
+            }
+
+            .brand-mark img {
+                width: 31px;
+                height: 31px;
+            }
+
+            .hero h1 {
+                font-size: clamp(38px, 11vw, 48px);
+            }
+        }
+
         @media (prefers-reduced-motion: reduce) {
             *,
             *::before,
@@ -2378,10 +2762,12 @@
 <main>
 
     <section class="hero">
+        <div class="hero-ambient one"></div>
+        <div class="hero-ambient two"></div>
 
         <div class="container hero-grid">
 
-            <div>
+            <div class="hero-copy">
                 <div class="hero-badge hero-animate delay-1">
                     <i></i>
                     Smarter online collaboration
@@ -2394,7 +2780,7 @@
                 </h1>
 
                 <p class="hero-animate delay-3">
-                    SmartMeet brings video meetings, real-time chat, scheduling and live transcription together in one simple workspace.
+                    Bring video meetings, real-time chat, scheduling and live transcription together in one focused workspace.
                 </p>
 
                 <div class="hero-actions hero-animate delay-4">
@@ -2414,7 +2800,7 @@
                 </div>
             </div>
 
-            <div class="mockup-wrap hero-animate delay-4">
+            <div class="mockup-wrap hero-animate delay-4 reveal-ready">
 
                 <div class="mockup-glow"></div>
                 <div class="mockup-orbit"></div>
@@ -2429,95 +2815,109 @@
                     <span>4 participants online</span>
                 </div>
 
-                <div class="meeting-card">
+                <div class="mini-status-card top-left">
+                    <span class="mini-status-icon">✦</span>
+                    <span class="mini-status-copy">Live transcript<small>Capturing conversation</small></span>
+                </div>
 
-                    <div class="meeting-top">
+                <div class="mini-status-card bottom-right">
+                    <span class="mini-status-icon">👥</span>
+                    <span class="mini-status-copy">4 participants<small>Connected now</small></span>
+                </div>
 
-                        <div class="meeting-title">
-                            <img src="{{ asset('images/s-logo.png') }}" alt="">
-                            Weekly Product Sync
-                        </div>
+                <div class="mockup-shell">
+                    <div class="mockup-shine"></div>
 
-                        <div class="meeting-top-meta">
-                            <div class="meeting-secure">Browser meeting</div>
-                            <div class="live">
-                                LIVE
-                            </div>
-                        </div>
+                    <div class="meeting-card">
 
-                    </div>
+                        <div class="meeting-top">
 
-                    <div class="meeting-body">
-
-                        <div class="video-grid">
-
-                            <div class="video-tile active">
-                                <div class="speaker-wave"><span></span><span></span><span></span><span></span></div>
-                                <div class="avatar">AL</div>
-                                <div class="person">Alex · 🎙</div>
+                            <div class="meeting-title">
+                                <img src="{{ asset('images/s-logo.png') }}" alt="">
+                                Weekly Product Sync
                             </div>
 
-                            <div class="video-tile">
-                                <div class="avatar avatar-purple">SR</div>
-                                <div class="person">Sarah · 🎙</div>
-                            </div>
-
-                            <div class="video-tile">
-                                <div class="avatar avatar-green">DV</div>
-                                <div class="person">David · 🎙</div>
-                            </div>
-
-                            <div class="video-tile">
-                                <div class="avatar avatar-amber">EM</div>
-                                <div class="person">Emma · 🎙</div>
+                            <div class="meeting-top-meta">
+                                <div class="meeting-secure">Browser meeting</div>
+                                <div class="live">
+                                    LIVE
+                                </div>
                             </div>
 
                         </div>
 
-                        <aside class="sidebar">
+                        <div class="meeting-body">
 
-                            <div class="tabs">
-                                <div class="tab active">Chat</div>
-                                <div class="tab">Transcript</div>
+                            <div class="video-grid">
+
+                                <div class="video-tile active">
+                                    <div class="speaker-wave"><span></span><span></span><span></span><span></span></div>
+                                    <div class="avatar">AL</div>
+                                    <div class="person">Alex · 🎙</div>
+                                </div>
+
+                                <div class="video-tile">
+                                    <div class="avatar avatar-purple">SR</div>
+                                    <div class="person">Sarah · 🎙</div>
+                                </div>
+
+                                <div class="video-tile">
+                                    <div class="avatar avatar-green">DV</div>
+                                    <div class="person">David · 🎙</div>
+                                </div>
+
+                                <div class="video-tile">
+                                    <div class="avatar avatar-amber">EM</div>
+                                    <div class="person">Emma · 🎙</div>
+                                </div>
+
                             </div>
 
-                            <div class="chat">
+                            <aside class="sidebar">
 
-                                <div class="chat-item">
-                                    <strong>Sarah</strong>
-                                    <div class="bubble">
-                                        The new milestone looks good from my side.
+                                <div class="tabs">
+                                    <div class="tab active">Chat</div>
+                                    <div class="tab">Transcript</div>
+                                </div>
+
+                                <div class="chat">
+
+                                    <div class="chat-item">
+                                        <strong>Sarah</strong>
+                                        <div class="bubble">
+                                            The new milestone looks good from my side.
+                                        </div>
                                     </div>
-                                </div>
 
-                                <div class="chat-item">
-                                    <strong>David</strong>
-                                    <div class="bubble">
-                                        Great — I’ll update the schedule today.
+                                    <div class="chat-item">
+                                        <strong>David</strong>
+                                        <div class="bubble">
+                                            Great — I’ll update the schedule today.
+                                        </div>
                                     </div>
+
+                                    <div class="transcript">
+                                        <strong>Live transcript</strong>
+                                        <p>
+                                            Let's review the project milestones for this week...
+                                        </p>
+                                    </div>
+
                                 </div>
 
-                                <div class="transcript">
-                                    <strong>Live transcript</strong>
-                                    <p>
-                                        Let's review the project milestones for this week...
-                                    </p>
-                                </div>
+                            </aside>
 
-                            </div>
+                        </div>
 
-                        </aside>
+                        <div class="meeting-controls">
+                            <div class="control">🎙</div>
+                            <div class="control">◉</div>
+                            <div class="control">👥</div>
+                            <div class="control">💬</div>
+                            <div class="control leave">Leave</div>
+                        </div>
 
                     </div>
-
-                    <div class="meeting-controls">
-                        <div class="control">🎙</div>
-                        <div class="control">◉</div>
-                        <div class="control">👥</div>
-                        <div class="control">💬</div>
-                        <div class="control leave">Leave</div>
-                    </div>
-
                 </div>
 
             </div>
@@ -3028,6 +3428,44 @@
         document.querySelectorAll('.step').forEach((step, index) => {
             step.style.transitionDelay = `${index * 120}ms`;
         });
+
+        const sectionLinks = [...document.querySelectorAll('.nav-links a[href^="#"]')];
+        const observedSections = sectionLinks
+            .map(link => document.querySelector(link.getAttribute('href')))
+            .filter(Boolean);
+
+        const activeNavObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    sectionLinks.forEach(link => {
+                        link.classList.toggle(
+                            'active',
+                            link.getAttribute('href') === `#${entry.target.id}`
+                        );
+                    });
+                }
+            });
+        }, {
+            rootMargin: '-35% 0px -55% 0px',
+            threshold: 0
+        });
+
+        observedSections.forEach(section => activeNavObserver.observe(section));
+
+        const mockup = document.querySelector('.mockup-wrap.reveal-ready');
+        if (mockup) {
+            const mockupObserver = new IntersectionObserver((entries, obs) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('mockup-visible');
+                        obs.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.18 });
+
+            mockupObserver.observe(mockup);
+        }
+
 
         document.querySelectorAll('.exp-card').forEach((card, index) => {
             card.style.transitionDelay = `${index * 110}ms`;
