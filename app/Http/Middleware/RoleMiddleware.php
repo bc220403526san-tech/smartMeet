@@ -1,5 +1,7 @@
 <?php
+
 namespace App\Http\Middleware;
+
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -17,17 +19,27 @@ class RoleMiddleware
         $userRole = Auth::user()->role;
 
         if ($userRole !== $role) {
-            if (in_array($userRole, ['admin', 'organizers', 'participant']) && Route::has($userRole . '.dashboard')) {
-                return redirect()->route($userRole . '.dashboard');
+            $dashboardRoute = match ($userRole) {
+                'admin' => 'admin.dashboard',
+                'organizer' => 'organizer.dashboard',
+                'participant' => 'participant.dashboard',
+                default => null,
+            };
+
+            if ($dashboardRoute && Route::has($dashboardRoute)) {
+                return redirect()->route($dashboardRoute);
             }
 
-            // Invalid role — logout karke loop rokein
             Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
 
-            return redirect()->route('login')
-                ->with('error', 'Your account has an invalid role. Please contact support.');
+            return redirect()
+                ->route('login')
+                ->with(
+                    'error',
+                    'Your account has an invalid role. Please contact support.'
+                );
         }
 
         return $next($request);
