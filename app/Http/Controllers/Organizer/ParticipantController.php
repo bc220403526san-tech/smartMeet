@@ -173,13 +173,6 @@ class ParticipantController extends Controller
         ];
     }
 
-    /**
-     * Ek participant ke liye stats (show page).
-     * FIXED: attended / attendance-rate / active-status ab
-     * joined_at + left_at par based hain, 'status' column par nahi
-     * (kyunke status sirf invited/accepted/declined hota hai,
-     * meeting mein waqai attend karne ka pata nahi deta).
-     */
     private function computeParticipantStats(User $participant): array
     {
         $meetings = $participant->joinedMeetings; // already loaded, sorted latest first

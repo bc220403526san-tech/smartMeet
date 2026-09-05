@@ -66,7 +66,7 @@
         }
     @endphp
 
-    <div class="p-3 sm:p-4 bg-gray-50 rounded-2xl m-2 mt-0 space-y-4">
+    <div class="p-3 sm:p-5 bg-slate-50 rounded-3xl m-2 mt-0 space-y-5">
         <x-success />
         <x-error />
 
@@ -79,7 +79,7 @@
 
             <div class="mt-2 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
                 <div>
-                    <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 tracking-tight">Meeting Details</h1>
+                    <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Meeting Details</h1>
                     <p class="mt-1 text-sm sm:text-base text-gray-400">
                         Review meeting information, organizer and participants.
                     </p>
@@ -93,12 +93,12 @@
             </div>
         </div>
 
-        <div class="bg-white border border-gray-200 rounded-3xl shadow-sm overflow-hidden">
-            <div class="px-5 sm:px-7 py-5 sm:py-6 bg-gradient-to-r from-blue-50 to-indigo-50">
+        <div class="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden ring-1 ring-slate-100">
+            <div class="relative px-5 sm:px-7 py-6 sm:py-7 bg-gradient-to-br from-blue-50 via-white to-indigo-50 border-b border-slate-100">
                 <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
                     <div class="min-w-0">
                         <p class="text-xs font-semibold text-blue-500 uppercase tracking-wider">Meeting</p>
-                        <h2 class="mt-1 text-xl sm:text-2xl font-bold text-gray-800 break-words">
+                        <h2 class="mt-3 text-xl sm:text-2xl font-extrabold text-slate-900 break-words">
                             {{ $meeting->title }}
                         </h2>
 
@@ -110,12 +110,12 @@
                     </div>
 
                     <div class="grid grid-cols-2 gap-3 shrink-0">
-                        <div class="bg-white border border-gray-200 rounded-2xl px-4 py-3 min-w-[130px]">
+                        <div class="bg-white/90 border border-slate-200 rounded-2xl px-4 py-3 min-w-[130px] shadow-sm">
                             <p class="text-xs text-gray-400">Meeting ID</p>
                             <p class="mt-1 font-semibold text-gray-800">#{{ $meeting->id }}</p>
                         </div>
 
-                        <div class="bg-white border border-gray-200 rounded-2xl px-4 py-3 min-w-[130px]">
+                        <div class="bg-white/90 border border-slate-200 rounded-2xl px-4 py-3 min-w-[130px] shadow-sm">
                             <p class="text-xs text-gray-400">Participants</p>
                             <p class="mt-1 font-semibold text-gray-800">{{ $displayParticipants->count() }}</p>
                         </div>
@@ -127,7 +127,7 @@
                 <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Meeting Information</h3>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    <div class="flex items-center gap-3 p-4 bg-gray-50 border border-gray-100 rounded-2xl">
+                    <div class="flex items-center gap-3 p-4 bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition">
                         <div class="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
                             <i class="fa-solid fa-calendar-days text-xs"></i>
                         </div>
@@ -139,7 +139,7 @@
                         </div>
                     </div>
 
-                    <div class="flex items-center gap-3 p-4 bg-gray-50 border border-gray-100 rounded-2xl">
+                    <div class="flex items-center gap-3 p-4 bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition">
                         <div class="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
                             <i class="fa-regular fa-clock text-xs"></i>
                         </div>
@@ -151,7 +151,7 @@
                         </div>
                     </div>
 
-                    <div class="flex items-center gap-3 p-4 bg-gray-50 border border-gray-100 rounded-2xl">
+                    <div class="flex items-center gap-3 p-4 bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition">
                         <div class="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
                             <i class="fa-solid fa-hourglass-half text-xs"></i>
                         </div>
@@ -163,7 +163,7 @@
                         </div>
                     </div>
 
-                    <div class="flex items-center gap-3 p-4 bg-gray-50 border border-gray-100 rounded-2xl">
+                    <div class="flex items-center gap-3 p-4 bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition">
                         <div class="w-9 h-9 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center shrink-0">
                             <i class="fa-solid fa-earth-americas text-xs"></i>
                         </div>
@@ -229,7 +229,7 @@
                 @if(count($agendaItems) > 0)
                     <div class="space-y-2">
                         @foreach($agendaItems as $item)
-                            <div class="flex items-start gap-3 p-3.5 bg-gray-50 border border-gray-100 rounded-xl">
+                            <div class="flex items-start gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-xl hover:bg-white hover:shadow-sm transition">
                                 <span class="mt-1.5 w-2 h-2 rounded-full bg-blue-500 shrink-0"></span>
                                 <p class="text-sm text-gray-600 leading-relaxed">
                                     {{ is_array($item) ? ($item['title'] ?? json_encode($item)) : $item }}
@@ -249,8 +249,8 @@
             </div>
         </div>
 
-        <div class="bg-white border border-gray-200 rounded-3xl shadow-sm overflow-hidden">
-            <div class="px-5 sm:px-7 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-100">
+        <div class="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden ring-1 ring-slate-100">
+            <div class="px-5 sm:px-7 py-5 bg-gradient-to-r from-blue-50 via-white to-indigo-50 border-b border-slate-100">
                 <h2 class="font-semibold text-gray-800 text-lg">Participants</h2>
                 <p class="mt-0.5 text-xs text-gray-400">
                     {{ $displayParticipants->count() }}
@@ -327,7 +327,7 @@
             </div>
         </div>
 
-        <div class="bg-white border border-gray-200 rounded-2xl shadow-sm p-4 sm:p-5">
+        <div class="bg-white border border-slate-200 rounded-3xl shadow-sm p-4 sm:p-5 ring-1 ring-slate-100">
             <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div>
                     <h3 class="font-semibold text-gray-800">Admin Actions</h3>
