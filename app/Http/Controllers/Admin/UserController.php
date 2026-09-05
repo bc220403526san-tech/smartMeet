@@ -102,7 +102,7 @@ class UserController extends Controller
         $meetingCount = match ($user->role) {
             'participant' => Meeting::query()
                 ->whereHas('participants', function ($query) use ($user) {
-                    $query->where('users.id', $user->id);
+                    $query->where('user_id', $user->id);
                 })
                 ->count(),
 
@@ -166,14 +166,14 @@ class UserController extends Controller
     private function participantMeetingHistory(User $user)
     {
         /*
-         * Membership is the source for WHICH meetings belong in history.
-         * This means older meetings still appear even if audit logging was
-         * introduced later and no MeetingParticipantLog row exists for them.
+         * MeetingParticipant is the source of truth for membership.
+         * Therefore, every meeting the user joined/was attached to appears,
+         * even if an older meeting has no audit-log session rows.
          */
         $participantMeetings = Meeting::query()
             ->with('organizer')
             ->whereHas('participants', function ($query) use ($user) {
-                $query->where('users.id', $user->id);
+                $query->where('user_id', $user->id);
             })
             ->orderByDesc('date')
             ->orderByDesc('time')
