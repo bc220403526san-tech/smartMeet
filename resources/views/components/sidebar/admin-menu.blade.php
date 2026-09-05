@@ -1,4 +1,4 @@
-<aside class="w-64 bg-white shadow-lg flex flex-col h-[calc(100vh-1rem)] m-2 rounded-5xl border border-gray-100">
+<aside class="w-64 bg-white shadow-lg flex flex-col h-[calc(100vh-1rem)] m-2 rounded-4xl border border-gray-100">
     <!-- TOP -->
     <div class="p-5 flex-1 overflow-y-auto">
         {{-- Logo --}}
