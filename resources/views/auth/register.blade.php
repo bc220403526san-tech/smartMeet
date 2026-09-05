@@ -1,378 +1,389 @@
-
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" sizes="96x96" href="{{ asset('images/s-logo.png') }}">
     <title>{{ env('APP_NAME') }}</title>
-
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Urbanist:wght@500;600;700;800&display=swap" rel="stylesheet">
-
     @vite(['resources/css/app.css','resources/js/app.js'])
 
     <style>
-        :root{
-            --brand:#2563eb;
-            --brand-dark:#1d4ed8;
-            --ink:#0f172a;
-            --muted:#64748b;
-            --line:#dbe4f0;
-            --panel:#ffffff;
-            --soft:#f8fbff;
+        @keyframes heroFade {
+            from { opacity: 0; transform: translateY(18px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
-        html{scroll-behavior:smooth}
+        @keyframes heroFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
 
-        body{
-            font-family:'Manrope',sans-serif;
+        @keyframes orbOne {
+            0%,100% { transform: translate(0,0) scale(1); }
+            50% { transform: translate(16px,-12px) scale(1.05); }
+        }
+
+        @keyframes orbTwo {
+            0%,100% { transform: translate(0,0) scale(1); }
+            50% { transform: translate(-14px,10px) scale(1.08); }
+        }
+
+        .auth-visual {
+            position: relative;
+            overflow: hidden;
             background:
-                radial-gradient(circle at 8% 12%, rgba(59,130,246,.10), transparent 26%),
-                radial-gradient(circle at 92% 88%, rgba(96,165,250,.09), transparent 30%),
-                #f7f9fc;
+                radial-gradient(circle at 18% 18%, rgba(59,130,246,.15), transparent 27%),
+                radial-gradient(circle at 82% 82%, rgba(96,165,250,.12), transparent 30%),
+                linear-gradient(145deg, #f8fbff 0%, #eef5ff 48%, #f8fbff 100%);
         }
 
-        h1,h2,h3,.display-font{
-            font-family:'Urbanist',sans-serif;
+        .auth-visual::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(37,99,235,.025) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(37,99,235,.025) 1px, transparent 1px);
+            background-size: 34px 34px;
+            mask-image: linear-gradient(to bottom right, #000, transparent 74%);
+            pointer-events: none;
         }
 
-        @keyframes fadeSlide{
-            from{opacity:0;transform:translateY(18px)}
-            to{opacity:1;transform:translateY(0)}
+        .hero-orb {
+            position: absolute;
+            border-radius: 999px;
+            pointer-events: none;
         }
 
-        @keyframes floatIcon{
-            0%,100%{transform:translateY(0)}
-            50%{transform:translateY(-4px)}
+        .hero-orb.one {
+            width: 210px;
+            height: 210px;
+            top: -70px;
+            right: -55px;
+            background: rgba(59,130,246,.10);
+            animation: orbOne 8s ease-in-out infinite;
         }
 
-        @keyframes shine{
-            from{left:-70%}
-            to{left:130%}
+        .hero-orb.two {
+            width: 160px;
+            height: 160px;
+            bottom: -55px;
+            left: -45px;
+            border: 1px solid rgba(37,99,235,.09);
+            box-shadow: 0 0 0 34px rgba(37,99,235,.025);
+            animation: orbTwo 9s ease-in-out infinite;
         }
 
-        .auth-panel{
-            position:relative;
-            overflow:hidden;
-            background:
-                radial-gradient(circle at 85% 10%, rgba(59,130,246,.10), transparent 28%),
-                radial-gradient(circle at 15% 90%, rgba(37,99,235,.06), transparent 28%),
-                linear-gradient(180deg,#ffffff 0%,#f8fbff 100%);
+        .hero-content {
+            animation: heroFade .75s cubic-bezier(.22,1,.36,1) both;
         }
 
-        .auth-panel::before{
-            content:"";
-            position:absolute;
-            width:220px;
-            height:220px;
-            border-radius:999px;
-            top:-90px;
-            right:-80px;
-            background:linear-gradient(135deg,rgba(59,130,246,.14),rgba(147,197,253,.04));
+        .hero-logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 800;
+            color: #2563eb;
+            letter-spacing: -.02em;
         }
 
-        .auth-panel::after{
-            content:"";
-            position:absolute;
-            width:170px;
-            height:170px;
-            border-radius:999px;
-            bottom:-70px;
-            left:-55px;
-            border:1px solid rgba(37,99,235,.08);
-            box-shadow:0 0 0 34px rgba(37,99,235,.025);
+        .hero-logo img {
+            width: 44px;
+            height: 44px;
+            object-fit: contain;
+            filter: drop-shadow(0 8px 18px rgba(37,99,235,.16));
         }
 
-        .auth-card{
-            animation:fadeSlide .7s cubic-bezier(.22,1,.36,1) both;
-            border:1px solid rgba(219,228,240,.92);
+        .image-stage {
+            position: relative;
+            width: min(82%, 520px);
+            margin: 28px auto 0;
+            padding: 26px;
+            border-radius: 32px;
+            background: rgba(255,255,255,.72);
+            border: 1px solid rgba(191,211,238,.75);
             box-shadow:
                 0 28px 70px rgba(15,23,42,.10),
-                0 8px 24px rgba(37,99,235,.04);
-        }
-
-        .auth-icon{
-            animation:floatIcon 4s ease-in-out infinite;
-            box-shadow:
-                0 10px 24px rgba(37,99,235,.12),
                 inset 0 1px 0 rgba(255,255,255,.9);
+            backdrop-filter: blur(10px);
         }
 
-        .premium-input{
-            transition:
-                border-color .22s ease,
-                background-color .22s ease,
-                box-shadow .22s ease,
-                transform .22s ease;
+        .image-stage::before {
+            content: "";
+            position: absolute;
+            inset: 18px;
+            border-radius: 24px;
+            border: 1px dashed rgba(37,99,235,.14);
+            pointer-events: none;
         }
 
-        .premium-input:hover{
-            border-color:#c7d2e0;
-            background:#fff;
+        .image-stage img {
+            width: 100%;
+            position: relative;
+            z-index: 1;
+            animation: heroFloat 5.5s ease-in-out infinite;
+            filter: drop-shadow(0 22px 36px rgba(15,23,42,.12));
         }
 
-        .premium-input:focus{
-            background:#fff;
-            border-color:#60a5fa;
-            box-shadow:0 0 0 4px rgba(59,130,246,.09);
-            transform:translateY(-1px);
+        .float-pill {
+            position: absolute;
+            z-index: 3;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 9px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,.94);
+            border: 1px solid #e2eaf5;
+            box-shadow: 0 12px 28px rgba(15,23,42,.08);
+            font-size: 11px;
+            font-weight: 700;
+            color: #475569;
+            backdrop-filter: blur(10px);
         }
 
-        .primary-btn{
-            position:relative;
-            overflow:hidden;
-            isolation:isolate;
-            background:linear-gradient(135deg,#3b82f6 0%,#2563eb 55%,#1d4ed8 100%);
-            box-shadow:
-                0 12px 28px rgba(37,99,235,.24),
-                inset 0 1px 0 rgba(255,255,255,.24);
+        .float-pill.one { left: -20px; top: 24%; }
+        .float-pill.two { right: -18px; bottom: 18%; }
+
+        .float-pill i {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #22c55e;
+            box-shadow: 0 0 0 4px rgba(34,197,94,.10);
         }
 
-        .primary-btn::after{
-            content:"";
-            position:absolute;
-            top:-55%;
-            left:-70%;
-            width:32%;
-            height:210%;
-            transform:rotate(18deg);
-            background:linear-gradient(90deg,transparent,rgba(255,255,255,.38),transparent);
-            pointer-events:none;
+        @media (max-width: 767px) {
+            .auth-visual { min-height: 500px; }
+            .image-stage { width: min(88%, 470px); }
         }
 
-        .primary-btn:hover::after{
-            animation:shine .75s ease;
-        }
-
-        @media (max-width:520px){
-            .password-grid{
-                grid-template-columns:1fr!important;
-            }
-        }
-
-        @media (prefers-reduced-motion:reduce){
-            *,*::before,*::after{
-                animation-duration:.01ms!important;
-                animation-iteration-count:1!important;
-                transition-duration:.01ms!important;
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: .01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: .01ms !important;
             }
         }
     </style>
 </head>
 
-<body class="min-h-screen text-slate-800">
+<body class="min-h-screen bg-gray-50">
 
 <div class="min-h-screen flex flex-col md:flex-row p-3 sm:p-4 md:p-6">
 
-    <x-auth-hero-section
-        title="Welcome to Smartmeet"
-        subtitle="Connect, Meet, Collaborate"
-        image="images/login-illustration.png"
-    />
+    <!-- LEFT HERO ONLY REDESIGNED -->
+    <section class="auth-visual w-full md:w-1/2 min-h-[45vh] md:min-h-[calc(100vh-3rem)]
+        rounded-t-2xl md:rounded-l-2xl md:rounded-tr-none border-l-4 border-blue-700">
 
-    <div class="auth-panel w-full md:w-1/2 flex justify-center items-center
-        rounded-b-3xl md:rounded-r-3xl md:rounded-bl-none
-        min-h-[55vh] sm:min-h-[60vh] md:min-h-[calc(100vh-3rem)]
-        px-4 py-6 sm:px-6 md:px-10 border-r-4 border-blue-700">
+        <div class="hero-orb one"></div>
+        <div class="hero-orb two"></div>
 
-        <div class="relative z-10 w-full max-w-[470px]">
+        <div class="hero-content relative z-10 h-full flex flex-col px-6 sm:px-10 md:px-12 py-7 md:py-9">
 
-            <div class="auth-card bg-white rounded-[26px] p-5 sm:p-6 md:p-7">
+            <a href="{{ url('/') }}" class="hero-logo">
+                <img src="{{ asset('images/s-logo.png') }}" alt="SmartMeet logo">
+                <span class="text-xl">SmartMeet</span>
+            </a>
 
-                <div class="flex flex-col items-center mb-5">
-                    <div class="auth-icon w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100
-                        border border-blue-100 flex items-center justify-center mb-2.5">
+            <div class="flex-1 flex flex-col justify-center">
+                <div class="max-w-xl mx-auto md:mx-0 text-center md:text-left">
+                    <span class="inline-flex items-center px-3 py-1.5 rounded-full bg-blue-50 border border-blue-100
+                        text-[11px] font-semibold text-blue-600 mb-4">
+                        Smart online collaboration
+                    </span>
 
-                        <svg class="w-5 h-5 text-blue-600" viewBox="0 0 24 24" fill="none"
-                             stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                            <circle cx="12" cy="7" r="4"/>
-                        </svg>
-                    </div>
+                    <h1 class="text-3xl sm:text-4xl md:text-[42px] font-bold tracking-[-0.035em] text-slate-900 leading-tight">
+                        Welcome to SmartMeet
+                    </h1>
 
-                    <h2 class="display-font text-[27px] leading-none font-bold tracking-[-0.03em] text-slate-900">
-                        Create an account
-                    </h2>
-
-                    <p class="text-[12px] text-slate-400 mt-2">
-                        Fill in your details below to get started
+                    <p class="mt-2 text-sm sm:text-base text-slate-500 font-medium">
+                        Connect, Meet, Collaborate
                     </p>
                 </div>
 
-                <x-success />
-                <x-error />
+                <div class="image-stage">
+                    <div class="float-pill one"><i></i> Real-time meetings</div>
+                    <div class="float-pill two"><i></i> Stay connected</div>
+                    <img src="{{ asset('images/login-illustration.png') }}" alt="SmartMeet illustration">
+                </div>
+            </div>
 
-                @if ($errors->any())
-                    <div class="mb-3 px-3 py-2 bg-red-50 border border-red-100 rounded-xl">
-                        <ul class="text-xs text-red-600 space-y-0.5 list-disc list-inside">
-                            @foreach ($errors->all() as $error)
-                                <li>{{ $error }}</li>
-                            @endforeach
-                        </ul>
-                    </div>
-                @endif
+        </div>
+    </section>
 
-                <form method="post" action="{{ route('register') }}" class="space-y-3" id="register-form">
-                    @csrf
+    <!-- RIGHT SIDE UNCHANGED -->
+    <div class="w-full md:w-1/2 flex justify-center items-center bg-gradient-to-br from-blue-50 via-white to-green-50
+    rounded-b-2xl md:rounded-r-2xl md:rounded-bl-none
+    min-h-[55vh] sm:min-h-[60vh] md:min-h-[calc(100vh-3rem)]
+    px-4 py-6 sm:px-6 md:px-8 border-r-4 border-blue-700">
 
-                    <div>
-                        <label class="text-[12px] font-semibold text-slate-600 mb-1.5 block">Full name</label>
+        <div class="w-full max-w-md bg-white/80 backdrop-blur-xl
+        p-5 sm:p-6 rounded-2xl
+        shadow-lg border border-white/60
+        hover:shadow-xl transition-all duration-300">
 
-                        <input type="text" name="name" placeholder="name" value="{{ old('name') }}"
-                               class="premium-input w-full px-3.5 py-2.5 text-sm rounded-xl
-                               border border-slate-200 bg-slate-50/80
-                               focus:ring-0 focus:outline-none"
-                               required>
-                    </div>
+            <div class="flex flex-col items-center mb-4">
+                <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center mb-2">
+                    <svg class="w-5 h-5 text-blue-600" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                        <circle cx="12" cy="7" r="4"/>
+                    </svg>
+                </div>
+                <h2 class="text-lg font-semibold text-gray-800">Create an account</h2>
+                <p class="text-xs text-gray-400 mt-0.5">Fill in your details below to get started</p>
+            </div>
 
-                    <div>
-                        <label class="text-[12px] font-semibold text-slate-600 mb-1.5 block">Email address</label>
+            <x-success />
+            <x-error />
 
-                        <input type="email" name="email" placeholder="Email" value="{{ old('email') }}"
-                               class="premium-input w-full px-3.5 py-2.5 text-sm rounded-xl
-                               border {{ $errors->has('email') ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-slate-50/80' }}
-                               focus:ring-0 focus:outline-none"
-                               required>
+            @if ($errors->any())
+                <div class="mb-3 px-3 py-2 bg-red-50 border border-red-100 rounded-lg">
+                    <ul class="text-xs text-red-600 space-y-0.5 list-disc list-inside">
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
 
-                        @error('email')
-                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
-                        @enderror
-                    </div>
+            <form method="post" action="{{ route('register') }}" class="space-y-2.5" id="register-form">
+                @csrf
 
-                    <div class="password-grid grid grid-cols-2 gap-3">
+                <div>
+                    <label class="text-xs text-gray-400 mb-1 block">Full name</label>
+                    <input type="text" name="name" placeholder="name" value="{{ old('name') }}"
+                           class="w-full px-3 py-2 text-sm rounded-xl
+                    border border-gray-200 bg-gray-50
+                    focus:ring-2 focus:ring-blue-100 focus:border-blue-400
+                    outline-none transition"
+                           required>
+                </div>
 
-                        <div>
-                            <label class="text-[12px] font-semibold text-slate-600 mb-1.5 block">Password</label>
+                <div>
+                    <label class="text-xs text-gray-400 mb-1 block">Email address</label>
+                    <input type="email" name="email" placeholder="Email" value="{{ old('email') }}"
+                           class="w-full px-3 py-2 text-sm rounded-xl
+                    border {{ $errors->has('email') ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50' }}
+                    focus:ring-2 focus:ring-blue-100 focus:border-blue-400
+                    outline-none transition"
+                           required>
 
-                            <div class="relative">
-                                <input type="password" name="password" id="reg-password" placeholder="password"
-                                       class="premium-input w-full px-3.5 py-2.5 pr-10 text-sm rounded-xl
-                                       border border-slate-200 bg-slate-50/80
-                                       focus:ring-0 focus:outline-none"
-                                       oninput="checkStrength(this.value)"
-                                       required>
+                    @error('email')
+                    <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
 
-                                <button type="button" onclick="togglePassword('reg-password', this)"
-                                        class="absolute inset-y-0 right-0 flex items-center px-3
-                                        text-slate-400 hover:text-blue-600 transition-colors">
-
-                                    <svg class="w-4 h-4 eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                         stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/>
-                                        <circle cx="12" cy="12" r="3"/>
-                                    </svg>
-
-                                    <svg class="w-4 h-4 eye-closed hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                         stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a19.87 19.87 0 0 1 4.22-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a19.86 19.86 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-                                        <line x1="1" y1="1" x2="23" y2="23"/>
-                                    </svg>
-
-                                </button>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label class="text-[12px] font-semibold text-slate-600 mb-1.5 block">Confirm</label>
-
-                            <div class="relative">
-                                <input type="password" name="password_confirmation" id="reg-password-confirm" placeholder="confirm"
-                                       class="premium-input w-full px-3.5 py-2.5 pr-10 text-sm rounded-xl
-                                       border border-slate-200 bg-slate-50/80
-                                       focus:ring-0 focus:outline-none"
-                                       required>
-
-                                <button type="button" onclick="togglePassword('reg-password-confirm', this)"
-                                        class="absolute inset-y-0 right-0 flex items-center px-3
-                                        text-slate-400 hover:text-blue-600 transition-colors">
-
-                                    <svg class="w-4 h-4 eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                         stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/>
-                                        <circle cx="12" cy="12" r="3"/>
-                                    </svg>
-
-                                    <svg class="w-4 h-4 eye-closed hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                         stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a19.87 19.87 0 0 1 4.22-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a19.86 19.86 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-                                        <line x1="1" y1="1" x2="23" y2="23"/>
-                                    </svg>
-
-                                </button>
-                            </div>
-                        </div>
-
-                    </div>
-
-                    <div class="-mt-1">
-                        <div class="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
-                            <div id="strength-bar"
-                                 class="h-full w-0 rounded-full transition-all duration-300 bg-slate-200"></div>
-                        </div>
-
-                        <p id="strength-label" class="text-[10.5px] mt-1 text-slate-400">
-                            8+ chars, upper &amp; lower case, number, symbol
-                        </p>
-                    </div>
+                <div class="grid grid-cols-2 gap-3">
 
                     <div>
-                        <label class="text-[12px] font-semibold text-slate-600 block mb-1.5">Role</label>
+                        <label class="text-xs text-gray-400 mb-1 block">Password</label>
 
                         <div class="relative">
-                            <select name="role"
-                                    class="premium-input w-full appearance-none px-3.5 py-2.5 text-sm
-                                    border border-slate-200 rounded-xl
-                                    bg-slate-50/80 text-slate-700
-                                    focus:outline-none focus:ring-0">
+                            <input type="password" name="password" id="reg-password" placeholder="password"
+                                   class="w-full px-3 py-2 pr-9 text-sm rounded-xl
+                            border border-gray-200 bg-gray-50
+                            focus:ring-2 focus:ring-blue-100 focus:border-blue-400
+                            outline-none transition"
+                                   oninput="checkStrength(this.value)"
+                                   required>
 
-                                <option selected disabled>Select a role</option>
-                                <option value="organizer">Organizer</option>
-                                <option value="participant">Participant</option>
-
-                            </select>
-
-                            <div class="absolute inset-y-0 right-3 flex items-center pointer-events-none">
-                                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" stroke-width="2"
-                                     viewBox="0 0 24 24">
-                                    <path d="M19 9l-7 7-7-7"/>
+                            <button type="button" onclick="togglePassword('reg-password', this)"
+                                    class="absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-400 hover:text-gray-600">
+                                <svg class="w-4 h-4 eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/>
+                                    <circle cx="12" cy="12" r="3"/>
                                 </svg>
-                            </div>
+                                <svg class="w-4 h-4 eye-closed hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a19.87 19.87 0 0 1 4.22-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a19.86 19.86 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                                    <line x1="1" y1="1" x2="23" y2="23"/>
+                                </svg>
+                            </button>
                         </div>
                     </div>
 
-                    <div class="flex items-center gap-2 pt-0.5">
-                        <input type="checkbox" name="terms"
-                               class="w-3.5 h-3.5 accent-blue-600 border-slate-300 rounded">
+                    <div>
+                        <label class="text-xs text-gray-400 mb-1 block">Confirm</label>
 
-                        <p class="text-[11px] text-slate-400">
-                            I agree to the
-                            <a href="#" class="text-blue-600 hover:text-blue-700 hover:underline underline-offset-4">
-                                Terms and Conditions
-                            </a>
-                        </p>
+                        <div class="relative">
+                            <input type="password" name="password_confirmation" id="reg-password-confirm" placeholder="confirm"
+                                   class="w-full px-3 py-2 pr-9 text-sm rounded-xl
+                            border border-gray-200 bg-gray-50
+                            focus:ring-2 focus:ring-blue-100 focus:border-blue-400
+                            outline-none transition"
+                                   required>
+
+                            <button type="button" onclick="togglePassword('reg-password-confirm', this)"
+                                    class="absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-400 hover:text-gray-600">
+                                <svg class="w-4 h-4 eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                                <svg class="w-4 h-4 eye-closed hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a19.87 19.87 0 0 1 4.22-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a19.86 19.86 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                                    <line x1="1" y1="1" x2="23" y2="23"/>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
 
-                    <button type="submit"
-                            class="primary-btn w-full py-2.5 rounded-xl
-                            text-white text-sm font-semibold
-                            hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(37,99,235,0.30)]
-                            active:translate-y-0 active:scale-[0.995]
-                            transition-all duration-300 mt-1">
-                        Register
-                    </button>
+                </div>
 
-                </form>
+                <div class="-mt-1">
+                    <div class="w-full h-1 bg-gray-100 rounded-full overflow-hidden">
+                        <div id="strength-bar" class="h-full w-0 rounded-full transition-all duration-300 bg-gray-200"></div>
+                    </div>
+                    <p id="strength-label" class="text-[10.5px] mt-0.5 text-gray-400">
+                        8+ chars, upper &amp; lower case, number, symbol
+                    </p>
+                </div>
 
-                <p class="text-center mt-4 text-[11px] text-slate-400">
-                    Already have an account?
-                    <a href="/login"
-                       class="text-blue-600 hover:text-blue-700 hover:underline underline-offset-4 font-semibold">
-                        Log in
-                    </a>
-                </p>
+                <div>
+                    <label class="text-xs text-gray-400 block mb-1">Role</label>
+                    <div class="relative">
+                        <select name="role"
+                                class="w-full appearance-none px-3 py-2 text-sm
+                        border border-gray-200 rounded-xl
+                        bg-gray-50 text-gray-700
+                        focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400
+                        transition">
+                            <option selected disabled>Select a role</option>
+                            <option value="organizer">Organizer</option>
+                            <option value="participant">Participant</option>
+                        </select>
 
-            </div>
+                        <div class="absolute inset-y-0 right-3 flex items-center pointer-events-none">
+                            <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" stroke-width="2"
+                                 viewBox="0 0 24 24">
+                                <path d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 pt-0.5">
+                    <input type="checkbox" name="terms" class="w-3.5 h-3.5 accent-blue-500 border-gray-300 rounded">
+                    <p class="text-xs text-gray-400">
+                        I agree to the
+                        <a href="#" class="text-blue-500 hover:underline">Terms and Conditions</a>
+                    </p>
+                </div>
+
+                <button type="submit"
+                        class="w-full py-2.5 rounded-xl
+                bg-blue-600 text-white text-sm font-medium
+                hover:bg-blue-700 hover:scale-[1.01]
+                transition-all duration-200 mt-1">
+                    Register
+                </button>
+            </form>
+
+            <p class="text-center mt-3 text-xs text-gray-400">
+                Already have an account?
+                <a href="/login" class="text-blue-600 hover:underline font-medium">Log in</a>
+            </p>
+
         </div>
     </div>
 </div>
@@ -411,9 +422,9 @@
 
         if (value.length === 0) {
             bar.style.width = '0%';
-            bar.className = 'h-full w-0 rounded-full transition-all duration-300 bg-slate-200';
+            bar.className = 'h-full w-0 rounded-full transition-all duration-300 bg-gray-200';
             label.textContent = '8+ chars, upper & lower case, number, symbol';
-            label.className = 'text-[10.5px] mt-1 text-slate-400';
+            label.className = 'text-[10.5px] mt-0.5 text-gray-400';
             return;
         }
 
@@ -421,8 +432,9 @@
         bar.style.width = widths[idx];
         bar.className = 'h-full rounded-full transition-all duration-300 ' + colors[idx];
         label.textContent = labels[idx];
-        label.className = 'text-[10.5px] mt-1 ' + textColors[idx];
+        label.className = 'text-[10.5px] mt-0.5 ' + textColors[idx];
     }
 </script>
+
 </body>
 </html>
