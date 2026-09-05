@@ -170,6 +170,199 @@
             }
         }
 
+
+        /* CENTERED RESPONSIVE HERO IMAGE */
+        .auth-visual {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .hero-content {
+            min-height: 100%;
+            height: 100%;
+        }
+
+        .hero-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            transform: translateY(-8px);
+        }
+
+        .hero-copy {
+            width: 100%;
+            max-width: 560px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .image-stage {
+            width: min(72%, 440px);
+            margin: 18px auto 0;
+            padding: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .image-stage img {
+            display: block;
+            width: 100%;
+            max-width: 400px;
+            max-height: 300px;
+            object-fit: contain;
+            margin: 0 auto;
+        }
+
+        @media (max-width: 1100px) {
+            .hero-main {
+                transform: translateY(-4px);
+            }
+
+            .image-stage {
+                width: min(76%, 410px);
+            }
+
+            .image-stage img {
+                max-height: 280px;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .hero-content {
+                padding-left: 1.75rem !important;
+                padding-right: 1.75rem !important;
+            }
+
+            .image-stage {
+                width: min(80%, 390px);
+            }
+
+            .image-stage img {
+                max-height: 260px;
+            }
+        }
+
+        @media (max-width: 767px) {
+            .auth-visual {
+                min-height: 470px !important;
+            }
+
+            .hero-content {
+                min-height: 470px;
+                padding-top: 1.4rem !important;
+                padding-bottom: 1.2rem !important;
+            }
+
+            .hero-main {
+                transform: none;
+                justify-content: center;
+            }
+
+            .hero-copy {
+                max-width: 500px;
+            }
+
+            .image-stage {
+                width: min(78%, 360px);
+                margin-top: 14px;
+                padding: 14px;
+            }
+
+            .image-stage img {
+                max-height: 220px;
+            }
+
+            .float-pill {
+                font-size: 9px;
+                padding: 7px 9px;
+            }
+
+            .float-pill.one {
+                left: -8px;
+            }
+
+            .float-pill.two {
+                right: -8px;
+            }
+        }
+
+        @media (max-width: 520px) {
+            .auth-visual {
+                min-height: 430px !important;
+            }
+
+            .hero-content {
+                min-height: 430px;
+                padding-left: 1.1rem !important;
+                padding-right: 1.1rem !important;
+                padding-top: 1.1rem !important;
+            }
+
+            .hero-logo img {
+                width: 38px;
+                height: 38px;
+            }
+
+            .hero-logo span {
+                font-size: 1.05rem !important;
+            }
+
+            .hero-copy h1 {
+                font-size: 1.9rem !important;
+                line-height: 1.08 !important;
+            }
+
+            .hero-copy p {
+                font-size: .86rem !important;
+            }
+
+            .hero-badge {
+                font-size: 10px;
+                margin-bottom: 9px;
+            }
+
+            .image-stage {
+                width: min(82%, 330px);
+                margin-top: 12px;
+                border-radius: 24px;
+            }
+
+            .image-stage::before {
+                inset: 10px;
+                border-radius: 18px;
+            }
+
+            .image-stage img {
+                max-height: 190px;
+            }
+
+            .float-pill {
+                display: none;
+            }
+        }
+
+        @media (max-width: 390px) {
+            .auth-visual {
+                min-height: 405px !important;
+            }
+
+            .hero-content {
+                min-height: 405px;
+            }
+
+            .image-stage {
+                width: min(86%, 300px);
+            }
+
+            .image-stage img {
+                max-height: 170px;
+            }
+        }
+
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after {
                 animation-duration: .01ms !important;
