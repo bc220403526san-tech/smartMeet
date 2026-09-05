@@ -1,1 +1,13 @@
-<?php
+<x-layouts.app>
+    <x-header.page-title title="Admin Dashboard" />
+    <div class="p-3 sm:p-4 bg-gray-50 rounded-2xl m-2 mt-0 space-y-4 overflow-y-auto">
+        <div><a href="{{ route('admin.users.show',$user) }}" class="text-blue-600 text-sm inline-flex items-center gap-2 font-medium"><i class="fa-solid fa-arrow-left text-xs"></i> Back to User Details</a><h1 class="text-2xl sm:text-3xl font-bold text-gray-800 mt-2">Meeting History</h1><p class="text-gray-400 mt-1 text-sm">{{ $user->name }} · {{ ucfirst($user->role) }}</p></div>
+        <div class="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+            @if($meetings->isEmpty())<div class="py-16 px-4 text-center"><i class="fa-regular fa-calendar-xmark text-3xl text-gray-300"></i><p class="font-semibold text-gray-700 mt-3">No meeting history found</p></div>
+            @else
+                <div class="overflow-x-auto"><table class="min-w-[980px] w-full text-sm"><thead class="bg-blue-50 border-b border-blue-100"><tr class="text-left text-xs uppercase tracking-wider text-blue-700"><th class="px-5 py-4">Meeting</th><th class="px-4 py-4">Date</th><th class="px-4 py-4">{{ $user->role==='organizer'?'Participants':'Organizer' }}</th><th class="px-4 py-4">Joined</th><th class="px-4 py-4">Left</th><th class="px-4 py-4">Duration</th><th class="px-4 py-4">{{ $user->role==='organizer'?'Status':'Sessions' }}</th></tr></thead>
+                        <tbody class="divide-y divide-gray-100">@foreach($meetings as $item) @php $m=$item->meeting;$s=(int)$item->total_seconds;$h=intdiv($s,3600);$min=intdiv($s%3600,60);$sec=$s%60;$dur=$h>0?"{$h}h {$min}m":($min>0?"{$min}m {$sec}s":"{$sec}s"); @endphp
+                        <tr class="hover:bg-gray-50"><td class="px-5 py-4"><p class="font-semibold text-gray-800">{{ $m->title ?? 'Untitled Meeting' }}</p><p class="text-xs text-gray-400">#{{ $m->id }}</p></td><td class="px-4 py-4 whitespace-nowrap">{{ $m->date ? \Illuminate\Support\Carbon::parse($m->date)->format('M d, Y') : '—' }}</td><td class="px-4 py-4">{{ $user->role==='organizer' ? ($item->participants_count ?? 0) : ($m->organizer?->name ?? '—') }}</td><td class="px-4 py-4 whitespace-nowrap">{{ $item->first_joined_at?->format('h:i A') ?? '—' }}</td><td class="px-4 py-4 whitespace-nowrap">{{ $item->last_left_at?->format('h:i A') ?? '—' }}</td><td class="px-4 py-4 whitespace-nowrap">{{ $s>0?$dur:'—' }}</td><td class="px-4 py-4">@if($user->role==='organizer')<span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">{{ ucfirst($m->status ?? 'unknown') }}</span>@else<span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-600">{{ $item->sessions->count() }} {{ \Illuminate\Support\Str::plural('session',$item->sessions->count()) }}</span>@endif</td></tr>
+                        @endforeach</tbody></table></div>@endif</div>
+    </div>
+</x-layouts.app>
