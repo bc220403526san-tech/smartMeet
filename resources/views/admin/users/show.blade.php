@@ -4,7 +4,7 @@
     </x-slot:header>
 
     @php
-        $isOwnAccount = auth()->check() && auth()->user()->is($user);
+        $isProtectedAdmin = $user->role === 'admin';
     @endphp
 
     <div class="p-3 sm:p-4 bg-gray-50 rounded-2xl m-2 mt-0 space-y-4">
@@ -19,19 +19,12 @@
                     Back to User Directory
                 </a>
 
-                <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 tracking-tight">
-                    User Details
-                </h1>
-
-                <p class="mt-1 text-sm sm:text-base text-gray-400">
-                    View account information and manage access.
-                </p>
+                <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 tracking-tight">User Details</h1>
+                <p class="mt-1 text-sm sm:text-base text-gray-400">View account information and manage access.</p>
             </div>
 
-            @unless($isOwnAccount)
-                <form action="{{ route('admin.users.toggle-status', $user) }}"
-                      method="POST"
-                      class="w-fit">
+            @unless($isProtectedAdmin)
+                <form action="{{ route('admin.users.toggle-status', $user) }}" method="POST" class="w-fit">
                     @csrf
                     @method('PATCH')
 
@@ -50,10 +43,7 @@
             <div class="px-5 sm:px-8 py-6 sm:py-7 bg-gradient-to-r from-blue-50 to-indigo-50">
                 <div class="flex flex-col sm:flex-row sm:items-center gap-5 sm:gap-6">
                     <div class="relative shrink-0 self-center sm:self-auto">
-                        <x-user-avatar :user="$user"
-                                       size="xl"
-                                       :ring="false"
-                                       class="border-4 border-white shadow-md" />
+                        <x-user-avatar :user="$user" size="xl" :ring="false" class="border-4 border-white shadow-md" />
 
                         <span class="absolute bottom-0 right-0 flex items-center justify-center w-5 h-5 rounded-full
                                      border-2 border-white {{ $user->is_active ? 'bg-green-500' : 'bg-red-500' }}">
@@ -63,9 +53,7 @@
 
                     <div class="min-w-0 flex-1 text-center sm:text-left">
                         <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                            <h2 class="text-xl sm:text-2xl font-bold text-gray-800 break-words">
-                                {{ $user->name }}
-                            </h2>
+                            <h2 class="text-xl sm:text-2xl font-bold text-gray-800 break-words">{{ $user->name }}</h2>
 
                             <span class="self-center sm:self-auto inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold
                                          {{ $user->role === 'admin'
@@ -109,9 +97,7 @@
             </div>
 
             <div class="px-5 sm:px-8 py-6">
-                <h3 class="mb-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                    Account Information
-                </h3>
+                <h3 class="mb-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Account Information</h3>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div class="flex items-center gap-3 p-4 bg-gray-50 border border-gray-100 rounded-2xl">
@@ -167,16 +153,11 @@
                             </div>
 
                             <div>
-                                <p class="text-xs font-semibold text-blue-500 uppercase tracking-wider">
-                                    Meeting Activity
-                                </p>
-
+                                <p class="text-xs font-semibold text-blue-500 uppercase tracking-wider">Meeting Activity</p>
                                 <div class="flex items-baseline gap-2 mt-0.5">
                                     <span class="text-2xl font-bold text-gray-800">{{ $meetingCount }}</span>
                                     <span class="text-sm text-gray-500">
-                                        {{ $user->role === 'organizer'
-                                            ? 'meetings organized'
-                                            : 'meetings attended' }}
+                                        {{ $user->role === 'organizer' ? 'meetings organized' : 'meetings attended' }}
                                     </span>
                                 </div>
                             </div>
@@ -192,7 +173,7 @@
                 </div>
             @endif
 
-            @unless($isOwnAccount)
+            @unless($isProtectedAdmin)
                 <div class="px-5 sm:px-8 py-5 border-t border-gray-100 bg-gray-50/50">
                     <form action="{{ route('admin.users.destroy', $user) }}"
                           method="POST"

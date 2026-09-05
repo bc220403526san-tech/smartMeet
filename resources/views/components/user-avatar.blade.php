@@ -6,14 +6,16 @@
 
 @php
     /*
-     * IMPORTANT:
-     * Uploaded/local image gets first priority.
-     * Social/provider avatar is only fallback.
-     * If neither exists, show initials avatar.
+     * Exact rule:
+     * 1) uploaded/local image
+     * 2) social/provider avatar
+     * 3) initials
      */
-    $rawProfileImage = $user->image ?: $user->avatar;
+    $hasImage = !empty($user?->image);
+    $hasAvatar = !empty($user?->avatar);
+    $hasRealProfileImage = $hasImage || $hasAvatar;
 
-    $nameParts = preg_split('/\s+/', trim($user->name ?: 'User'));
+    $nameParts = preg_split('/\s+/', trim($user?->name ?: 'User'));
 
     $initials = collect($nameParts)
         ->filter()
@@ -31,12 +33,10 @@
         default => 'w-12 h-12 text-base',
     };
 
-    $ringClasses = $ring
-        ? 'ring-2 ring-gray-100'
-        : '';
+    $ringClasses = $ring ? 'ring-2 ring-gray-100' : '';
 @endphp
 
-@if($rawProfileImage)
+@if($hasRealProfileImage)
     <div {{ $attributes->merge([
         'class' => "{$sizeClasses} {$ringClasses} rounded-full overflow-hidden shrink-0 bg-white"
     ]) }}>

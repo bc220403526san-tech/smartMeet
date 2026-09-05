@@ -177,13 +177,8 @@ class UserController extends Controller
 
                 $lastSession = $sessions
                     ->sortByDesc(function ($session) {
-                        $leftAt = $session->left_at
-                            ? Carbon::parse($session->left_at)
-                            : null;
-
-                        $joinedAt = $session->joined_at
-                            ? Carbon::parse($session->joined_at)
-                            : null;
+                        $leftAt = $session->left_at ? Carbon::parse($session->left_at) : null;
+                        $joinedAt = $session->joined_at ? Carbon::parse($session->joined_at) : null;
 
                         return $leftAt?->timestamp
                             ?? $joinedAt?->timestamp
@@ -269,8 +264,8 @@ class UserController extends Controller
 
     public function destroy(User $user)
     {
-        if (auth()->user()->is($user)) {
-            return back()->with('error', 'You cannot remove your own admin account.');
+        if ($user->role === 'admin') {
+            return back()->with('error', 'Admin accounts cannot be removed.');
         }
 
         if ($user->image && !str_starts_with($user->image, 'http')) {
@@ -286,8 +281,8 @@ class UserController extends Controller
 
     public function toggleStatus(User $user)
     {
-        if (auth()->user()->is($user)) {
-            return back()->with('error', 'You cannot deactivate your own admin account.');
+        if ($user->role === 'admin') {
+            return back()->with('error', 'Admin accounts cannot be deactivated.');
         }
 
         $newStatus = !$user->is_active;
