@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -13,12 +13,14 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
 
     <style>
         :root {
             --blue: #2563eb;
+            --blue-bright: #3b82f6;
             --blue-dark: #1d4ed8;
+            --blue-deep: #1746b5;
             --blue-soft: #eff6ff;
             --navy: #0b1220;
             --text: #1f2937;
@@ -43,7 +45,7 @@
 
         body {
             margin: 0;
-            font-family: "Inter", sans-serif;
+            font-family: "Plus Jakarta Sans", sans-serif;
             color: var(--text);
             background: var(--white);
             overflow-x: hidden;
@@ -94,7 +96,7 @@
         }
 
         .section-title {
-            font-family: "Manrope", sans-serif;
+            font-family: "Sora", sans-serif;
             font-size: clamp(36px, 5vw, 56px);
             line-height: 1.05;
             letter-spacing: -.045em;
@@ -112,12 +114,18 @@
 
         /* NAVBAR */
         .navbar {
+            animation: navEnter .75s .03s var(--ease) both;
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             z-index: 1000;
             transition: .35s var(--ease);
+        }
+
+        @keyframes navEnter {
+            from { opacity: 0; transform: translateY(-14px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .navbar.scrolled {
@@ -135,20 +143,74 @@
         }
 
         .brand {
-            display: flex;
+            display: inline-flex;
             align-items: center;
-            gap: 10px;
-            font-family: "Manrope", sans-serif;
+            gap: 11px;
+            font-family: "Sora", sans-serif;
             font-size: 20px;
             font-weight: 800;
             color: var(--navy);
-            letter-spacing: -.03em;
+            letter-spacing: -.045em;
+            transition: transform .3s var(--ease);
         }
 
-        .brand img {
-            width: 36px;
-            height: 36px;
+        .brand:hover {
+            transform: translateY(-1px);
+        }
+
+        .brand-mark {
+            width: 40px;
+            height: 40px;
+            display: grid;
+            place-items: center;
+            border-radius: 13px;
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(145deg, #ffffff, #eef5ff);
+            border: 1px solid #d9e6fb;
+            box-shadow:
+                0 8px 20px rgba(37, 99, 235, .12),
+                inset 0 1px 0 rgba(255,255,255,.9);
+            transition: transform .35s var(--ease), box-shadow .35s var(--ease);
+        }
+
+        .brand:hover .brand-mark {
+            transform: rotate(-4deg) scale(1.04);
+            box-shadow: 0 12px 28px rgba(37, 99, 235, .18);
+        }
+
+        .brand-mark::after {
+            content: "";
+            position: absolute;
+            inset: -40% 55% -40% -55%;
+            background: linear-gradient(110deg, transparent, rgba(255,255,255,.9), transparent);
+            transform: translateX(-120%);
+            transition: transform .7s var(--ease);
+        }
+
+        .brand:hover .brand-mark::after {
+            transform: translateX(230%);
+        }
+
+        .brand-mark img {
+            width: 30px;
+            height: 30px;
             object-fit: contain;
+            position: relative;
+            z-index: 1;
+        }
+
+        .brand-name {
+            display: inline-flex;
+            align-items: baseline;
+        }
+
+        .brand-name .smart {
+            color: var(--navy);
+        }
+
+        .brand-name .meet {
+            color: var(--blue);
         }
 
         .nav-links {
@@ -175,44 +237,114 @@
         }
 
         .btn {
-            min-height: 48px;
-            padding: 0 20px;
-            border-radius: 13px;
+            min-height: 50px;
+            padding: 0 21px;
+            border-radius: 14px;
             border: 1px solid transparent;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
+            gap: 9px;
             font-size: 14px;
-            font-weight: 700;
-            transition: .28s var(--ease);
+            font-weight: 750;
+            letter-spacing: -.01em;
+            position: relative;
+            overflow: hidden;
+            isolation: isolate;
+            transition:
+                transform .3s var(--ease),
+                box-shadow .3s var(--ease),
+                border-color .3s ease,
+                background .3s ease;
             cursor: pointer;
         }
 
+        .btn::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            z-index: -1;
+            opacity: 0;
+            transition: opacity .3s ease;
+        }
+
+        .btn::after {
+            content: "";
+            position: absolute;
+            top: -60%;
+            left: -45%;
+            width: 35%;
+            height: 220%;
+            transform: rotate(18deg);
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,.38), transparent);
+            transition: left .65s var(--ease);
+            pointer-events: none;
+        }
+
         .btn:hover {
-            transform: translateY(-2px);
+            transform: translateY(-3px);
+        }
+
+        .btn:hover::after {
+            left: 120%;
         }
 
         .btn-primary {
-            background: var(--blue);
             color: #fff;
-            box-shadow: 0 10px 24px rgba(37, 99, 235, .22);
+            background: linear-gradient(135deg, var(--blue-bright) 0%, var(--blue) 48%, var(--blue-deep) 100%);
+            border-color: rgba(37,99,235,.75);
+            box-shadow:
+                0 10px 24px rgba(37, 99, 235, .22),
+                inset 0 1px 0 rgba(255,255,255,.22);
+        }
+
+        .btn-primary::before {
+            background: linear-gradient(135deg, #4b91ff, #1d4ed8);
         }
 
         .btn-primary:hover {
-            background: var(--blue-dark);
-            box-shadow: 0 16px 30px rgba(37, 99, 235, .28);
+            box-shadow:
+                0 18px 34px rgba(37, 99, 235, .30),
+                inset 0 1px 0 rgba(255,255,255,.28);
+        }
+
+        .btn-primary:hover::before {
+            opacity: 1;
         }
 
         .btn-secondary {
-            background: #fff;
+            background: rgba(255,255,255,.92);
             color: var(--navy);
-            border-color: var(--line);
+            border-color: #dfe7f2;
+            box-shadow: 0 5px 16px rgba(15,23,42,.04);
+        }
+
+        .btn-secondary::before {
+            background: linear-gradient(180deg, #fff, #f5f9ff);
         }
 
         .btn-secondary:hover {
-            box-shadow: var(--shadow-soft);
-            border-color: #cfd8e7;
+            border-color: #bfd2ef;
+            box-shadow: 0 14px 30px rgba(15,23,42,.09);
+        }
+
+        .btn-secondary:hover::before {
+            opacity: 1;
+        }
+
+        .btn-arrow {
+            width: 24px;
+            height: 24px;
+            border-radius: 8px;
+            display: inline-grid;
+            place-items: center;
+            background: rgba(255,255,255,.16);
+            transition: transform .3s var(--ease), background .3s ease;
+        }
+
+        .btn:hover .btn-arrow {
+            transform: translateX(3px);
+            background: rgba(255,255,255,.24);
         }
 
         .menu-btn {
@@ -338,10 +470,16 @@
             border-radius: 50%;
             background: var(--blue);
             box-shadow: 0 0 0 5px rgba(37,99,235,.1);
+            animation: badgePulse 2.4s ease-in-out infinite;
+        }
+
+        @keyframes badgePulse {
+            0%, 100% { box-shadow: 0 0 0 5px rgba(37,99,235,.10); }
+            50% { box-shadow: 0 0 0 9px rgba(37,99,235,.025); }
         }
 
         .hero h1 {
-            font-family: "Manrope", sans-serif;
+            font-family: "Sora", sans-serif;
             font-size: clamp(54px, 6vw, 80px);
             line-height: .97;
             letter-spacing: -.06em;
@@ -350,7 +488,29 @@
         }
 
         .hero h1 span {
-            color: var(--blue);
+            color: transparent;
+            background: linear-gradient(100deg, #2563eb 8%, #4f8cff 52%, #1d4ed8 92%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            position: relative;
+        }
+
+        .hero h1 span::after {
+            content: "";
+            position: absolute;
+            left: 2px;
+            right: 8%;
+            bottom: -8px;
+            height: 7px;
+            border-radius: 999px;
+            background: linear-gradient(90deg, rgba(37,99,235,.15), rgba(59,130,246,.55), rgba(37,99,235,.08));
+            transform: scaleX(.15);
+            transform-origin: left;
+            animation: underlineGrow .9s .85s var(--ease) forwards;
+        }
+
+        @keyframes underlineGrow {
+            to { transform: scaleX(1); }
         }
 
         .hero p {
@@ -411,12 +571,21 @@
         }
 
         .meeting-card {
-            border-radius: 24px;
-            border: 1px solid #dfe7f2;
+            border-radius: 25px;
+            border: 1px solid #d9e3f1;
             overflow: hidden;
             background: #fff;
-            box-shadow: var(--shadow);
-            animation: float 5.5s ease-in-out infinite;
+            box-shadow:
+                0 34px 90px rgba(15,23,42,.15),
+                0 10px 28px rgba(37,99,235,.06);
+            animation: float 5.8s ease-in-out infinite;
+            transition: transform .5s var(--ease), box-shadow .5s var(--ease);
+        }
+
+        .mockup-wrap:hover .meeting-card {
+            box-shadow:
+                0 42px 110px rgba(15,23,42,.18),
+                0 14px 34px rgba(37,99,235,.10);
         }
 
         @keyframes float {
@@ -466,6 +635,12 @@
             border-radius: 50%;
             background: var(--danger);
             box-shadow: 0 0 0 4px rgba(239,68,68,.1);
+            animation: livePulse 1.8s ease-in-out infinite;
+        }
+
+        @keyframes livePulse {
+            0%, 100% { box-shadow: 0 0 0 4px rgba(239,68,68,.10); opacity: 1; }
+            50% { box-shadow: 0 0 0 8px rgba(239,68,68,.025); opacity: .78; }
         }
 
         .meeting-body {
@@ -496,7 +671,15 @@
 
         .video-tile.active {
             border: 2px solid #4f8cff;
-            box-shadow: inset 0 0 0 2px rgba(79,140,255,.14);
+            box-shadow:
+                inset 0 0 0 2px rgba(79,140,255,.14),
+                0 0 0 0 rgba(79,140,255,.20);
+            animation: speakerPulse 2.8s ease-in-out infinite;
+        }
+
+        @keyframes speakerPulse {
+            0%, 100% { box-shadow: inset 0 0 0 2px rgba(79,140,255,.14), 0 0 0 0 rgba(79,140,255,.16); }
+            50% { box-shadow: inset 0 0 0 2px rgba(79,140,255,.18), 0 0 0 5px rgba(79,140,255,.03); }
         }
 
         .avatar {
@@ -505,7 +688,7 @@
             border-radius: 50%;
             background: linear-gradient(145deg,#eef4ff,#bed4ff);
             color: #1d4ed8;
-            font-family: "Manrope", sans-serif;
+            font-family: "Sora", sans-serif;
             font-size: 18px;
             font-weight: 800;
             display: grid;
@@ -707,17 +890,25 @@
             width: 46px;
             height: 46px;
             border-radius: 13px;
-            background: var(--blue-soft);
+            background: linear-gradient(145deg, #f4f8ff, #e8f1ff);
+            border: 1px solid #dce9fb;
             color: var(--blue);
             display: grid;
             place-items: center;
             margin-bottom: 26px;
             font-size: 20px;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.8);
+            transition: transform .35s var(--ease), box-shadow .35s var(--ease);
+        }
+
+        .feature-card:hover .feature-icon {
+            transform: translateY(-3px) rotate(-3deg) scale(1.05);
+            box-shadow: 0 10px 24px rgba(37,99,235,.12);
         }
 
         .feature-card h3 {
             margin: 0 0 9px;
-            font-family: "Manrope", sans-serif;
+            font-family: "Sora", sans-serif;
             color: var(--navy);
             font-size: 18px;
         }
@@ -965,7 +1156,7 @@
             display: grid;
             place-items: center;
             color: var(--blue);
-            font-family: "Manrope", sans-serif;
+            font-family: "Sora", sans-serif;
             font-weight: 800;
             font-size: 20px;
             position: relative;
@@ -974,7 +1165,7 @@
 
         .step h3 {
             margin: 0 0 8px;
-            font-family: "Manrope", sans-serif;
+            font-family: "Sora", sans-serif;
             font-size: 20px;
             color: var(--navy);
         }
@@ -1021,7 +1212,7 @@
 
         .exp-card h3 {
             margin: 0 0 18px;
-            font-family: "Manrope", sans-serif;
+            font-family: "Sora", sans-serif;
             font-size: 17px;
         }
 
@@ -1115,7 +1306,7 @@
 
         .cta h2 {
             margin: 0;
-            font-family: "Manrope", sans-serif;
+            font-family: "Sora", sans-serif;
             font-size: clamp(38px, 5vw, 58px);
             line-height: 1.03;
             letter-spacing: -.045em;
@@ -1187,26 +1378,31 @@
         .reveal-right {
             opacity: 0;
             transition:
-                opacity .75s var(--ease),
-                transform .75s var(--ease);
+                opacity .85s var(--ease),
+                transform .85s var(--ease),
+                filter .85s var(--ease);
         }
 
         .reveal,
         .reveal-up {
-            transform: translateY(30px);
+            transform: translateY(34px);
+            filter: blur(4px);
         }
 
         .reveal-left {
-            transform: translateX(-34px);
+            transform: translateX(-38px);
+            filter: blur(4px);
         }
 
         .reveal-right {
-            transform: translateX(34px);
+            transform: translateX(38px);
+            filter: blur(4px);
         }
 
         .visible {
             opacity: 1;
             transform: translate(0,0);
+            filter: blur(0);
         }
 
         .hero-animate {
@@ -1401,6 +1597,318 @@
             }
         }
 
+
+        /* EXTRA RESPONSIVE POLISH */
+        @media (max-width: 1180px) {
+            .container {
+                width: min(100% - 36px, 1120px);
+            }
+
+            .hero-grid {
+                gap: 44px;
+            }
+
+            .hero h1 {
+                font-size: clamp(52px, 6.4vw, 74px);
+            }
+        }
+
+        @media (max-width: 900px) {
+            .navbar.scrolled {
+                background: rgba(255,255,255,.94);
+            }
+
+            .nav-inner {
+                height: 72px;
+            }
+
+            .hero {
+                padding-top: 128px;
+            }
+
+            .hero-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .hero > .container {
+                max-width: 820px;
+            }
+
+            .hero-copy,
+            .hero-grid > div:first-child {
+                text-align: center;
+            }
+
+            .hero-badge {
+                margin-inline: auto;
+            }
+
+            .hero p {
+                margin-inline: auto;
+            }
+
+            .hero-actions,
+            .hero-benefits {
+                justify-content: center;
+            }
+
+            .mockup-wrap {
+                margin-inline: auto;
+                width: 100%;
+            }
+
+            .features-head,
+            .showcase-grid {
+                gap: 34px;
+            }
+        }
+
+        @media (max-width: 700px) {
+            .brand {
+                font-size: 18px;
+            }
+
+            .brand-mark {
+                width: 36px;
+                height: 36px;
+                border-radius: 11px;
+            }
+
+            .brand-mark img {
+                width: 27px;
+                height: 27px;
+            }
+
+            .hero {
+                padding-top: 118px;
+            }
+
+            .hero h1 {
+                font-size: clamp(44px, 14vw, 62px);
+                line-height: 1;
+            }
+
+            .hero h1 span::after {
+                bottom: -5px;
+                height: 5px;
+            }
+
+            .hero p {
+                font-size: 15.5px;
+                line-height: 1.72;
+            }
+
+            .hero-benefits {
+                display: grid;
+                grid-template-columns: 1fr;
+                justify-items: center;
+            }
+
+            .meeting-card {
+                border-radius: 20px;
+            }
+
+            .meeting-top {
+                height: 52px;
+                padding: 0 12px;
+            }
+
+            .meeting-title {
+                font-size: 10px;
+            }
+
+            .meeting-title img {
+                width: 22px;
+                height: 22px;
+            }
+
+            .video-grid {
+                gap: 6px;
+                padding: 8px;
+            }
+
+            .video-tile {
+                border-radius: 11px;
+            }
+
+            .avatar {
+                width: 48px;
+                height: 48px;
+                font-size: 15px;
+            }
+
+            .person {
+                left: 7px;
+                bottom: 7px;
+                font-size: 9px;
+                padding: 4px 6px;
+            }
+
+            .meeting-controls {
+                height: 60px;
+            }
+
+            .control {
+                width: 34px;
+                height: 34px;
+            }
+
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .feature-card {
+                min-height: auto;
+            }
+
+            .showcase-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .dashboard {
+                min-height: 370px;
+            }
+
+            .dash-main {
+                padding: 14px;
+            }
+
+            .stats {
+                gap: 7px;
+            }
+
+            .stat {
+                padding: 10px;
+            }
+
+            .table-head,
+            .table-row {
+                grid-template-columns: 1.4fr .8fr .8fr;
+                padding: 9px;
+            }
+
+            .cta {
+                padding: 44px 18px;
+            }
+
+            .cta p {
+                font-size: 14px;
+            }
+        }
+
+        @media (max-width: 430px) {
+            .container {
+                width: min(100% - 22px, 1180px);
+            }
+
+            .nav-inner {
+                height: 68px;
+            }
+
+            .hero {
+                padding: 108px 0 62px;
+            }
+
+            .hero-badge {
+                font-size: 11px;
+                padding: 7px 10px;
+            }
+
+            .hero h1 {
+                font-size: clamp(42px, 14vw, 54px);
+                margin-top: 18px;
+            }
+
+            .hero-actions {
+                gap: 9px;
+            }
+
+            .btn {
+                min-height: 48px;
+                border-radius: 13px;
+            }
+
+            .section {
+                padding: 68px 0;
+            }
+
+            .section-title {
+                font-size: clamp(32px, 10vw, 42px);
+            }
+
+            .section-copy {
+                font-size: 15px;
+            }
+
+            .video-grid {
+                min-height: 292px;
+            }
+
+            .video-tile {
+                min-height: 132px;
+            }
+
+            .benefit-box {
+                border-radius: 16px;
+            }
+
+            .dashboard {
+                border-radius: 18px;
+            }
+
+            .stats {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .stat:last-child {
+                grid-column: span 2;
+            }
+
+            .table-head {
+                display: none;
+            }
+
+            .table-row {
+                grid-template-columns: 1fr auto;
+                gap: 6px 10px;
+                padding: 12px;
+            }
+
+            .table-row > span:nth-child(2) {
+                grid-column: 1;
+                font-size: 8px;
+                color: #98a2b3;
+            }
+
+            .table-row .status {
+                grid-column: 2;
+                grid-row: 1 / span 2;
+                align-self: center;
+            }
+
+            .steps {
+                gap: 28px;
+            }
+
+            .step-num {
+                width: 72px;
+                height: 72px;
+                border-radius: 20px;
+            }
+
+            .exp-card {
+                min-height: auto;
+            }
+
+            .footer-grid {
+                gap: 28px;
+            }
+
+            .footer-bottom {
+                text-align: center;
+            }
+        }
+
         @media (prefers-reduced-motion: reduce) {
             *,
             *::before,
@@ -1429,8 +1937,10 @@
     <div class="container nav-inner">
 
         <a href="{{ url('/') }}" class="brand">
-            <img src="{{ asset('images/s-logo.png') }}" alt="SmartMeet logo">
-            SmartMeet
+            <span class="brand-mark">
+                <img src="{{ asset('images/s-logo.png') }}" alt="SmartMeet logo">
+            </span>
+            <span class="brand-name"><span class="smart">Smart</span><span class="meet">Meet</span></span>
         </a>
 
         <nav class="nav-links">
@@ -1440,20 +1950,13 @@
         </nav>
 
         <div class="nav-actions">
-            @guest
-                <a href="{{ route('login') }}" class="btn btn-secondary">Log In</a>
-                <a href="{{ route('register') }}" class="btn btn-primary">Get Started</a>
-            @else
-                @php
-                    $dashboardUrl = \Illuminate\Support\Facades\Route::has('organizer.dashboard')
-                        ? route('organizer.dashboard')
-                        : (\Illuminate\Support\Facades\Route::has('participant.dashboard')
-                            ? route('participant.dashboard')
-                            : url('/'));
-                @endphp
+            <a href="{{ route('login') }}" class="btn btn-secondary">
+                Log In
+            </a>
 
-                <a href="{{ $dashboardUrl }}" class="btn btn-primary">Dashboard</a>
-            @endguest
+            <a href="{{ route('register') }}" class="btn btn-primary">
+                Get Started <span class="btn-arrow">→</span>
+            </a>
         </div>
 
         <button class="menu-btn" id="menuBtn" aria-label="Open menu">
@@ -1466,11 +1969,8 @@
         <a href="#features">Features</a>
         <a href="#how-it-works">How It Works</a>
         <a href="#experience">Experience</a>
-
-        @guest
-            <a href="{{ route('login') }}">Log In</a>
-            <a href="{{ route('register') }}">Get Started</a>
-        @endguest
+        <a href="{{ route('login') }}">Log In</a>
+        <a href="{{ route('register') }}">Sign Up</a>
     </div>
 </header>
 
@@ -1497,14 +1997,12 @@
                 </p>
 
                 <div class="hero-actions hero-animate delay-4">
-                    @guest
-                        <a href="{{ route('register') }}" class="btn btn-primary">
-                            Get Started Free →
-                        </a>
-                    @endguest
+                    <a href="{{ route('register') }}" class="btn btn-primary">
+                        Get Started Free <span class="btn-arrow">→</span>
+                    </a>
 
-                    <a href="#features" class="btn btn-secondary">
-                        Explore Features
+                    <a href="{{ route('login') }}" class="btn btn-secondary">
+                        Log In
                     </a>
                 </div>
 
@@ -1981,19 +2479,13 @@
                     Bring scheduling, conversations and collaboration together with SmartMeet.
                 </p>
 
-                @guest
-                    <a href="{{ route('register') }}" class="btn btn-primary">
-                        Get Started Free
-                    </a>
+                <a href="{{ route('register') }}" class="btn btn-primary">
+                    Get Started Free <span class="btn-arrow">→</span>
+                </a>
 
-                    <a href="{{ route('login') }}" class="btn btn-secondary">
-                        Log In
-                    </a>
-                @else
-                    <a href="#features" class="btn btn-primary">
-                        Explore SmartMeet
-                    </a>
-                @endguest
+                <a href="{{ route('login') }}" class="btn btn-secondary">
+                    Log In
+                </a>
 
             </div>
 
@@ -2012,8 +2504,10 @@
             <div>
 
                 <a href="{{ url('/') }}" class="brand">
-                    <img src="{{ asset('images/s-logo.png') }}" alt="SmartMeet logo">
-                    SmartMeet
+                    <span class="brand-mark">
+                        <img src="{{ asset('images/s-logo.png') }}" alt="SmartMeet logo">
+                    </span>
+                    <span class="brand-name"><span class="smart">Smart</span><span class="meet">Meet</span></span>
                 </a>
 
                 <p class="footer-copy">
@@ -2117,6 +2611,10 @@
 
         document.querySelectorAll('.step').forEach((step, index) => {
             step.style.transitionDelay = `${index * 120}ms`;
+        });
+
+        document.querySelectorAll('.exp-card').forEach((card, index) => {
+            card.style.transitionDelay = `${index * 110}ms`;
         });
 
     })();
