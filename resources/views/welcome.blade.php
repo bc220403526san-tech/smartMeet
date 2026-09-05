@@ -562,6 +562,9 @@
         /* MEETING MOCKUP */
         .mockup-wrap {
             position: relative;
+            width: 92%;
+            max-width: 620px;
+            margin-left: auto;
         }
 
         .mockup-orbit {
@@ -2284,6 +2287,26 @@
 
             .meeting-secure {
                 display: none;
+            }
+        }
+
+
+        /* HERO PRODUCT PREVIEW SIZE */
+        @media (max-width: 1040px) {
+            .mockup-wrap {
+                width: 88%;
+                max-width: 650px;
+                margin-left: auto;
+                margin-right: auto;
+            }
+        }
+
+        @media (max-width: 620px) {
+            .mockup-wrap {
+                width: 96%;
+                max-width: 560px;
+                margin-left: auto;
+                margin-right: auto;
             }
         }
 
