@@ -1,4 +1,3 @@
-```
 <x-layouts.app>
     <x-slot name="header">
         <x-header.page-title title="Admin Dashboard" />
