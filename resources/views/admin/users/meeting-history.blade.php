@@ -1,131 +1,385 @@
-<x-layouts.app>
-    <x-header.page-title title="Admin Dashboard" />
+<?php
 
-    <!-- Only page content scrolls; the app header remains fixed -->
-    <div class="h-[calc(100vh-5rem)] overflow-y-auto">
-        <div class="p-3 sm:p-4 bg-gray-50 rounded-2xl m-2 mt-0 space-y-4">
+namespace App\Http\Controllers\Admin;
 
-            <div>
-                <a href="{{ route('admin.users.show', $user) }}"
-                   class="inline-flex items-center gap-2 text-sm font-medium text-blue-600">
-                    <i class="fa-solid fa-arrow-left text-xs"></i>
-                    Back to User Details
-                </a>
+use App\Http\Controllers\Controller;
+use App\Models\Meeting;
+use App\Models\MeetingParticipantLog;
+use App\Models\Notification;
+use App\Models\User;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 
-                <h1 class="mt-2 text-2xl sm:text-3xl font-bold text-gray-800 tracking-tight">
-                    Meeting History
-                </h1>
+class UserController extends Controller
+{
+    public function index(Request $request)
+    {
+        $query = User::query();
 
-                <p class="mt-1 text-sm text-gray-400">
-                    {{ $user->name }} · {{ ucfirst($user->role) }}
-                </p>
-            </div>
+        if ($request->filled('role')) {
+            $query->where('role', $request->role);
+        }
 
-            <div class="overflow-hidden bg-white border border-gray-200 rounded-2xl shadow-sm">
-                @if($meetings->isEmpty())
-                    <div class="px-4 py-16 text-center">
-                        <i class="fa-regular fa-calendar-xmark text-3xl text-gray-300"></i>
-                        <p class="mt-3 font-semibold text-gray-700">No meeting history found</p>
-                        <p class="mt-1 text-sm text-gray-400">
-                            There are no recorded meetings for this user yet.
-                        </p>
-                    </div>
-                @else
-                    <div class="overflow-x-auto">
-                        <table class="w-full min-w-[980px] text-sm">
-                            <thead class="bg-blue-50 border-b border-blue-100">
-                            <tr class="text-left text-xs font-semibold uppercase tracking-wider text-blue-700">
-                                <th class="px-5 py-4">Meeting</th>
-                                <th class="px-4 py-4">Date</th>
-                                <th class="px-4 py-4">
-                                    {{ $user->role === 'organizer' ? 'Participants' : 'Organizer' }}
-                                </th>
-                                <th class="px-4 py-4">Joined</th>
-                                <th class="px-4 py-4">Left</th>
-                                <th class="px-4 py-4">Duration</th>
-                                <th class="px-4 py-4">
-                                    {{ $user->role === 'organizer' ? 'Status' : 'Sessions' }}
-                                </th>
-                            </tr>
-                            </thead>
+        if ($request->filled('search')) {
+            $search = $request->search;
 
-                            <tbody class="divide-y divide-gray-100">
-                            @foreach($meetings as $item)
-                                @php
-                                    $meeting = $item->meeting;
-                                    $seconds = (int) $item->total_seconds;
-                                    $hours = intdiv($seconds, 3600);
-                                    $minutes = intdiv($seconds % 3600, 60);
-                                    $remainingSeconds = $seconds % 60;
+            $query->where(function ($query) use ($search) {
+                $query->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('role', 'like', "%{$search}%");
+            });
+        }
 
-                                    $duration = $hours > 0
-                                        ? "{$hours}h {$minutes}m"
-                                        : ($minutes > 0
-                                            ? "{$minutes}m {$remainingSeconds}s"
-                                            : "{$remainingSeconds}s");
-                                @endphp
+        $users = $query->latest()->paginate(6)->withQueryString();
 
-                                <tr class="hover:bg-gray-50/70 transition">
-                                    <td class="px-5 py-4">
-                                        <p class="font-semibold text-gray-800">
-                                            {{ $meeting->title ?? 'Untitled Meeting' }}
-                                        </p>
-                                        <p class="mt-1 text-xs text-gray-400">
-                                            #{{ $meeting->id }}
-                                        </p>
-                                    </td>
+        $totalUsers = User::count();
+        $activeUsers = User::where('is_active', true)->count();
+        $inactiveUsers = User::where('is_active', false)->count();
 
-                                    <td class="px-4 py-4 whitespace-nowrap text-gray-600">
-                                        {{ $meeting->date
-                                            ? \Illuminate\Support\Carbon::parse($meeting->date)->format('M d, Y')
-                                            : '—' }}
-                                    </td>
+        return view('admin.users.index', compact(
+            'users',
+            'totalUsers',
+            'activeUsers',
+            'inactiveUsers'
+        ));
+    }
 
-                                    <td class="px-4 py-4 text-gray-600">
-                                        @if($user->role === 'organizer')
-                                            {{ $item->participants_count ?? 0 }}
-                                        @else
-                                            {{ $meeting->organizer?->name ?? '—' }}
-                                        @endif
-                                    </td>
+    public function create()
+    {
+        return view('admin.users.create');
+    }
 
-                                    <td class="px-4 py-4 whitespace-nowrap text-gray-600">
-                                        {{ $item->first_joined_at?->format('h:i A') ?? '—' }}
-                                    </td>
+    public function store(Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => [
+                'required',
+                'email:rfc',
+                'regex:/^.+@.+\..+$/',
+                'unique:users,email',
+            ],
+            'password' => 'required|min:6',
+            'role' => 'required|in:admin,organizer,participant',
+            'image' => 'nullable|mimes:jpg,jpeg,png,webp,avif|max:2048',
+        ]);
 
-                                    <td class="px-4 py-4 whitespace-nowrap text-gray-600">
-                                        {{ $item->last_left_at?->format('h:i A') ?? '—' }}
-                                    </td>
+        $imagePath = $request->hasFile('image')
+            ? $request->file('image')->store('user_images', 'public')
+            : null;
 
-                                    <td class="px-4 py-4 whitespace-nowrap font-medium text-gray-700">
-                                        {{ $seconds > 0 ? $duration : '—' }}
-                                    </td>
+        User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+            'role' => $request->role,
+            'is_active' => $request->boolean('is_active'),
+            'image' => $imagePath,
+        ]);
 
-                                    <td class="px-4 py-4">
-                                        @if($user->role === 'organizer')
-                                            <span class="inline-flex px-2.5 py-1 rounded-full
-                                                             text-xs font-semibold bg-gray-100 text-gray-600">
-                                                    {{ ucfirst($meeting->status ?? 'unknown') }}
-                                                </span>
-                                        @else
-                                            @php
-                                                $sessionCount = $item->sessions->count();
-                                            @endphp
+        return redirect()
+            ->route('admin.users.index')
+            ->with('success', 'User created successfully!');
+    }
 
-                                            <span class="inline-flex px-2.5 py-1 rounded-full
-                                                             text-xs font-semibold bg-blue-50 text-blue-600">
-                                                    {{ $sessionCount }}
-                                                {{ \Illuminate\Support\Str::plural('session', $sessionCount) }}
-                                                </span>
-                                        @endif
-                                    </td>
-                                </tr>
-                            @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                @endif
-            </div>
-        </div>
-    </div>
-</x-layouts.app>
+    private function setImageUrl(User $user): void
+    {
+        $user->image_url = $user->image
+            ? (
+            str_starts_with($user->image, 'http')
+                ? $user->image
+                : Storage::url($user->image)
+            )
+            : asset('images/default-avatar.png');
+    }
+
+    public function show(User $user)
+    {
+        $this->setImageUrl($user);
+
+        $meetingCount = match ($user->role) {
+            'participant' => Meeting::query()
+                ->whereHas('participants', function ($query) use ($user) {
+                    $query->where('users.id', $user->id);
+                })
+                ->count(),
+
+            'organizer' => Meeting::where('organizer_id', $user->id)->count(),
+
+            default => 0,
+        };
+
+        return view('admin.users.show', compact('user', 'meetingCount'));
+    }
+
+    public function meetingHistory(User $user)
+    {
+        abort_unless(
+            in_array($user->role, ['participant', 'organizer'], true),
+            404
+        );
+
+        $this->setImageUrl($user);
+
+        $meetings = $user->role === 'organizer'
+            ? $this->organizerMeetingHistory($user)
+            : $this->participantMeetingHistory($user);
+
+        return view('admin.users.meeting-history', compact('user', 'meetings'));
+    }
+
+    private function organizerMeetingHistory(User $user)
+    {
+        return Meeting::query()
+            ->where('organizer_id', $user->id)
+            ->withCount('participants')
+            ->orderByDesc('date')
+            ->orderByDesc('time')
+            ->get()
+            ->map(function (Meeting $meeting) {
+                $joinedAt = $meeting->organizer_joined_at
+                    ? Carbon::parse($meeting->organizer_joined_at)
+                    : null;
+
+                $leftAt = $meeting->organizer_left_at
+                    ? Carbon::parse($meeting->organizer_left_at)
+                    : null;
+
+                $totalSeconds = ($joinedAt && $leftAt)
+                    ? (int) $joinedAt->diffInSeconds($leftAt)
+                    : 0;
+
+                return (object) [
+                    'meeting' => $meeting,
+                    'first_joined_at' => $joinedAt,
+                    'last_left_at' => $leftAt,
+                    'total_seconds' => $totalSeconds,
+                    'sessions' => collect(),
+                    'participants_count' => $meeting->participants_count,
+                ];
+            })
+            ->values();
+    }
+
+    private function participantMeetingHistory(User $user)
+    {
+        /*
+         * Membership is the source for WHICH meetings belong in history.
+         * This means older meetings still appear even if audit logging was
+         * introduced later and no MeetingParticipantLog row exists for them.
+         */
+        $participantMeetings = Meeting::query()
+            ->with('organizer')
+            ->whereHas('participants', function ($query) use ($user) {
+                $query->where('users.id', $user->id);
+            })
+            ->orderByDesc('date')
+            ->orderByDesc('time')
+            ->get();
+
+        $logsByMeeting = MeetingParticipantLog::query()
+            ->where('user_id', $user->id)
+            ->whereIn('meeting_id', $participantMeetings->pluck('id'))
+            ->orderBy('joined_at')
+            ->get()
+            ->groupBy('meeting_id');
+
+        return $participantMeetings
+            ->map(function (Meeting $meeting) use ($logsByMeeting) {
+                $sessions = $logsByMeeting
+                    ->get($meeting->id, collect())
+                    ->sortBy('joined_at')
+                    ->values();
+
+                $firstSession = $sessions->first();
+
+                $lastSession = $sessions
+                    ->sortByDesc(function ($session) {
+                        $leftAt = $session->left_at
+                            ? Carbon::parse($session->left_at)
+                            : null;
+
+                        $joinedAt = $session->joined_at
+                            ? Carbon::parse($session->joined_at)
+                            : null;
+
+                        return $leftAt?->timestamp
+                            ?? $joinedAt?->timestamp
+                            ?? 0;
+                    })
+                    ->first();
+
+                $firstJoinedAt = $firstSession?->joined_at
+                    ? Carbon::parse($firstSession->joined_at)
+                    : null;
+
+                $lastLeftAt = $lastSession?->left_at
+                    ? Carbon::parse($lastSession->left_at)
+                    : null;
+
+                $totalSeconds = (int) $sessions->sum(function ($session) {
+                    if (!$session->joined_at || !$session->left_at) {
+                        return 0;
+                    }
+
+                    return (int) Carbon::parse($session->joined_at)
+                        ->diffInSeconds(Carbon::parse($session->left_at));
+                });
+
+                return (object) [
+                    'meeting' => $meeting,
+                    'first_joined_at' => $firstJoinedAt,
+                    'last_left_at' => $lastLeftAt,
+                    'total_seconds' => $totalSeconds,
+                    'sessions' => $sessions,
+                    'participants_count' => null,
+                ];
+            })
+            ->values();
+    }
+
+    public function edit(User $user)
+    {
+        return view('admin.users.edit', compact('user'));
+    }
+
+    public function update(Request $request, User $user)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => [
+                'required',
+                'email:rfc',
+                'regex:/^.+@.+\..+$/',
+                'unique:users,email,' . $user->id,
+            ],
+            'role' => 'required|in:admin,organizer,participant',
+            'image' => 'nullable|mimes:jpg,jpeg,png,webp,avif|max:2048',
+        ]);
+
+        $data = [
+            'name' => $request->name,
+            'email' => $request->email,
+            'role' => $request->role,
+            'is_active' => $request->boolean('is_active'),
+        ];
+
+        if ($request->remove_image) {
+            if ($user->image && !str_starts_with($user->image, 'http')) {
+                Storage::disk('public')->delete($user->image);
+            }
+
+            $data['image'] = null;
+        }
+
+        if ($request->hasFile('image')) {
+            if ($user->image && !str_starts_with($user->image, 'http')) {
+                Storage::disk('public')->delete($user->image);
+            }
+
+            $data['image'] = $request->file('image')
+                ->store('user_images', 'public');
+        }
+
+        $user->update($data);
+
+        return back()->with('success', 'User updated successfully!');
+    }
+
+    public function destroy(User $user)
+    {
+        if ($user->id === auth()->id()) {
+            return back()->with(
+                'error',
+                'You cannot delete your own account!'
+            );
+        }
+
+        if ($user->image && !str_starts_with($user->image, 'http')) {
+            Storage::disk('public')->delete($user->image);
+        }
+
+        $user->delete();
+
+        return redirect()
+            ->route('admin.users.index')
+            ->with('success', 'User removed successfully!');
+    }
+
+    public function toggleStatus(User $user)
+    {
+        if ($user->id === auth()->id()) {
+            return back()->with(
+                'error',
+                'You cannot deactivate your own account!'
+            );
+        }
+
+        $newStatus = !$user->is_active;
+
+        $user->update([
+            'is_active' => $newStatus,
+        ]);
+
+        Notification::create([
+            'user_id' => $user->id,
+            'title' => $newStatus
+                ? 'Account Activated'
+                : 'Account Deactivated',
+            'message' => $newStatus
+                ? 'Your account has been activated by an administrator. You now have full access again.'
+                : 'Your account has been deactivated by an administrator.',
+            'link' => null,
+        ]);
+
+        return back()->with('success', 'User status updated.');
+    }
+
+    public function changeRole(Request $request, User $user)
+    {
+        if ($user->id === auth()->id()) {
+            return back()->with(
+                'error',
+                'You cannot change your own role!'
+            );
+        }
+
+        $request->validate([
+            'role' => 'required|in:admin,organizer,participant',
+        ]);
+
+        $oldRole = $user->role;
+        $newRole = $request->role;
+
+        if ($oldRole === $newRole) {
+            return back()->with(
+                'success',
+                'No change — user already has this role.'
+            );
+        }
+
+        $user->update([
+            'role' => $newRole,
+        ]);
+
+        Notification::create([
+            'user_id' => $user->id,
+            'title' => 'Your Role Has Been Updated',
+            'message' => 'Your role has been changed from '
+                . ucfirst($oldRole)
+                . ' to '
+                . ucfirst($newRole)
+                . '.',
+            'link' => null,
+        ]);
+
+        return back()->with(
+            'success',
+            'User role changed to '
+            . ucfirst($newRole)
+            . ' successfully!'
+        );
+    }
+}
