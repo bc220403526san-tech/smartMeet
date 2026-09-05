@@ -43,30 +43,26 @@ class User extends Authenticatable
     | Profile Image URL
     |--------------------------------------------------------------------------
     |
-    | Usage:
-    |
-    | {{ $user->image_url }}
-    |
-    | Handles:
-    | - Local uploaded avatar
-    | - Google/social avatar URL
-    | - Fallback generated avatar
+    | Priority:
+    | 1. Uploaded/local image column
+    | 2. Social/provider avatar column
+    | 3. Generated initials avatar
     |
     */
 
     public function getImageUrlAttribute(): string
     {
         /*
-         * First preference: avatar column
-         * Second preference: image column
+         * IMPORTANT:
+         * If an uploaded image exists, always show it first.
+         * Only fall back to avatar when image is empty.
          */
-        $profileImage = $this->avatar ?: $this->image;
+        $profileImage = $this->image ?: $this->avatar;
 
         /*
-         * No image exists: generate initials avatar
+         * No image/avatar exists: generate initials avatar.
          */
         if (empty($profileImage)) {
-
             $colors = [
                 '3b82f6',
                 'ef4444',
@@ -85,7 +81,6 @@ class User extends Authenticatable
             );
 
             $index = ord($firstCharacter) % count($colors);
-
             $color = $colors[$index];
 
             return 'https://ui-avatars.com/api/?name='
@@ -96,7 +91,7 @@ class User extends Authenticatable
         }
 
         /*
-         * Google / Facebook / external image
+         * Google / Facebook / external image.
          */
         if (
             str_starts_with($profileImage, 'http://') ||
@@ -106,21 +101,21 @@ class User extends Authenticatable
         }
 
         /*
-         * Already starts with /storage/
+         * Already starts with /storage/.
          */
         if (str_starts_with($profileImage, '/storage/')) {
             return url($profileImage);
         }
 
         /*
-         * Already starts with storage/
+         * Already starts with storage/.
          */
         if (str_starts_with($profileImage, 'storage/')) {
             return asset($profileImage);
         }
 
         /*
-         * Local Laravel storage image
+         * Local Laravel public storage image.
          */
         return Storage::disk('public')->url(
             ltrim($profileImage, '/')
@@ -162,7 +157,7 @@ class User extends Authenticatable
 
     public function isOrganizer(): bool
     {
-        return $this->role === 'organizers';
+        return $this->role === 'organizer';
     }
 
     public function isParticipant(): bool
@@ -190,7 +185,7 @@ class User extends Authenticatable
             'admin' =>
             'bg-blue-100 text-blue-700',
 
-            'organizers' =>
+            'organizer' =>
             'bg-gray-200 text-gray-700',
 
             'participant' =>
