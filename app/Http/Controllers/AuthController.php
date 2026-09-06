@@ -350,36 +350,15 @@ class AuthController extends Controller
 
         $meeting = Meeting::where('unique_code', $code)->first();
 
-        /*
-         * Invite links are for participants only. If an organizer/admin
-         * opened an invite link before login, show the dedicated blocked
-         * page immediately after login instead of adding them as a participant.
-         */
-        if ($user->role === 'organizer') {
-            session()->forget('pending_meeting_code');
-
-            return view('meetings.organizer-link-blocked', [
-                'meeting' => $meeting,
-                'backUrl' => route('organizer.dashboard'),
-                'backLabel' => 'Back to Organizer Dashboard',
-            ]);
-        }
-
-        if ($user->role === 'admin') {
-            session()->forget('pending_meeting_code');
-
-            return view('meetings.organizer-link-blocked', [
-                'meeting' => $meeting,
-                'backUrl' => route('admin.dashboard'),
-                'backLabel' => 'Back to Admin Dashboard',
-            ]);
-        }
-
         if (!$meeting) {
             session()->forget('pending_meeting_code');
 
+            $dashboardRoute = $user->role === 'organizer'
+                ? 'organizer.dashboard'
+                : 'participant.meetings.index';
+
             return redirect()
-                ->route('participant.meetings.index')
+                ->route($dashboardRoute)
                 ->with(
                     'error',
                     'The meeting invite link is no longer valid.'
@@ -405,9 +384,30 @@ class AuthController extends Controller
                 default => 'This meeting has already completed.',
             };
 
+            $dashboardRoute = $user->role === 'organizer'
+                ? 'organizer.dashboard'
+                : 'participant.meetings.index';
+
             return redirect()
-                ->route('participant.meetings.index')
+                ->route($dashboardRoute)
                 ->with('info', $message);
+        }
+
+        /*
+         * Invite links can be used by both Participants and Organizers.
+         * If an Organizer uses the link, add that organizer to this meeting's
+         * participant list. In the room they are intentionally treated as a
+         * normal participant, not as the host/owner of this meeting.
+         */
+        if (!in_array($user->role, ['participant', 'organizer'], true)) {
+            session()->forget('pending_meeting_code');
+
+            return redirect()
+                ->route('admin.dashboard')
+                ->with(
+                    'error',
+                    'Meeting invite links can only be used by Participant or Organizer accounts.'
+                );
         }
 
         $meeting->participants()->firstOrCreate(
@@ -429,8 +429,19 @@ class AuthController extends Controller
                 )
                 ->with(
                     'success',
-                    'You have joined the meeting: '
+                    'You have joined the meeting as a participant: '
                     . $meeting->title
+                );
+        }
+
+        if ($user->role === 'organizer') {
+            return redirect()
+                ->route('organizer.dashboard')
+                ->with(
+                    'info',
+                    'You have been added to "'
+                    . $meeting->title
+                    . '" as a participant. Open the invite link again when the meeting starts.'
                 );
         }
 

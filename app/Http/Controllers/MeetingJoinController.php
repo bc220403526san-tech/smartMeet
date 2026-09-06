@@ -31,8 +31,8 @@ class MeetingJoinController extends Controller
         }
 
         /*
-         * If nobody is logged in, remember the meeting link through login.
-         * AuthController will decide what to do based on the logged-in role.
+         * Keep the invite code through login/registration.
+         * AuthController will continue the same join flow after login.
          */
         if (!auth()->check()) {
             session(['pending_meeting_code' => $meeting->unique_code]);
@@ -48,39 +48,16 @@ class MeetingJoinController extends Controller
         $user = auth()->user();
 
         /*
-         * Organizer accounts cannot join another meeting through a
-         * participant invite link. Show a dedicated page instead of
-         * redirecting with a toast/error.
+         * Participants and organizers may use an invite link.
+         * An organizer who joins through an invite link is treated as a
+         * normal participant inside this meeting room.
          */
-        if ($user->role === 'organizer') {
-            session()->forget('pending_meeting_code');
-
-            return view('meetings.organizer-link-blocked', [
-                'meeting' => $meeting,
-                'backUrl' => route('organizer.dashboard'),
-                'backLabel' => 'Back to Organizer Dashboard',
-            ]);
-        }
-
-        /*
-         * Admin accounts are also not participant accounts.
-         */
-        if ($user->role === 'admin') {
-            session()->forget('pending_meeting_code');
-
-            return view('meetings.organizer-link-blocked', [
-                'meeting' => $meeting,
-                'backUrl' => route('admin.dashboard'),
-                'backLabel' => 'Back to Admin Dashboard',
-            ]);
-        }
-
-        if ($user->role !== 'participant') {
+        if (!in_array($user->role, ['participant', 'organizer'], true)) {
             return redirect()
-                ->route('login')
+                ->route('admin.dashboard')
                 ->with(
                     'error',
-                    'Your account role cannot use meeting invite links.'
+                    'Meeting invite links can only be used by Participant or Organizer accounts.'
                 );
         }
 
@@ -96,7 +73,22 @@ class MeetingJoinController extends Controller
                 ->route('participant.meetings.attend', $meeting->id)
                 ->with(
                     'success',
-                    'You have joined the meeting: ' . $meeting->title
+                    'You have joined the meeting as a participant: ' . $meeting->title
+                );
+        }
+
+        /*
+         * Participant accounts can see the meeting in their participant list.
+         * Organizer accounts keep their organizer dashboard and can reopen the
+         * same invite link when the meeting becomes active.
+         */
+        if ($user->role === 'organizer') {
+            return redirect()
+                ->route('organizer.dashboard')
+                ->with(
+                    'info',
+                    'You have been added to "' . $meeting->title .
+                    '" as a participant. Open the invite link again when the meeting starts.'
                 );
         }
 
@@ -115,8 +107,6 @@ class MeetingJoinController extends Controller
     {
         $meeting->refresh();
 
-        // Login/invite navigation may only activate an UPCOMING meeting.
-        // It can never complete or rewrite a final meeting status.
         if ($meeting->status !== 'upcoming') {
             return;
         }
