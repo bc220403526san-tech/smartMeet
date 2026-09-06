@@ -399,6 +399,9 @@
             }
         }
 
+
+        /* Top decorative circle removed */
+        .hero-orb.one { display: none !important; }
     </style>
 </head>
 
@@ -409,8 +412,6 @@
     <!-- LEFT HERO ONLY REDESIGNED -->
     <section class="auth-visual w-full md:w-1/2 min-h-[45vh] md:min-h-[calc(100vh-3rem)]
         rounded-t-2xl md:rounded-l-2xl md:rounded-tr-none border-l-4 border-blue-700">
-
-        <div class="hero-orb one"></div>
         <div class="hero-orb two"></div>
 
         <div class="hero-content relative z-10 h-full flex flex-col px-6 sm:px-10 md:px-12 py-7 md:py-9">
