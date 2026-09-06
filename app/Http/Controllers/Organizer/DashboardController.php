@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Organizer;
 use App\Http\Controllers\Controller;
 use App\Models\Meeting;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 
 class DashboardController extends Controller
@@ -17,33 +18,26 @@ class DashboardController extends Controller
         $now = Carbon::now($timezone);
         $today = $now->toDateString();
 
-        /*
-         * Dashboard refresh may ONLY activate meetings whose scheduled
-         * start time has arrived.
-         *
-         * It must NEVER change active -> completed.
-         * Ended / Cancelled / Completed are permanent final statuses.
-         */
-        $this->syncOrganizerMeetingStatuses($organizerId);
+        $this->syncAccessibleMeetingStatuses($organizerId);
 
-        // STATS
-        $totalMeetings = Meeting::where('organizer_id', $organizerId)
-            ->count();
+        $baseQuery = $this->accessibleMeetingQuery($organizerId);
 
-        $activeMeetings = Meeting::where('organizer_id', $organizerId)
+        $totalMeetings = (clone $baseQuery)->count();
+
+        $activeMeetings = (clone $baseQuery)
             ->where('status', 'active')
             ->count();
 
-        $todayMeetings = Meeting::where('organizer_id', $organizerId)
+        $todayMeetings = (clone $baseQuery)
             ->whereDate('date', $today)
             ->count();
 
-        $upcomingMeetings = Meeting::where('organizer_id', $organizerId)
+        $upcomingMeetings = (clone $baseQuery)
             ->where('status', 'upcoming')
             ->count();
 
-        // TODAY'S AGENDA
-        $agenda = Meeting::where('organizer_id', $organizerId)
+        $agenda = (clone $baseQuery)
+            ->with('organizer')
             ->whereDate('date', $today)
             ->orderBy('time')
             ->get();
@@ -57,10 +51,26 @@ class DashboardController extends Controller
         ));
     }
 
-    private function syncOrganizerMeetingStatuses(int|string $organizerId): void
+    private function accessibleMeetingQuery(int|string $organizerId): Builder
     {
-        Meeting::query()
-            ->where('organizer_id', $organizerId)
+        return Meeting::query()
+            ->where(function (Builder $query) use ($organizerId) {
+                $query
+                    ->where('organizer_id', $organizerId)
+                    ->orWhereHas(
+                        'participants',
+                        function (Builder $participantQuery) use ($organizerId) {
+                            $participantQuery
+                                ->where('user_id', $organizerId);
+                        }
+                    );
+            });
+    }
+
+    private function syncAccessibleMeetingStatuses(
+        int|string $organizerId
+    ): void {
+        (clone $this->accessibleMeetingQuery($organizerId))
             ->where('status', 'upcoming')
             ->get()
             ->each(function (Meeting $meeting) {
@@ -70,10 +80,6 @@ class DashboardController extends Controller
 
     private function syncSingleMeetingStatus(Meeting $meeting): void
     {
-        /*
-         * Only upcoming -> active is allowed from dashboard refresh.
-         * No active -> completed logic is intentionally present here.
-         */
         $meeting->refresh();
 
         if ($meeting->status !== 'upcoming') {

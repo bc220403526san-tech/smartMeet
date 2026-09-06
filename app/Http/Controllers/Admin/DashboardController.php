@@ -1,129 +1,110 @@
 <?php
 
-namespace App\Http\Controllers\Admin;
+namespace App\Http\Controllers\Organizer;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use App\Models\Meeting;
-use App\Models\DismissedActivity;
 use Carbon\Carbon;
-use Illuminate\Http\Request;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 
 class DashboardController extends Controller
 {
     public function index()
     {
-        $totalMeetings = Meeting::count();
+        $user = Auth::user();
+        $organizerId = $user->id;
+        $timezone = config('app.timezone', 'Asia/Karachi');
+        $now = Carbon::now($timezone);
+        $today = $now->toDateString();
 
-        $activeMeetings = Meeting::where('starts_at', '<=', now())
-            ->where('starts_at', '>=', now()->subMinutes(60))
+        $this->syncAccessibleMeetingStatuses($organizerId);
+
+        $baseQuery = $this->accessibleMeetingQuery($organizerId);
+
+        $totalMeetings = (clone $baseQuery)->count();
+
+        $activeMeetings = (clone $baseQuery)
+            ->where('status', 'active')
             ->count();
 
-        $totalUsers = User::count();
-        $todayMeetings = Meeting::whereDate('created_at', Carbon::today())->count();
-
-        $upcomingMeetings = Meeting::where('starts_at', '>=', now())
-            ->where('starts_at', '<=', now()->addHours(48))
+        $todayMeetings = (clone $baseQuery)
+            ->whereDate('date', $today)
             ->count();
 
-        $lastMonthMeetings = Meeting::whereMonth('created_at', now()->subMonth()->month)->count();
-        $thisMonthMeetings = Meeting::whereMonth('created_at', now()->month)->count();
+        $upcomingMeetings = (clone $baseQuery)
+            ->where('status', 'upcoming')
+            ->count();
 
-        $growthPercent = $lastMonthMeetings > 0
-            ? round((($thisMonthMeetings - $lastMonthMeetings) / $lastMonthMeetings) * 100, 1)
-            : 0;
+        $agenda = (clone $baseQuery)
+            ->with('organizer')
+            ->whereDate('date', $today)
+            ->orderBy('time')
+            ->get();
 
-        $newUsersThisWeek = User::where('created_at', '>=', now()->subWeek())->count();
-        $activities = $this->getActivities(20);
-
-        return view('admin.dashboard', compact(
+        return view('organizer.dashboard', compact(
             'totalMeetings',
             'activeMeetings',
-            'totalUsers',
             'todayMeetings',
             'upcomingMeetings',
-            'growthPercent',
-            'newUsersThisWeek',
-            'activities'
+            'agenda'
         ));
     }
 
-    public function activities()
+    private function accessibleMeetingQuery(int|string $organizerId): Builder
     {
-        return redirect()->route('admin.dashboard');
+        return Meeting::query()
+            ->where(function (Builder $query) use ($organizerId) {
+                $query
+                    ->where('organizer_id', $organizerId)
+                    ->orWhereHas('participants', function (Builder $participantQuery) use ($organizerId) {
+                        $participantQuery->where('user_id', $organizerId);
+                    });
+            });
     }
 
-    public function fetchActivities(Request $request)
+    private function syncAccessibleMeetingStatuses(int|string $organizerId): void
     {
-        $limit = max(1, min((int) $request->get('limit', 6), 100));
-        $activities = $this->getActivities($limit);
-
-        return response()->json($activities);
+        (clone $this->accessibleMeetingQuery($organizerId))
+            ->where('status', 'upcoming')
+            ->get()
+            ->each(function (Meeting $meeting) {
+                $this->syncSingleMeetingStatus($meeting);
+            });
     }
 
-    public function removeActivity(Request $request, string $key)
+    private function syncSingleMeetingStatus(Meeting $meeting): void
     {
-        DismissedActivity::firstOrCreate(['activity_key' => $key]);
+        $meeting->refresh();
 
-        $limit = max(1, min((int) $request->get('limit', 6), 100));
-        $activities = $this->getActivities($limit);
-
-        return response()->json([
-            'success' => true,
-            'activities' => $activities->values(),
-        ]);
-    }
-
-    private function getActivities(int $limit)
-    {
-        $activities = collect();
-        $dismissedKeys = DismissedActivity::pluck('activity_key')->all();
-
-        // Meeting model defines organizer() as a singular relationship.
-        $recentMeetings = Meeting::with('organizer')
-            ->latest()
-            ->take(50)
-            ->get();
-
-        foreach ($recentMeetings as $meeting) {
-            $key = 'meeting-' . $meeting->id;
-
-            if (in_array($key, $dismissedKeys, true)) {
-                continue;
-            }
-
-            $activities->push([
-                'key' => $key,
-                'image' => optional($meeting->organizer)->image_url
-                    ?? asset('images/default-avatar.png'),
-                'name' => optional($meeting->organizer)->name ?? 'Unknown',
-                'message' => 'Created meeting: ' . $meeting->title,
-                'time' => $meeting->created_at->diffForHumans(),
-                'sort' => $meeting->created_at,
-                'type' => 'meeting',
-            ]);
+        if ($meeting->status !== 'upcoming') {
+            return;
         }
 
-        $recentUsers = User::latest()->take(50)->get();
+        $startTime = $this->meetingStartUtc($meeting);
 
-        foreach ($recentUsers as $user) {
-            $key = 'user-' . $user->id;
-
-            if (in_array($key, $dismissedKeys, true)) {
-                continue;
-            }
-
-            $activities->push([
-                'key' => $key,
-                'image' => $user->image_url,
-                'name' => $user->name,
-                'message' => 'Joined as ' . ucfirst($user->role),
-                'time' => $user->created_at->diffForHumans(),
-                'sort' => $user->created_at,
-                'type' => 'user',
-            ]);
+        if (now('UTC')->lt($startTime)) {
+            return;
         }
 
-        return $activities->sortByDesc('sort')->take($limit)->values();
+        Meeting::query()
+            ->whereKey($meeting->id)
+            ->where('status', 'upcoming')
+            ->update([
+                'status' => 'active',
+            ]);
+
+        $meeting->refresh();
+    }
+
+    private function meetingStartUtc(Meeting $meeting): Carbon
+    {
+        $timezone = $meeting->timezone
+            ?: config('app.timezone', 'Asia/Karachi');
+
+        return Carbon::parse(
+            trim($meeting->date . ' ' . $meeting->time),
+            $timezone
+        )->utc();
     }
 }

@@ -170,13 +170,22 @@
 
                 @php
                     $isActive = $meeting->status === 'active';
-                    $isCompleted = $meeting->status === 'completed';
+                    $isCompleted = in_array(
+                        $meeting->status,
+                        ['completed', 'ended'],
+                        true
+                    );
                     $isCancelled = $meeting->status === 'cancelled';
+
+                    $isMeetingOwner =
+                        (string) $meeting->organizer_id ===
+                        (string) auth()->id();
 
                     $borderColor = match($meeting->status) {
                         'active' => 'border-l-blue-600 bg-blue-50',
                         'upcoming' => 'border-l-blue-200 bg-white',
                         'completed' => 'border-l-gray-300 bg-gray-50',
+                        'ended' => 'border-l-gray-300 bg-gray-50',
                         'cancelled' => 'border-l-red-300 bg-red-50',
                         default => 'border-l-gray-200 bg-white',
                     };
@@ -185,6 +194,7 @@
                         'active' => 'bg-orange-100 text-orange-600',
                         'upcoming' => 'bg-blue-100 text-blue-600',
                         'completed' => 'bg-gray-100 text-gray-600',
+                        'ended' => 'bg-gray-100 text-gray-600',
                         'cancelled' => 'bg-red-100 text-red-500',
                         default => 'bg-gray-100 text-gray-600',
                     };
@@ -193,6 +203,7 @@
                         'active' => 'LIVE NOW',
                         'upcoming' => 'SCHEDULED',
                         'completed' => 'COMPLETED',
+                        'ended' => 'ENDED',
                         'cancelled' => 'CANCELLED',
                         default => strtoupper($meeting->status),
                     };
@@ -228,6 +239,14 @@
                                 <span class="text-[11px] font-semibold px-2.5 py-1 rounded-full {{ $badgeClass }} tracking-wide">
                                     {{ $badgeLabel }}
                                 </span>
+
+                                @unless($isMeetingOwner)
+                                    <span class="inline-flex items-center gap-1
+                                                 text-[11px] font-medium text-blue-600">
+                                        <i class="fa-solid fa-user-group text-[10px]"></i>
+                                        Invited as participant
+                                    </span>
+                                @endunless
 
                                 @if($isActive)
                                     <span class="inline-flex items-center gap-1 text-[11px] font-medium text-green-600">
@@ -268,14 +287,24 @@
 
                     <div class="flex gap-2 self-start sm:self-center shrink-0 relative z-10">
                         @if($isActive)
-                            <a href="{{ route('organizer.meetings.attend', $meeting) }}"
+                            <a href="{{ $isMeetingOwner
+                                        ? route('organizer.meetings.attend', $meeting)
+                                        : route('participant.meetings.attend', $meeting) }}"
                                class="inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600
                                       text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-md
                                       hover:shadow-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200">
                                 <i class="fa-solid fa-video text-xs"></i>
                                 Join
                             </a>
-                        @elseif(!$isCompleted && !$isCancelled)
+
+                        @elseif(!$isMeetingOwner && !$isCompleted && !$isCancelled)
+                            <span class="inline-flex items-center gap-2 text-blue-600 bg-blue-50 border border-blue-100
+                                         px-4 py-2.5 rounded-xl text-sm font-medium">
+                                <i class="fa-solid fa-clock text-xs"></i>
+                                Upcoming
+                            </span>
+
+                        @elseif($isMeetingOwner && !$isCompleted && !$isCancelled)
                             <a href="{{ route('organizer.meetings.show', $meeting) }}"
                                class="inline-flex items-center gap-2 text-blue-600 bg-blue-50 border border-blue-100
                                       px-4 py-2.5 rounded-xl text-sm font-medium
@@ -283,13 +312,21 @@
                                 <i class="fa-solid fa-gear text-xs"></i>
                                 Manage
                             </a>
-                        @else
+
+                        @elseif($isMeetingOwner)
                             <a href="{{ route('organizer.meetings.show', $meeting) }}"
                                class="inline-flex items-center gap-2 text-gray-500 bg-gray-50 border border-gray-200
                                       px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-100 transition-all duration-200">
                                 <i class="fa-solid fa-eye text-xs"></i>
                                 View
                             </a>
+
+                        @else
+                            <span class="inline-flex items-center gap-2 text-gray-500 bg-gray-50 border border-gray-200
+                                         px-4 py-2.5 rounded-xl text-sm font-medium">
+                                <i class="fa-solid fa-lock text-xs"></i>
+                                {{ ucfirst($meeting->status) }}
+                            </span>
                         @endif
                     </div>
                 </div>
