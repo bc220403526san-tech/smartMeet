@@ -13,6 +13,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
@@ -755,16 +756,20 @@ class MeetingController extends Controller
     private function accessibleMeetingQuery(
         int|string $organizerId
     ): Builder {
+        /*
+         * Use the meeting_participants table directly.
+         * This makes invited-organizer visibility independent of Eloquent
+         * relation interpretation and matches MeetingJoinController::firstOrCreate().
+         */
         return Meeting::query()
             ->where(function (Builder $query) use ($organizerId) {
                 $query
                     ->where('organizer_id', $organizerId)
-                    ->orWhereHas(
-                        'participants',
-                        function (Builder $participantQuery) use ($organizerId) {
-                            $participantQuery
-                                ->where('user_id', $organizerId);
-                        }
+                    ->orWhereIn(
+                        'id',
+                        DB::table('meeting_participants')
+                            ->select('meeting_id')
+                            ->where('user_id', $organizerId)
                     );
             });
     }

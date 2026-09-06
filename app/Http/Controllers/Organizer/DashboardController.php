@@ -7,6 +7,7 @@ use App\Models\Meeting;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
@@ -14,7 +15,7 @@ class DashboardController extends Controller
     {
         $user = Auth::user();
         $organizerId = $user->id;
-        $timezone = config('app.timezone', 'Asia/Karachi');
+        $timezone = 'Asia/Karachi';
         $now = Carbon::now($timezone);
         $today = $now->toDateString();
 
@@ -53,16 +54,20 @@ class DashboardController extends Controller
 
     private function accessibleMeetingQuery(int|string $organizerId): Builder
     {
+        /*
+         * Own meetings + meetings this organizer joined through an invite link.
+         * MeetingJoinController stores invite-link joins in meeting_participants,
+         * so query that table directly.
+         */
         return Meeting::query()
             ->where(function (Builder $query) use ($organizerId) {
                 $query
                     ->where('organizer_id', $organizerId)
-                    ->orWhereHas(
-                        'participants',
-                        function (Builder $participantQuery) use ($organizerId) {
-                            $participantQuery
-                                ->where('user_id', $organizerId);
-                        }
+                    ->orWhereIn(
+                        'id',
+                        DB::table('meeting_participants')
+                            ->select('meeting_id')
+                            ->where('user_id', $organizerId)
                     );
             });
     }

@@ -156,7 +156,7 @@
                     </h2>
 
                     <p class="text-xs text-gray-500">
-                        Your schedule for {{ \Carbon\Carbon::today()->format('M d, Y') }}
+                        Your schedule for {{ \Carbon\Carbon::now('Asia/Karachi')->format('M d, Y') }}
                     </p>
                 </div>
 
