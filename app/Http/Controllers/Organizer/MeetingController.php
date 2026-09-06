@@ -788,11 +788,14 @@ class MeetingController extends Controller
     private function syncMeetingStatuses(int|string $organizerId): void
     {
         /*
-         * Includes both owned meetings and meetings this organizer joined
-         * through an invite link.
+         * Reconcile all accessible meetings, not only "upcoming" ones.
+         * This repairs a meeting that was marked "completed" too early while
+         * its scheduled duration is still running.
+         *
+         * Explicit final states "ended" and "cancelled" are preserved.
          */
         $meetings = (clone $this->accessibleMeetingQuery($organizerId))
-            ->where('status', 'upcoming')
+            ->whereNotIn('status', ['ended', 'cancelled'])
             ->get();
 
         foreach ($meetings as $meeting) {
@@ -804,22 +807,31 @@ class MeetingController extends Controller
     {
         $meeting->refresh();
 
-        if ($meeting->status !== 'upcoming') {
+        if (in_array($meeting->status, ['ended', 'cancelled'], true)) {
             return;
         }
 
         $now = now('UTC');
         $startTime = $this->getMeetingStartTime($meeting);
+        $endTime = $startTime->copy()->addMinutes((int) $meeting->duration);
 
         if ($now->lt($startTime)) {
+            $targetStatus = 'upcoming';
+        } elseif ($now->lt($endTime)) {
+            $targetStatus = 'active';
+        } else {
+            $targetStatus = 'completed';
+        }
+
+        if ($meeting->status === $targetStatus) {
             return;
         }
 
         Meeting::query()
             ->whereKey($meeting->id)
-            ->where('status', 'upcoming')
+            ->whereNotIn('status', ['ended', 'cancelled'])
             ->update([
-                'status' => 'active',
+                'status' => $targetStatus,
             ]);
 
         $meeting->refresh();

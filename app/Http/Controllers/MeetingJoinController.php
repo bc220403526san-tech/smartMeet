@@ -120,7 +120,7 @@ class MeetingJoinController extends Controller
     {
         $meeting->refresh();
 
-        if ($meeting->status !== 'upcoming') {
+        if (in_array($meeting->status, ['ended', 'cancelled'], true)) {
             return;
         }
 
@@ -132,15 +132,26 @@ class MeetingJoinController extends Controller
             $timezone
         )->utc();
 
-        if (now('UTC')->lt($start)) {
+        $end = $start->copy()->addMinutes((int) $meeting->duration);
+        $now = now('UTC');
+
+        if ($now->lt($start)) {
+            $targetStatus = 'upcoming';
+        } elseif ($now->lt($end)) {
+            $targetStatus = 'active';
+        } else {
+            $targetStatus = 'completed';
+        }
+
+        if ($meeting->status === $targetStatus) {
             return;
         }
 
         Meeting::query()
             ->whereKey($meeting->id)
-            ->where('status', 'upcoming')
+            ->whereNotIn('status', ['ended', 'cancelled'])
             ->update([
-                'status' => 'active',
+                'status' => $targetStatus,
             ]);
 
         $meeting->refresh();

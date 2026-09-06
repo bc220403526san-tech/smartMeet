@@ -37,9 +37,21 @@ class DashboardController extends Controller
             ->where('status', 'upcoming')
             ->count();
 
+        /*
+         * Dashboard agenda:
+         * - always show ACTIVE accessible meetings, even if they started
+         *   before midnight and are still inside their scheduled duration;
+         * - also show all meetings scheduled for today.
+         */
         $agenda = (clone $baseQuery)
             ->with('organizer')
-            ->whereDate('date', $today)
+            ->where(function (Builder $query) use ($today) {
+                $query
+                    ->where('status', 'active')
+                    ->orWhereDate('date', $today);
+            })
+            ->orderByRaw("CASE WHEN status = 'active' THEN 0 ELSE 1 END")
+            ->orderBy('date')
             ->orderBy('time')
             ->get();
 
@@ -75,8 +87,16 @@ class DashboardController extends Controller
     private function syncAccessibleMeetingStatuses(
         int|string $organizerId
     ): void {
+        /*
+         * Reconcile every accessible non-final meeting against its scheduled
+         * start/end window. This also repairs an incorrectly "completed"
+         * meeting while its scheduled duration is still running.
+         *
+         * "ended" and "cancelled" are explicit final states and are never
+         * reopened automatically.
+         */
         (clone $this->accessibleMeetingQuery($organizerId))
-            ->where('status', 'upcoming')
+            ->whereNotIn('status', ['ended', 'cancelled'])
             ->get()
             ->each(function (Meeting $meeting) {
                 $this->syncSingleMeetingStatus($meeting);
@@ -87,21 +107,31 @@ class DashboardController extends Controller
     {
         $meeting->refresh();
 
-        if ($meeting->status !== 'upcoming') {
+        if (in_array($meeting->status, ['ended', 'cancelled'], true)) {
             return;
         }
 
+        $now = now('UTC');
         $startTime = $this->meetingStartUtc($meeting);
+        $endTime = $startTime->copy()->addMinutes((int) $meeting->duration);
 
-        if (now('UTC')->lt($startTime)) {
+        if ($now->lt($startTime)) {
+            $targetStatus = 'upcoming';
+        } elseif ($now->lt($endTime)) {
+            $targetStatus = 'active';
+        } else {
+            $targetStatus = 'completed';
+        }
+
+        if ($meeting->status === $targetStatus) {
             return;
         }
 
         Meeting::query()
             ->whereKey($meeting->id)
-            ->where('status', 'upcoming')
+            ->whereNotIn('status', ['ended', 'cancelled'])
             ->update([
-                'status' => 'active',
+                'status' => $targetStatus,
             ]);
 
         $meeting->refresh();
