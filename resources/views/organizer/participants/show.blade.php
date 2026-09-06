@@ -16,9 +16,9 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 gap-8 xl:grid-cols-3">
+        <div class="grid grid-cols-1 xl:grid-cols-3" style="gap: 32px;">
             {{-- PROFILE --}}
-            <section class="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-blue-50 xl:col-span-1">
+            <section class="rounded-2xl bg-white p-6 shadow-sm xl:col-span-1" style="border:1px solid #e5eefc;">
                 @php
                     $nameParts = preg_split('/\s+/', trim($participant->name ?? 'User'));
                     $initials = '';
@@ -28,18 +28,19 @@
                 @endphp
 
                 <div class="text-center">
-                    <div class="relative mx-auto w-fit">
+                    <div class="relative mx-auto" style="width:96px;height:96px;">
                         @if(!empty($participant->image_url))
                             <img src="{{ $participant->image_url }}"
                                  alt="{{ $participant->name }}"
-                                 class="h-24 w-24 rounded-full object-cover shadow-md">
+                                 class="h-24 w-24 rounded-full object-cover shadow-md" style="border:none;outline:none;">
                         @else
-                            <div class="flex h-24 w-24 items-center justify-center rounded-full bg-blue-600 text-2xl font-bold text-white shadow-md">
+                            <div class="flex h-24 w-24 items-center justify-center rounded-full bg-blue-600 text-2xl font-bold text-white shadow-md" style="border:none;outline:none;">
                                 {{ $initials }}
                             </div>
                         @endif
 
-                        <span class="absolute bottom-1.5 right-1.5 h-3.5 w-3.5 rounded-full border-2 border-white {{ $pStats['isActiveNow'] ? 'bg-emerald-500' : 'bg-gray-300' }}"></span>
+                        <span class="{{ $pStats['isActiveNow'] ? 'bg-emerald-500' : 'bg-gray-300' }}"
+                              style="position:absolute;right:4px;bottom:5px;width:14px;height:14px;border-radius:9999px;border:3px solid #ffffff;box-sizing:border-box;"></span>
                     </div>
 
                     <h2 class="mt-4 text-xl font-bold text-gray-900">{{ $participant->name }}</h2>
@@ -55,27 +56,27 @@
                     </div>
                 </div>
 
-                <div class="mt-7 grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <div class="rounded-2xl bg-blue-50 p-4 text-center shadow-sm ring-1 ring-blue-100">
+                <div class="mt-7 grid grid-cols-1 sm:grid-cols-3" style="gap:16px;">
+                    <div class="rounded-2xl p-4 text-center shadow-sm" style="background:#eff6ff;border:1px solid #dbeafe;">
                         <p class="text-xl font-bold text-blue-600">{{ $pStats['totalMeetings'] }}</p>
                         <p class="mt-1 text-[9px] font-semibold uppercase tracking-wide text-gray-500">Meetings</p>
                     </div>
-                    <div class="rounded-2xl bg-emerald-50 p-4 text-center shadow-sm ring-1 ring-emerald-100">
+                    <div class="rounded-2xl p-4 text-center shadow-sm" style="background:#ecfdf5;border:1px solid #d1fae5;">
                         <p class="text-xl font-bold text-emerald-600">{{ $pStats['attended'] }}</p>
                         <p class="mt-1 text-[9px] font-semibold uppercase tracking-wide text-gray-500">Attended</p>
                     </div>
-                    <div class="rounded-2xl bg-indigo-50 p-4 text-center shadow-sm ring-1 ring-indigo-100">
+                    <div class="rounded-2xl p-4 text-center shadow-sm" style="background:#eef2ff;border:1px solid #e0e7ff;">
                         <p class="text-xl font-bold text-indigo-600">{{ $pStats['attendanceRate'] }}%</p>
                         <p class="mt-1 text-[9px] font-semibold uppercase tracking-wide text-gray-500">Attendance</p>
                     </div>
                 </div>
 
-                <div class="mt-7 space-y-5">
-                    <div class="rounded-2xl bg-blue-50/70 p-5 shadow-sm ring-1 ring-blue-100">
+                <div class="mt-7" style="display:flex;flex-direction:column;gap:18px;">
+                    <div class="rounded-2xl p-5 shadow-sm" style="background:#eff6ff;border:1px solid #dbeafe;">
                         <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Joined Platform</p>
                         <p class="mt-1 text-sm font-semibold text-gray-700">{{ $pStats['joinedOn'] }}</p>
                     </div>
-                    <div class="rounded-2xl bg-amber-50/70 p-5 shadow-sm ring-1 ring-amber-100">
+                    <div class="rounded-2xl p-5 shadow-sm" style="background:#fff7ed;border:1px solid #fed7aa;">
                         <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Last Meeting Activity</p>
                         <p class="mt-1 text-sm font-semibold text-gray-700">{{ $pStats['lastActive'] }}</p>
                     </div>
@@ -83,7 +84,7 @@
             </section>
 
             {{-- MEETING HISTORY --}}
-            <section class="self-start rounded-2xl bg-white p-5 shadow-sm ring-1 ring-blue-50 sm:p-6 xl:col-span-2">
+            <section class="self-start rounded-2xl bg-white p-5 shadow-sm sm:p-6 xl:col-span-2" style="border:1px solid #e5eefc;">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h3 class="text-lg font-bold text-gray-900">Meeting History</h3>
@@ -98,7 +99,8 @@
                     $meetingHistoryCount = $participant->joinedMeetings->count();
                 @endphp
 
-                <div class="mt-6 space-y-5 {{ $meetingHistoryCount > 3 ? 'max-h-[520px] overflow-y-auto pr-3' : '' }}">
+                <div class="mt-6"
+                     style="display:flex;flex-direction:column;gap:20px;{{ $meetingHistoryCount > 3 ? 'max-height:520px;overflow-y:auto;padding-right:12px;' : '' }}">
                     @forelse($participant->joinedMeetings->take(10) as $record)
                         @php
                             $meetingItem = $record->meeting;
@@ -107,7 +109,7 @@
                             $hasAttended = !is_null($joinedAt) || !is_null($leftAt);
                         @endphp
 
-                        <div class="rounded-2xl bg-blue-50/40 p-5 shadow-sm ring-1 ring-blue-100">
+                        <div class="rounded-2xl p-5 shadow-sm" style="background:#f8fbff;border:1px solid #dbeafe;">
                             <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                                 <div class="min-w-0">
                                     <div class="flex flex-wrap items-center gap-2">
@@ -138,22 +140,22 @@
                                     @endif
                                 </div>
 
-                                <div class="grid w-full grid-cols-1 gap-4 sm:grid-cols-3 lg:w-auto lg:min-w-[520px]">
-                                    <div class="rounded-xl bg-white p-4 shadow-sm ring-1 ring-blue-100">
+                                <div class="grid w-full grid-cols-1 sm:grid-cols-3 lg:w-auto lg:min-w-[520px]" style="gap:16px;">
+                                    <div class="rounded-xl bg-white p-4 shadow-sm" style="border:1px solid #dbeafe;">
                                         <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Meeting Duration</p>
                                         <p class="mt-1 text-sm font-bold text-gray-700">
                                             {{ $meetingItem && $meetingItem->duration ? $meetingItem->duration . ' min' : '—' }}
                                         </p>
                                     </div>
 
-                                    <div class="rounded-xl bg-white p-4 shadow-sm ring-1 ring-emerald-100">
+                                    <div class="rounded-xl bg-white p-4 shadow-sm" style="border:1px solid #d1fae5;">
                                         <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Joined</p>
                                         <p class="mt-1 text-sm font-bold text-gray-700">
                                             {{ $joinedAt ? \Carbon\Carbon::parse($joinedAt)->format('h:i A') : 'Not joined' }}
                                         </p>
                                     </div>
 
-                                    <div class="rounded-xl bg-white p-4 shadow-sm ring-1 ring-indigo-100">
+                                    <div class="rounded-xl bg-white p-4 shadow-sm" style="border:1px solid #e0e7ff;">
                                         <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Left</p>
                                         <p class="mt-1 text-sm font-bold text-gray-700">
                                             {{ $leftAt ? \Carbon\Carbon::parse($leftAt)->format('h:i A') : '—' }}
@@ -163,7 +165,7 @@
                             </div>
                         </div>
                     @empty
-                        <div class="rounded-2xl bg-gray-50 py-10 text-center ring-1 ring-gray-100">
+                        <div class="rounded-2xl bg-gray-50 py-10 text-center" style="border:1px dashed #e5e7eb;">
                             <i class="fa-regular fa-calendar-xmark text-2xl text-gray-300"></i>
                             <p class="mt-2 text-sm text-gray-400">No meeting history available.</p>
                         </div>
