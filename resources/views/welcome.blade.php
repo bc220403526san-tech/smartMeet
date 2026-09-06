@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>SmartMeet — Simple Online Meetings & Collaboration</title>
+    <title>SmartMeet</title>
 
     <meta name="description"
           content="SmartMeet makes online meetings simple with video, audio, scheduling, real-time chat and live transcription.">
