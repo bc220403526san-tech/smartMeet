@@ -18,7 +18,7 @@
 
         <div class="grid grid-cols-1 xl:grid-cols-3" style="gap: 32px;">
             {{-- PROFILE --}}
-            <section class="rounded-2xl bg-white p-6 shadow-sm xl:col-span-1" style="border:1px solid #e5eefc;">
+            <section class="rounded-2xl bg-white p-6 shadow-sm xl:col-span-1" style="border:1px solid #e5eefc;padding-bottom:28px;">
                 @php
                     $nameParts = preg_split('/\s+/', trim($participant->name ?? 'User'));
                     $initials = '';
@@ -46,7 +46,7 @@
                     <h2 class="mt-4 text-xl font-bold text-gray-900">{{ $participant->name }}</h2>
                     <p class="mt-1 break-all text-sm text-gray-500">{{ $participant->email }}</p>
 
-                    <div class="mt-4 flex flex-wrap justify-center gap-2 mb-7">
+                    <div class="mt-5 flex flex-wrap justify-center gap-2" style="margin-bottom:18px;">
                         <span class="rounded-full bg-blue-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-blue-600">
                             Participant
                         </span>
@@ -56,8 +56,8 @@
                     </div>
                 </div>
 
-                <div class="mt-7 grid grid-cols-1 sm:grid-cols-3 mb-7" style="gap:16px;">
-                    <div class="rounded-2xl p-4 text-center shadow-sm" style="background:#eff6ff;border:1px solid #dbeafe;">
+                <div class="grid grid-cols-1 sm:grid-cols-3" style="gap:16px;margin-top:20px;margin-bottom:22px;">
+                    <div class="rounded-2xl p-4 text-center shadow-sm" style="background:#eff6ff;border:1px solid #dbeafe;padding:20px;">
                         <p class="text-xl font-bold text-blue-600">{{ $pStats['totalMeetings'] }}</p>
                         <p class="mt-1 text-[9px] font-semibold uppercase tracking-wide text-gray-500">Meetings</p>
                     </div>
@@ -71,12 +71,12 @@
                     </div>
                 </div>
 
-                <div class="mt-7" style="display:flex;flex-direction:column;gap:18px;">
+                <div style="display:flex;flex-direction:column;gap:22px;margin-top:24px;">
                     <div class="rounded-2xl p-5 shadow-sm" style="background:#eff6ff;border:1px solid #dbeafe;">
                         <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Joined Platform</p>
                         <p class="mt-1 text-sm font-semibold text-gray-700">{{ $pStats['joinedOn'] }}</p>
                     </div>
-                    <div class="rounded-2xl p-5 shadow-sm" style="background:#fff7ed;border:1px solid #fed7aa;">
+                    <div class="rounded-2xl p-5 shadow-sm" style="background:#fff7ed;border:1px solid #fed7aa;padding:20px;">
                         <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Last Meeting Activity</p>
                         <p class="mt-1 text-sm font-semibold text-gray-700">{{ $pStats['lastActive'] }}</p>
                     </div>
