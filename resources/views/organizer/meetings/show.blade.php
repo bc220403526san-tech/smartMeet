@@ -201,7 +201,7 @@
 
         <!-- RIGHT: Participants -->
         <div class="lg:col-span-1 flex flex-col">
-            <div class="rounded-2xl bg-white p-5 shadow-sm">
+            <div class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
                 <div class="flex items-center justify-between gap-3">
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-[2px] text-blue-500">Team Members</p>
@@ -249,11 +249,11 @@
                             $hasAttended = !is_null($joinedAt) || !is_null($leftAt);
                         @endphp
 
-                        <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition hover:border-blue-100 hover:shadow-md">
-                            <div class="flex items-start gap-3">
+                        <div class="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:border-blue-100 hover:shadow-md">
+                            <div class="flex items-center gap-3">
                                 <img src="{{ $participant->user->image_url }}"
                                      alt="{{ $participant->user->name }}"
-                                     class="h-11 w-11 shrink-0 rounded-full object-cover ring-2 ring-white shadow-sm">
+                                     class="h-11 w-11 shrink-0 rounded-full object-cover shadow-sm">
 
                                 <div class="min-w-0 flex-1">
                                     <div class="flex items-start justify-between gap-2">
