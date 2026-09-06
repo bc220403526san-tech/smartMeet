@@ -29,21 +29,20 @@
                     </p>
                 </div>
 
-                <div class="flex flex-col gap-2 sm:flex-row">
+                <div class="flex flex-wrap items-center gap-2 sm:justify-end">
                     <a href="{{ route('admin.reports.index') }}"
-                       class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white/12
-                              px-4 py-2.5 text-sm font-semibold text-white backdrop-blur
-                              transition hover:-translate-y-0.5 hover:bg-white/18 sm:w-auto">
-                        <i class="fa-solid fa-rotate-left text-[10px]"></i>
+                       class="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-blue-100
+                              px-4 text-sm font-semibold text-blue-700 shadow-sm
+                              transition hover:-translate-y-0.5 hover:bg-blue-200">
+                        <i class="fa-solid fa-rotate-left text-[11px]"></i>
                         Reset
                     </a>
 
                     <a href="{{ route('admin.reports.export', request()->query()) }}"
-                       class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white
-                              px-4 py-2.5 text-sm font-semibold text-blue-700
-                              shadow-[0_10px_28px_rgba(15,23,42,0.14)]
-                              transition hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(15,23,42,0.18)] sm:w-auto">
-                        <i class="fa-solid fa-file-pdf text-xs"></i>
+                       class="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-white
+                              px-4 text-sm font-semibold text-blue-700 shadow-md
+                              transition hover:-translate-y-0.5 hover:bg-blue-50 hover:shadow-lg">
+                        <i class="fa-solid fa-file-pdf text-[12px]"></i>
                         Export PDF
                     </a>
                 </div>
