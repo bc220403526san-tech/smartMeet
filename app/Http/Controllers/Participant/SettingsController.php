@@ -246,7 +246,7 @@ class SettingsController extends Controller
             'user_id' => $user->id,
             'subject' => $request->subject,
             'message' => $request->message,
-            'requested_role' => 'organizers',
+            'requested_role' => 'organizer',
             'status' => 'pending',
         ]);
 

@@ -7,9 +7,11 @@ use App\Mail\RoleRequestResolved;
 use App\Models\Notification;
 use App\Models\RoleRequest;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 class RoleRequestController extends Controller
 {
@@ -24,17 +26,45 @@ class RoleRequestController extends Controller
 
     public function approve(RoleRequest $roleRequest)
     {
-        $roleRequest->update(['status' => 'approved']);
-        $roleRequest->user->update([
-            'role' => $roleRequest->requested_role,
-        ]);
+        $requestedRole = strtolower(trim((string) $roleRequest->requested_role));
+
+        // Backward compatibility for old bad records.
+        if ($requestedRole === 'organizers') {
+            $requestedRole = 'organizer';
+        }
+
+        if ($requestedRole === 'participants') {
+            $requestedRole = 'participant';
+        }
+
+        if (!in_array($requestedRole, ['organizer', 'participant'], true)) {
+            throw ValidationException::withMessages([
+                'role' => 'The requested role is invalid.',
+            ]);
+        }
+
+        DB::transaction(function () use ($roleRequest, $requestedRole) {
+            $roleRequest->update([
+                'status' => 'approved',
+                'requested_role' => $requestedRole,
+            ]);
+
+            $roleRequest->user->forceFill([
+                'role' => $requestedRole,
+            ])->save();
+        });
+
+        $roleRequest->refresh();
+        $roleRequest->load('user');
 
         $this->sendResolutionEmail($roleRequest);
 
         Notification::create([
             'user_id' => $roleRequest->user_id,
             'title' => 'Role Change Approved',
-            'message' => 'Your request to become an Organizer has been approved!',
+            'message' => 'Your request to become ' .
+                ($requestedRole === 'organizer' ? 'an Organizer' : 'a Participant') .
+                ' has been approved!',
             'link' => null,
         ]);
 
@@ -59,10 +89,20 @@ class RoleRequestController extends Controller
 
         $this->sendResolutionEmail($roleRequest);
 
+        $requestedRole = strtolower(trim((string) $roleRequest->requested_role));
+        if ($requestedRole === 'organizers') {
+            $requestedRole = 'organizer';
+        }
+        if ($requestedRole === 'participants') {
+            $requestedRole = 'participant';
+        }
+
         Notification::create([
             'user_id' => $roleRequest->user_id,
             'title' => 'Role Change Rejected',
-            'message' => 'Your request to become an Organizer has been rejected.',
+            'message' => 'Your request to become ' .
+                ($requestedRole === 'participant' ? 'a Participant' : 'an Organizer') .
+                ' has been rejected.',
             'link' => null,
         ]);
 
@@ -89,7 +129,7 @@ class RoleRequestController extends Controller
 
         $validator = Validator::make(
             ['email' => $email],
-            ['email' => ['required', 'email:rfc', 'regex:/^.+@.+\\..+$/']]
+            ['email' => ['required', 'email:rfc', 'regex:/^.+@.+\..+$/']]
         );
 
         if ($validator->fails()) {
