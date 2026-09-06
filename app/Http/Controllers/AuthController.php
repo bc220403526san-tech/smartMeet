@@ -350,6 +350,31 @@ class AuthController extends Controller
 
         $meeting = Meeting::where('unique_code', $code)->first();
 
+        /*
+         * Invite links are for participants only. If an organizer/admin
+         * opened an invite link before login, show the dedicated blocked
+         * page immediately after login instead of adding them as a participant.
+         */
+        if ($user->role === 'organizer') {
+            session()->forget('pending_meeting_code');
+
+            return view('meetings.organizer-link-blocked', [
+                'meeting' => $meeting,
+                'backUrl' => route('organizer.dashboard'),
+                'backLabel' => 'Back to Organizer Dashboard',
+            ]);
+        }
+
+        if ($user->role === 'admin') {
+            session()->forget('pending_meeting_code');
+
+            return view('meetings.organizer-link-blocked', [
+                'meeting' => $meeting,
+                'backUrl' => route('admin.dashboard'),
+                'backLabel' => 'Back to Admin Dashboard',
+            ]);
+        }
+
         if (!$meeting) {
             session()->forget('pending_meeting_code');
 

@@ -31,22 +31,57 @@ class MeetingJoinController extends Controller
         }
 
         /*
-         * Keep the invite code through login/registration. AuthController will
-         * guarantee the participant row before redirecting.
+         * If nobody is logged in, remember the meeting link through login.
+         * AuthController will decide what to do based on the logged-in role.
          */
         if (!auth()->check()) {
             session(['pending_meeting_code' => $meeting->unique_code]);
 
             return redirect()
                 ->route('login')
-                ->with('info', 'Please login or register to continue to: ' . $meeting->title);
+                ->with(
+                    'info',
+                    'Please login or register to continue to: ' . $meeting->title
+                );
         }
 
         $user = auth()->user();
 
+        /*
+         * Organizer accounts cannot join another meeting through a
+         * participant invite link. Show a dedicated page instead of
+         * redirecting with a toast/error.
+         */
+        if ($user->role === 'organizer') {
+            session()->forget('pending_meeting_code');
+
+            return view('meetings.organizer-link-blocked', [
+                'meeting' => $meeting,
+                'backUrl' => route('organizer.dashboard'),
+                'backLabel' => 'Back to Organizer Dashboard',
+            ]);
+        }
+
+        /*
+         * Admin accounts are also not participant accounts.
+         */
+        if ($user->role === 'admin') {
+            session()->forget('pending_meeting_code');
+
+            return view('meetings.organizer-link-blocked', [
+                'meeting' => $meeting,
+                'backUrl' => route('admin.dashboard'),
+                'backLabel' => 'Back to Admin Dashboard',
+            ]);
+        }
+
         if ($user->role !== 'participant') {
-            return redirect($user->role === 'admin' ? '/admin/dashboard' : '/organizer/dashboard')
-                ->with('error', 'Meeting invite links can only be joined with a Participant account.');
+            return redirect()
+                ->route('login')
+                ->with(
+                    'error',
+                    'Your account role cannot use meeting invite links.'
+                );
         }
 
         $meeting->participants()->firstOrCreate(
@@ -59,11 +94,17 @@ class MeetingJoinController extends Controller
         if ($meeting->status === 'active') {
             return redirect()
                 ->route('participant.meetings.attend', $meeting->id)
-                ->with('success', 'You have joined the meeting: ' . $meeting->title);
+                ->with(
+                    'success',
+                    'You have joined the meeting: ' . $meeting->title
+                );
         }
 
         return redirect()
-            ->route('participant.meetings.index', ['highlight' => $meeting->id])
+            ->route(
+                'participant.meetings.index',
+                ['highlight' => $meeting->id]
+            )
             ->with(
                 'info',
                 'This meeting has not started yet. It is now visible in your upcoming meetings.'
