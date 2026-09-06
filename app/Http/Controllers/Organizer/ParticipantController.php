@@ -1,11 +1,14 @@
 <?php
+
 namespace App\Http\Controllers\Organizer;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use App\Models\User;
 use App\Models\Meeting;
 use App\Models\MeetingParticipant;
+use App\Models\User;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ParticipantController extends Controller
 {
@@ -32,30 +35,43 @@ class ParticipantController extends Controller
             });
         }
 
-        $participants = $query->orderBy('name')->paginate(8)->appends($request->query());
+        $participants = $query->orderBy('name')
+            ->paginate(8)
+            ->appends($request->query());
+
         $stats = $this->computeStats($organizerId, $meetingIds);
 
         if ($request->ajax() || $request->wantsJson()) {
             return response()->json([
-                'rows'       => view('components.participant-table-rows', ['participants' => $participants])->render(),
-                'pagination' => $participants->hasPages() ? (string) $participants->links() : '',
-                'showing'    => $participants->total() > 0
+                'rows' => view('components.participant-table-rows', [
+                    'participants' => $participants
+                ])->render(),
+                'pagination' => $participants->hasPages()
+                    ? (string) $participants->links()
+                    : '',
+                'showing' => $participants->total() > 0
                     ? "Showing {$participants->firstItem()}–{$participants->lastItem()} of {$participants->total()} participants"
                     : 'No participants found',
-                'stats'      => $stats,
+                'stats' => $stats,
             ]);
         }
 
         return view('organizer.participants.index', [
             'participants' => $participants,
-            'stats'        => $stats,
+            'stats' => $stats,
         ]);
     }
 
     public function show(Request $request, $id)
     {
         $organizerId = auth()->id();
-        $meetingIds  = Meeting::where('organizer_id', $organizerId)->pluck('id');
+
+        /*
+         * Security rule:
+         * Organizer can only view users who participated in / were attached
+         * to one of THIS organizer's meetings.
+         */
+        $meetingIds = Meeting::where('organizer_id', $organizerId)->pluck('id');
 
         $participant = User::where('id', '!=', $organizerId)
             ->whereHas('joinedMeetings', function ($q) use ($meetingIds) {
@@ -63,30 +79,57 @@ class ParticipantController extends Controller
             })
             ->with(['joinedMeetings' => function ($q) use ($meetingIds) {
                 $q->whereIn('meeting_id', $meetingIds)
-                    ->with('meeting:id,title,status')
+                    ->with('meeting:id,title,status,date,time,duration')
                     ->latest('updated_at');
             }])
             ->findOrFail($id);
 
         $participantStats = $this->computeParticipantStats($participant);
 
+        /*
+         * LIMITED access/security information for organizer.
+         * We intentionally do NOT expose:
+         * - session id
+         * - session payload
+         * - authentication tokens
+         * - passwords
+         * - full/raw user-agent
+         *
+         * Laravel's database sessions table already stores user_id,
+         * ip_address, user_agent and last_activity.
+         */
+        $latestSession = DB::table('sessions')
+            ->where('user_id', $participant->id)
+            ->orderByDesc('last_activity')
+            ->first();
+
+        $accessInfo = $this->buildAccessInfo($latestSession);
+
         if ($request->ajax() || $request->wantsJson()) {
             return response()->json([
-                'id'             => $participant->id,
-                'name'           => $participant->name,
-                'email'          => $participant->email,
-                'image_url'      => $participant->image_url,
-                'status'         => $participantStats['label'],
+                'id' => $participant->id,
+                'name' => $participant->name,
+                'email' => $participant->email,
+                'image_url' => $participant->image_url,
+                'status' => $participantStats['label'],
                 'meeting_active' => $participantStats['isActiveNow'],
-                'meeting_title'  => $participantStats['latestMeeting'],
-                'last_active'    => $participantStats['lastActive'],
+                'meeting_title' => $participantStats['latestMeeting'],
+                'last_active' => $participantStats['lastActive'],
                 'meetings_count' => $participantStats['totalMeetings'],
+
+                // Limited access information only.
+                'last_ip' => $accessInfo['ip'],
+                'browser' => $accessInfo['browser'],
+                'platform' => $accessInfo['platform'],
+                'device' => $accessInfo['device'],
+                'session_last_active' => $accessInfo['lastActive'],
             ]);
         }
 
         return view('organizer.participants.show', [
             'participant' => $participant,
-            'pStats'      => $participantStats,
+            'pStats' => $participantStats,
+            'accessInfo' => $accessInfo,
         ]);
     }
 
@@ -100,7 +143,9 @@ class ParticipantController extends Controller
             ->exists();
 
         if (! $exists) {
-            return response()->json(['message' => 'Participant not found.'], 404);
+            return response()->json([
+                'message' => 'Participant not found.'
+            ], 404);
         }
 
         MeetingParticipant::whereIn('meeting_id', $meetingIds)
@@ -111,28 +156,22 @@ class ParticipantController extends Controller
 
         return response()->json([
             'message' => 'Participant removed successfully.',
-            'stats'   => $stats,
+            'stats' => $stats,
         ]);
     }
 
-    /**
-     * Global stats cards (Total / Active Now / Avg Engagement).
-     * FIXED: 'joined' status never existed — ab joined_at/left_at
-     * columns se currently-active aur ever-attended decide hota hai.
-     */
     private function computeStats($organizerId, $meetingIds)
     {
         $total = User::where('id', '!=', $organizerId)
             ->whereHas('joinedMeetings', function ($q) use ($meetingIds) {
                 $q->whereIn('meeting_id', $meetingIds);
-            })->count();
+            })
+            ->count();
 
         $activeMeetingIds = Meeting::where('organizer_id', $organizerId)
             ->where('status', 'active')
             ->pluck('id');
 
-        // Currently active = joined_at set AND (left_at null OR left_at < joined_at)
-        // AND meeting khud "active" hai.
         $activeNow = MeetingParticipant::whereIn('meeting_id', $activeMeetingIds)
             ->where('user_id', '!=', $organizerId)
             ->whereNotNull('joined_at')
@@ -143,21 +182,6 @@ class ParticipantController extends Controller
             ->distinct('user_id')
             ->count('user_id');
 
-        // Engagement = kitne unique participants ne kabhi na kabhi
-        // koi meeting attend ki (joined_at ya left_at set hua ho),
-        // total invited participants ke against.
-        $attendedUsers = MeetingParticipant::whereIn('meeting_id', $meetingIds)
-            ->where('user_id', '!=', $organizerId)
-            ->where(function ($q) {
-                $q->whereNotNull('joined_at')
-                    ->orWhereNotNull('left_at');
-            })
-            ->distinct('user_id')
-            ->count('user_id');
-
-        // Pending Invites = kitne unique participants abhi tak kabhi
-        // attend nahi huay (na joined_at, na left_at set hai) aur
-        // unka status "declined" bhi nahi hai — yani invite abhi pending hai.
         $pendingInvites = MeetingParticipant::whereIn('meeting_id', $meetingIds)
             ->where('user_id', '!=', $organizerId)
             ->whereNull('joined_at')
@@ -167,40 +191,47 @@ class ParticipantController extends Controller
             ->count('user_id');
 
         return [
-            'total'      => $total,
-            'activeNow'  => $activeNow,
-            'pending'    => $pendingInvites,
+            'total' => $total,
+            'activeNow' => $activeNow,
+            'pending' => $pendingInvites,
         ];
     }
 
     private function computeParticipantStats(User $participant): array
     {
-        $meetings = $participant->joinedMeetings; // already loaded, sorted latest first
+        $meetings = $participant->joinedMeetings;
 
         $totalMeetings = $meetings->count();
 
-        // "Attended" = kam az kam ek dafa joined_at ya left_at set hua ho.
-        // (joined_at leave hone par null ho jata hai, left_at set ho jata hai —
-        // isliye dono mein se ek bhi set ho to attend ki hui shumar hogi)
         $attended = $meetings->filter(function ($m) {
             return ! is_null($m->joined_at) || ! is_null($m->left_at);
         })->count();
 
-        $attendanceRate = $totalMeetings > 0 ? round(($attended / $totalMeetings) * 100) : 0;
+        $attendanceRate = $totalMeetings > 0
+            ? round(($attended / $totalMeetings) * 100)
+            : 0;
 
         $latest = $meetings->first();
 
-        // Currently active = abhi meeting ke andar maujood hai
         $isActiveNow = false;
+
         if ($latest) {
             $currentlyJoined = ! is_null($latest->joined_at)
-                && (is_null($latest->left_at) || $latest->left_at < $latest->joined_at);
-            $isActiveNow = $currentlyJoined && optional($latest->meeting)->status === 'active';
+                && (
+                    is_null($latest->left_at)
+                    || $latest->left_at < $latest->joined_at
+                );
+
+            $isActiveNow = $currentlyJoined
+                && optional($latest->meeting)->status === 'active';
         }
 
-        $latestEverAttended = $latest && (! is_null($latest->joined_at) || ! is_null($latest->left_at));
+        $latestEverAttended = $latest
+            && (
+                ! is_null($latest->joined_at)
+                || ! is_null($latest->left_at)
+            );
 
-        // Human-readable status label (priority order):
         if ($isActiveNow) {
             $label = 'Active Now';
         } elseif ($latestEverAttended) {
@@ -214,14 +245,131 @@ class ParticipantController extends Controller
         }
 
         return [
-            'totalMeetings'  => $totalMeetings,
-            'attended'       => $attended,
+            'totalMeetings' => $totalMeetings,
+            'attended' => $attended,
             'attendanceRate' => $attendanceRate,
-            'label'          => $label,
-            'isActiveNow'    => $isActiveNow,
-            'lastActive'     => $latest?->updated_at ? $latest->updated_at->diffForHumans() : 'Never',
-            'joinedOn'       => $participant->created_at->format('M d, Y'),
-            'latestMeeting'  => optional($latest?->meeting)->title,
+            'label' => $label,
+            'isActiveNow' => $isActiveNow,
+            'lastActive' => $latest?->updated_at
+                ? $latest->updated_at->diffForHumans()
+                : 'Never',
+            'joinedOn' => $participant->created_at->format('M d, Y'),
+            'latestMeeting' => optional($latest?->meeting)->title,
         ];
+    }
+
+    private function buildAccessInfo($session): array
+    {
+        if (! $session) {
+            return [
+                'ip' => 'Not available',
+                'browser' => 'Not available',
+                'platform' => 'Not available',
+                'device' => 'Not available',
+                'lastActive' => 'No active session found',
+            ];
+        }
+
+        $agent = (string) ($session->user_agent ?? '');
+
+        return [
+            'ip' => $session->ip_address ?: 'Not available',
+            'browser' => $this->detectBrowser($agent),
+            'platform' => $this->detectPlatform($agent),
+            'device' => $this->detectDevice($agent),
+            'lastActive' => ! empty($session->last_activity)
+                ? Carbon::createFromTimestamp((int) $session->last_activity)
+                    ->timezone(config('app.timezone', 'Asia/Karachi'))
+                    ->format('M d, Y h:i A')
+                : 'Not available',
+        ];
+    }
+
+    private function detectBrowser(string $agent): string
+    {
+        if ($agent === '') {
+            return 'Unknown';
+        }
+
+        if (stripos($agent, 'Edg/') !== false) {
+            return 'Microsoft Edge';
+        }
+
+        if (stripos($agent, 'OPR/') !== false || stripos($agent, 'Opera') !== false) {
+            return 'Opera';
+        }
+
+        if (stripos($agent, 'Chrome/') !== false) {
+            return 'Google Chrome';
+        }
+
+        if (stripos($agent, 'Firefox/') !== false) {
+            return 'Mozilla Firefox';
+        }
+
+        if (
+            stripos($agent, 'Safari/') !== false
+            && stripos($agent, 'Chrome/') === false
+        ) {
+            return 'Safari';
+        }
+
+        return 'Other Browser';
+    }
+
+    private function detectPlatform(string $agent): string
+    {
+        if ($agent === '') {
+            return 'Unknown';
+        }
+
+        if (stripos($agent, 'Windows NT') !== false) {
+            return 'Windows';
+        }
+
+        if (stripos($agent, 'Android') !== false) {
+            return 'Android';
+        }
+
+        if (
+            stripos($agent, 'iPhone') !== false
+            || stripos($agent, 'iPad') !== false
+        ) {
+            return 'iOS';
+        }
+
+        if (stripos($agent, 'Mac OS X') !== false) {
+            return 'macOS';
+        }
+
+        if (stripos($agent, 'Linux') !== false) {
+            return 'Linux';
+        }
+
+        return 'Other';
+    }
+
+    private function detectDevice(string $agent): string
+    {
+        if ($agent === '') {
+            return 'Unknown';
+        }
+
+        if (
+            stripos($agent, 'Mobile') !== false
+            || stripos($agent, 'Android') !== false
+            || stripos($agent, 'iPhone') !== false
+        ) {
+            return 'Mobile';
+        }
+
+        if (
+            stripos($agent, 'iPad') !== false
+            || stripos($agent, 'Tablet') !== false
+        ) {
+            return 'Tablet';
+        }
+
+        return 'Desktop';
     }
 }
