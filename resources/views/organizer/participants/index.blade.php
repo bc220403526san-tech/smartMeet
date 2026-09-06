@@ -15,13 +15,18 @@
                 </div>
             </div>
 
-            <div class="relative w-full sm:w-80">
-                <i class="fa-solid fa-magnifying-glass pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-xs text-gray-400"></i>
-                <input type="text"
-                       id="participant-search-input"
-                       value="{{ request('search', '') }}"
-                       placeholder="Search by name or email..."
-                       class="h-10 w-full rounded-xl border border-gray-200 bg-white pl-10 pr-4 text-sm text-gray-700 shadow-sm outline-none transition placeholder:text-gray-400 hover:border-blue-300 focus:border-blue-400 focus:ring-4 focus:ring-blue-50">
+            <div class="w-full sm:w-auto">
+                <div class="relative w-full sm:w-64">
+                    <span class="pointer-events-none absolute inset-y-0 left-0 flex w-9 items-center justify-center">
+                        <i class="fa-solid fa-magnifying-glass text-[11px] text-gray-400"></i>
+                    </span>
+
+                    <input type="text"
+                           id="participant-search-input"
+                           value="{{ request('search', '') }}"
+                           placeholder="Search name or email"
+                           class="block h-9 w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 text-[13px] text-gray-700 shadow-sm outline-none transition placeholder:text-gray-400 hover:border-gray-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
+                </div>
             </div>
         </div>
         <!-- STAT CARDS -->
