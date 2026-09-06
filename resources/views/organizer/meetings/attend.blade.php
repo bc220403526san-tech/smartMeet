@@ -807,6 +807,7 @@
 <div class="controls">
     <div class="ctrl-btn" onclick="safeToggleMic()"><div class="ctrl-icon off" id="ctrl-mic"><i class="fa fa-microphone-slash"></i></div><span class="ctrl-label">Mic</span></div>
     <div class="ctrl-btn" onclick="safeToggleCamera()"><div class="ctrl-icon off" id="ctrl-camera"><i class="fa fa-video-slash"></i></div><span class="ctrl-label">Camera</span></div>
+    <div class="ctrl-btn" onclick="toggleScreenShare()"><div class="ctrl-icon" id="ctrl-screen"><i class="fa-solid fa-display"></i></div><span class="ctrl-label" id="ctrl-screen-label">Share</span></div>
     <div class="ctrl-divider"></div>
     <div class="ctrl-btn" onclick="toggleSidePanel('transcript')"><div class="ctrl-icon" id="ctrl-transcript"><i class="fa fa-closed-captioning"></i></div><span class="ctrl-label">Captions</span></div>
     <div class="ctrl-btn" onclick="toggleSidePanel('chat')"><div class="ctrl-icon" id="ctrl-chat"><i class="fa fa-comment"></i><span id="chat-badge">0</span></div><span class="ctrl-label">Chat</span></div>
@@ -914,6 +915,7 @@
     const camStatus     = {};
     const receivedSignalIds = new Set();
     let localStream = null, isMicOn = false, isCameraOn = false;
+    let screenStream = null, screenTrack = null, isScreenSharing = false, screenShareBusy = false;
     let maximizedUserId = null, maximizedPlaceholder = null;
     let activeTab = null, panelOpen = false, unreadChat = 0;
     let leftNotified = false, autoEndTimer = null, autoEndTriggered = false;
@@ -2055,13 +2057,13 @@
         });
 
         const audioTrack=liveLocalTrack('audio');
-        const videoTrack=liveLocalTrack('video');
+        const videoTrack=activeOutgoingVideoTrack();
 
         if(audioTrack){
             await optimizeVoiceTrack(audioTrack);
             audioTrack.enabled=Boolean(isMicOn);
         }
-        try{ if(videoTrack && 'contentHint' in videoTrack) videoTrack.contentHint='motion'; }catch(e){}
+        try{ if(videoTrack && 'contentHint' in videoTrack) videoTrack.contentHint=isScreenSharing?'detail':'motion'; }catch(e){}
 
         try{
             // On the answering side the transceiver may appear only after the
@@ -2086,8 +2088,10 @@
                         const sender=pc.__videoTx.sender;
                         const params=sender.getParameters();
                         if(!params.encodings || !params.encodings.length) params.encodings=[{}];
-                        params.encodings[0].maxBitrate=IS_MOBILE_BROWSER ? 250000 : 400000;
-                        params.encodings[0].maxFramerate=15;
+                        params.encodings[0].maxBitrate=isScreenSharing
+                            ? (IS_MOBILE_BROWSER ? 800000 : 1500000)
+                            : (IS_MOBILE_BROWSER ? 250000 : 400000);
+                        params.encodings[0].maxFramerate=isScreenSharing ? 20 : 15;
                         await sender.setParameters(params);
                     }catch(e){}
                 }
@@ -2109,7 +2113,7 @@
         bindPeerTransceivers(pc);
 
         const audioTrack=liveLocalTrack('audio');
-        const videoTrack=liveLocalTrack('video');
+        const videoTrack=activeOutgoingVideoTrack();
         const audioDirection=String(pc.__audioTx?.currentDirection||'');
         const videoDirection=String(pc.__videoTx?.currentDirection||'');
         const audioSenderTrack=pc.__audioTx?.sender?.track || null;
@@ -2979,6 +2983,13 @@
         return list.find(t=>t.readyState==='live') || null;
     }
 
+    function activeOutgoingVideoTrack(){
+        if(isScreenSharing && screenTrack && screenTrack.readyState==='live'){
+            return screenTrack;
+        }
+        return liveLocalTrack('video');
+    }
+
     function removeDeadLocalTracks(kind=null){
         if(!localStream) return;
         localStream.getTracks().forEach(t=>{
@@ -3281,8 +3292,8 @@
             btn.classList.toggle('off',!on);
             btn.classList.toggle('active',on);
         }
-        if(localVideo) localVideo.style.display=on?'block':'none';
-        if(avatar) avatar.style.display=on?'none':'flex';
+        if(localVideo) localVideo.style.display=(on || isScreenSharing)?'block':'none';
+        if(avatar) avatar.style.display=(on || isScreenSharing)?'none':'flex';
     }
 
     async function toggleCamera(){
@@ -3332,11 +3343,159 @@
         }
     }
 
+    function setScreenShareButton(on){
+        const btn=document.getElementById('ctrl-screen');
+        const label=document.getElementById('ctrl-screen-label');
+        if(btn){
+            btn.classList.toggle('active',Boolean(on));
+            btn.classList.toggle('off',false);
+            btn.innerHTML=on
+                ? '<i class="fa-solid fa-stop"></i>'
+                : '<i class="fa-solid fa-display"></i>';
+        }
+        if(label) label.textContent=on?'Stop share':'Share';
+    }
+
+    async function toggleScreenShare(){
+        if(screenShareBusy) return;
+
+        if(isScreenSharing){
+            await stopScreenShare();
+            return;
+        }
+
+        if(!window.isSecureContext || !navigator.mediaDevices?.getDisplayMedia){
+            showToast('🖥️ Screen sharing is not supported by this browser.');
+            return;
+        }
+
+        screenShareBusy=true;
+        try{
+            /*
+             * Request VIDEO ONLY. Meeting microphone/audio remains exactly on the
+             * existing SmartMeet audio path, preventing duplicate/echo audio.
+             */
+            const displayStream=await navigator.mediaDevices.getDisplayMedia({
+                video:{
+                    frameRate:{ideal:15,max:30}
+                },
+                audio:false
+            });
+
+            const displayTrack=displayStream.getVideoTracks()[0] || null;
+            if(!displayTrack){
+                displayStream.getTracks().forEach(t=>{ try{t.stop();}catch(e){} });
+                return;
+            }
+
+            screenStream=displayStream;
+            screenTrack=displayTrack;
+            isScreenSharing=true;
+
+            try{
+                if('contentHint' in screenTrack) screenTrack.contentHint='detail';
+            }catch(e){}
+
+            screenTrack.onended=()=>{
+                if(isScreenSharing) void stopScreenShare(true);
+            };
+
+            const localVideo=document.getElementById('localVideo');
+            const avatar=document.getElementById('avatar-'+MY_USER_ID);
+            if(localVideo){
+                localVideo.srcObject=screenStream;
+                localVideo.muted=true;
+                localVideo.autoplay=true;
+                localVideo.playsInline=true;
+                localVideo.setAttribute('playsinline','');
+                localVideo.classList.remove('mirrored');
+                localVideo.style.display='block';
+                localVideo.play().catch(()=>{});
+            }
+            if(avatar) avatar.style.display='none';
+
+            setScreenShareButton(true);
+
+            /*
+             * Existing negotiated video transceiver is reused with replaceTrack().
+             * No new peer connection and no second audio path are created.
+             */
+            await syncTracksToEveryPeer();
+            ensureOutboundMediaForAll();
+            broadcastMyCameraStatus();
+            unlockRemoteMedia();
+            showToast('🖥️ Screen sharing started.');
+        }catch(err){
+            if(err?.name!=='NotAllowedError' && err?.name!=='AbortError'){
+                console.error('[SmartMeet] screen share error',err);
+                showToast('🖥️ Could not start screen sharing.');
+            }
+        }finally{
+            screenShareBusy=false;
+        }
+    }
+
+    async function stopScreenShare(fromBrowser=false){
+        if(screenShareBusy && !fromBrowser) return;
+        if(!isScreenSharing && !screenTrack && !screenStream) return;
+
+        screenShareBusy=true;
+        try{
+            const oldTrack=screenTrack;
+            const oldStream=screenStream;
+
+            /*
+             * Clear screen state BEFORE peer sync so activeOutgoingVideoTrack()
+             * automatically falls back to the existing camera track (or null).
+             */
+            isScreenSharing=false;
+            screenTrack=null;
+            screenStream=null;
+
+            if(oldTrack) oldTrack.onended=null;
+            if(oldStream){
+                oldStream.getTracks().forEach(t=>{
+                    try{
+                        if(t.readyState!=='ended') t.stop();
+                    }catch(e){}
+                });
+            }
+
+            await syncTracksToEveryPeer();
+            ensureOutboundMediaForAll();
+
+            const localVideo=document.getElementById('localVideo');
+            if(localVideo){
+                localVideo.srcObject=localStream || new MediaStream();
+                localVideo.muted=true;
+                localVideo.autoplay=true;
+                localVideo.playsInline=true;
+                localVideo.setAttribute('playsinline','');
+                localVideo.classList.add('mirrored');
+                if(isCameraOn){
+                    localVideo.style.display='block';
+                    localVideo.play().catch(()=>{});
+                }else{
+                    localVideo.style.display='none';
+                }
+            }
+
+            const avatar=document.getElementById('avatar-'+MY_USER_ID);
+            if(avatar) avatar.style.display=isCameraOn?'none':'flex';
+
+            setScreenShareButton(false);
+            broadcastMyCameraStatus();
+            if(!fromBrowser) showToast('Screen sharing stopped.');
+        }finally{
+            screenShareBusy=false;
+        }
+    }
+
     function broadcastMyMicStatus(){
         void sendSignal('all','mic-status',{userId:MY_USER_ID,muted:!isMicOn}).catch(()=>{});
     }
     function broadcastMyCameraStatus(){
-        void sendSignal('all','camera-status',{userId:MY_USER_ID,cameraOn:isCameraOn}).catch(()=>{});
+        void sendSignal('all','camera-status',{userId:MY_USER_ID,cameraOn:Boolean(isCameraOn || isScreenSharing)}).catch(()=>{});
     }
 
     /* ---------- Mobile media recovery ---------- */
@@ -4012,3 +4171,4 @@
 </script>
 </body>
 </html>
+
