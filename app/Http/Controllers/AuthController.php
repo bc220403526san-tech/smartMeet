@@ -110,13 +110,44 @@ class AuthController extends Controller
 
         $user = Auth::user();
 
+        /*
+         * Repair legacy/incorrect plural role values created by older
+         * role-request code. This also persists the corrected value so
+         * subsequent requests use the valid SmartMeet role.
+         */
+        $rawRole = strtolower(
+            trim((string) $user->getRawOriginal('role'))
+        );
+
+        $normalizedRole = match ($rawRole) {
+            'organizers' => 'organizer',
+            'participants' => 'participant',
+            'admins' => 'admin',
+            default => $rawRole,
+        };
+
+        if (
+            $normalizedRole !== $rawRole &&
+            in_array(
+                $normalizedRole,
+                ['admin', 'organizer', 'participant'],
+                true
+            )
+        ) {
+            $user->forceFill([
+                'role' => $normalizedRole,
+            ])->save();
+
+            $user->refresh();
+        }
+
         $this->setWelcomeSession($user, 'login');
 
         if ($redirect = $this->handlePendingMeetingInvite($user)) {
             return $redirect;
         }
 
-        return match ($user->role) {
+        return match ($normalizedRole) {
             'admin' => redirect()->route('admin.dashboard'),
             'organizer' => redirect()->route('organizer.dashboard'),
             'participant' => redirect()->route('participant.dashboard'),
