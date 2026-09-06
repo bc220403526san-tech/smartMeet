@@ -3,98 +3,98 @@
         <x-header.search-bar placeholder="Search reports, meetings, users..." />
     </x-slot>
 
-    <div class="m-2 mt-0 space-y-6 overflow-y-auto rounded-[28px]
-                bg-gradient-to-br from-slate-50 via-white to-blue-50/40
-                p-4 sm:p-6 lg:p-7">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
 
-        {{-- PAGE HEADER --}}
-        <div class="relative overflow-hidden rounded-[28px] border border-slate-200/70 bg-white px-5 py-6 sm:px-7 sm:py-7 shadow-sm">
-            <div class="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-blue-100/50 blur-2xl"></div>
-            <div class="pointer-events-none absolute -bottom-20 left-1/3 h-48 w-48 rounded-full bg-indigo-100/40 blur-2xl"></div>
+        .rpt-scope { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
+        .rpt-scope .num { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-feature-settings: "tnum" 1; }
+        .rpt-scope .bar-track { background: #ECEAE2; }
+        .rpt-scope .tab-underline { transition: color .15s ease; }
+        .rpt-scope .tab-underline::after {
+            content: '';
+            position: absolute;
+            left: 0; right: 0; bottom: -1px;
+            height: 2px;
+            background: #1F3A66;
+            transform: scaleX(0);
+            transition: transform .18s ease;
+        }
+        .rpt-scope .tab-underline.is-active::after { transform: scaleX(1); }
+    </style>
 
-            <div class="relative flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-                <div class="min-w-0">
-                    <div class="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5
-                                text-[11px] font-bold uppercase tracking-[0.14em] text-blue-600">
-                        <span class="flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm">
-                            <i class="fa-solid fa-chart-line text-[9px]"></i>
-                        </span>
-                        Analytics
-                    </div>
+    @php
+        $totalForBars = max((int) ($stats['total_meetings'] ?? 0), 1);
+        $completedPct = min(100, round(($stats['completed'] ?? 0) / $totalForBars * 100));
+        $cancelledPct = min(100, round(($stats['cancelled'] ?? 0) / $totalForBars * 100));
+        $maxDailyMeetings = $dailyBreakdown->max('meetings') ?: 1;
+        $maxDailyUsers = $dailyBreakdown->max('users') ?: 1;
+    @endphp
 
-                    <h1 class="mt-4 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
-                        Reports & Analytics
-                    </h1>
+    <div class="rpt-scope m-2 mt-0 space-y-5 overflow-y-auto rounded-2xl bg-[#F7F6F2] p-4 sm:p-6 lg:p-8">
 
-                    <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-                        Review meeting activity, unique users, daily trends and detailed meeting performance for any selected date range.
-                    </p>
-                </div>
+        {{-- MASTHEAD --}}
+        <div class="flex flex-col gap-4 border-b border-[#E4E1D8] pb-5 sm:flex-row sm:items-end sm:justify-between">
+            <div class="min-w-0">
+                <p class="text-xs font-medium text-[#8A8D97]">Admin / Analytics</p>
+                <h1 class="mt-1 text-[26px] font-semibold leading-tight tracking-tight text-[#14161F] sm:text-[30px]">
+                    Reports &amp; Analytics
+                </h1>
+                <p class="mt-1.5 max-w-xl text-sm leading-6 text-[#6B6F7A]">
+                    Meeting activity, unique users and performance for
+                    <span class="num text-[#14161F]">{{ $fromDate->format('M d, Y') }}</span>
+                    through
+                    <span class="num text-[#14161F]">{{ $toDate->format('M d, Y') }}</span>.
+                </p>
+            </div>
 
-                <div class="flex flex-col gap-2 sm:flex-row">
-                    <a href="{{ route('admin.reports.index') }}"
-                       class="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white
-                              px-4 py-2.5 text-sm font-semibold text-slate-600 shadow-sm transition
-                              hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50 sm:w-auto">
-                        <i class="fa-solid fa-rotate-left text-[10px]"></i>
-                        Reset
-                    </a>
+            <div class="flex shrink-0 gap-2">
+                <a href="{{ route('admin.reports.index') }}"
+                   class="inline-flex items-center gap-2 rounded-lg border border-[#DEDBD2] bg-white px-4 py-2.5
+                          text-sm font-medium text-[#4B4F5B] transition hover:border-[#C7C3B7] hover:bg-[#FBFAF7]">
+                    <i class="fa-solid fa-rotate-left text-[11px] text-[#8A8D97]"></i>
+                    Reset
+                </a>
 
-                    <a href="{{ route('admin.reports.export', request()->query()) }}"
-                       class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700
-                              px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(37,99,235,.20)]
-                              transition hover:-translate-y-0.5 hover:shadow-[0_14px_30px_rgba(37,99,235,.28)] sm:w-auto">
-                        <i class="fa-solid fa-file-pdf text-xs"></i>
-                        Export PDF
-                    </a>
-                </div>
+                <a href="{{ route('admin.reports.export', request()->query()) }}"
+                   class="inline-flex items-center gap-2 rounded-lg bg-[#1F3A66] px-4 py-2.5
+                          text-sm font-medium text-white transition hover:bg-[#17294D]">
+                    <i class="fa-regular fa-file-pdf text-[11px]"></i>
+                    Export PDF
+                </a>
             </div>
         </div>
 
         {{-- DATE RANGE --}}
-        <section class="rounded-[26px] border border-slate-200/70 bg-white p-5 shadow-sm sm:p-6">
-            <div class="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 text-blue-600">
-                        <i class="fa-regular fa-calendar text-sm"></i>
-                    </div>
-
-                    <div>
-                        <h2 class="text-base font-semibold text-slate-900">Date Range</h2>
-                        <p class="mt-0.5 text-xs text-slate-400">Select a reporting period and apply it instantly.</p>
-                    </div>
-                </div>
-
-                <span class="inline-flex w-fit items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
-                    <i class="fa-regular fa-calendar-days text-[10px] text-blue-500"></i>
-                    {{ $fromDate->format('M d, Y') }} — {{ $toDate->format('M d, Y') }}
+        <section class="rounded-xl border border-[#E4E1D8] bg-white p-5 sm:p-6">
+            <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <h2 class="text-sm font-semibold text-[#14161F]">Date range</h2>
+                <span class="num inline-flex w-fit items-center gap-2 rounded-md bg-[#F7F6F2] px-2.5 py-1.5 text-xs text-[#4B4F5B]">
+                    {{ $fromDate->format('M d, Y') }} → {{ $toDate->format('M d, Y') }}
                 </span>
             </div>
 
             <form method="GET" action="{{ route('admin.reports.index') }}">
-                <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
-                        <label for="from_date" class="mb-2 block text-xs font-semibold text-slate-600">From Date</label>
+                        <label for="from_date" class="mb-1.5 block text-xs font-medium text-[#6B6F7A]">From date</label>
                         <input id="from_date"
                                type="date"
                                name="from_date"
                                value="{{ $filters['from_date'] }}"
                                max="{{ $filters['to_date'] }}"
-                               class="w-full rounded-xl border-0 bg-slate-50 px-4 py-3 text-sm text-slate-700
-                                      shadow-inner outline-none ring-1 ring-slate-100 transition
-                                      hover:bg-white focus:bg-white focus:ring-2 focus:ring-blue-500">
+                               class="num w-full rounded-lg border border-[#DEDBD2] bg-white px-3.5 py-2.5 text-sm text-[#14161F]
+                                      outline-none transition focus:border-[#1F3A66] focus:ring-2 focus:ring-[#1F3A66]/15">
                     </div>
 
                     <div>
-                        <label for="to_date" class="mb-2 block text-xs font-semibold text-slate-600">To Date</label>
+                        <label for="to_date" class="mb-1.5 block text-xs font-medium text-[#6B6F7A]">To date</label>
                         <input id="to_date"
                                type="date"
                                name="to_date"
                                value="{{ $filters['to_date'] }}"
                                min="{{ $filters['from_date'] }}"
-                               class="w-full rounded-xl border-0 bg-slate-50 px-4 py-3 text-sm text-slate-700
-                                      shadow-inner outline-none ring-1 ring-slate-100 transition
-                                      hover:bg-white focus:bg-white focus:ring-2 focus:ring-blue-500">
+                               class="num w-full rounded-lg border border-[#DEDBD2] bg-white px-3.5 py-2.5 text-sm text-[#14161F]
+                                      outline-none transition focus:border-[#1F3A66] focus:ring-2 focus:ring-[#1F3A66]/15">
                     </div>
                 </div>
 
@@ -110,18 +110,18 @@
                     <input type="hidden" name="flagged" value="1">
                 @endif
 
-                <div class="mt-5 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                    <div class="flex flex-wrap items-center gap-2">
-                        <span class="mr-1 text-xs font-semibold text-slate-400">Quick range</span>
+                <div class="mt-5 flex flex-col gap-4 border-t border-[#EFEDE6] pt-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        <span class="mr-1 text-xs text-[#8A8D97]">Quick range</span>
 
                         @php
                             $today = now()->toDateString();
 
                             $quickRanges = [
                                 ['Today', $today, $today],
-                                ['Last 7 Days', now()->subDays(6)->toDateString(), $today],
-                                ['Last 30 Days', now()->subDays(29)->toDateString(), $today],
-                                ['This Month', now()->startOfMonth()->toDateString(), $today],
+                                ['Last 7 days', now()->subDays(6)->toDateString(), $today],
+                                ['Last 30 days', now()->subDays(29)->toDateString(), $today],
+                                ['This month', now()->startOfMonth()->toDateString(), $today],
                             ];
                         @endphp
 
@@ -130,118 +130,130 @@
                                 request()->except(['page', 'from_date', 'to_date']),
                                 ['from_date' => $from, 'to_date' => $to]
                             )) }}"
-                               class="rounded-xl border border-slate-100 bg-slate-50 px-3.5 py-2 text-xs font-semibold text-slate-600
-                                      transition hover:-translate-y-0.5 hover:border-blue-100 hover:bg-blue-50 hover:text-blue-600">
+                               class="rounded-md px-3 py-1.5 text-xs font-medium text-[#4B4F5B]
+                                      transition hover:bg-[#F0EEE7] hover:text-[#14161F]">
                                 {{ $label }}
                             </a>
                         @endforeach
                     </div>
 
-                    <div class="flex items-center gap-2">
-                        <button type="submit"
-                                class="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-blue-600
-                                       px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition
-                                       hover:-translate-y-0.5 hover:bg-blue-700 sm:flex-none">
-                            <i class="fa-solid fa-check text-[10px]"></i>
-                            Apply Filters
-                        </button>
-                    </div>
+                    <button type="submit"
+                            class="inline-flex items-center justify-center gap-2 rounded-lg bg-[#14161F]
+                                   px-5 py-2.5 text-sm font-medium text-white transition hover:bg-[#2B2E3A]">
+                        Apply filters
+                    </button>
                 </div>
             </form>
         </section>
 
-        {{-- SUMMARY CARDS --}}
-        @php
-            $summaryCards = [
-                ['label' => 'Meetings', 'value' => $stats['total_meetings'], 'icon' => 'fa-video', 'iconClass' => 'bg-blue-50 text-blue-600', 'accent' => 'from-blue-500 to-blue-600'],
-                ['label' => 'Unique Users', 'value' => $stats['unique_users'], 'icon' => 'fa-user-group', 'iconClass' => 'bg-violet-50 text-violet-600', 'accent' => 'from-violet-500 to-indigo-500'],
-                ['label' => 'Completed', 'value' => $stats['completed'], 'icon' => 'fa-circle-check', 'iconClass' => 'bg-emerald-50 text-emerald-600', 'accent' => 'from-emerald-500 to-teal-500'],
-                ['label' => 'Cancelled', 'value' => $stats['cancelled'], 'icon' => 'fa-ban', 'iconClass' => 'bg-rose-50 text-rose-500', 'accent' => 'from-rose-500 to-red-500'],
-            ];
-        @endphp
+        {{-- SUMMARY LEDGER --}}
+        <section class="rounded-xl border border-[#E4E1D8] bg-white p-5 sm:p-6">
+            <div class="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_auto_1.3fr] lg:items-center">
 
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            @foreach($summaryCards as $card)
-                <div class="group relative overflow-hidden rounded-[24px] border border-slate-200/70 bg-white p-5 shadow-sm
-                            transition duration-300 hover:-translate-y-1 hover:shadow-lg sm:p-6">
-                    <div class="absolute left-0 top-0 h-1 w-full bg-gradient-to-r {{ $card['accent'] }}"></div>
-
-                    <div class="flex items-start justify-between gap-3">
-                        <div class="flex h-11 w-11 items-center justify-center rounded-2xl {{ $card['iconClass'] }}">
-                            <i class="fa-solid {{ $card['icon'] }} text-sm"></i>
-                        </div>
-
-                        <span class="rounded-lg bg-slate-50 px-2.5 py-1 text-[10px] font-medium text-slate-400">
-                            {{ $fromDate->format('M d') }} – {{ $toDate->format('M d') }}
-                        </span>
-                    </div>
-
-                    <p class="mt-5 text-3xl font-bold tracking-tight text-slate-950">
-                        {{ number_format($card['value']) }}
+                {{-- hero metric --}}
+                <div>
+                    <p class="text-xs font-medium text-[#8A8D97]">Meetings recorded</p>
+                    <p class="num mt-1.5 text-[44px] font-semibold leading-none text-[#14161F]">
+                        {{ number_format($stats['total_meetings']) }}
                     </p>
-
-                    <p class="mt-1 text-sm font-medium text-slate-500">{{ $card['label'] }}</p>
+                    <p class="mt-2 text-xs text-[#8A8D97]">
+                        across {{ $dailyBreakdown->count() }} active {{ Str::plural('day', $dailyBreakdown->count()) }}
+                    </p>
                 </div>
-            @endforeach
-        </div>
 
-        {{-- DAILY ACTIVITY --}}
-        <section class="overflow-hidden rounded-[26px] border border-slate-200/70 bg-white shadow-sm">
-            <div class="flex flex-col gap-3 border-b border-slate-100 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-                <div class="flex items-center gap-3">
-                    <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
-                        <i class="fa-solid fa-chart-column text-sm"></i>
+                <div class="hidden h-20 w-px bg-[#E4E1D8] lg:block"></div>
+
+                {{-- supporting metrics --}}
+                <div class="space-y-3.5">
+                    <div>
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="flex items-center gap-2 text-[#4B4F5B]">
+                                <i class="fa-solid fa-user-group text-[11px] text-[#5B5FA6]"></i>
+                                Unique users
+                            </span>
+                            <span class="num font-semibold text-[#14161F]">{{ number_format($stats['unique_users']) }}</span>
+                        </div>
                     </div>
 
                     <div>
-                        <h2 class="text-base font-semibold text-slate-900">Daily Activity</h2>
-                        <p class="mt-0.5 text-xs text-slate-400">Meetings and unique users for each active day.</p>
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="flex items-center gap-2 text-[#4B4F5B]">
+                                <i class="fa-solid fa-circle-check text-[11px] text-[#1E8577]"></i>
+                                Completed
+                            </span>
+                            <span class="num font-semibold text-[#14161F]">
+                                {{ number_format($stats['completed']) }} <span class="text-[#8A8D97]">({{ $completedPct }}%)</span>
+                            </span>
+                        </div>
+                        <div class="bar-track mt-1.5 h-1.5 w-full overflow-hidden rounded-full">
+                            <div class="h-full rounded-full bg-[#1E8577]" style="width: {{ $completedPct }}%"></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="flex items-center gap-2 text-[#4B4F5B]">
+                                <i class="fa-solid fa-ban text-[11px] text-[#B14A3E]"></i>
+                                Cancelled
+                            </span>
+                            <span class="num font-semibold text-[#14161F]">
+                                {{ number_format($stats['cancelled']) }} <span class="text-[#8A8D97]">({{ $cancelledPct }}%)</span>
+                            </span>
+                        </div>
+                        <div class="bar-track mt-1.5 h-1.5 w-full overflow-hidden rounded-full">
+                            <div class="h-full rounded-full bg-[#B14A3E]" style="width: {{ $cancelledPct }}%"></div>
+                        </div>
                     </div>
                 </div>
+            </div>
+        </section>
 
-                <span class="inline-flex w-fit items-center gap-1.5 rounded-xl bg-slate-50 px-3 py-2 text-xs font-medium text-slate-500">
-                    <i class="fa-regular fa-calendar text-[10px]"></i>
-                    {{ $dailyBreakdown->count() }} active days
-                </span>
+        {{-- DAILY ACTIVITY --}}
+        <section class="overflow-hidden rounded-xl border border-[#E4E1D8] bg-white">
+            <div class="flex items-center justify-between border-b border-[#EFEDE6] px-5 py-4 sm:px-6">
+                <div>
+                    <h2 class="text-sm font-semibold text-[#14161F]">Daily activity</h2>
+                    <p class="mt-0.5 text-xs text-[#8A8D97]">Meetings and unique users per active day</p>
+                </div>
+                <span class="num text-xs text-[#8A8D97]">{{ $dailyBreakdown->count() }} days</span>
             </div>
 
             <div class="overflow-x-auto">
                 <table class="w-full min-w-[560px] text-sm">
                     <thead>
-                    <tr class="bg-slate-50/80 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                        <th class="px-6 py-3.5 text-left">Date</th>
-                        <th class="px-6 py-3.5 text-center">Meetings</th>
-                        <th class="px-6 py-3.5 text-center">Unique Users</th>
+                    <tr class="text-xs font-medium text-[#8A8D97]">
+                        <th class="px-6 py-3 text-left">Date</th>
+                        <th class="px-6 py-3 text-left">Meetings</th>
+                        <th class="px-6 py-3 text-right">Unique users</th>
                     </tr>
                     </thead>
 
-                    <tbody class="divide-y divide-slate-100">
+                    <tbody class="divide-y divide-[#EFEDE6]">
                     @forelse($dailyBreakdown as $day)
-                        <tr class="transition hover:bg-blue-50/30">
-                            <td class="px-6 py-4">
-                                <p class="font-semibold text-slate-800">{{ $day['date']->format('M d, Y') }}</p>
-                                <p class="mt-0.5 text-xs text-slate-400">{{ $day['date']->format('l') }}</p>
+                        <tr class="transition hover:bg-[#FBFAF7]">
+                            <td class="px-6 py-3.5 align-middle">
+                                <p class="font-medium text-[#14161F]">{{ $day['date']->format('M d, Y') }}</p>
+                                <p class="text-xs text-[#8A8D97]">{{ $day['date']->format('l') }}</p>
                             </td>
 
-                            <td class="px-6 py-4 text-center">
-                                <span class="inline-flex min-w-10 justify-center rounded-xl bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-600">
-                                    {{ $day['meetings'] }}
-                                </span>
+                            <td class="px-6 py-3.5 align-middle">
+                                <div class="flex items-center gap-3">
+                                    <span class="num w-6 shrink-0 text-[#14161F]">{{ $day['meetings'] }}</span>
+                                    <div class="bar-track h-1.5 w-28 max-w-[40%] overflow-hidden rounded-full">
+                                        <div class="h-full rounded-full bg-[#1F3A66]"
+                                             style="width: {{ min(100, round($day['meetings'] / $maxDailyMeetings * 100)) }}%"></div>
+                                    </div>
+                                </div>
                             </td>
 
-                            <td class="px-6 py-4 text-center">
-                                <span class="inline-flex min-w-10 justify-center rounded-xl bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-600">
-                                    {{ $day['users'] }}
-                                </span>
+                            <td class="px-6 py-3.5 text-right align-middle">
+                                <span class="num text-[#4B4F5B]">{{ $day['users'] }}</span>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="3" class="px-6 py-12 text-center">
-                                <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 text-slate-300">
-                                    <i class="fa-regular fa-folder-open text-lg"></i>
-                                </div>
-                                <p class="mt-3 text-sm text-slate-400">No activity found for this date range.</p>
+                            <td colspan="3" class="px-6 py-12 text-center text-sm text-[#8A8D97]">
+                                No activity found for this date range.
                             </td>
                         </tr>
                     @endforelse
@@ -250,14 +262,29 @@
             </div>
         </section>
 
-        {{-- STATUS FILTER --}}
-        <section class="rounded-[24px] border border-slate-200/70 bg-white px-4 py-4 shadow-sm">
-            <div class="flex items-center gap-2 overflow-x-auto no-scrollbar">
-                <span class="mr-1 flex shrink-0 items-center gap-1.5 text-xs font-semibold text-slate-500">
-                    <i class="fa-solid fa-sliders text-blue-500"></i>
-                    Status
-                </span>
+        @php
+            $statusColors = [
+                'completed' => 'text-[#4F46E5]',
+                'active' => 'text-[#1E8577]',
+                'cancelled' => 'text-[#B14A3E]',
+                'upcoming' => 'text-[#B07C1F]',
+                'ended' => 'text-[#6B6F7A]',
+                'flagged' => 'text-[#C2661A]',
+            ];
 
+            $dotColors = [
+                'completed' => 'bg-[#4F46E5]',
+                'active' => 'bg-[#1E8577] animate-pulse',
+                'cancelled' => 'bg-[#B14A3E]',
+                'upcoming' => 'bg-[#B07C1F]',
+                'ended' => 'bg-[#8A8D97]',
+                'flagged' => 'bg-[#C2661A]',
+            ];
+        @endphp
+
+        {{-- STATUS FILTER --}}
+        <section class="rounded-xl border border-[#E4E1D8] bg-white px-5 pt-1">
+            <div class="flex items-center gap-5 overflow-x-auto no-scrollbar">
                 @foreach(['All Status', 'Active', 'Upcoming', 'Completed', 'Cancelled'] as $opt)
                     @php
                         $isActive = request('status', 'All Status') === $opt;
@@ -265,53 +292,25 @@
                     @endphp
 
                     <a href="{{ route('admin.reports.index', $target) }}"
-                       class="shrink-0 rounded-xl px-3.5 py-2 text-xs font-semibold transition
-                              {{ $isActive
-                                  ? 'bg-blue-600 text-white shadow-sm'
-                                  : 'bg-slate-50 text-slate-600 hover:bg-blue-50 hover:text-blue-600' }}">
+                       class="tab-underline relative shrink-0 whitespace-nowrap py-3.5 text-sm font-medium transition
+                              {{ $isActive ? 'is-active text-[#14161F]' : 'text-[#8A8D97] hover:text-[#4B4F5B]' }}">
                         {{ $opt }}
                     </a>
                 @endforeach
             </div>
         </section>
 
-        @php
-            $statusColors = [
-                'completed' => 'bg-indigo-50 text-indigo-600',
-                'active' => 'bg-emerald-50 text-emerald-700',
-                'cancelled' => 'bg-rose-50 text-rose-600',
-                'upcoming' => 'bg-amber-50 text-amber-700',
-                'ended' => 'bg-slate-100 text-slate-600',
-                'flagged' => 'bg-orange-50 text-orange-600',
-            ];
-
-            $dotColors = [
-                'completed' => 'bg-indigo-500',
-                'active' => 'bg-emerald-500 animate-pulse',
-                'cancelled' => 'bg-rose-500',
-                'upcoming' => 'bg-amber-500',
-                'ended' => 'bg-slate-400',
-                'flagged' => 'bg-orange-500',
-            ];
-        @endphp
-
         {{-- MEETINGS REPORT --}}
-        <section id="reports-table" class="overflow-hidden rounded-[26px] border border-slate-200/70 bg-white shadow-sm">
-            <div class="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-5 sm:px-6">
-                <div class="flex items-center gap-3">
-                    <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-600">
-                        <i class="fa-solid fa-table-list text-sm"></i>
-                    </div>
-
-                    <div>
-                        <h2 class="text-base font-semibold text-slate-900">Meetings Report</h2>
-                        <p class="mt-0.5 text-xs text-slate-400">
-                            {{ $fromDate->format('M d, Y') }} to {{ $toDate->format('M d, Y') }}
-                        </p>
-                    </div>
+        <section id="reports-table" class="overflow-hidden rounded-xl border border-[#E4E1D8] bg-white">
+            <div class="flex items-center justify-between gap-3 border-b border-[#EFEDE6] px-5 py-4 sm:px-6">
+                <div>
+                    <h2 class="text-sm font-semibold text-[#14161F]">Meeting details</h2>
+                    <p class="mt-0.5 text-xs text-[#8A8D97]">
+                        {{ $fromDate->format('M d, Y') }} to {{ $toDate->format('M d, Y') }}
+                    </p>
                 </div>
 
-                <span class="rounded-xl bg-slate-50 px-3 py-2 text-xs font-medium text-slate-400 whitespace-nowrap">
+                <span class="num whitespace-nowrap text-xs text-[#8A8D97]">
                     {{ number_format($meetings->total()) }} records
                 </span>
             </div>
@@ -319,22 +318,22 @@
             <div class="hidden overflow-x-auto md:block">
                 <table class="w-full min-w-[760px] text-sm">
                     <thead>
-                    <tr class="bg-slate-50/80 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                        <th class="px-6 py-3.5 text-left">Meeting</th>
-                        <th class="px-6 py-3.5 text-left">Organizer</th>
-                        <th class="px-6 py-3.5 text-left">Schedule</th>
-                        <th class="px-6 py-3.5 text-center">Participants</th>
-                        <th class="px-6 py-3.5 text-left">Status</th>
-                        <th class="px-6 py-3.5 text-center">View</th>
+                    <tr class="text-xs font-medium text-[#8A8D97]">
+                        <th class="px-6 py-3 text-left">Meeting</th>
+                        <th class="px-6 py-3 text-left">Organizer</th>
+                        <th class="px-6 py-3 text-left">Schedule</th>
+                        <th class="px-6 py-3 text-center">Participants</th>
+                        <th class="px-6 py-3 text-left">Status</th>
+                        <th class="px-6 py-3 text-center">View</th>
                     </tr>
                     </thead>
 
-                    <tbody class="divide-y divide-slate-100">
+                    <tbody class="divide-y divide-[#EFEDE6]">
                     @forelse($meetings as $meeting)
-                        <tr class="transition hover:bg-blue-50/25">
+                        <tr class="transition hover:bg-[#FBFAF7]">
                             <td class="max-w-[230px] px-6 py-4">
-                                <p class="truncate font-semibold text-slate-800">{{ $meeting->title }}</p>
-                                <p class="mt-0.5 text-xs text-slate-400">{{ $meeting->duration }} min</p>
+                                <p class="truncate font-medium text-[#14161F]">{{ $meeting->title }}</p>
+                                <p class="num mt-0.5 text-xs text-[#8A8D97]">{{ $meeting->duration }} min</p>
                             </td>
 
                             <td class="px-6 py-4">
@@ -342,46 +341,42 @@
                                     @if($meeting->organizer)
                                         <x-user-avatar :user="$meeting->organizer" size="sm" />
                                     @else
-                                        <div class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-xs text-slate-400">NA</div>
+                                        <div class="flex h-8 w-8 items-center justify-center rounded-full bg-[#F0EEE7] text-xs text-[#8A8D97]">NA</div>
                                     @endif
 
-                                    <span class="truncate text-sm text-slate-700">
+                                    <span class="truncate text-sm text-[#4B4F5B]">
                                         {{ $meeting->organizer?->name ?? 'Unassigned' }}
                                     </span>
                                 </div>
                             </td>
 
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <p class="text-sm text-slate-700">{{ \Carbon\Carbon::parse($meeting->date)->format('M d, Y') }}</p>
-                                <p class="text-xs text-slate-400">{{ \Carbon\Carbon::parse($meeting->time)->format('h:i A') }}</p>
+                            <td class="num px-6 py-4 whitespace-nowrap">
+                                <p class="text-sm text-[#14161F]">{{ \Carbon\Carbon::parse($meeting->date)->format('M d, Y') }}</p>
+                                <p class="text-xs text-[#8A8D97]">{{ \Carbon\Carbon::parse($meeting->time)->format('h:i A') }}</p>
                             </td>
 
-                            <td class="px-6 py-4 text-center">
-                                <span class="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600">
-                                    <i class="fa-solid fa-users text-[10px]"></i>
-                                    {{ $meeting->participants->count() }}
-                                </span>
+                            <td class="num px-6 py-4 text-center text-[#4B4F5B]">
+                                {{ $meeting->participants->count() }}
                             </td>
 
                             <td class="px-6 py-4">
-                                <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold
-                                             {{ $statusColors[$meeting->status] ?? 'bg-slate-100 text-slate-600' }}">
-                                    <span class="h-1.5 w-1.5 rounded-full {{ $dotColors[$meeting->status] ?? 'bg-slate-400' }}"></span>
+                                <span class="inline-flex items-center gap-1.5 text-xs font-medium {{ $statusColors[$meeting->status] ?? 'text-[#6B6F7A]' }}">
+                                    <span class="h-1.5 w-1.5 rounded-full {{ $dotColors[$meeting->status] ?? 'bg-[#8A8D97]' }}"></span>
                                     {{ ucfirst($meeting->status) }}
                                 </span>
                             </td>
 
                             <td class="px-6 py-4 text-center">
                                 <a href="{{ route('admin.meetings.show', $meeting->id) }}"
-                                   class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 text-slate-400
-                                          transition hover:-translate-y-0.5 hover:bg-blue-50 hover:text-blue-600">
+                                   class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#8A8D97]
+                                          transition hover:bg-[#F0EEE7] hover:text-[#1F3A66]">
                                     <i class="fa-regular fa-eye text-xs"></i>
                                 </a>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-6 py-12 text-center text-sm text-slate-400">No meetings found.</td>
+                            <td colspan="6" class="px-6 py-12 text-center text-sm text-[#8A8D97]">No meetings found.</td>
                         </tr>
                     @endforelse
                     </tbody>
@@ -389,47 +384,46 @@
             </div>
 
             {{-- MOBILE --}}
-            <div class="divide-y divide-slate-100 md:hidden">
+            <div class="divide-y divide-[#EFEDE6] md:hidden">
                 @forelse($meetings as $meeting)
                     <div class="p-5">
                         <div class="flex items-start justify-between gap-3">
                             <div class="min-w-0">
-                                <p class="truncate font-semibold text-slate-800">{{ $meeting->title }}</p>
-                                <p class="mt-1 text-xs text-slate-400">
-                                    {{ \Carbon\Carbon::parse($meeting->date)->format('M d, Y') }} ·
+                                <p class="truncate font-medium text-[#14161F]">{{ $meeting->title }}</p>
+                                <p class="num mt-1 text-xs text-[#8A8D97]">
+                                    {{ \Carbon\Carbon::parse($meeting->date)->format('M d, Y') }} —
                                     {{ \Carbon\Carbon::parse($meeting->time)->format('h:i A') }}
                                 </p>
                             </div>
 
-                            <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold
-                                         {{ $statusColors[$meeting->status] ?? 'bg-slate-100 text-slate-600' }}">
-                                <span class="h-1.5 w-1.5 rounded-full {{ $dotColors[$meeting->status] ?? 'bg-slate-400' }}"></span>
+                            <span class="inline-flex shrink-0 items-center gap-1.5 text-xs font-medium {{ $statusColors[$meeting->status] ?? 'text-[#6B6F7A]' }}">
+                                <span class="h-1.5 w-1.5 rounded-full {{ $dotColors[$meeting->status] ?? 'bg-[#8A8D97]' }}"></span>
                                 {{ ucfirst($meeting->status) }}
                             </span>
                         </div>
 
                         <div class="mt-4 flex items-center justify-between gap-3">
                             <div class="min-w-0">
-                                <p class="truncate text-xs text-slate-700">{{ $meeting->organizer?->name ?? 'Unassigned' }}</p>
-                                <p class="text-[11px] text-slate-400">
-                                    {{ $meeting->participants->count() }} participants · {{ $meeting->duration }} min
+                                <p class="truncate text-xs text-[#4B4F5B]">{{ $meeting->organizer?->name ?? 'Unassigned' }}</p>
+                                <p class="num text-[11px] text-[#8A8D97]">
+                                    {{ $meeting->participants->count() }} participants — {{ $meeting->duration }} min
                                 </p>
                             </div>
 
                             <a href="{{ route('admin.meetings.show', $meeting->id) }}"
-                               class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-slate-500
-                                      transition hover:bg-blue-50 hover:text-blue-600">
+                               class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#8A8D97]
+                                      transition hover:bg-[#F0EEE7] hover:text-[#1F3A66]">
                                 <i class="fa-regular fa-eye text-xs"></i>
                             </a>
                         </div>
                     </div>
                 @empty
-                    <div class="p-10 text-center text-sm text-slate-400">No meetings found.</div>
+                    <div class="p-10 text-center text-sm text-[#8A8D97]">No meetings found.</div>
                 @endforelse
             </div>
 
             @if($meetings->hasPages())
-                <div class="border-t border-slate-100 bg-slate-50/60 px-5 py-4">
+                <div class="border-t border-[#EFEDE6] bg-[#FBFAF7] px-5 py-4">
                     {{ $meetings->links() }}
                 </div>
             @endif
