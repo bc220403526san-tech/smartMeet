@@ -1,4 +1,4 @@
-
+<x-layouts.app>
 <x-slot name="header">
     <x-header.search-bar placeholder="Search Participants..." />
 </x-slot>
