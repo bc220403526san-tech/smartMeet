@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Meeting;
+use App\Models\MeetingParticipant;
 use Carbon\Carbon;
 
 class MeetingJoinController extends Controller
@@ -61,34 +62,44 @@ class MeetingJoinController extends Controller
                 );
         }
 
-        $meeting->participants()->firstOrCreate(
-            ['user_id' => $user->id],
-            ['status' => 'invited']
+        /*
+         * Persist the invite membership directly in meeting_participants.
+         * updateOrCreate makes the operation idempotent and removes any
+         * ambiguity around relationship-generated foreign keys.
+         */
+        MeetingParticipant::updateOrCreate(
+            [
+                'meeting_id' => $meeting->id,
+                'user_id' => $user->id,
+            ],
+            [
+                'status' => 'invited',
+            ]
         );
 
         session()->forget('pending_meeting_code');
 
-        if ($meeting->status === 'active') {
-            return redirect()
-                ->route('participant.meetings.attend', $meeting->id)
-                ->with(
-                    'success',
-                    'You have joined the meeting as a participant: ' . $meeting->title
-                );
-        }
-
         /*
-         * Participant accounts can see the meeting in their participant list.
-         * Organizer accounts keep their organizer dashboard and can reopen the
-         * same invite link when the meeting becomes active.
+         * IMPORTANT FLOW:
+         * Opening an invite link NEVER jumps straight into the live room.
+         *
+         * - Organizer -> Organizer My Meetings index
+         * - Participant -> Participant My Meetings index
+         *
+         * If the meeting is active, the index page shows Attend and the user
+         * explicitly enters the room from there.
          */
         if ($user->role === 'organizer') {
             return redirect()
-                ->route('organizer.dashboard')
+                ->route(
+                    'organizer.meetings.index',
+                    ['highlight' => $meeting->id]
+                )
                 ->with(
-                    'info',
-                    'You have been added to "' . $meeting->title .
-                    '" as a participant. Open the invite link again when the meeting starts.'
+                    $meeting->status === 'active' ? 'success' : 'info',
+                    $meeting->status === 'active'
+                        ? 'Meeting is active. It has been added to My Meetings. Click Attend to join as a participant.'
+                        : 'Meeting has been added to My Meetings and is visible as an upcoming meeting.'
                 );
         }
 
@@ -98,8 +109,10 @@ class MeetingJoinController extends Controller
                 ['highlight' => $meeting->id]
             )
             ->with(
-                'info',
-                'This meeting has not started yet. It is now visible in your upcoming meetings.'
+                $meeting->status === 'active' ? 'success' : 'info',
+                $meeting->status === 'active'
+                    ? 'Meeting is active. Click Attend to join.'
+                    : 'Meeting has been added to your upcoming meetings.'
             );
     }
 

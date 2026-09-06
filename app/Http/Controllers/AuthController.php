@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Meeting;
+use App\Models\MeetingParticipant;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Auth\Events\PasswordReset;
@@ -410,8 +411,14 @@ class AuthController extends Controller
                 );
         }
 
-        $meeting->participants()->firstOrCreate(
+        /*
+         * Persist invite membership directly in meeting_participants.
+         * This is safe to call repeatedly and guarantees the organizer or
+         * participant is visible in their meeting lists after login.
+         */
+        MeetingParticipant::updateOrCreate(
             [
+                'meeting_id' => $meeting->id,
                 'user_id' => $user->id,
             ],
             [
@@ -421,27 +428,24 @@ class AuthController extends Controller
 
         session()->forget('pending_meeting_code');
 
-        if ($meeting->status === 'active') {
-            return redirect()
-                ->route(
-                    'participant.meetings.attend',
-                    $meeting->id
-                )
-                ->with(
-                    'success',
-                    'You have joined the meeting as a participant: '
-                    . $meeting->title
-                );
-        }
-
+        /*
+         * Same behavior as opening the link while already logged in:
+         * never auto-enter the meeting room after login.
+         * Always land on the relevant My Meetings index first.
+         */
         if ($user->role === 'organizer') {
             return redirect()
-                ->route('organizer.dashboard')
+                ->route(
+                    'organizer.meetings.index',
+                    [
+                        'highlight' => $meeting->id,
+                    ]
+                )
                 ->with(
-                    'info',
-                    'You have been added to "'
-                    . $meeting->title
-                    . '" as a participant. Open the invite link again when the meeting starts.'
+                    $meeting->status === 'active' ? 'success' : 'info',
+                    $meeting->status === 'active'
+                        ? 'Meeting is active. It has been added to My Meetings. Click Attend to join as a participant.'
+                        : 'Meeting has been added to My Meetings and is visible as an upcoming meeting.'
                 );
         }
 
@@ -453,10 +457,10 @@ class AuthController extends Controller
                 ]
             )
             ->with(
-                'info',
-                'You have been added to "'
-                . $meeting->title
-                . '". It is upcoming and is now available in My Meetings.'
+                $meeting->status === 'active' ? 'success' : 'info',
+                $meeting->status === 'active'
+                    ? 'Meeting is active. Click Attend to join.'
+                    : 'Meeting has been added to your upcoming meetings.'
             );
     }
 
