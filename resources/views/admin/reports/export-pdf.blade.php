@@ -10,56 +10,56 @@
         {!! file_get_contents(resource_path('css/admin/export-pdf.css')) !!}
 
         @page {
-            margin: 34px 34px 38px;
-        }
-
-        * {
-            box-sizing: border-box;
+            margin: 28px 30px 32px;
         }
 
         body {
-            font-family: "DejaVu Sans", sans-serif;
-            font-size: 9.5px;
-            color: #14161F;
+            font-family: DejaVu Sans, sans-serif;
+            font-size: 9px;
+            color: #334155;
             background: #ffffff;
         }
 
-        .num {
-            font-family: "DejaVu Sans Mono", monospace;
-        }
-
-        /* ---------- Masthead ---------- */
-
         .report-header {
             width: 100%;
-            border-bottom: 1.5px solid #14161F;
-            padding-bottom: 12px;
-            margin-bottom: 4px;
+            padding: 14px 16px;
+            margin-bottom: 16px;
+            background: #eff6ff;
+            border-radius: 8px;
         }
 
         .report-header .brand,
         .report-header .meta {
             display: inline-block;
-            vertical-align: bottom;
+            vertical-align: middle;
         }
 
-        .report-header .brand { width: 58%; }
-        .report-header .meta { width: 40%; text-align: right; }
+        .report-header .brand {
+            width: 58%;
+        }
+
+        .report-header .meta {
+            width: 40%;
+            text-align: right;
+        }
 
         .brand-logo {
-            width: 26px;
-            height: 26px;
+            width: 32px;
+            height: 32px;
             vertical-align: middle;
             margin-right: 8px;
         }
 
-        .brand-text { display: inline-block; vertical-align: middle; }
+        .brand-text {
+            display: inline-block;
+            vertical-align: middle;
+        }
 
         .brand-text .name {
             display: block;
-            font-size: 14px;
+            font-size: 16px;
             font-weight: 700;
-            color: #14161F;
+            color: #1d4ed8;
             line-height: 1.1;
         }
 
@@ -67,84 +67,83 @@
             display: block;
             margin-top: 2px;
             font-size: 7.5px;
-            color: #8A8D97;
-            letter-spacing: .3px;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: .6px;
         }
 
         .meta .title {
-            font-size: 13px;
+            font-size: 14px;
             font-weight: 700;
-            color: #14161F;
+            color: #0f172a;
         }
 
         .meta .generated {
             margin-top: 4px;
             font-size: 7.5px;
-            color: #8A8D97;
+            color: #94a3b8;
         }
 
-        /* ---------- Section labels ---------- */
-
         .section-title {
-            margin: 18px 0 8px;
+            margin: 16px 0 8px;
+            padding: 7px 10px;
+            background: #eff6ff;
+            border-radius: 6px;
             font-size: 10px;
             font-weight: 700;
-            color: #14161F;
+            color: #1d4ed8;
+            text-transform: uppercase;
+            letter-spacing: .3px;
         }
 
         .period-box {
-            margin: 10px 0 4px;
-            padding: 0;
+            margin: 12px 0 15px;
+            padding: 10px 12px;
+            background: #f8fbff;
+            border-radius: 6px;
             font-size: 8.5px;
-            line-height: 1.6;
-            color: #6B6F7A;
+            line-height: 1.5;
+            color: #475569;
         }
 
         .period-box strong {
-            color: #14161F;
-            font-family: "DejaVu Sans Mono", monospace;
-            font-weight: 700;
+            color: #1e3a8a;
         }
-
-        /* ---------- Summary ledger ---------- */
 
         .summary-table {
             width: 100%;
-            border-collapse: collapse;
-            border-top: 1px solid #E4E1D8;
-            border-bottom: 1px solid #E4E1D8;
-            margin: 4px 0 4px;
+            border-collapse: separate;
+            border-spacing: 8px 0;
+            margin: 0 -8px 16px;
         }
 
         .summary-table td {
             width: 25%;
-            padding: 10px 14px;
+            padding: 12px 12px 11px;
             vertical-align: top;
-            border-left: 1px solid #E4E1D8;
+            background: #f8fbff;
+            border-radius: 7px;
         }
 
-        .summary-table td:first-child {
-            border-left: none;
-            padding-left: 0;
+        .summary-table td.blue {
+            background: #eff6ff;
         }
 
         .summary-number {
-            font-family: "DejaVu Sans Mono", monospace;
-            font-size: 17px;
+            font-size: 20px;
             line-height: 1;
             font-weight: 700;
-            color: #14161F;
-            margin-bottom: 5px;
+            color: #0f172a;
+            margin-bottom: 6px;
         }
 
         .summary-label {
             font-size: 7.5px;
-            color: #8A8D97;
-            letter-spacing: .2px;
-            line-height: 1.35;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: .3px;
+            line-height: 1.3;
         }
-
-        /* ---------- Tables ---------- */
 
         .daily-table,
         .meetings-table {
@@ -157,89 +156,81 @@
         .daily-table td,
         .meetings-table th,
         .meetings-table td {
-            padding: 6px 8px;
-            border-bottom: 1px solid #EFEDE6;
-            font-size: 8.5px;
+            padding: 7px 8px;
+            font-size: 8.2px;
             vertical-align: middle;
         }
 
         .daily-table th,
         .meetings-table th {
-            color: #8A8D97;
+            background: #eff6ff;
+            color: #1d4ed8;
+            text-transform: uppercase;
+            letter-spacing: .25px;
             text-align: left;
             font-weight: 700;
-            border-top: 1px solid #E4E1D8;
-            border-bottom: 1px solid #E4E1D8;
-            padding-top: 7px;
-            padding-bottom: 7px;
         }
 
-        .daily-table .center,
-        .meetings-table .center {
+        .daily-table td,
+        .meetings-table td {
+            border-bottom: 1px solid #edf2f7;
+        }
+
+        .daily-table tr:nth-child(even) td,
+        .meetings-table tr:nth-child(even) td {
+            background: #fbfdff;
+        }
+
+        .center {
             text-align: center;
         }
 
         .muted {
-            color: #8A8D97;
+            color: #94a3b8;
         }
 
-        .bar-cell {
-            width: 130px;
-        }
-
-        .bar-track {
+        .status-badge {
             display: inline-block;
-            width: 80px;
-            height: 5px;
-            background: #ECEAE2;
-            vertical-align: middle;
-            margin-left: 6px;
-        }
-
-        .bar-fill {
-            display: block;
-            height: 5px;
-            background: #1F3A66;
-        }
-
-        .status-dot {
-            display: inline-block;
-            width: 5px;
-            height: 5px;
-            margin-right: 5px;
-            vertical-align: middle;
-        }
-
-        .status-label {
-            font-size: 8.5px;
+            padding: 4px 7px;
+            border-radius: 9px;
+            font-size: 7px;
             font-weight: 700;
-            vertical-align: middle;
+            text-transform: capitalize;
         }
 
-        .status-active .status-dot         { background: #1E8577; }
-        .status-active .status-label       { color: #1E8577; }
-        .status-upcoming .status-dot       { background: #B07C1F; }
-        .status-upcoming .status-label     { color: #B07C1F; }
-        .status-completed .status-dot      { background: #4F46E5; }
-        .status-completed .status-label    { color: #4F46E5; }
-        .status-cancelled .status-dot      { background: #B14A3E; }
-        .status-cancelled .status-label    { color: #B14A3E; }
-        .status-ended .status-dot          { background: #8A8D97; }
-        .status-ended .status-label        { color: #6B6F7A; }
+        .status-active {
+            background: #ecfdf5;
+            color: #047857;
+        }
 
-        .footer-note {
-            margin-top: 16px;
-            padding-top: 9px;
-            border-top: 1px solid #E4E1D8;
-            text-align: center;
-            font-size: 7.5px;
-            color: #8A8D97;
+        .status-upcoming {
+            background: #eff6ff;
+            color: #1d4ed8;
+        }
+
+        .status-completed {
+            background: #e0f2fe;
+            color: #0369a1;
+        }
+
+        .status-cancelled,
+        .status-ended {
+            background: #f1f5f9;
+            color: #64748b;
         }
 
         .empty-row {
             text-align: center;
-            color: #8A8D97;
+            color: #94a3b8;
             padding: 14px 8px !important;
+        }
+
+        .footer-note {
+            margin-top: 18px;
+            padding-top: 10px;
+            text-align: center;
+            font-size: 7.2px;
+            color: #94a3b8;
         }
     </style>
 </head>
@@ -262,52 +253,52 @@
 
     <div class="meta">
         <div class="title">Meetings Report</div>
-        <div class="generated num">
-            Generated {{ now()->format('M d, Y h:i A') }}
+        <div class="generated">
+            Generated on {{ now()->format('M d, Y h:i A') }}
         </div>
     </div>
 </div>
 
 @if(!empty($filters['from_date']) && !empty($filters['to_date']))
     <div class="period-box">
-        Report period
+        Report Period:
         <strong>{{ \Carbon\Carbon::parse($filters['from_date'])->format('M d, Y') }}</strong>
-        &nbsp;&rarr;&nbsp;
+        &nbsp;to&nbsp;
         <strong>{{ \Carbon\Carbon::parse($filters['to_date'])->format('M d, Y') }}</strong>
 
         @if(($filters['status'] ?? 'All Status') !== 'All Status')
-            &nbsp;&nbsp;/&nbsp;&nbsp;
-            Status <strong>{{ $filters['status'] }}</strong>
+            &nbsp;&nbsp; | &nbsp;&nbsp;
+            Status: <strong>{{ $filters['status'] }}</strong>
         @endif
 
         @if(!empty($filters['search']))
-            &nbsp;&nbsp;/&nbsp;&nbsp;
-            Search <strong>{{ $filters['search'] }}</strong>
+            &nbsp;&nbsp; | &nbsp;&nbsp;
+            Search: <strong>{{ $filters['search'] }}</strong>
         @endif
 
         @if(!empty($filters['flagged']))
-            &nbsp;&nbsp;/&nbsp;&nbsp;
+            &nbsp;&nbsp; | &nbsp;&nbsp;
             <strong>Flagged only</strong>
         @endif
     </div>
 @endif
 
 @if(!empty($stats))
-    <h2 class="section-title">Selected period summary</h2>
+    <h2 class="section-title">Selected Period Summary</h2>
 
     <table class="summary-table">
         <tr>
-            <td>
+            <td class="blue">
                 <div class="summary-number">{{ $stats['total_meetings'] ?? 0 }}</div>
                 <div class="summary-label">Meetings</div>
             </td>
 
             <td>
                 <div class="summary-number">{{ $stats['unique_users'] ?? 0 }}</div>
-                <div class="summary-label">Unique users in meetings</div>
+                <div class="summary-label">Unique Users In Meetings</div>
             </td>
 
-            <td>
+            <td class="blue">
                 <div class="summary-number">{{ $stats['completed'] ?? 0 }}</div>
                 <div class="summary-label">Completed</div>
             </td>
@@ -320,18 +311,14 @@
     </table>
 @endif
 
-<h2 class="section-title">Daily activity</h2>
-
-@php
-    $maxDailyMeetings = collect($dailyBreakdown ?? [])->max('meetings') ?: 1;
-@endphp
+<h2 class="section-title">Daily Activity</h2>
 
 <table class="daily-table">
     <thead>
     <tr>
         <th>Date</th>
-        <th class="bar-cell">Meetings</th>
-        <th class="center">Unique users</th>
+        <th class="center">Meetings</th>
+        <th class="center">Unique Users</th>
     </tr>
     </thead>
 
@@ -339,14 +326,11 @@
     @forelse($dailyBreakdown ?? [] as $day)
         <tr>
             <td>
-                <strong class="num">{{ $day['date']->format('M d, Y') }}</strong>
+                <strong>{{ $day['date']->format('M d, Y') }}</strong>
                 <span class="muted">&nbsp;({{ $day['date']->format('l') }})</span>
             </td>
-            <td class="num">
-                {{ $day['meetings'] }}
-                <span class="bar-track"><span class="bar-fill" style="width: {{ min(100, round($day['meetings'] / $maxDailyMeetings * 100)) }}%;"></span></span>
-            </td>
-            <td class="center num">{{ $day['users'] }}</td>
+            <td class="center">{{ $day['meetings'] }}</td>
+            <td class="center">{{ $day['users'] }}</td>
         </tr>
     @empty
         <tr>
@@ -359,7 +343,7 @@
 </table>
 
 <h2 class="section-title">
-    Meeting details ({{ $meetings->count() }})
+    Meeting Details ({{ $meetings->count() }})
 </h2>
 
 <table class="meetings-table">
@@ -380,13 +364,13 @@
         <tr>
             <td><strong>{{ $meeting->title }}</strong></td>
             <td>{{ $meeting->organizer?->name ?? 'Unassigned' }}</td>
-            <td class="num">{{ \Carbon\Carbon::parse($meeting->date)->format('M d, Y') }}</td>
-            <td class="num">{{ \Carbon\Carbon::parse($meeting->time)->format('h:i A') }}</td>
-            <td class="num">{{ $meeting->duration }} min</td>
-            <td class="center num">{{ $meeting->participants->count() }}</td>
+            <td>{{ \Carbon\Carbon::parse($meeting->date)->format('M d, Y') }}</td>
+            <td>{{ \Carbon\Carbon::parse($meeting->time)->format('h:i A') }}</td>
+            <td>{{ $meeting->duration }} min</td>
+            <td class="center">{{ $meeting->participants->count() }}</td>
             <td>
-                <span class="status-{{ $meeting->status }}">
-                    <span class="status-dot"></span><span class="status-label">{{ ucfirst($meeting->status) }}</span>
+                <span class="status-badge status-{{ $meeting->status }}">
+                    {{ ucfirst($meeting->status) }}
                 </span>
             </td>
         </tr>
