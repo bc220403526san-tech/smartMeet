@@ -592,9 +592,10 @@
         /* MEETING MOCKUP */
         .mockup-wrap {
             position: relative;
-            width: 92%;
-            max-width: 620px;
+            width: 86%;
+            max-width: 560px;
             margin-left: auto;
+            perspective: 1200px;
         }
 
         .mockup-orbit {
@@ -859,7 +860,7 @@
 
         .meeting-body {
             display: grid;
-            grid-template-columns: 1fr 180px;
+            grid-template-columns: 1fr;
             min-height: 390px;
         }
 
@@ -1245,6 +1246,86 @@
 
         .meeting-card {
             transition: transform .45s var(--ease), box-shadow .45s var(--ease);
+        }
+
+
+        /* SIMPLER PROFESSIONAL HERO PREVIEW */
+        .meeting-body {
+            grid-template-columns: 1fr !important;
+        }
+
+        .sidebar,
+        .side-panel {
+            display: none !important;
+        }
+
+        .video-grid,
+        .video-area {
+            grid-template-columns: 1fr 1fr;
+            min-height: 350px;
+            padding: 12px;
+            gap: 10px;
+        }
+
+        .video-tile {
+            min-height: 160px;
+        }
+
+        .meeting-card {
+            border-radius: 22px;
+        }
+
+        .meeting-controls {
+            height: 62px;
+        }
+
+        .mockup-orbit,
+        .floating-chip,
+        .mini-status-card {
+            display: none !important;
+        }
+
+        .mockup-shell {
+            padding: 12px;
+            border-radius: 26px;
+            background: rgba(255,255,255,.86);
+            border: 1px solid rgba(206,219,237,.9);
+            box-shadow: 0 26px 72px rgba(15,23,42,.10);
+        }
+
+        .mockup-wrap:hover .mockup-shell {
+            transform: translateY(-3px);
+        }
+
+        .mockup-wrap:hover .meeting-card {
+            transform: none;
+        }
+
+        @media (max-width: 1040px) {
+            .mockup-wrap {
+                width: 82%;
+                max-width: 560px;
+                margin-left: auto;
+                margin-right: auto;
+            }
+        }
+
+        @media (max-width: 620px) {
+            .mockup-wrap {
+                width: 94%;
+                max-width: 520px;
+            }
+
+            .video-grid,
+            .video-area {
+                min-height: 310px;
+                gap: 7px;
+                padding: 8px;
+            }
+
+            .video-tile {
+                min-height: 140px;
+            }
         }
 
         /* BENEFITS STRIP */
@@ -2052,6 +2133,58 @@
             transform: translateY(-5px);
         }
 
+
+        /* FREE SERVICES SECTION */
+        .free-section {
+            padding-top: 82px;
+            padding-bottom: 18px;
+        }
+
+        .free-card {
+            display: grid;
+            grid-template-columns: 1.2fr .8fr;
+            gap: 44px;
+            align-items: center;
+            padding: 42px;
+            border-radius: 26px;
+            background:
+                radial-gradient(circle at 88% 15%, rgba(59,130,246,.10), transparent 28%),
+                linear-gradient(145deg, #ffffff, #f7fbff);
+            border: 1px solid #e1e9f4;
+            box-shadow: 0 22px 60px rgba(15,23,42,.07);
+        }
+
+        .free-points {
+            display: grid;
+            gap: 12px;
+        }
+
+        .free-point {
+            padding: 14px 16px;
+            border-radius: 14px;
+            background: #ffffff;
+            border: 1px solid #e6edf6;
+            color: #344054;
+            font-size: 14px;
+            font-weight: 700;
+            box-shadow: 0 8px 22px rgba(15,23,42,.04);
+        }
+
+        @media (max-width: 820px) {
+            .free-card {
+                grid-template-columns: 1fr;
+                padding: 28px;
+                gap: 26px;
+            }
+        }
+
+        @media (max-width: 520px) {
+            .free-card {
+                padding: 22px;
+                border-radius: 20px;
+            }
+        }
+
         /* REVEALS */
         .reveal,
         .reveal-up,
@@ -2770,7 +2903,7 @@
             <div class="hero-copy">
                 <div class="hero-badge hero-animate delay-1">
                     <i></i>
-                    Smarter online collaboration
+                    Free online meetings & collaboration
                 </div>
 
                 <h1 class="hero-animate delay-2">
@@ -2780,7 +2913,7 @@
                 </h1>
 
                 <p class="hero-animate delay-3">
-                    Bring video meetings, real-time chat, scheduling and live transcription together in one focused workspace.
+                    Bring video meetings, scheduling, real-time collaboration and live transcription together in one focused workspace — free to use.
                 </p>
 
                 <div class="hero-actions hero-animate delay-4">
@@ -2794,6 +2927,7 @@
                 </div>
 
                 <div class="hero-benefits hero-animate delay-5">
+                    <span>Free to Use</span>
                     <span>Browser Based</span>
                     <span>Simple Setup</span>
                     <span>Real-Time Collaboration</span>
@@ -2803,124 +2937,50 @@
             <div class="mockup-wrap hero-animate delay-4 reveal-ready">
 
                 <div class="mockup-glow"></div>
-                <div class="mockup-orbit"></div>
 
-                <div class="floating-chip transcript-chip">
-                    <span class="chip-icon">✦</span>
-                    <span>Live transcript active</span>
-                </div>
+            </div>
 
-                <div class="floating-chip people-chip">
-                    <span class="chip-icon">👥</span>
-                    <span>4 participants online</span>
-                </div>
+            <div class="meeting-body">
 
-                <div class="mini-status-card top-left">
-                    <span class="mini-status-icon">✦</span>
-                    <span class="mini-status-copy">Live transcript<small>Capturing conversation</small></span>
-                </div>
+                <div class="video-grid">
 
-                <div class="mini-status-card bottom-right">
-                    <span class="mini-status-icon">👥</span>
-                    <span class="mini-status-copy">4 participants<small>Connected now</small></span>
-                </div>
-
-                <div class="mockup-shell">
-                    <div class="mockup-shine"></div>
-
-                    <div class="meeting-card">
-
-                        <div class="meeting-top">
-
-                            <div class="meeting-title">
-                                <img src="{{ asset('images/s-logo.png') }}" alt="">
-                                Weekly Product Sync
-                            </div>
-
-                            <div class="meeting-top-meta">
-                                <div class="meeting-secure">Browser meeting</div>
-                                <div class="live">
-                                    LIVE
-                                </div>
-                            </div>
-
-                        </div>
-
-                        <div class="meeting-body">
-
-                            <div class="video-grid">
-
-                                <div class="video-tile active">
-                                    <div class="speaker-wave"><span></span><span></span><span></span><span></span></div>
-                                    <div class="avatar">AL</div>
-                                    <div class="person">Alex · 🎙</div>
-                                </div>
-
-                                <div class="video-tile">
-                                    <div class="avatar avatar-purple">SR</div>
-                                    <div class="person">Sarah · 🎙</div>
-                                </div>
-
-                                <div class="video-tile">
-                                    <div class="avatar avatar-green">DV</div>
-                                    <div class="person">David · 🎙</div>
-                                </div>
-
-                                <div class="video-tile">
-                                    <div class="avatar avatar-amber">EM</div>
-                                    <div class="person">Emma · 🎙</div>
-                                </div>
-
-                            </div>
-
-                            <aside class="sidebar">
-
-                                <div class="tabs">
-                                    <div class="tab active">Chat</div>
-                                    <div class="tab">Transcript</div>
-                                </div>
-
-                                <div class="chat">
-
-                                    <div class="chat-item">
-                                        <strong>Sarah</strong>
-                                        <div class="bubble">
-                                            The new milestone looks good from my side.
-                                        </div>
-                                    </div>
-
-                                    <div class="chat-item">
-                                        <strong>David</strong>
-                                        <div class="bubble">
-                                            Great — I’ll update the schedule today.
-                                        </div>
-                                    </div>
-
-                                    <div class="transcript">
-                                        <strong>Live transcript</strong>
-                                        <p>
-                                            Let's review the project milestones for this week...
-                                        </p>
-                                    </div>
-
-                                </div>
-
-                            </aside>
-
-                        </div>
-
-                        <div class="meeting-controls">
-                            <div class="control">🎙</div>
-                            <div class="control">◉</div>
-                            <div class="control">👥</div>
-                            <div class="control">💬</div>
-                            <div class="control leave">Leave</div>
-                        </div>
-
+                    <div class="video-tile active">
+                        <div class="speaker-wave"><span></span><span></span><span></span><span></span></div>
+                        <div class="avatar">AL</div>
+                        <div class="person">Alex · 🎙</div>
                     </div>
+
+                    <div class="video-tile">
+                        <div class="avatar avatar-purple">SR</div>
+                        <div class="person">Sarah · 🎙</div>
+                    </div>
+
+                    <div class="video-tile">
+                        <div class="avatar avatar-green">DV</div>
+                        <div class="person">David · 🎙</div>
+                    </div>
+
+                    <div class="video-tile">
+                        <div class="avatar avatar-amber">EM</div>
+                        <div class="person">Emma · 🎙</div>
+                    </div>
+
                 </div>
 
             </div>
+
+            <div class="meeting-controls">
+                <div class="control">🎙</div>
+                <div class="control">◉</div>
+                <div class="control">👥</div>
+                <div class="control">💬</div>
+                <div class="control leave">Leave</div>
+            </div>
+
+        </div>
+        </div>
+
+        </div>
 
         </div>
 
@@ -3281,6 +3341,28 @@
 
     </section>
 
+
+    <section class="section free-section" id="free">
+        <div class="container">
+            <div class="free-card reveal-up">
+                <div>
+                    <div class="eyebrow">No pricing plans</div>
+                    <h2 class="section-title">SmartMeet is free to use.</h2>
+                    <p class="section-copy">
+                        Use SmartMeet's core meeting features without a subscription plan — schedule meetings,
+                        invite participants, collaborate in real time and use live transcription in one workspace.
+                    </p>
+                </div>
+
+                <div class="free-points">
+                    <div class="free-point">✓ Free access</div>
+                    <div class="free-point">✓ No paid plan required</div>
+                    <div class="free-point">✓ Core collaboration features included</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <section class="cta-wrap">
 
         <div class="container">
@@ -3292,7 +3374,7 @@
                 </h2>
 
                 <p>
-                    Bring scheduling, conversations and collaboration together with SmartMeet.
+                    Start using SmartMeet for free and keep meetings, scheduling and collaboration in one place.
                 </p>
 
                 <a href="{{ route('register') }}" class="btn btn-primary">
