@@ -86,9 +86,9 @@
                                name="from_date"
                                value="{{ $filters['from_date'] }}"
                                max="{{ $filters['to_date'] }}"
-                               class="w-full rounded-xl border-0 bg-white px-4 py-3 text-sm text-slate-700
-                                      outline-none ring-1 ring-slate-100 transition
-                                      focus:ring-2 focus:ring-blue-500">
+                               class="w-full rounded-xl bg-white px-4 py-3 text-sm text-slate-700
+                                      outline-none transition focus:ring-2 focus:ring-blue-500"
+                               style="border:1px solid #e2e8f0; box-shadow:0 4px 14px rgba(15,23,42,.04);">
                     </div>
 
                     <div class="rounded-2xl bg-slate-50 p-4">
@@ -101,9 +101,9 @@
                                name="to_date"
                                value="{{ $filters['to_date'] }}"
                                min="{{ $filters['from_date'] }}"
-                               class="w-full rounded-xl border-0 bg-white px-4 py-3 text-sm text-slate-700
-                                      outline-none ring-1 ring-slate-100 transition
-                                      focus:ring-2 focus:ring-blue-500">
+                               class="w-full rounded-xl bg-white px-4 py-3 text-sm text-slate-700
+                                      outline-none transition focus:ring-2 focus:ring-blue-500"
+                               style="border:1px solid #e2e8f0; box-shadow:0 4px 14px rgba(15,23,42,.04);">
                     </div>
                 </div>
 
@@ -160,109 +160,74 @@
         </section>
 
         {{-- SUMMARY CARDS --}}
-        @php
-            $summaryCards = [
-                [
-                    'label' => 'Total Meetings',
-                    'value' => $stats['total_meetings'] ?? 0,
-                    'icon' => 'fa-video',
-                    'iconClass' => 'bg-blue-50 text-blue-600',
-                ],
-                [
-                    'label' => 'Unique Users',
-                    'value' => $stats['unique_users'] ?? 0,
-                    'icon' => 'fa-user-group',
-                    'iconClass' => 'bg-indigo-50 text-indigo-600',
-                ],
-                [
-                    'label' => 'Active Meetings',
-                    'value' => $stats['active'] ?? 0,
-                    'icon' => 'fa-signal',
-                    'iconClass' => 'bg-cyan-50 text-cyan-600',
-                ],
-                [
-                    'label' => 'Upcoming Meetings',
-                    'value' => $stats['upcoming'] ?? 0,
-                    'icon' => 'fa-clock',
-                    'iconClass' => 'bg-sky-50 text-sky-600',
-                ],
-                [
-                    'label' => 'Completed Meetings',
-                    'value' => $stats['completed'] ?? 0,
-                    'icon' => 'fa-circle-check',
-                    'iconClass' => 'bg-blue-50 text-blue-700',
-                ],
-                [
-                    'label' => 'Cancelled Meetings',
-                    'value' => $stats['cancelled'] ?? 0,
-                    'icon' => 'fa-ban',
-                    'iconClass' => 'bg-slate-100 text-slate-500',
-                ],
-            ];
-        @endphp
-
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-            @foreach($summaryCards as $card)
-                @php
-                    $label = $card['label'];
 
-                    if ($label === 'Total Meetings') {
-                        $cardClass = 'bg-blue-50';
-                        $iconClass = 'bg-blue-600 text-white';
-                        $numberClass = 'text-blue-900';
-                        $accentClass = 'bg-blue-500';
-                    } elseif ($label === 'Unique Users') {
-                        $cardClass = 'bg-indigo-50';
-                        $iconClass = 'bg-indigo-600 text-white';
-                        $numberClass = 'text-indigo-900';
-                        $accentClass = 'bg-indigo-500';
-                    } elseif ($label === 'Active Meetings') {
-                        $cardClass = 'bg-cyan-50';
-                        $iconClass = 'bg-cyan-500 text-white';
-                        $numberClass = 'text-cyan-900';
-                        $accentClass = 'bg-cyan-500';
-                    } elseif ($label === 'Upcoming Meetings') {
-                        $cardClass = 'bg-sky-50';
-                        $iconClass = 'bg-sky-500 text-white';
-                        $numberClass = 'text-sky-900';
-                        $accentClass = 'bg-sky-500';
-                    } elseif ($label === 'Completed Meetings') {
-                        $cardClass = 'bg-emerald-50';
-                        $iconClass = 'bg-emerald-500 text-white';
-                        $numberClass = 'text-emerald-900';
-                        $accentClass = 'bg-emerald-500';
-                    } else {
-                        $cardClass = 'bg-rose-50';
-                        $iconClass = 'bg-rose-500 text-white';
-                        $numberClass = 'text-rose-900';
-                        $accentClass = 'bg-rose-500';
-                    }
-                @endphp
-
-                <div class="relative overflow-hidden rounded-2xl {{ $cardClass }} p-4 shadow-md
-                            transition duration-300 hover:-translate-y-1 hover:shadow-lg">
-
-                    <span class="absolute left-0 top-5 h-8 w-1 rounded-r-full {{ $accentClass }}"></span>
-
-                    <div class="flex items-start justify-between gap-2">
-                        <div class="flex h-10 w-10 items-center justify-center rounded-xl {{ $iconClass }} shadow-sm">
-                            <i class="fa-solid {{ $card['icon'] }} text-sm"></i>
-                        </div>
-
-                        <span class="rounded-lg bg-white px-2 py-1 text-[9px] font-semibold text-slate-400 shadow-sm whitespace-nowrap">
-                            {{ $fromDate->format('M d') }}–{{ $toDate->format('M d') }}
-                        </span>
+            <div class="rounded-2xl bg-white p-4 shadow-md transition duration-300 hover:-translate-y-1 hover:shadow-lg">
+                <div class="flex items-start justify-between gap-2">
+                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">
+                        <i class="fa-solid fa-video text-sm"></i>
                     </div>
-
-                    <p class="mt-4 text-2xl font-bold tracking-tight {{ $numberClass }}">
-                        {{ number_format($card['value']) }}
-                    </p>
-
-                    <p class="mt-1 text-[11px] font-semibold leading-4 text-slate-600">
-                        {{ $card['label'] }}
-                    </p>
+                    <span class="rounded-lg bg-slate-50 px-2 py-1 text-[9px] font-semibold text-slate-400 shadow-sm whitespace-nowrap">{{ $fromDate->format('M d') }}–{{ $toDate->format('M d') }}</span>
                 </div>
-            @endforeach
+                <p class="mt-4 text-2xl font-bold tracking-tight text-slate-900">{{ number_format($stats['total_meetings'] ?? 0) }}</p>
+                <p class="mt-1 text-[11px] font-semibold leading-4 text-slate-600">Total Meetings</p>
+            </div>
+
+            <div class="rounded-2xl bg-white p-4 shadow-md transition duration-300 hover:-translate-y-1 hover:shadow-lg">
+                <div class="flex items-start justify-between gap-2">
+                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
+                        <i class="fa-solid fa-user-group text-sm"></i>
+                    </div>
+                    <span class="rounded-lg bg-slate-50 px-2 py-1 text-[9px] font-semibold text-slate-400 shadow-sm whitespace-nowrap">{{ $fromDate->format('M d') }}–{{ $toDate->format('M d') }}</span>
+                </div>
+                <p class="mt-4 text-2xl font-bold tracking-tight text-slate-900">{{ number_format($stats['unique_users'] ?? 0) }}</p>
+                <p class="mt-1 text-[11px] font-semibold leading-4 text-slate-600">Unique Users</p>
+            </div>
+
+            <div class="rounded-2xl bg-white p-4 shadow-md transition duration-300 hover:-translate-y-1 hover:shadow-lg">
+                <div class="flex items-start justify-between gap-2">
+                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-sm">
+                        <i class="fa-solid fa-signal text-sm"></i>
+                    </div>
+                    <span class="rounded-lg bg-slate-50 px-2 py-1 text-[9px] font-semibold text-slate-400 shadow-sm whitespace-nowrap">{{ $fromDate->format('M d') }}–{{ $toDate->format('M d') }}</span>
+                </div>
+                <p class="mt-4 text-2xl font-bold tracking-tight text-slate-900">{{ number_format($stats['active'] ?? 0) }}</p>
+                <p class="mt-1 text-[11px] font-semibold leading-4 text-slate-600">Active Meetings</p>
+            </div>
+
+            <div class="rounded-2xl bg-white p-4 shadow-md transition duration-300 hover:-translate-y-1 hover:shadow-lg">
+                <div class="flex items-start justify-between gap-2">
+                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500 text-white shadow-sm">
+                        <i class="fa-solid fa-clock text-sm"></i>
+                    </div>
+                    <span class="rounded-lg bg-slate-50 px-2 py-1 text-[9px] font-semibold text-slate-400 shadow-sm whitespace-nowrap">{{ $fromDate->format('M d') }}–{{ $toDate->format('M d') }}</span>
+                </div>
+                <p class="mt-4 text-2xl font-bold tracking-tight text-slate-900">{{ number_format($stats['upcoming'] ?? 0) }}</p>
+                <p class="mt-1 text-[11px] font-semibold leading-4 text-slate-600">Upcoming Meetings</p>
+            </div>
+
+            <div class="rounded-2xl bg-white p-4 shadow-md transition duration-300 hover:-translate-y-1 hover:shadow-lg">
+                <div class="flex items-start justify-between gap-2">
+                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500 text-white shadow-sm">
+                        <i class="fa-solid fa-circle-check text-sm"></i>
+                    </div>
+                    <span class="rounded-lg bg-slate-50 px-2 py-1 text-[9px] font-semibold text-slate-400 shadow-sm whitespace-nowrap">{{ $fromDate->format('M d') }}–{{ $toDate->format('M d') }}</span>
+                </div>
+                <p class="mt-4 text-2xl font-bold tracking-tight text-slate-900">{{ number_format($stats['completed'] ?? 0) }}</p>
+                <p class="mt-1 text-[11px] font-semibold leading-4 text-slate-600">Completed Meetings</p>
+            </div>
+
+            <div class="rounded-2xl bg-white p-4 shadow-md transition duration-300 hover:-translate-y-1 hover:shadow-lg">
+                <div class="flex items-start justify-between gap-2">
+                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500 text-white shadow-sm">
+                        <i class="fa-solid fa-ban text-sm"></i>
+                    </div>
+                    <span class="rounded-lg bg-slate-50 px-2 py-1 text-[9px] font-semibold text-slate-400 shadow-sm whitespace-nowrap">{{ $fromDate->format('M d') }}–{{ $toDate->format('M d') }}</span>
+                </div>
+                <p class="mt-4 text-2xl font-bold tracking-tight text-slate-900">{{ number_format($stats['cancelled'] ?? 0) }}</p>
+                <p class="mt-1 text-[11px] font-semibold leading-4 text-slate-600">Cancelled Meetings</p>
+            </div>
+
         </div>
 
         {{-- STATUS FILTER --}}
