@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -36,6 +37,36 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_active' => 'boolean',
         ];
+    }
+
+    /*
+     * Keep role values compatible with the application's valid roles.
+     *
+     * Old role requests accidentally saved:
+     *   organizers   -> organizer
+     *   participants -> participant
+     *
+     * The getter makes already-corrupted users work immediately on login,
+     * while the setter prevents plural values from being saved again.
+     */
+    protected function role(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                return match (strtolower(trim((string) $value))) {
+                    'organizers' => 'organizer',
+                    'participants' => 'participant',
+                    default => strtolower(trim((string) $value)),
+                };
+            },
+            set: function ($value) {
+                return match (strtolower(trim((string) $value))) {
+                    'organizers' => 'organizer',
+                    'participants' => 'participant',
+                    default => strtolower(trim((string) $value)),
+                };
+            }
+        );
     }
 
     public function getImageUrlAttribute(): string
