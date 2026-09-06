@@ -1328,6 +1328,198 @@
             }
         }
 
+
+        /* HERO IMAGE VISUAL */
+        .hero-visual {
+            position: relative;
+            width: 100%;
+            max-width: 690px;
+            min-height: 520px;
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .hero-visual-glow {
+            position: absolute;
+            width: 88%;
+            height: 78%;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(59,130,246,.18), rgba(37,99,235,.06) 48%, transparent 72%);
+            filter: blur(30px);
+            animation: heroGlow 6s ease-in-out infinite;
+        }
+
+        @keyframes heroGlow {
+            0%,100% { transform: scale(1); opacity: .78; }
+            50% { transform: scale(1.05); opacity: 1; }
+        }
+
+        .hero-image-card {
+            position: relative;
+            z-index: 2;
+            width: 84%;
+            border-radius: 28px;
+            overflow: hidden;
+            background: rgba(255,255,255,.88);
+            border: 1px solid rgba(203,216,234,.85);
+            box-shadow:
+                0 34px 90px rgba(15,23,42,.13),
+                0 12px 30px rgba(37,99,235,.07);
+            transition: transform .55s var(--ease), box-shadow .55s var(--ease);
+        }
+
+        .hero-image-card::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            pointer-events: none;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.9);
+        }
+
+        .hero-visual:hover .hero-image-card {
+            transform: translateY(-6px) scale(1.01);
+            box-shadow:
+                0 42px 110px rgba(15,23,42,.16),
+                0 16px 38px rgba(37,99,235,.10);
+        }
+
+        .hero-meeting-image {
+            display: block;
+            width: 100%;
+            height: auto;
+            object-fit: cover;
+            transition: transform .7s var(--ease);
+        }
+
+        .hero-visual:hover .hero-meeting-image {
+            transform: scale(1.02);
+        }
+
+        .hero-feature-card {
+            position: absolute;
+            z-index: 4;
+            min-width: 150px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 11px 13px;
+            border-radius: 15px;
+            background: rgba(255,255,255,.95);
+            backdrop-filter: blur(14px);
+            border: 1px solid #e1e9f5;
+            box-shadow: 0 14px 34px rgba(15,23,42,.09);
+            color: #344054;
+            transition: transform .35s var(--ease), box-shadow .35s var(--ease);
+        }
+
+        .hero-feature-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 18px 42px rgba(15,23,42,.12);
+        }
+
+        .hero-feature-card strong {
+            display: block;
+            font-size: 11px;
+            color: #1f2937;
+            line-height: 1.2;
+        }
+
+        .hero-feature-card small {
+            display: block;
+            margin-top: 2px;
+            font-size: 8.5px;
+            color: #98a2b3;
+            line-height: 1.25;
+        }
+
+        .feature-mini-icon {
+            width: 34px;
+            height: 34px;
+            flex: 0 0 auto;
+            display: grid;
+            place-items: center;
+            border-radius: 11px;
+            background: linear-gradient(145deg,#eff6ff,#dbeafe);
+            color: var(--blue);
+            border: 1px solid #d8e7fb;
+        }
+
+        .feature-video {
+            left: 2%;
+            top: 14%;
+            animation: floatA 5.6s ease-in-out infinite;
+        }
+
+        .feature-schedule {
+            left: -1%;
+            bottom: 15%;
+            animation: floatB 6s ease-in-out infinite;
+        }
+
+        .feature-collab {
+            right: -1%;
+            top: 20%;
+            animation: floatB 5.8s ease-in-out infinite;
+        }
+
+        .feature-transcript {
+            right: 1%;
+            bottom: 18%;
+            animation: floatA 6.2s ease-in-out infinite;
+        }
+
+        @keyframes floatA {
+            0%,100% { transform: translateY(0); }
+            50% { transform: translateY(-7px); }
+        }
+
+        @keyframes floatB {
+            0%,100% { transform: translateY(0); }
+            50% { transform: translateY(7px); }
+        }
+
+        @media (max-width: 1100px) {
+            .hero-visual {
+                max-width: 620px;
+                min-height: 470px;
+                margin-left: auto;
+                margin-right: auto;
+            }
+
+            .hero-image-card {
+                width: 82%;
+            }
+        }
+
+        @media (max-width: 760px) {
+            .hero-visual {
+                min-height: auto;
+                padding: 34px 0 18px;
+            }
+
+            .hero-image-card {
+                width: 92%;
+            }
+
+            .hero-feature-card {
+                display: none;
+            }
+        }
+
+        @media (max-width: 520px) {
+            .hero-visual {
+                padding-top: 24px;
+            }
+
+            .hero-image-card {
+                width: 96%;
+                border-radius: 20px;
+            }
+        }
+
         /* BENEFITS STRIP */
         .benefit-strip {
             position: relative;
@@ -2934,56 +3126,52 @@
                 </div>
             </div>
 
-            <div class="mockup-wrap hero-animate delay-4 reveal-ready">
 
-                <div class="mockup-glow"></div>
+            <div class="hero-visual hero-animate delay-4">
+                <div class="hero-visual-glow"></div>
 
-            </div>
-
-            <div class="meeting-body">
-
-                <div class="video-grid">
-
-                    <div class="video-tile active">
-                        <div class="speaker-wave"><span></span><span></span><span></span><span></span></div>
-                        <div class="avatar">AL</div>
-                        <div class="person">Alex · 🎙</div>
-                    </div>
-
-                    <div class="video-tile">
-                        <div class="avatar avatar-purple">SR</div>
-                        <div class="person">Sarah · 🎙</div>
-                    </div>
-
-                    <div class="video-tile">
-                        <div class="avatar avatar-green">DV</div>
-                        <div class="person">David · 🎙</div>
-                    </div>
-
-                    <div class="video-tile">
-                        <div class="avatar avatar-amber">EM</div>
-                        <div class="person">Emma · 🎙</div>
-                    </div>
-
+                <div class="hero-image-card">
+                    <img
+                        src="{{ asset('images/smartmeet-hero-meeting.png') }}"
+                        alt="SmartMeet online meeting experience"
+                        class="hero-meeting-image"
+                    >
                 </div>
 
+                <div class="hero-feature-card feature-video">
+                    <span class="feature-mini-icon">◉</span>
+                    <div>
+                        <strong>HD Video</strong>
+                        <small>Clear online meetings</small>
+                    </div>
+                </div>
+
+                <div class="hero-feature-card feature-schedule">
+                    <span class="feature-mini-icon">⌚</span>
+                    <div>
+                        <strong>Schedule Meetings</strong>
+                        <small>Plan in seconds</small>
+                    </div>
+                </div>
+
+                <div class="hero-feature-card feature-collab">
+                    <span class="feature-mini-icon">👥</span>
+                    <div>
+                        <strong>Collaborate Together</strong>
+                        <small>Stay connected</small>
+                    </div>
+                </div>
+
+                <div class="hero-feature-card feature-transcript">
+                    <span class="feature-mini-icon">✦</span>
+                    <div>
+                        <strong>Live Transcription</strong>
+                        <small>Follow every word</small>
+                    </div>
+                </div>
             </div>
 
-            <div class="meeting-controls">
-                <div class="control">🎙</div>
-                <div class="control">◉</div>
-                <div class="control">👥</div>
-                <div class="control">💬</div>
-                <div class="control leave">Leave</div>
-            </div>
-
         </div>
-        </div>
-
-        </div>
-
-        </div>
-
     </section>
 
     <div class="benefit-strip">
