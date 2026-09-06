@@ -46,7 +46,7 @@
                     <h2 class="mt-4 text-xl font-bold text-gray-900">{{ $participant->name }}</h2>
                     <p class="mt-1 break-all text-sm text-gray-500">{{ $participant->email }}</p>
 
-                    <div class="mt-4 flex flex-wrap justify-center gap-2">
+                    <div class="mt-4 flex flex-wrap justify-center gap-2 mb-7">
                         <span class="rounded-full bg-blue-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-blue-600">
                             Participant
                         </span>
@@ -56,7 +56,7 @@
                     </div>
                 </div>
 
-                <div class="mt-7 grid grid-cols-1 sm:grid-cols-3" style="gap:16px;">
+                <div class="mt-7 grid grid-cols-1 sm:grid-cols-3 mb-7" style="gap:16px;">
                     <div class="rounded-2xl p-4 text-center shadow-sm" style="background:#eff6ff;border:1px solid #dbeafe;">
                         <p class="text-xl font-bold text-blue-600">{{ $pStats['totalMeetings'] }}</p>
                         <p class="mt-1 text-[9px] font-semibold uppercase tracking-wide text-gray-500">Meetings</p>
