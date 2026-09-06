@@ -298,11 +298,13 @@
                             </a>
 
                         @elseif(!$isMeetingOwner && !$isCompleted && !$isCancelled)
-                            <span class="inline-flex items-center gap-2 text-blue-600 bg-blue-50 border border-blue-100
-                                         px-4 py-2.5 rounded-xl text-sm font-medium">
-                                <i class="fa-solid fa-clock text-xs"></i>
-                                Upcoming
-                            </span>
+                            <a href="{{ route('organizer.meetings.show', $meeting) }}"
+                               class="inline-flex items-center gap-2 text-blue-600 bg-blue-50 border border-blue-100
+                                      px-4 py-2.5 rounded-xl text-sm font-medium
+                                      hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all duration-200">
+                                <i class="fa-solid fa-eye text-xs"></i>
+                                View
+                            </a>
 
                         @elseif($isMeetingOwner && !$isCompleted && !$isCancelled)
                             <a href="{{ route('organizer.meetings.show', $meeting) }}"
@@ -322,11 +324,12 @@
                             </a>
 
                         @else
-                            <span class="inline-flex items-center gap-2 text-gray-500 bg-gray-50 border border-gray-200
-                                         px-4 py-2.5 rounded-xl text-sm font-medium">
-                                <i class="fa-solid fa-lock text-xs"></i>
-                                {{ ucfirst($meeting->status) }}
-                            </span>
+                            <a href="{{ route('organizer.meetings.show', $meeting) }}"
+                               class="inline-flex items-center gap-2 text-gray-500 bg-gray-50 border border-gray-200
+                                      px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-100 transition-all duration-200">
+                                <i class="fa-solid fa-eye text-xs"></i>
+                                View
+                            </a>
                         @endif
                     </div>
                 </div>

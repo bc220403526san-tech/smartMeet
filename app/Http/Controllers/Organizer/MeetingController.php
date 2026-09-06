@@ -221,10 +221,14 @@ class MeetingController extends Controller
     public function show(Meeting $meeting)
     {
         /*
-         * Management/details page remains owner-only.
-         * Invited organizers are participants, not co-hosts.
+         * An Organizer may VIEW:
+         * 1) a meeting they own, OR
+         * 2) a meeting they joined through an invite link.
+         *
+         * Edit/update/cancel/end remain owner-only because those actions
+         * still call authorizeOrganizer().
          */
-        $this->authorizeOrganizer($meeting);
+        $this->authorizeAccessibleMeeting($meeting);
         $this->syncSingleMeetingStatus($meeting);
 
         $meeting->refresh()->load([
@@ -232,7 +236,14 @@ class MeetingController extends Controller
             'participants.user',
         ]);
 
-        return view('organizer.meetings.show', compact('meeting'));
+        $isMeetingOwner =
+            (string) $meeting->organizer_id ===
+            (string) auth()->id();
+
+        return view(
+            'organizer.meetings.show',
+            compact('meeting', 'isMeetingOwner')
+        );
     }
 
     public function edit(Meeting $meeting)
@@ -881,6 +892,22 @@ class MeetingController extends Controller
                 ->where('status', 'cancelled')
                 ->count(),
         ];
+    }
+
+    private function authorizeAccessibleMeeting(Meeting $meeting): void
+    {
+        $organizerId = auth()->id();
+
+        $isOwner =
+            (string) $meeting->organizer_id ===
+            (string) $organizerId;
+
+        $isInvited = DB::table('meeting_participants')
+            ->where('meeting_id', $meeting->id)
+            ->where('user_id', $organizerId)
+            ->exists();
+
+        abort_unless($isOwner || $isInvited, 403);
     }
 
     private function authorizeOrganizer(Meeting $meeting): void

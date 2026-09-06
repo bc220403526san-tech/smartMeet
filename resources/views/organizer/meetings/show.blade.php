@@ -4,6 +4,11 @@
         <x-header.page-title title="Organizer Dashboard" />
     </x-slot>
 
+    @php
+        $isMeetingOwner = $isMeetingOwner
+            ?? ((string) $meeting->organizer_id === (string) auth()->id());
+    @endphp
+
     <div class="p-4 bg-gray-50 rounded-2xl m-2 mt-0 space-y-4 overflow-y-auto min-h-screen">
 
         <!-- TOP BAR -->
@@ -17,30 +22,49 @@
                 <span>/</span>
                 <span class="text-gray-700 font-medium">Meeting Details</span>
             </div>
-            <div class="flex items-center gap-2">
-                {{-- Edit — sirf upcoming --}}
-                @if($meeting->status === 'upcoming')
-                    <a href="{{ route('organizer.meetings.edit', $meeting) }}"
-                       class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200
-                              rounded-lg hover:bg-gray-50 hover:border-gray-300 transition shadow-sm">
-                        Edit Meeting
-                    </a>
+            <div class="flex items-center gap-2 flex-wrap">
+                @if($isMeetingOwner)
+                    {{-- Owner controls --}}
+                    @if($meeting->status === 'upcoming')
+                        <a href="{{ route('organizer.meetings.edit', $meeting) }}"
+                           class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200
+                                  rounded-lg hover:bg-gray-50 hover:border-gray-300 transition shadow-sm">
+                            Edit Meeting
+                        </a>
+                    @endif
+
+                    @if(in_array($meeting->status, ['upcoming', 'active']))
+                        <form action="{{ route('organizer.meetings.cancel', $meeting) }}"
+                              method="POST"
+                              onsubmit="return confirm('Cancel this meeting?')">
+                            @csrf
+                            @method('PATCH')
+                            <button type="submit"
+                                    class="px-4 py-2 text-sm font-medium text-red-500 bg-white
+                                           border border-red-200 rounded-lg hover:bg-red-50 transition shadow-sm">
+                                <i class="fa-solid fa-xmark text-xs mr-1"></i>
+                                Cancel Meeting
+                            </button>
+                        </form>
+                    @endif
+                @else
+                    {{-- Invited organizer is a normal participant in this meeting --}}
+                    <span class="px-3 py-2 text-xs font-semibold text-blue-600 bg-blue-50
+                                 border border-blue-100 rounded-lg">
+                        <i class="fa-solid fa-user-group mr-1"></i>
+                        Invited as Participant
+                    </span>
+
+                    @if($meeting->status === 'active')
+                        <a href="{{ route('participant.meetings.attend', $meeting) }}"
+                           class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold
+                                  text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition shadow-sm">
+                            <i class="fa-solid fa-video text-xs"></i>
+                            Attend
+                        </a>
+                    @endif
                 @endif
-                {{-- Cancel — upcoming ya active --}}
-                @if(in_array($meeting->status, ['upcoming', 'active']))
-                    <form action="{{ route('organizer.meetings.cancel', $meeting) }}"
-                          method="POST"
-                          onsubmit="return confirm('Cancel this meeting?')">
-                        @csrf
-                        @method('PATCH')
-                        <button type="submit"
-                                class="px-4 py-2 text-sm font-medium text-red-500 bg-white
-                                       border border-red-200 rounded-lg hover:bg-red-50 transition shadow-sm">
-                            <i class="fa-solid fa-xmark text-xs mr-1"></i>
-                            Cancel Meeting
-                        </button>
-                    </form>
-                @endif
+
                 {{-- Status Badge --}}
                 <span class="px-4 py-2 text-sm font-semibold rounded-lg
                     {{ $meeting->status == 'upcoming'  ? 'bg-blue-50 text-blue-600'     : '' }}
