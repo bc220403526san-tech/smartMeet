@@ -114,12 +114,14 @@
             width: 100%;
             border-collapse: separate;
             border-spacing: 8px 0;
-            margin: 0 -8px 16px;
+            margin: 0 -8px 14px;
         }
 
+        .summary-table tr + tr td { padding-top: 11px; }
+
         .summary-table td {
-            width: 25%;
-            padding: 12px 12px 11px;
+            width: 33.33%;
+            padding: 10px 11px;
             vertical-align: top;
             background: #f8fbff;
             border-radius: 7px;
@@ -286,7 +288,7 @@
 @if(!empty($stats))
     <h2 class="section-title">Selected Period Summary</h2>
 
-    <table class="summary-table">
+    <table class="summary-table six-summary">
         <tr>
             <td class="blue">
                 <div class="summary-number">{{ $stats['total_meetings'] ?? 0 }}</div>
@@ -295,7 +297,19 @@
 
             <td>
                 <div class="summary-number">{{ $stats['unique_users'] ?? 0 }}</div>
-                <div class="summary-label">Unique Users In Meetings</div>
+                <div class="summary-label">Unique Users</div>
+            </td>
+
+            <td class="blue">
+                <div class="summary-number">{{ $stats['active'] ?? 0 }}</div>
+                <div class="summary-label">Active</div>
+            </td>
+        </tr>
+
+        <tr>
+            <td>
+                <div class="summary-number">{{ $stats['upcoming'] ?? 0 }}</div>
+                <div class="summary-label">Upcoming</div>
             </td>
 
             <td class="blue">
@@ -310,37 +324,6 @@
         </tr>
     </table>
 @endif
-
-<h2 class="section-title">Daily Activity</h2>
-
-<table class="daily-table">
-    <thead>
-    <tr>
-        <th>Date</th>
-        <th class="center">Meetings</th>
-        <th class="center">Unique Users</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    @forelse($dailyBreakdown ?? [] as $day)
-        <tr>
-            <td>
-                <strong>{{ $day['date']->format('M d, Y') }}</strong>
-                <span class="muted">&nbsp;({{ $day['date']->format('l') }})</span>
-            </td>
-            <td class="center">{{ $day['meetings'] }}</td>
-            <td class="center">{{ $day['users'] }}</td>
-        </tr>
-    @empty
-        <tr>
-            <td colspan="3" class="empty-row">
-                No meeting activity found for this date range.
-            </td>
-        </tr>
-    @endforelse
-    </tbody>
-</table>
 
 <h2 class="section-title">
     Meeting Details ({{ $meetings->count() }})

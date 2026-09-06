@@ -162,150 +162,71 @@
         {{-- SUMMARY CARDS --}}
         @php
             $summaryCards = [
-                ['label' => 'Meetings', 'value' => $stats['total_meetings'], 'icon' => 'fa-video', 'iconClass' => 'bg-blue-50 text-blue-600'],
-                ['label' => 'Unique Users', 'value' => $stats['unique_users'], 'icon' => 'fa-user-group', 'iconClass' => 'bg-indigo-50 text-indigo-600'],
-                ['label' => 'Completed', 'value' => $stats['completed'], 'icon' => 'fa-circle-check', 'iconClass' => 'bg-sky-50 text-sky-600'],
-                ['label' => 'Cancelled', 'value' => $stats['cancelled'], 'icon' => 'fa-ban', 'iconClass' => 'bg-slate-100 text-slate-500'],
+                [
+                    'label' => 'Meetings',
+                    'value' => $stats['total_meetings'] ?? 0,
+                    'icon' => 'fa-video',
+                    'iconClass' => 'bg-blue-50 text-blue-600',
+                ],
+                [
+                    'label' => 'Unique Users',
+                    'value' => $stats['unique_users'] ?? 0,
+                    'icon' => 'fa-user-group',
+                    'iconClass' => 'bg-indigo-50 text-indigo-600',
+                ],
+                [
+                    'label' => 'Active',
+                    'value' => $stats['active'] ?? 0,
+                    'icon' => 'fa-signal',
+                    'iconClass' => 'bg-cyan-50 text-cyan-600',
+                ],
+                [
+                    'label' => 'Upcoming',
+                    'value' => $stats['upcoming'] ?? 0,
+                    'icon' => 'fa-clock',
+                    'iconClass' => 'bg-sky-50 text-sky-600',
+                ],
+                [
+                    'label' => 'Completed',
+                    'value' => $stats['completed'] ?? 0,
+                    'icon' => 'fa-circle-check',
+                    'iconClass' => 'bg-blue-50 text-blue-700',
+                ],
+                [
+                    'label' => 'Cancelled',
+                    'value' => $stats['cancelled'] ?? 0,
+                    'icon' => 'fa-ban',
+                    'iconClass' => 'bg-slate-100 text-slate-500',
+                ],
             ];
         @endphp
 
-        <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
             @foreach($summaryCards as $card)
-                <div class="rounded-[26px] bg-white p-5 shadow-[0_14px_36px_rgba(15,23,42,0.06)]
-                            transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_48px_rgba(15,23,42,0.09)] sm:p-6">
-                    <div class="flex items-start justify-between gap-3">
-                        <div class="flex h-11 w-11 items-center justify-center rounded-2xl {{ $card['iconClass'] }}">
-                            <i class="fa-solid {{ $card['icon'] }} text-sm"></i>
+                <div class="group rounded-2xl bg-white p-4
+                            shadow-[0_10px_28px_rgba(15,23,42,0.055)]
+                            transition duration-300
+                            hover:-translate-y-1 hover:shadow-[0_16px_36px_rgba(37,99,235,0.10)]">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="flex h-9 w-9 items-center justify-center rounded-xl {{ $card['iconClass'] }}">
+                            <i class="fa-solid {{ $card['icon'] }} text-xs"></i>
                         </div>
 
-                        <span class="rounded-xl bg-slate-50 px-2.5 py-1 text-[10px] font-medium text-slate-400">
-                            {{ $fromDate->format('M d') }} – {{ $toDate->format('M d') }}
+                        <span class="text-[9px] font-medium text-slate-400 whitespace-nowrap">
+                            {{ $fromDate->format('M d') }}–{{ $toDate->format('M d') }}
                         </span>
                     </div>
 
-                    <p class="mt-5 text-3xl font-bold tracking-tight text-slate-900">
+                    <p class="mt-4 text-2xl font-bold tracking-tight text-slate-900">
                         {{ number_format($card['value']) }}
                     </p>
 
-                    <p class="mt-1 text-sm font-medium text-slate-500">
+                    <p class="mt-1 text-xs font-medium text-slate-500">
                         {{ $card['label'] }}
                     </p>
                 </div>
             @endforeach
         </div>
-
-        {{-- DAILY ACTIVITY --}}
-        <section class="overflow-hidden rounded-[28px] bg-white shadow-[0_14px_38px_rgba(15,23,42,0.06)]">
-            <div class="flex flex-col gap-3 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-                <div class="flex items-center gap-3">
-                    <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
-                        <i class="fa-solid fa-chart-column text-sm"></i>
-                    </div>
-
-                    <div>
-                        <h2 class="text-base font-semibold text-slate-900">Daily Activity</h2>
-                        <p class="mt-0.5 text-xs text-slate-400">
-                            Meetings and unique users for each day.
-                        </p>
-                    </div>
-                </div>
-
-                <span class="inline-flex w-fit items-center gap-1.5 rounded-xl bg-blue-50 px-3 py-2
-                             text-xs font-medium text-blue-600">
-                    <i class="fa-regular fa-calendar text-[10px]"></i>
-                    {{ $dailyBreakdown->count() }} active days
-                </span>
-            </div>
-
-            <div class="overflow-x-auto px-3 pb-3 sm:px-5 sm:pb-5">
-                <div class="overflow-hidden rounded-2xl bg-slate-50">
-                    <table class="w-full min-w-[560px] text-sm">
-                        <thead>
-                        <tr class="bg-blue-50 text-[11px] font-semibold uppercase tracking-wider text-blue-700">
-                            <th class="px-5 py-3.5 text-left">Date</th>
-                            <th class="px-5 py-3.5 text-center">Meetings</th>
-                            <th class="px-5 py-3.5 text-center">Unique Users</th>
-                        </tr>
-                        </thead>
-
-                        <tbody id="daily-activity-body" class="divide-y divide-white bg-slate-50">
-                        @forelse($dailyBreakdown as $day)
-                            <tr class="daily-activity-row transition hover:bg-white">
-                                <td class="px-5 py-4">
-                                    <p class="font-semibold text-slate-800">
-                                        {{ $day['date']->format('M d, Y') }}
-                                    </p>
-                                    <p class="mt-0.5 text-xs text-slate-400">
-                                        {{ $day['date']->format('l') }}
-                                    </p>
-                                </td>
-
-                                <td class="px-5 py-4 text-center">
-                                    <span class="inline-flex min-w-10 justify-center rounded-xl bg-white px-3 py-1.5
-                                                 text-xs font-semibold text-blue-600 shadow-sm">
-                                        {{ $day['meetings'] }}
-                                    </span>
-                                </td>
-
-                                <td class="px-5 py-4 text-center">
-                                    <span class="inline-flex min-w-10 justify-center rounded-xl bg-white px-3 py-1.5
-                                                 text-xs font-semibold text-indigo-600 shadow-sm">
-                                        {{ $day['users'] }}
-                                    </span>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="3" class="px-6 py-12 text-center">
-                                    <i class="fa-regular fa-folder-open text-2xl text-slate-300"></i>
-                                    <p class="mt-2 text-sm text-slate-400">
-                                        No activity found for this date range.
-                                    </p>
-                                </td>
-                            </tr>
-                        @endforelse
-                        </tbody>
-                    </table>
-                </div>
-
-                <div id="daily-pagination"
-                     class="mt-4 hidden flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p class="text-xs text-slate-400">
-                        Showing
-                        <span id="daily-page-start" class="font-semibold text-slate-600">0</span>
-                        –
-                        <span id="daily-page-end" class="font-semibold text-slate-600">0</span>
-                        of
-                        <span id="daily-page-total" class="font-semibold text-slate-600">0</span>
-                        active days
-                    </p>
-
-                    <div class="flex items-center gap-2">
-                        <button type="button"
-                                id="daily-prev"
-                                class="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-white px-3.5
-                                       text-xs font-semibold text-slate-500 shadow-sm transition
-                                       hover:-translate-y-0.5 hover:text-blue-600 disabled:cursor-not-allowed
-                                       disabled:opacity-40 disabled:hover:translate-y-0">
-                            <i class="fa-solid fa-chevron-left text-[9px]"></i>
-                            Previous
-                        </button>
-
-                        <div id="daily-page-numbers" class="flex items-center gap-1"></div>
-
-                        <button type="button"
-                                id="daily-next"
-                                class="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-white px-3.5
-                                       text-xs font-semibold text-slate-500 shadow-sm transition
-                                       hover:-translate-y-0.5 hover:text-blue-600 disabled:cursor-not-allowed
-                                       disabled:opacity-40 disabled:hover:translate-y-0">
-                            Next
-                            <i class="fa-solid fa-chevron-right text-[9px]"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </section>
 
         {{-- STATUS FILTER --}}
         <section class="rounded-[26px] bg-white p-4 shadow-[0_14px_36px_rgba(15,23,42,0.06)]">
@@ -526,115 +447,4 @@
             @endif
         </section>
     </div>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const rows = Array.from(document.querySelectorAll('.daily-activity-row'));
-            const pagination = document.getElementById('daily-pagination');
-
-            if (!pagination || rows.length === 0) {
-                return;
-            }
-
-            const perPage = 7;
-            const totalPages = Math.ceil(rows.length / perPage);
-
-            if (totalPages <= 1) {
-                return;
-            }
-
-            const prevButton = document.getElementById('daily-prev');
-            const nextButton = document.getElementById('daily-next');
-            const numbersWrap = document.getElementById('daily-page-numbers');
-            const startText = document.getElementById('daily-page-start');
-            const endText = document.getElementById('daily-page-end');
-            const totalText = document.getElementById('daily-page-total');
-
-            let currentPage = 1;
-
-            pagination.classList.remove('hidden');
-            totalText.textContent = rows.length;
-
-            function pageButton(page) {
-                const button = document.createElement('button');
-                button.type = 'button';
-                button.textContent = page;
-
-                button.className = page === currentPage
-                    ? 'flex h-9 min-w-9 items-center justify-center rounded-xl bg-blue-600 px-3 text-xs font-semibold text-white shadow-sm'
-                    : 'flex h-9 min-w-9 items-center justify-center rounded-xl bg-white px-3 text-xs font-semibold text-slate-500 shadow-sm transition hover:text-blue-600';
-
-                button.addEventListener('click', function () {
-                    currentPage = page;
-                    render();
-                });
-
-                return button;
-            }
-
-            function renderNumbers() {
-                numbersWrap.innerHTML = '';
-
-                let pages = [];
-
-                if (totalPages <= 5) {
-                    pages = Array.from({ length: totalPages }, (_, index) => index + 1);
-                } else if (currentPage <= 3) {
-                    pages = [1, 2, 3, 4, totalPages];
-                } else if (currentPage >= totalPages - 2) {
-                    pages = [1, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
-                } else {
-                    pages = [1, currentPage - 1, currentPage, currentPage + 1, totalPages];
-                }
-
-                let previous = null;
-
-                pages.forEach(function (page) {
-                    if (previous !== null && page - previous > 1) {
-                        const dots = document.createElement('span');
-                        dots.className = 'px-1 text-xs text-slate-400';
-                        dots.textContent = '…';
-                        numbersWrap.appendChild(dots);
-                    }
-
-                    numbersWrap.appendChild(pageButton(page));
-                    previous = page;
-                });
-            }
-
-            function render() {
-                const startIndex = (currentPage - 1) * perPage;
-                const endIndex = Math.min(startIndex + perPage, rows.length);
-
-                rows.forEach(function (row, index) {
-                    row.style.display = index >= startIndex && index < endIndex ? '' : 'none';
-                });
-
-                startText.textContent = startIndex + 1;
-                endText.textContent = endIndex;
-
-                prevButton.disabled = currentPage === 1;
-                nextButton.disabled = currentPage === totalPages;
-
-                renderNumbers();
-            }
-
-            prevButton.addEventListener('click', function () {
-                if (currentPage > 1) {
-                    currentPage--;
-                    render();
-                }
-            });
-
-            nextButton.addEventListener('click', function () {
-                if (currentPage < totalPages) {
-                    currentPage++;
-                    render();
-                }
-            });
-
-            render();
-        });
-    </script>
-
 </x-layouts.app>
