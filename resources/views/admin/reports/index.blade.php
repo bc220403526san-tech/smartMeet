@@ -3,14 +3,14 @@
         <x-header.search-bar placeholder="Search reports, meetings, users..." />
     </x-slot>
 
-    <div class="m-2 mt-0 space-y-7 overflow-y-auto rounded-[32px] bg-[#f6f9ff] p-4 sm:p-6 lg:p-8">
+    <div class="m-2 mt-0 rounded-3xl bg-slate-50 p-4 sm:p-6 lg:p-7 overflow-y-auto space-y-6">
 
         {{-- HERO / PAGE HEADER --}}
-        <section class="relative overflow-hidden rounded-[30px] bg-gradient-to-br from-blue-600 via-blue-600 to-blue-700
-                        px-6 py-7 text-white shadow-[0_22px_55px_rgba(37,99,235,0.22)]
+        <section class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-500 via-blue-500 to-blue-600
+                        px-6 py-7 text-white shadow-lg
                         sm:px-8 sm:py-8">
-            <div class="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-white/10 blur-2xl"></div>
-            <div class="pointer-events-none absolute bottom-0 left-1/3 h-40 w-40 rounded-full bg-sky-300/10 blur-2xl"></div>
+            <div class="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-white/12 blur-2xl"></div>
+            <div class="pointer-events-none absolute bottom-0 left-1/3 h-40 w-40 rounded-full bg-sky-200/12 blur-2xl"></div>
 
             <div class="relative flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
                 <div class="min-w-0">
@@ -228,9 +228,9 @@
                         </tr>
                         </thead>
 
-                        <tbody class="divide-y divide-white bg-slate-50">
+                        <tbody id="daily-activity-body" class="divide-y divide-white bg-slate-50">
                         @forelse($dailyBreakdown as $day)
-                            <tr class="transition hover:bg-white">
+                            <tr class="daily-activity-row transition hover:bg-white">
                                 <td class="px-5 py-4">
                                     <p class="font-semibold text-slate-800">
                                         {{ $day['date']->format('M d, Y') }}
@@ -266,6 +266,43 @@
                         @endforelse
                         </tbody>
                     </table>
+                </div>
+
+                <div id="daily-pagination"
+                     class="mt-4 hidden flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p class="text-xs text-slate-400">
+                        Showing
+                        <span id="daily-page-start" class="font-semibold text-slate-600">0</span>
+                        –
+                        <span id="daily-page-end" class="font-semibold text-slate-600">0</span>
+                        of
+                        <span id="daily-page-total" class="font-semibold text-slate-600">0</span>
+                        active days
+                    </p>
+
+                    <div class="flex items-center gap-2">
+                        <button type="button"
+                                id="daily-prev"
+                                class="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-white px-3.5
+                                       text-xs font-semibold text-slate-500 shadow-sm transition
+                                       hover:-translate-y-0.5 hover:text-blue-600 disabled:cursor-not-allowed
+                                       disabled:opacity-40 disabled:hover:translate-y-0">
+                            <i class="fa-solid fa-chevron-left text-[9px]"></i>
+                            Previous
+                        </button>
+
+                        <div id="daily-page-numbers" class="flex items-center gap-1"></div>
+
+                        <button type="button"
+                                id="daily-next"
+                                class="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-white px-3.5
+                                       text-xs font-semibold text-slate-500 shadow-sm transition
+                                       hover:-translate-y-0.5 hover:text-blue-600 disabled:cursor-not-allowed
+                                       disabled:opacity-40 disabled:hover:translate-y-0">
+                            Next
+                            <i class="fa-solid fa-chevron-right text-[9px]"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
         </section>
@@ -489,4 +526,115 @@
             @endif
         </section>
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const rows = Array.from(document.querySelectorAll('.daily-activity-row'));
+            const pagination = document.getElementById('daily-pagination');
+
+            if (!pagination || rows.length === 0) {
+                return;
+            }
+
+            const perPage = 7;
+            const totalPages = Math.ceil(rows.length / perPage);
+
+            if (totalPages <= 1) {
+                return;
+            }
+
+            const prevButton = document.getElementById('daily-prev');
+            const nextButton = document.getElementById('daily-next');
+            const numbersWrap = document.getElementById('daily-page-numbers');
+            const startText = document.getElementById('daily-page-start');
+            const endText = document.getElementById('daily-page-end');
+            const totalText = document.getElementById('daily-page-total');
+
+            let currentPage = 1;
+
+            pagination.classList.remove('hidden');
+            totalText.textContent = rows.length;
+
+            function pageButton(page) {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.textContent = page;
+
+                button.className = page === currentPage
+                    ? 'flex h-9 min-w-9 items-center justify-center rounded-xl bg-blue-600 px-3 text-xs font-semibold text-white shadow-sm'
+                    : 'flex h-9 min-w-9 items-center justify-center rounded-xl bg-white px-3 text-xs font-semibold text-slate-500 shadow-sm transition hover:text-blue-600';
+
+                button.addEventListener('click', function () {
+                    currentPage = page;
+                    render();
+                });
+
+                return button;
+            }
+
+            function renderNumbers() {
+                numbersWrap.innerHTML = '';
+
+                let pages = [];
+
+                if (totalPages <= 5) {
+                    pages = Array.from({ length: totalPages }, (_, index) => index + 1);
+                } else if (currentPage <= 3) {
+                    pages = [1, 2, 3, 4, totalPages];
+                } else if (currentPage >= totalPages - 2) {
+                    pages = [1, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+                } else {
+                    pages = [1, currentPage - 1, currentPage, currentPage + 1, totalPages];
+                }
+
+                let previous = null;
+
+                pages.forEach(function (page) {
+                    if (previous !== null && page - previous > 1) {
+                        const dots = document.createElement('span');
+                        dots.className = 'px-1 text-xs text-slate-400';
+                        dots.textContent = '…';
+                        numbersWrap.appendChild(dots);
+                    }
+
+                    numbersWrap.appendChild(pageButton(page));
+                    previous = page;
+                });
+            }
+
+            function render() {
+                const startIndex = (currentPage - 1) * perPage;
+                const endIndex = Math.min(startIndex + perPage, rows.length);
+
+                rows.forEach(function (row, index) {
+                    row.style.display = index >= startIndex && index < endIndex ? '' : 'none';
+                });
+
+                startText.textContent = startIndex + 1;
+                endText.textContent = endIndex;
+
+                prevButton.disabled = currentPage === 1;
+                nextButton.disabled = currentPage === totalPages;
+
+                renderNumbers();
+            }
+
+            prevButton.addEventListener('click', function () {
+                if (currentPage > 1) {
+                    currentPage--;
+                    render();
+                }
+            });
+
+            nextButton.addEventListener('click', function () {
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    render();
+                }
+            });
+
+            render();
+        });
+    </script>
+
 </x-layouts.app>
