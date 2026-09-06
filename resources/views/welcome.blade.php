@@ -1220,7 +1220,7 @@
         }
 
         .hero-copy {
-            max-width: 620px;
+            max-width: 680px;
         }
 
         .hero-copy .hero-actions {
@@ -1303,7 +1303,7 @@
 
         @media (max-width: 1040px) {
             .mockup-wrap {
-                width: 82%;
+                width: 89%;
                 max-width: 560px;
                 margin-left: auto;
                 margin-right: auto;
@@ -1333,8 +1333,8 @@
         .hero-visual {
             position: relative;
             width: 100%;
-            max-width: 690px;
-            min-height: 520px;
+            max-width: 760px;
+            min-height: 550px;
             margin-left: auto;
             display: flex;
             align-items: center;
@@ -1359,7 +1359,7 @@
         .hero-image-card {
             position: relative;
             z-index: 2;
-            width: 84%;
+            width: 91%;
             border-radius: 28px;
             overflow: hidden;
             background: rgba(255,255,255,.88);
@@ -1484,7 +1484,7 @@
         @media (max-width: 1100px) {
             .hero-visual {
                 max-width: 620px;
-                min-height: 470px;
+                min-height: 500px;
                 margin-left: auto;
                 margin-right: auto;
             }
