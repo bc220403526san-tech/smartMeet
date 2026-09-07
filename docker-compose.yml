@@ -1,0 +1,161 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: smartmeet-app
+    restart: unless-stopped
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html
+      - smartmeet_storage:/var/www/html/storage
+    environment:
+      APP_NAME: SmartMeet
+      APP_ENV: ${APP_ENV}
+      APP_KEY: ${APP_KEY}
+      APP_DEBUG: ${APP_DEBUG}
+      APP_URL: ${APP_URL}
+
+      DB_CONNECTION: mysql
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+
+      BROADCAST_CONNECTION: reverb
+      REVERB_APP_ID: ${REVERB_APP_ID}
+      REVERB_APP_KEY: ${REVERB_APP_KEY}
+      REVERB_APP_SECRET: ${REVERB_APP_SECRET}
+      REVERB_HOST: ${REVERB_HOST}
+      REVERB_PORT: ${REVERB_PORT}
+      REVERB_SCHEME: ${REVERB_SCHEME}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - smartmeet
+
+  web:
+    image: nginx:latest
+    container_name: smartmeet-web
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./:/var/www/html:ro
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+      - reverb
+    networks:
+      - smartmeet
+
+  db:
+    image: mysql:8.0
+    container_name: smartmeet-db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - smartmeet
+
+  reverb:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: smartmeet-reverb
+    restart: unless-stopped
+    working_dir: /var/www/html
+    command: php artisan reverb:start --host=0.0.0.0 --port=8080
+    volumes:
+      - ./:/var/www/html
+    environment:
+      APP_ENV: ${APP_ENV}
+      APP_KEY: ${APP_KEY}
+
+      DB_CONNECTION: mysql
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+
+      REVERB_APP_ID: ${REVERB_APP_ID}
+      REVERB_APP_KEY: ${REVERB_APP_KEY}
+      REVERB_APP_SECRET: ${REVERB_APP_SECRET}
+      REVERB_SERVER_HOST: 0.0.0.0
+      REVERB_SERVER_PORT: 8080
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - smartmeet
+
+  queue:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: smartmeet-queue
+    restart: unless-stopped
+    working_dir: /var/www/html
+    command: php artisan queue:work --sleep=3 --tries=3 --timeout=90
+    volumes:
+      - ./:/var/www/html
+    environment:
+      APP_ENV: ${APP_ENV}
+      APP_KEY: ${APP_KEY}
+
+      DB_CONNECTION: mysql
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - smartmeet
+
+  coturn:
+    image: coturn/coturn:latest
+    container_name: smartmeet-coturn
+    restart: unless-stopped
+    command:
+      - -n
+      - --log-file=stdout
+      - --fingerprint
+      - --lt-cred-mech
+      - --realm=${TURN_REALM}
+      - --user=${TURN_USERNAME}:${TURN_PASSWORD}
+      - --listening-port=3478
+      - --min-port=49160
+      - --max-port=49200
+    ports:
+      - "3478:3478/tcp"
+      - "3478:3478/udp"
+      - "49160-49200:49160-49200/udp"
+    networks:
+      - smartmeet
+
+volumes:
+  db_data:
+  smartmeet_storage:
+
+networks:
+  smartmeet:
+    driver: bridge
