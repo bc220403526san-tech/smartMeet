@@ -17,6 +17,11 @@ class AuditLogController extends Controller
                 'meeting:id,title,unique_code',
             ]);
 
+        /*
+        |--------------------------------------------------------------------------
+        | Search
+        |--------------------------------------------------------------------------
+        */
         if ($search = trim((string) $request->get('search'))) {
             $query->where(function ($q) use ($search) {
                 $q->where('public_ip', 'like', "%{$search}%")
@@ -25,24 +30,41 @@ class AuditLogController extends Controller
                     ->orWhere('operating_system', 'like', "%{$search}%")
                     ->orWhere('browser', 'like', "%{$search}%")
                     ->orWhere('network_effective_type', 'like', "%{$search}%")
+
                     ->orWhereHas('user', function ($userQuery) use ($search) {
-                        $userQuery->where('name', 'like', "%{$search}%")
+                        $userQuery
+                            ->where('name', 'like', "%{$search}%")
                             ->orWhere('email', 'like', "%{$search}%");
                     })
+
                     ->orWhereHas('meeting', function ($meetingQuery) use ($search) {
-                        $meetingQuery->where('title', 'like', "%{$search}%")
+                        $meetingQuery
+                            ->where('title', 'like', "%{$search}%")
                             ->orWhere('unique_code', 'like', "%{$search}%");
                     });
             });
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Date Filter
+        |--------------------------------------------------------------------------
+        */
         if ($request->filled('date')) {
             $query->whereDate('joined_at', $request->date);
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Pagination
+        |--------------------------------------------------------------------------
+        */
         $logs = $query
-            ->latest('joined_at')
-            ->paginate(15)
+            ->orderByDesc('joined_at')
+            ->paginate(
+                perPage: 15,
+                pageName: 'page'
+            )
             ->withQueryString();
 
         return view('admin.audit', compact('logs'));
