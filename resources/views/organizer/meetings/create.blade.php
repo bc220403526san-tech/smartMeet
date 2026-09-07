@@ -43,7 +43,7 @@
                             <label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">
                                 Meeting Title <span class="text-red-400">*</span>
                             </label>
-                            <input type="text" name="title" value="{{ old('title') }}"
+                            <input type="text" name="title" value="{{ old('title') }}" required maxlength="255"
                                    placeholder="e.g. Q4 Strategy Sync"
                                    class="w-full mt-1.5 px-4 py-3 bg-gray-50 rounded-xl text-sm border border-gray-200
                                           focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white
@@ -55,7 +55,7 @@
                                 <label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">
                                     Date <span class="text-red-400">*</span>
                                 </label>
-                                <input type="date" name="date" value="{{ old('date') }}"
+                                <input type="date" name="date" value="{{ old('date') }}" required
                                        min="{{ date('Y-m-d') }}"
                                        class="w-full mt-1.5 px-4 py-3 bg-gray-50 rounded-xl text-sm border border-gray-200
                                               focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white transition-all duration-200">
@@ -64,7 +64,7 @@
                                 <label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">
                                     Time <span class="text-red-400">*</span>
                                 </label>
-                                <input type="time" name="time" value="{{ old('time') }}"
+                                <input type="time" name="time" value="{{ old('time') }}" required
                                        class="w-full mt-1.5 px-4 py-3 bg-gray-50 rounded-xl text-sm border border-gray-200
                                               focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white transition-all duration-200">
                             </div>
@@ -72,7 +72,7 @@
                                 <label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">
                                     Duration <span class="text-red-400">*</span>
                                 </label>
-                                <select name="duration"
+                                <select name="duration" required
                                         class="w-full mt-1.5 px-4 py-3 bg-gray-50 rounded-xl text-sm border border-gray-200
                                                focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white transition-all duration-200 cursor-pointer">
                                     <option value="15"  {{ old('duration') == 15  ? 'selected' : '' }}>15 mins</option>
@@ -89,7 +89,7 @@
                             <label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">
                                 Timezone <span class="text-red-400">*</span>
                             </label>
-                            <select name="timezone"
+                            <select name="timezone" required
                                     class="w-full mt-1.5 px-4 py-3 bg-gray-50 rounded-xl text-sm border border-gray-200
                                            focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white transition-all duration-200 cursor-pointer">
                                 @foreach(\DateTimeZone::listIdentifiers() as $timezone)
@@ -235,7 +235,7 @@
                         <div class="mb-6">
                             <div class="flex items-center justify-between mb-3">
                                 <label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                    Meeting Agenda
+                                    Meeting Agenda <span class="normal-case tracking-normal font-medium text-gray-400">(Optional)</span>
                                 </label>
                                 <button type="button" id="addAgendaBtn"
                                         class="px-4 py-2 text-xs font-semibold bg-gradient-to-r from-blue-600 to-indigo-600
@@ -272,9 +272,9 @@
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5 text-blue-500">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
                                 </svg>
-                                Description
+                                Description <span class="text-red-400">*</span>
                             </label>
-                            <textarea rows="3" name="description"
+                            <textarea rows="3" name="description" required maxlength="2000"
                                       placeholder="Outline the meeting objectives..."
                                       class="w-full mt-1.5 px-4 py-3 bg-gray-50 rounded-xl text-sm border border-gray-200
                                              focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white
@@ -407,6 +407,27 @@
 
         refreshInviteEmailCount();
 
+        // Optional invite emails: validate only when the field contains a value.
+        const meetingForm = document.getElementById('meeting-form');
+        meetingForm?.addEventListener('submit', function (event) {
+            const emails = parsedInviteEmails();
+            const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            const invalidEmail = emails.find(email => !emailPattern.test(email));
+
+            if (invalidEmail) {
+                event.preventDefault();
+                inviteEmailsInput.setCustomValidity('Please enter valid email addresses separated by commas, semicolons, or new lines.');
+                inviteEmailsInput.reportValidity();
+                return;
+            }
+
+            inviteEmailsInput?.setCustomValidity('');
+        });
+
+        inviteEmailsInput?.addEventListener('input', () => {
+            inviteEmailsInput.setCustomValidity('');
+        });
+
         // ── Agenda ───────────────────────────────────────────────────
         const addAgendaBtn  = document.getElementById('addAgendaBtn');
         const agendaWrapper = document.getElementById('agendaWrapper');
@@ -446,3 +467,4 @@
         updateRemoveButtons();
     </script>
 </x-layouts.app>
+
