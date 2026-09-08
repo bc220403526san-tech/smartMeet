@@ -210,6 +210,12 @@
         .people-body::-webkit-scrollbar-track{background:rgba(255,255,255,.08); border-radius:999px; margin:4px 0}
         .people-body::-webkit-scrollbar-thumb{background:#94a3b8; border-radius:999px; border:3px solid rgba(13,22,42,.92)}
         .people-body::-webkit-scrollbar-thumb:hover{background:#cbd5e1}
+        .people-scroll-wrap{position:relative; flex:1; min-height:0; overflow:hidden}
+        .people-scroll-wrap .people-body{height:100%}
+        .people-drag-scrollbar{position:absolute; top:8px; right:3px; bottom:8px; width:10px; border-radius:999px; background:rgba(255,255,255,.08); z-index:30; display:none}
+        .people-drag-scrollbar.is-visible{display:block}
+        .people-drag-thumb{position:absolute; top:0; left:1px; width:8px; min-height:44px; border-radius:999px; background:#e2e8f0; cursor:grab; touch-action:none; user-select:none; box-shadow:0 0 0 1px rgba(15,23,42,.7)}
+        .people-drag-thumb:active{cursor:grabbing; background:#fff}
         .person-row{display:flex; align-items:center; gap:10px; padding:10px; border-radius:13px; border:1px solid var(--line); background:rgba(255,255,255,.02); transition:opacity .2s, filter .2s, background .2s, border-color .2s}
         .person-row.joined{opacity:1; filter:none; background:rgba(34,197,94,.07); border-color:rgba(34,197,94,.22)}
         .person-row.pending{opacity:.5; filter:grayscale(.5) saturate(.4)}
@@ -718,7 +724,12 @@
                     </div>
                     <div class="room-invite-link" id="room-invite-link-preview" title="Meeting invite link"></div>
                 </div>
-                <div class="people-body" id="people-body"></div>
+                <div class="people-scroll-wrap">
+                    <div class="people-body" id="people-body"></div>
+                    <div class="people-drag-scrollbar" id="people-drag-scrollbar" aria-hidden="true">
+                        <div class="people-drag-thumb" id="people-drag-thumb"></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -3802,5 +3813,107 @@
         },30000);
     });
 </script>
+
+<script>
+    (function(){
+        const body = document.getElementById('people-body');
+        const rail = document.getElementById('people-drag-scrollbar');
+        const thumb = document.getElementById('people-drag-thumb');
+
+        if (!body || !rail || !thumb) return;
+
+        let dragging = false;
+        let startY = 0;
+        let startScrollTop = 0;
+
+        function syncPeopleDragScrollbar(){
+            const maxScroll = body.scrollHeight - body.clientHeight;
+
+            if (maxScroll <= 1) {
+                rail.classList.remove('is-visible');
+                return;
+            }
+
+            rail.classList.add('is-visible');
+
+            const railHeight = rail.clientHeight;
+            const thumbHeight = Math.max(
+                44,
+                Math.round(railHeight * (body.clientHeight / body.scrollHeight))
+            );
+
+            const maxThumbTop = Math.max(0, railHeight - thumbHeight);
+            const thumbTop = maxScroll > 0
+                ? (body.scrollTop / maxScroll) * maxThumbTop
+                : 0;
+
+            thumb.style.height = thumbHeight + 'px';
+            thumb.style.transform = 'translateY(' + thumbTop + 'px)';
+        }
+
+        thumb.addEventListener('pointerdown', function(event){
+            dragging = true;
+            startY = event.clientY;
+            startScrollTop = body.scrollTop;
+            thumb.setPointerCapture(event.pointerId);
+            event.preventDefault();
+        });
+
+        thumb.addEventListener('pointermove', function(event){
+            if (!dragging) return;
+
+            const railHeight = rail.clientHeight;
+            const thumbHeight = thumb.offsetHeight;
+            const maxThumbTravel = Math.max(1, railHeight - thumbHeight);
+            const maxScroll = Math.max(0, body.scrollHeight - body.clientHeight);
+            const deltaY = event.clientY - startY;
+
+            body.scrollTop =
+                startScrollTop +
+                (deltaY / maxThumbTravel) * maxScroll;
+
+            event.preventDefault();
+        });
+
+        function stopDragging(event){
+            if (!dragging) return;
+            dragging = false;
+
+            try {
+                thumb.releasePointerCapture(event.pointerId);
+            } catch (_) {}
+        }
+
+        thumb.addEventListener('pointerup', stopDragging);
+        thumb.addEventListener('pointercancel', stopDragging);
+
+        body.addEventListener(
+            'scroll',
+            syncPeopleDragScrollbar,
+            { passive: true }
+        );
+
+        window.addEventListener(
+            'resize',
+            syncPeopleDragScrollbar
+        );
+
+        const observer = new MutationObserver(
+            syncPeopleDragScrollbar
+        );
+
+        observer.observe(
+            body,
+            {
+                childList: true,
+                subtree: true
+            }
+        );
+
+        requestAnimationFrame(syncPeopleDragScrollbar);
+        setTimeout(syncPeopleDragScrollbar, 250);
+    })();
+</script>
+
 </body>
 </html>
