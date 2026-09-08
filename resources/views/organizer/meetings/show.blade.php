@@ -238,7 +238,7 @@
                         </div>
                     </div>
 
-                    <div class="mt-5 space-y-4">
+                    <div class="mt-5">
                         {{-- Organizer --}}
                         <div class="rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
                             <div class="flex items-center gap-3">
@@ -260,64 +260,67 @@
                             </div>
                         </div>
 
-                        @forelse($meeting->participants as $participant)
-                            @php
-                                $joinedAt = $participant->joined_at;
-                                $leftAt = $participant->left_at;
+                        {{-- Scrollable participants list --}}
+                        <div class="mt-4 max-h-[520px] space-y-4 overflow-y-auto overscroll-contain pr-2">
+                            @forelse($meeting->participants as $participant)
+                                @php
+                                    $joinedAt = $participant->joined_at;
+                                    $leftAt = $participant->left_at;
 
-                                if (is_null($joinedAt) && isset($participant->pivot)) {
-                                    $joinedAt = $participant->pivot->joined_at;
-                                }
+                                    if (is_null($joinedAt) && isset($participant->pivot)) {
+                                        $joinedAt = $participant->pivot->joined_at;
+                                    }
 
-                                if (is_null($leftAt) && isset($participant->pivot)) {
-                                    $leftAt = $participant->pivot->left_at;
-                                }
+                                    if (is_null($leftAt) && isset($participant->pivot)) {
+                                        $leftAt = $participant->pivot->left_at;
+                                    }
 
-                                $hasAttended = !is_null($joinedAt) || !is_null($leftAt);
-                            @endphp
+                                    $hasAttended = !is_null($joinedAt) || !is_null($leftAt);
+                                @endphp
 
-                            <div class="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:border-blue-100 hover:shadow-md">
-                                <div class="flex items-center gap-3">
-                                    <img src="{{ $participant->user->image_url }}"
-                                         alt="{{ $participant->user->name }}"
-                                         class="h-12 w-12 shrink-0 rounded-full object-cover shadow-sm">
+                                <div class="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:border-blue-100 hover:shadow-md">
+                                    <div class="flex items-center gap-3">
+                                        <img src="{{ $participant->user->image_url }}"
+                                             alt="{{ $participant->user->name }}"
+                                             class="h-12 w-12 shrink-0 rounded-full object-cover shadow-sm">
 
-                                    <div class="min-w-0 flex-1">
-                                        <p class="truncate text-sm font-bold text-gray-900">
-                                            {{ $participant->user->name }}
-                                        </p>
-                                        <p class="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
-                                            {{ ucfirst($participant->user->role) }}
-                                        </p>
+                                        <div class="min-w-0 flex-1">
+                                            <p class="truncate text-sm font-bold text-gray-900">
+                                                {{ $participant->user->name }}
+                                            </p>
+                                            <p class="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                                                {{ ucfirst($participant->user->role) }}
+                                            </p>
 
-                                        <div class="mt-2.5">
-                                            @if($hasAttended)
-                                                <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wide text-emerald-600">
+                                            <div class="mt-2.5">
+                                                @if($hasAttended)
+                                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wide text-emerald-600">
                                                     <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
                                                     Attended
                                                 </span>
-                                            @else
-                                                <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wide text-amber-600">
+                                                @else
+                                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wide text-amber-600">
                                                     <span class="h-1.5 w-1.5 rounded-full bg-amber-400"></span>
                                                     Not Joined
                                                 </span>
-                                            @endif
+                                                @endif
+                                            </div>
                                         </div>
-                                    </div>
 
-                                    <a href="{{ route('organizer.participants.show', $participant->user->id) }}"
-                                       class="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-blue-100 bg-blue-50 px-3 text-[10px] font-semibold text-blue-600 transition hover:bg-blue-600 hover:text-white">
-                                        <i class="fa-regular fa-eye text-[9px]"></i>
-                                        View
-                                    </a>
+                                        <a href="{{ route('organizer.participants.show', $participant->user->id) }}"
+                                           class="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-blue-100 bg-blue-50 px-3 text-[10px] font-semibold text-blue-600 transition hover:bg-blue-600 hover:text-white">
+                                            <i class="fa-regular fa-eye text-[9px]"></i>
+                                            View
+                                        </a>
+                                    </div>
                                 </div>
-                            </div>
-                        @empty
-                            <div class="rounded-2xl border border-dashed border-gray-200 bg-gray-50 py-10 text-center text-gray-400">
-                                <i class="fa fa-users text-2xl"></i>
-                                <p class="mt-2 text-sm">No participants added.</p>
-                            </div>
-                        @endforelse
+                            @empty
+                                <div class="rounded-2xl border border-dashed border-gray-200 bg-gray-50 py-10 text-center text-gray-400">
+                                    <i class="fa fa-users text-2xl"></i>
+                                    <p class="mt-2 text-sm">No participants added.</p>
+                                </div>
+                            @endforelse
+                        </div>
                     </div>
                 </div>
             </div>
@@ -348,4 +351,5 @@
         });
     }
 </script>
+
 
