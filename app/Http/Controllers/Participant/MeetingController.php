@@ -9,401 +9,1017 @@ use Illuminate\Http\Request;
 
 class MeetingController extends Controller
 {
+    /*
+    |--------------------------------------------------------------------------
+    | MY MEETINGS
+    |--------------------------------------------------------------------------
+    */
     public function index(Request $request)
     {
         $userId = auth()->id();
-        $timezone = config('app.timezone', 'Asia/Karachi');
+
+        $timezone = config(
+            'app.timezone',
+            'Asia/Karachi'
+        );
+
         $today = Carbon::now($timezone)->toDateString();
 
-        // Refresh/polling may persist ONLY Upcoming -> Active.
-        // Completed is persisted only by the live-room scheduled timer.
-        // Ended/Cancelled/Completed are terminal and are never rewritten here.
+        /*
+         * Update participant's Upcoming meetings to Active
+         * when their exact start time has arrived.
+         */
         $this->syncParticipantMeetingStatuses($userId);
 
+        /*
+         * Used by the existing AJAX/status polling.
+         */
         if ($request->boolean('status_sync')) {
-            return $this->participantStatusSyncResponse($request, $userId, $today);
-        }
-
-        $query = Meeting::with(['organizer', 'participants'])
-            ->whereHas('participants', function ($q) use ($userId) {
-                $q->where('user_id', $userId);
-            });
-
-        switch ($request->query('filter')) {
-            case 'today':
-                $query->whereDate('date', $today);
-                break;
-            case 'upcoming':
-                $query->where('status', 'upcoming');
-                break;
-            case 'active':
-                $query->where('status', 'active');
-                break;
-            case 'completed':
-                $query->where('status', 'completed');
-                break;
-            case 'cancelled':
-                $query->where('status', 'cancelled');
-                break;
-            case 'ended':
-                $query->where('status', 'ended');
-                break;
+            return $this->participantStatusSyncResponse(
+                $request,
+                $userId,
+                $today
+            );
         }
 
         /*
          * IMPORTANT:
-         * Never order My Meetings by status.
-         * Otherwise a meeting jumps to another pagination page as soon as
-         * it becomes cancelled/ended/completed, which makes it look as if
-         * another meeting's details/status replaced it after refresh.
          *
-         * Keep the same newest-created-first order as Organizer My Meetings.
+         * Every meeting where current user exists inside
+         * meeting_participants must appear here.
+         *
+         * This includes:
+         * - participant added by Organizer
+         * - participant added through invite/join link
+         */
+        $query = Meeting::with([
+            'organizer',
+            'participants',
+        ])
+            ->whereHas(
+                'participants',
+                function ($q) use ($userId) {
+                    $q->where(
+                        'user_id',
+                        $userId
+                    );
+                }
+            );
+
+        /*
+         * Existing filters.
+         */
+        switch ($request->query('filter')) {
+            case 'today':
+
+                $query->whereDate(
+                    'date',
+                    $today
+                );
+
+                break;
+
+            case 'upcoming':
+
+                $query->where(
+                    'status',
+                    'upcoming'
+                );
+
+                break;
+
+            case 'active':
+
+                $query->where(
+                    'status',
+                    'active'
+                );
+
+                break;
+
+            case 'completed':
+
+                $query->where(
+                    'status',
+                    'completed'
+                );
+
+                break;
+
+            case 'cancelled':
+
+                $query->where(
+                    'status',
+                    'cancelled'
+                );
+
+                break;
+
+            case 'ended':
+
+                $query->where(
+                    'status',
+                    'ended'
+                );
+
+                break;
+        }
+
+        /*
+         * Keep stable ordering.
+         *
+         * Do not order by status because a meeting changing
+         * Upcoming -> Active should not suddenly jump to another
+         * pagination page.
          */
         $meetings = $query
             ->latest()
             ->paginate(4)
             ->withQueryString();
 
-        $participantMeetings = Meeting::whereHas('participants', function ($q) use ($userId) {
-            $q->where('user_id', $userId);
-        });
+        /*
+         * Base participant meeting query for statistics.
+         */
+        $participantMeetings = Meeting::whereHas(
+            'participants',
+            function ($q) use ($userId) {
+                $q->where(
+                    'user_id',
+                    $userId
+                );
+            }
+        );
 
         $upcomingToday = (clone $participantMeetings)
-            ->whereDate('date', $today)
-            ->where('status', 'upcoming')
+            ->whereDate(
+                'date',
+                $today
+            )
+            ->where(
+                'status',
+                'upcoming'
+            )
             ->count();
 
-        $totalMeetings = (clone $participantMeetings)->count();
+        $totalMeetings =
+            (clone $participantMeetings)->count();
 
-        $completedMeetings = (clone $participantMeetings)
-            ->where('status', 'completed')
-            ->count();
+        $completedMeetings =
+            (clone $participantMeetings)
+                ->where(
+                    'status',
+                    'completed'
+                )
+                ->count();
 
+        /*
+         * Existing exact-time frontend synchronization.
+         */
         $serverNowMs = now('UTC')->valueOf();
-        $nextTransitionMs = $this->getNextParticipantMeetingTransition($userId)?->valueOf();
 
-        return view('participant.meetings.index', compact(
-            'meetings',
-            'upcomingToday',
-            'totalMeetings',
-            'completedMeetings',
-            'serverNowMs',
-            'nextTransitionMs'
-        ));
+        $nextTransitionMs =
+            $this
+                ->getNextParticipantMeetingTransition(
+                    $userId
+                )
+                ?->valueOf();
+
+        return view(
+            'participant.meetings.index',
+            compact(
+                'meetings',
+                'upcomingToday',
+                'totalMeetings',
+                'completedMeetings',
+                'serverNowMs',
+                'nextTransitionMs'
+            )
+        );
     }
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | TODAY'S MEETINGS
+    |--------------------------------------------------------------------------
+    */
     public function today()
     {
         $userId = auth()->id();
-        $timezone = config('app.timezone', 'Asia/Karachi');
+
+        $timezone = config(
+            'app.timezone',
+            'Asia/Karachi'
+        );
+
         $now = Carbon::now($timezone);
+
         $today = $now->toDateString();
 
-        $this->syncParticipantMeetingStatuses($userId);
+        /*
+         * Update Upcoming -> Active before loading page.
+         */
+        $this->syncParticipantMeetingStatuses(
+            $userId
+        );
 
-        $todayMeetings = Meeting::with(['organizer', 'participants.user'])
-            ->whereHas('participants', function ($q) use ($userId) {
-                $q->where('user_id', $userId);
-            })
-            ->whereDate('date', $today)
-            ->orderByRaw("CASE status
-                WHEN 'active' THEN 1
-                WHEN 'upcoming' THEN 2
-                WHEN 'ended' THEN 3
-                WHEN 'completed' THEN 4
-                WHEN 'cancelled' THEN 5
-                WHEN 'flagged' THEN 6
-                ELSE 7
-            END")
-            ->orderBy('time', 'asc')
-            ->get()
-            ->map(function ($meeting) {
-                $meetingTimezone = $meeting->timezone
-                    ?: config('app.timezone', 'Asia/Karachi');
-
-                $now = Carbon::now($meetingTimezone);
-                $startTime = Carbon::parse(
-                    $meeting->date . ' ' . $meeting->time,
-                    $meetingTimezone
-                );
-                $endTime = $startTime->copy()->addMinutes((int) $meeting->duration);
-
-                if ($meeting->status === 'active') {
-                    $remainingMinutes = (int) $now->diffInMinutes($endTime, false);
-
-                    if ($remainingMinutes <= 0) {
-                        $meeting->time_label = 'Meeting time ended';
-                        $meeting->time_type = 'active';
-                    } elseif ($remainingMinutes <= 10) {
-                        $meeting->time_label = "{$remainingMinutes}m remaining";
-                        $meeting->time_type = 'ending_soon';
-                    } else {
-                        $hrs = intdiv($remainingMinutes, 60);
-                        $mins = $remainingMinutes % 60;
-                        $meeting->time_label = $hrs > 0
-                            ? "{$hrs}h {$mins}m remaining"
-                            : "{$mins}m remaining";
-                        $meeting->time_type = 'active';
-                    }
-                } elseif ($meeting->status === 'upcoming') {
-                    $minutesUntilStart = (int) $now->diffInMinutes($startTime, false);
-
-                    if ($minutesUntilStart <= 0) {
-                        $meeting->time_label = 'Starting now';
-                        $meeting->time_type = 'starting_now';
-                    } elseif ($minutesUntilStart < 60) {
-                        $meeting->time_label = "Starts in {$minutesUntilStart}m";
-                        $meeting->time_type = 'upcoming';
-                    } else {
-                        $hrs = intdiv($minutesUntilStart, 60);
-                        $mins = $minutesUntilStart % 60;
-                        $meeting->time_label = "Starts in {$hrs}h {$mins}m";
-                        $meeting->time_type = 'upcoming';
-                    }
-                } else {
-                    $meeting->time_label = null;
-                    $meeting->time_type = $meeting->status;
+        /*
+         * IMPORTANT:
+         *
+         * Any meeting happening TODAY where current user exists
+         * inside meeting_participants will appear here.
+         */
+        $todayMeetings = Meeting::with([
+            'organizer',
+            'participants.user',
+        ])
+            ->whereHas(
+                'participants',
+                function ($q) use ($userId) {
+                    $q->where(
+                        'user_id',
+                        $userId
+                    );
                 }
+            )
+            ->whereDate(
+                'date',
+                $today
+            )
+            ->orderByRaw("
+                CASE status
+                    WHEN 'active' THEN 1
+                    WHEN 'upcoming' THEN 2
+                    WHEN 'ended' THEN 3
+                    WHEN 'completed' THEN 4
+                    WHEN 'cancelled' THEN 5
+                    WHEN 'flagged' THEN 6
+                    ELSE 7
+                END
+            ")
+            ->orderBy(
+                'time',
+                'asc'
+            )
+            ->get()
+            ->map(
+                function ($meeting) {
 
-                $meeting->start_time_formatted = $startTime->format('g:i A');
-                $meeting->end_time_formatted = $endTime->format('g:i A');
+                    $meetingTimezone =
+                        $meeting->timezone
+                            ?: config(
+                            'app.timezone',
+                            'Asia/Karachi'
+                        );
 
-                return $meeting;
-            });
+                    $now = Carbon::now(
+                        $meetingTimezone
+                    );
 
-        $serverNowMs = now('UTC')->valueOf();
-        $nextTransitionMs = $this->getNextParticipantMeetingTransition($userId)?->valueOf();
+                    $startTime =
+                        Carbon::parse(
+                            $meeting->date
+                            . ' '
+                            . $meeting->time,
+                            $meetingTimezone
+                        );
 
-        return view('participant.meetings.today', compact(
-            'todayMeetings',
-            'serverNowMs',
-            'nextTransitionMs'
-        ));
+                    $endTime =
+                        $startTime
+                            ->copy()
+                            ->addMinutes(
+                                (int) $meeting->duration
+                            );
+
+                    /*
+                     * ACTIVE label
+                     */
+                    if (
+                        $meeting->status
+                        === 'active'
+                    ) {
+                        $remainingMinutes =
+                            (int)
+                            $now->diffInMinutes(
+                                $endTime,
+                                false
+                            );
+
+                        if (
+                            $remainingMinutes <= 0
+                        ) {
+                            $meeting->time_label =
+                                'Meeting time ended';
+
+                            $meeting->time_type =
+                                'active';
+                        } elseif (
+                            $remainingMinutes <= 10
+                        ) {
+                            $meeting->time_label =
+                                "{$remainingMinutes}m remaining";
+
+                            $meeting->time_type =
+                                'ending_soon';
+                        } else {
+                            $hrs = intdiv(
+                                $remainingMinutes,
+                                60
+                            );
+
+                            $mins =
+                                $remainingMinutes % 60;
+
+                            $meeting->time_label =
+                                $hrs > 0
+                                    ? "{$hrs}h {$mins}m remaining"
+                                    : "{$mins}m remaining";
+
+                            $meeting->time_type =
+                                'active';
+                        }
+                    }
+
+                    /*
+                     * UPCOMING label
+                     */
+                    elseif (
+                        $meeting->status
+                        === 'upcoming'
+                    ) {
+                        $minutesUntilStart =
+                            (int)
+                            $now->diffInMinutes(
+                                $startTime,
+                                false
+                            );
+
+                        if (
+                            $minutesUntilStart <= 0
+                        ) {
+                            $meeting->time_label =
+                                'Starting now';
+
+                            $meeting->time_type =
+                                'starting_now';
+                        } elseif (
+                            $minutesUntilStart < 60
+                        ) {
+                            $meeting->time_label =
+                                "Starts in {$minutesUntilStart}m";
+
+                            $meeting->time_type =
+                                'upcoming';
+                        } else {
+                            $hrs = intdiv(
+                                $minutesUntilStart,
+                                60
+                            );
+
+                            $mins =
+                                $minutesUntilStart % 60;
+
+                            $meeting->time_label =
+                                "Starts in {$hrs}h {$mins}m";
+
+                            $meeting->time_type =
+                                'upcoming';
+                        }
+                    }
+
+                    /*
+                     * Completed / Ended / Cancelled
+                     */
+                    else {
+                        $meeting->time_label = null;
+
+                        $meeting->time_type =
+                            $meeting->status;
+                    }
+
+                    $meeting->start_time_formatted =
+                        $startTime->format(
+                            'g:i A'
+                        );
+
+                    $meeting->end_time_formatted =
+                        $endTime->format(
+                            'g:i A'
+                        );
+
+                    return $meeting;
+                }
+            );
+
+        $serverNowMs =
+            now('UTC')->valueOf();
+
+        $nextTransitionMs =
+            $this
+                ->getNextParticipantMeetingTransition(
+                    $userId
+                )
+                ?->valueOf();
+
+        return view(
+            'participant.meetings.today',
+            compact(
+                'todayMeetings',
+                'serverNowMs',
+                'nextTransitionMs'
+            )
+        );
     }
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | MEETING DETAILS
+    |--------------------------------------------------------------------------
+    */
     public function show(Meeting $meeting)
     {
-        $isParticipant = $meeting->participants()
-            ->where('user_id', auth()->id())
-            ->exists();
+        /*
+         * Security:
+         * only assigned/link-joined participant can see meeting.
+         */
+        $isParticipant =
+            $meeting
+                ->participants()
+                ->where(
+                    'user_id',
+                    auth()->id()
+                )
+                ->exists();
 
         if (!$isParticipant) {
-            abort(403, 'You are not invited to this meeting.');
+            abort(
+                403,
+                'You are not invited to this meeting.'
+            );
         }
 
-        $this->syncSingleMeetingStatus($meeting);
-        $meeting->refresh()->load(['organizer', 'participants.user']);
-
-        $meetingTimezone = $meeting->timezone
-            ?: config('app.timezone', 'Asia/Karachi');
-
-        $startTime = Carbon::parse(
-            $meeting->date . ' ' . $meeting->time,
-            $meetingTimezone
+        $this->syncSingleMeetingStatus(
+            $meeting
         );
-        $endTime = $startTime->copy()->addMinutes((int) $meeting->duration);
 
-        return view('participant.meetings.show', compact('meeting', 'startTime', 'endTime'));
+        $meeting
+            ->refresh()
+            ->load([
+                'organizer',
+                'participants.user',
+            ]);
+
+        $meetingTimezone =
+            $meeting->timezone
+                ?: config(
+                'app.timezone',
+                'Asia/Karachi'
+            );
+
+        $startTime =
+            Carbon::parse(
+                $meeting->date
+                . ' '
+                . $meeting->time,
+                $meetingTimezone
+            );
+
+        $endTime =
+            $startTime
+                ->copy()
+                ->addMinutes(
+                    (int) $meeting->duration
+                );
+
+        return view(
+            'participant.meetings.show',
+            compact(
+                'meeting',
+                'startTime',
+                'endTime'
+            )
+        );
     }
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | ATTEND LIVE MEETING
+    |--------------------------------------------------------------------------
+    */
     public function attend(Meeting $meeting)
     {
-        $isParticipant = $meeting->participants()
-            ->where('user_id', auth()->id())
-            ->exists();
+        /*
+         * User must exist in meeting_participants.
+         */
+        $isParticipant =
+            $meeting
+                ->participants()
+                ->where(
+                    'user_id',
+                    auth()->id()
+                )
+                ->exists();
 
         if (!$isParticipant) {
-            abort(403, 'You are not invited to this meeting.');
+            abort(
+                403,
+                'You are not invited to this meeting.'
+            );
         }
 
-        $this->syncSingleMeetingStatus($meeting);
+        /*
+         * Ensure Upcoming becomes Active at start time.
+         */
+        $this->syncSingleMeetingStatus(
+            $meeting
+        );
+
         $meeting->refresh();
 
-        if ($meeting->status !== 'active') {
-            $message = match ($meeting->status) {
-                'ended' => 'This meeting was ended by the organizer.',
-                'cancelled' => 'This meeting was cancelled by the organizer.',
-                'completed' => 'This meeting has been completed.',
-                default => "This meeting isn't active right now. You'll be able to join only during its scheduled time.",
+        /*
+         * Room can only be entered while Active.
+         */
+        if (
+            $meeting->status
+            !== 'active'
+        ) {
+            $message = match (
+            $meeting->status
+            ) {
+                'ended' =>
+                'This meeting was ended by the organizer.',
+
+                'cancelled' =>
+                'This meeting was cancelled by the organizer.',
+
+                'completed' =>
+                'This meeting has been completed.',
+
+                default =>
+                "This meeting isn't active right now. You'll be able to join only during its scheduled time.",
             };
 
             return redirect()
-                ->route('participant.meetings.index')
-                ->with('info', $message);
+                ->route(
+                    'participant.meetings.index'
+                )
+                ->with(
+                    'info',
+                    $message
+                );
         }
 
+        /*
+         * IMPORTANT:
+         * Meeting room functionality is NOT changed.
+         */
         $isOrganizer = false;
-        $meeting->load(['participants.user', 'organizer']);
 
-        return view('participant.meetings.attend', compact('meeting', 'isOrganizer'));
+        $meeting->load([
+            'participants.user',
+            'organizer',
+        ]);
+
+        return view(
+            'participant.meetings.attend',
+            compact(
+                'meeting',
+                'isOrganizer'
+            )
+        );
     }
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | AJAX STATUS RESPONSE
+    |--------------------------------------------------------------------------
+    */
     private function participantStatusSyncResponse(
         Request $request,
         int|string $userId,
         string $today
     ) {
-        $ids = array_values(array_filter(
-            explode(',', (string) $request->query('ids', ''))
-        ));
+        $ids =
+            array_values(
+                array_filter(
+                    explode(
+                        ',',
+                        (string)
+                        $request->query(
+                            'ids',
+                            ''
+                        )
+                    )
+                )
+            );
 
-        $meetings = Meeting::query()
-            ->whereHas('participants', function ($q) use ($userId) {
-                $q->where('user_id', $userId);
-            })
-            ->when(!empty($ids), fn ($q) => $q->whereIn('id', $ids))
-            ->get(['id', 'status']);
+        $meetings =
+            Meeting::query()
+                ->whereHas(
+                    'participants',
+                    function ($q) use ($userId) {
+                        $q->where(
+                            'user_id',
+                            $userId
+                        );
+                    }
+                )
+                ->when(
+                    !empty($ids),
+                    fn ($q) =>
+                    $q->whereIn(
+                        'id',
+                        $ids
+                    )
+                )
+                ->get([
+                    'id',
+                    'status',
+                ]);
 
-        $participantMeetings = Meeting::whereHas(
-            'participants',
-            fn ($q) => $q->where('user_id', $userId)
-        );
+        $participantMeetings =
+            Meeting::whereHas(
+                'participants',
+                fn ($q) =>
+                $q->where(
+                    'user_id',
+                    $userId
+                )
+            );
 
-        return response()->json([
-            'meetings' => $meetings->keyBy('id')->map->status,
-            'stats' => [
-                'upcomingToday' => (clone $participantMeetings)
-                    ->whereDate('date', $today)
-                    ->where('status', 'upcoming')
-                    ->count(),
-                'total' => (clone $participantMeetings)->count(),
-                'completed' => (clone $participantMeetings)
-                    ->where('status', 'completed')
-                    ->count(),
-            ],
-            'server_now_ms' => now('UTC')->valueOf(),
-            'next_transition_ms' => $this
-                ->getNextParticipantMeetingTransition($userId)?->valueOf(),
-        ])->withHeaders([
-            'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
-            'Pragma' => 'no-cache',
-            'Expires' => '0',
-        ]);
+        return response()
+            ->json([
+                'meetings' =>
+                    $meetings
+                        ->keyBy('id')
+                        ->map
+                        ->status,
+
+                'stats' => [
+                    'upcomingToday' =>
+                        (clone $participantMeetings)
+                            ->whereDate(
+                                'date',
+                                $today
+                            )
+                            ->where(
+                                'status',
+                                'upcoming'
+                            )
+                            ->count(),
+
+                    'total' =>
+                        (clone $participantMeetings)
+                            ->count(),
+
+                    'completed' =>
+                        (clone $participantMeetings)
+                            ->where(
+                                'status',
+                                'completed'
+                            )
+                            ->count(),
+                ],
+
+                'server_now_ms' =>
+                    now('UTC')->valueOf(),
+
+                'next_transition_ms' =>
+                    $this
+                        ->getNextParticipantMeetingTransition(
+                            $userId
+                        )
+                        ?->valueOf(),
+            ])
+            ->withHeaders([
+                'Cache-Control' =>
+                    'no-store, no-cache, must-revalidate, max-age=0',
+
+                'Pragma' =>
+                    'no-cache',
+
+                'Expires' =>
+                    '0',
+            ]);
     }
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | STATUS CHECK
+    |--------------------------------------------------------------------------
+    */
     public function statusCheck(Request $request)
     {
         $userId = auth()->id();
-        $timezone = config('app.timezone', 'Asia/Karachi');
-        $today = Carbon::now($timezone)->toDateString();
 
-        $ids = array_values(array_filter(
-            explode(',', (string) $request->query('ids', ''))
-        ));
+        $timezone =
+            config(
+                'app.timezone',
+                'Asia/Karachi'
+            );
 
-        $this->syncParticipantMeetingStatuses($userId);
+        $today =
+            Carbon::now(
+                $timezone
+            )->toDateString();
 
-        $meetings = Meeting::whereIn('id', $ids)
-            ->whereHas('participants', function ($q) use ($userId) {
-                $q->where('user_id', $userId);
-            })
-            ->get(['id', 'status']);
+        $ids =
+            array_values(
+                array_filter(
+                    explode(
+                        ',',
+                        (string)
+                        $request->query(
+                            'ids',
+                            ''
+                        )
+                    )
+                )
+            );
 
-        $participantMeetings = Meeting::whereHas(
-            'participants',
-            fn ($q) => $q->where('user_id', $userId)
+        /*
+         * Exact Upcoming -> Active.
+         */
+        $this->syncParticipantMeetingStatuses(
+            $userId
         );
 
-        return response()->json([
-            'meetings' => $meetings->keyBy('id')->map->status,
-            'stats' => [
-                'upcomingToday' => (clone $participantMeetings)
-                    ->whereDate('date', $today)
-                    ->where('status', 'upcoming')
-                    ->count(),
-                'total' => (clone $participantMeetings)->count(),
-                'completed' => (clone $participantMeetings)
-                    ->where('status', 'completed')
-                    ->count(),
-            ],
-            'server_now_ms' => now('UTC')->valueOf(),
-            'next_transition_ms' => $this
-                ->getNextParticipantMeetingTransition($userId)?->valueOf(),
-        ])->withHeaders([
-            'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
-            'Pragma' => 'no-cache',
-            'Expires' => '0',
-        ]);
+        $meetings =
+            Meeting::query()
+                ->when(
+                    !empty($ids),
+                    fn ($q) =>
+                    $q->whereIn(
+                        'id',
+                        $ids
+                    )
+                )
+                ->whereHas(
+                    'participants',
+                    function ($q) use ($userId) {
+                        $q->where(
+                            'user_id',
+                            $userId
+                        );
+                    }
+                )
+                ->get([
+                    'id',
+                    'status',
+                ]);
+
+        $participantMeetings =
+            Meeting::whereHas(
+                'participants',
+                fn ($q) =>
+                $q->where(
+                    'user_id',
+                    $userId
+                )
+            );
+
+        return response()
+            ->json([
+                'meetings' =>
+                    $meetings
+                        ->keyBy('id')
+                        ->map
+                        ->status,
+
+                'stats' => [
+                    'upcomingToday' =>
+                        (clone $participantMeetings)
+                            ->whereDate(
+                                'date',
+                                $today
+                            )
+                            ->where(
+                                'status',
+                                'upcoming'
+                            )
+                            ->count(),
+
+                    'total' =>
+                        (clone $participantMeetings)
+                            ->count(),
+
+                    'completed' =>
+                        (clone $participantMeetings)
+                            ->where(
+                                'status',
+                                'completed'
+                            )
+                            ->count(),
+                ],
+
+                'server_now_ms' =>
+                    now('UTC')->valueOf(),
+
+                'next_transition_ms' =>
+                    $this
+                        ->getNextParticipantMeetingTransition(
+                            $userId
+                        )
+                        ?->valueOf(),
+            ])
+            ->withHeaders([
+                'Cache-Control' =>
+                    'no-store, no-cache, must-revalidate, max-age=0',
+
+                'Pragma' =>
+                    'no-cache',
+
+                'Expires' =>
+                    '0',
+            ]);
     }
 
-    private function syncParticipantMeetingStatuses(int|string $userId): void
-    {
-        $meetings = Meeting::whereHas(
-            'participants',
-            fn ($q) => $q->where('user_id', $userId)
-        )
-            ->where('status', 'upcoming')
-            ->get();
 
-        foreach ($meetings as $meeting) {
-            $this->syncSingleMeetingStatus($meeting);
+    /*
+    |--------------------------------------------------------------------------
+    | SYNC ALL PARTICIPANT MEETINGS
+    |--------------------------------------------------------------------------
+    */
+    private function syncParticipantMeetingStatuses(
+        int|string $userId
+    ): void {
+        /*
+         * Only Upcoming meetings need checking here.
+         */
+        $meetings =
+            Meeting::whereHas(
+                'participants',
+                fn ($q) =>
+                $q->where(
+                    'user_id',
+                    $userId
+                )
+            )
+                ->where(
+                    'status',
+                    'upcoming'
+                )
+                ->get();
+
+        foreach (
+            $meetings as $meeting
+        ) {
+            $this->syncSingleMeetingStatus(
+                $meeting
+            );
         }
     }
 
-    private function syncSingleMeetingStatus(Meeting $meeting): void
-    {
-        /*
-         * Participant refresh/status polling may ONLY do UPCOMING -> ACTIVE.
-         * It must never do ACTIVE -> COMPLETED.
-         * Natural completion is saved by the room when the scheduled timer ends.
-         */
+
+    /*
+    |--------------------------------------------------------------------------
+    | SYNC SINGLE MEETING
+    |--------------------------------------------------------------------------
+    */
+    private function syncSingleMeetingStatus(
+        Meeting $meeting
+    ): void {
         $meeting->refresh();
 
-        if ($meeting->status !== 'upcoming') {
+        /*
+         * IMPORTANT:
+         *
+         * Participant pages may only perform:
+         *
+         * Upcoming -> Active
+         *
+         * Existing room logic remains responsible for natural
+         * completion/end behaviour.
+         */
+        if (
+            $meeting->status
+            !== 'upcoming'
+        ) {
             return;
         }
 
-        $startTime = $this->meetingStartUtc($meeting);
+        $startTime =
+            $this->meetingStartUtc(
+                $meeting
+            );
 
-        if (now('UTC')->lt($startTime)) {
+        /*
+         * Meeting is still in future.
+         */
+        if (
+            now('UTC')->lt(
+                $startTime
+            )
+        ) {
             return;
         }
 
+        /*
+         * Atomic status update.
+         */
         Meeting::query()
-            ->whereKey($meeting->id)
-            ->where('status', 'upcoming')
+            ->whereKey(
+                $meeting->id
+            )
+            ->where(
+                'status',
+                'upcoming'
+            )
             ->update([
-                'status' => 'active',
+                'status' =>
+                    'active',
             ]);
 
         $meeting->refresh();
     }
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | NEXT UPCOMING -> ACTIVE TRANSITION
+    |--------------------------------------------------------------------------
+    */
     private function getNextParticipantMeetingTransition(
         int|string $userId
     ): ?Carbon {
         $now = now('UTC');
+
         $nextTransition = null;
 
-        $meetings = Meeting::whereHas(
-            'participants',
-            fn ($q) => $q->where('user_id', $userId)
-        )
-            ->where('status', 'upcoming')
-            ->get();
+        $meetings =
+            Meeting::whereHas(
+                'participants',
+                fn ($q) =>
+                $q->where(
+                    'user_id',
+                    $userId
+                )
+            )
+                ->where(
+                    'status',
+                    'upcoming'
+                )
+                ->get();
 
-        foreach ($meetings as $meeting) {
-            $startTime = $this->meetingStartUtc($meeting);
+        foreach (
+            $meetings as $meeting
+        ) {
+            $startTime =
+                $this->meetingStartUtc(
+                    $meeting
+                );
 
-            if ($startTime->lessThanOrEqualTo($now)) {
+            if (
+                $startTime
+                    ->lessThanOrEqualTo(
+                        $now
+                    )
+            ) {
                 continue;
             }
 
-            if ($nextTransition === null || $startTime->lessThan($nextTransition)) {
-                $nextTransition = $startTime->copy();
+            if (
+                $nextTransition === null
+                ||
+                $startTime
+                    ->lessThan(
+                        $nextTransition
+                    )
+            ) {
+                $nextTransition =
+                    $startTime->copy();
             }
         }
 
         return $nextTransition;
     }
 
-    private function meetingStartUtc(Meeting $meeting): Carbon
-    {
-        $timezone = $meeting->timezone
-            ?: config('app.timezone', 'Asia/Karachi');
+
+    /*
+    |--------------------------------------------------------------------------
+    | MEETING START TIME IN UTC
+    |--------------------------------------------------------------------------
+    */
+    private function meetingStartUtc(
+        Meeting $meeting
+    ): Carbon {
+        $timezone =
+            $meeting->timezone
+                ?: config(
+                'app.timezone',
+                'Asia/Karachi'
+            );
 
         return Carbon::parse(
-            trim($meeting->date . ' ' . $meeting->time),
+            trim(
+                $meeting->date
+                . ' '
+                . $meeting->time
+            ),
             $timezone
         )->utc();
     }

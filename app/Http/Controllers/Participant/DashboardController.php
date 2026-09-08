@@ -5,167 +5,251 @@ namespace App\Http\Controllers\Participant;
 use App\Http\Controllers\Controller;
 use App\Models\Meeting;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Auth;
 
 class DashboardController extends Controller
 {
     public function index()
     {
-        $user = Auth::user();
-        $timezone = config('app.timezone', 'Asia/Karachi');
-        $now = Carbon::now($timezone);
+        $user = auth()->user();
+
+        $userId = $user->id;
+
+        $timezone = config(
+            'app.timezone',
+            'Asia/Karachi'
+        );
+
+        $now = Carbon::now(
+            $timezone
+        );
+
         $today = $now->toDateString();
-        $scheduleEnd = $now->copy()->addHours(48);
 
         /*
-         * Dashboard refresh may ONLY persist UPCOMING -> ACTIVE.
-         * ACTIVE -> COMPLETED is never done here. Natural completion is
-         * persisted only by the live-room scheduled-time endpoint.
+         * ============================================================
+         * ALL PARTICIPANT MEETINGS
+         * ============================================================
+         *
+         * This query includes users who:
+         *
+         * 1. Were added by Organizer
+         * 2. Joined using invite/join link
+         *
+         * because both are stored inside meeting_participants.
          */
-        $this->syncParticipantMeetingStatuses($user->id);
+        $baseQuery =
+            Meeting::query()
+                ->whereHas(
+                    'participants',
+                    function ($q) use ($userId) {
+                        $q->where(
+                            'user_id',
+                            $userId
+                        );
+                    }
+                );
 
-        $participantMeetings = Meeting::query()
-            ->whereHas('participants', function ($query) use ($user) {
-                $query->where('user_id', $user->id);
-            });
+        /*
+         * Total meetings assigned to participant.
+         */
+        $totalMeetings =
+            (clone $baseQuery)
+                ->count();
 
-        $stats = $this->getParticipantMeetingStats($user->id, $today);
+        /*
+         * All today's meetings.
+         */
+        $todayMeetings =
+            (clone $baseQuery)
+                ->whereDate(
+                    'date',
+                    $today
+                )
+                ->count();
 
-        $totalMeetings = $stats['total'];
-        $todayMeetings = $stats['today'];
-        $liveMeetings = $stats['active'];
-        $upcomingMeetings = $stats['upcoming'];
+        /*
+         * Currently active meetings.
+         */
+        $liveMeetings =
+            (clone $baseQuery)
+                ->where(
+                    'status',
+                    'active'
+                )
+                ->count();
 
-        $schedule = (clone $participantMeetings)
-            ->with(['organizer:id,name,email,image,avatar'])
-            ->where(function ($query) use ($today, $now, $scheduleEnd) {
-                $query
-                    ->where(function ($active) use ($today) {
-                        $active->where('status', 'active')
-                            ->whereDate('date', $today);
-                    })
-                    ->orWhere(function ($upcoming) use ($today, $now, $scheduleEnd) {
-                        $upcoming->where('status', 'upcoming')
-                            ->where(function ($dateQuery) use ($today, $now) {
-                                $dateQuery->whereDate('date', '>', $today)
-                                    ->orWhere(function ($sameDay) use ($today, $now) {
-                                        $sameDay->whereDate('date', $today)
-                                            ->whereTime('time', '>=', $now->format('H:i:s'));
-                                    });
-                            })
-                            ->whereDate('date', '<=', $scheduleEnd->toDateString());
-                    });
-            })
-            ->orderByRaw("CASE
-                WHEN status = 'active' THEN 1
-                WHEN status = 'upcoming' THEN 2
-                ELSE 3
-            END")
-            ->orderBy('date', 'asc')
-            ->orderBy('time', 'asc')
-            ->take(10)
-            ->get();
+        /*
+         * Future/upcoming meetings.
+         */
+        $upcomingMeetings =
+            (clone $baseQuery)
+                ->where(
+                    'status',
+                    'upcoming'
+                )
+                ->count();
 
-        /* Exact server clock + next UPCOMING -> ACTIVE boundary. */
-        $serverNowMs = now('UTC')->valueOf();
-        $nextTransitionMs = $this->getNextParticipantMeetingTransition($user->id)?->valueOf();
+        /*
+         * ============================================================
+         * UPCOMING / ACTIVE SCHEDULE
+         * ============================================================
+         *
+         * Dashboard schedule shows participant's Active and Upcoming
+         * meetings.
+         *
+         * Link-joined meetings are automatically included because
+         * MeetingJoinController creates meeting_participants record.
+         */
+        $upcomingSchedule =
+            Meeting::with([
+                'organizer',
+            ])
+                ->whereHas(
+                    'participants',
+                    function ($q) use ($userId) {
+                        $q->where(
+                            'user_id',
+                            $userId
+                        );
+                    }
+                )
+                ->whereIn(
+                    'status',
+                    [
+                        'active',
+                        'upcoming',
+                    ]
+                )
+                ->where(function ($query) use (
+                    $today,
+                    $now
+                ) {
+                    /*
+                     * Future dates.
+                     */
+                    $query
+                        ->whereDate(
+                            'date',
+                            '>',
+                            $today
+                        )
 
-        return view('participant.dashboard', compact(
-            'totalMeetings',
-            'todayMeetings',
-            'liveMeetings',
-            'upcomingMeetings',
-            'schedule',
-            'serverNowMs',
-            'nextTransitionMs'
-        ));
-    }
+                        /*
+                         * OR today.
+                         *
+                         * Active meeting must remain visible even
+                         * after its start time.
+                         */
+                        ->orWhere(
+                            function ($todayQuery) use (
+                                $today,
+                                $now
+                            ) {
+                                $todayQuery
+                                    ->whereDate(
+                                        'date',
+                                        $today
+                                    )
+                                    ->where(
+                                        function ($statusQuery) use (
+                                            $now
+                                        ) {
+                                            /*
+                                             * Active meeting.
+                                             */
+                                            $statusQuery
+                                                ->where(
+                                                    'status',
+                                                    'active'
+                                                )
 
-    private function syncParticipantMeetingStatuses(int|string $userId): void
-    {
-        Meeting::query()
-            ->whereHas('participants', function ($query) use ($userId) {
-                $query->where('user_id', $userId);
-            })
-            ->where('status', 'upcoming')
-            ->get()
-            ->each(function (Meeting $meeting) {
-                $this->syncSingleMeetingStatus($meeting);
-            });
-    }
+                                                /*
+                                                 * Upcoming meeting whose
+                                                 * start time is still ahead.
+                                                 */
+                                                ->orWhere(
+                                                    function ($upcomingQuery) use (
+                                                        $now
+                                                    ) {
+                                                        $upcomingQuery
+                                                            ->where(
+                                                                'status',
+                                                                'upcoming'
+                                                            )
+                                                            ->where(
+                                                                'time',
+                                                                '>=',
+                                                                $now->format(
+                                                                    'H:i:s'
+                                                                )
+                                                            );
+                                                    }
+                                                );
+                                        }
+                                    );
+                            }
+                        );
+                })
+                ->orderBy(
+                    'date',
+                    'asc'
+                )
+                ->orderBy(
+                    'time',
+                    'asc'
+                )
+                ->take(10)
+                ->get();
 
-    private function syncSingleMeetingStatus(Meeting $meeting): void
-    {
-        $meeting->refresh();
+        /*
+         * Add useful calculated values without changing Blade design.
+         */
+        $upcomingSchedule->transform(
+            function ($meeting) use ($timezone) {
 
-        if ($meeting->status !== 'upcoming') {
-            return;
-        }
+                $meetingTimezone =
+                    $meeting->timezone
+                        ?: $timezone;
 
-        $startTime = $this->meetingStartUtc($meeting);
+                $start =
+                    Carbon::parse(
+                        $meeting->date
+                        . ' '
+                        . $meeting->time,
+                        $meetingTimezone
+                    );
 
-        if (now('UTC')->lt($startTime)) {
-            return;
-        }
+                $end =
+                    $start
+                        ->copy()
+                        ->addMinutes(
+                            (int)
+                            $meeting->duration
+                        );
 
-        Meeting::query()
-            ->whereKey($meeting->id)
-            ->where('status', 'upcoming')
-            ->update(['status' => 'active']);
+                $meeting->start_time_formatted =
+                    $start->format(
+                        'g:i A'
+                    );
 
-        $meeting->refresh();
-    }
+                $meeting->end_time_formatted =
+                    $end->format(
+                        'g:i A'
+                    );
 
-    private function getParticipantMeetingStats(int|string $userId, string $today): array
-    {
-        $base = Meeting::query()
-            ->whereHas('participants', function ($query) use ($userId) {
-                $query->where('user_id', $userId);
-            });
-
-        return [
-            'total' => (clone $base)->count(),
-            'today' => (clone $base)->whereDate('date', $today)->count(),
-            'active' => (clone $base)->where('status', 'active')->count(),
-            'upcoming' => (clone $base)->where('status', 'upcoming')->count(),
-        ];
-    }
-
-    private function getNextParticipantMeetingTransition(int|string $userId): ?Carbon
-    {
-        $now = now('UTC');
-        $nextTransition = null;
-
-        $meetings = Meeting::query()
-            ->whereHas('participants', function ($query) use ($userId) {
-                $query->where('user_id', $userId);
-            })
-            ->where('status', 'upcoming')
-            ->get();
-
-        foreach ($meetings as $meeting) {
-            $startTime = $this->meetingStartUtc($meeting);
-
-            if ($startTime->lessThanOrEqualTo($now)) {
-                continue;
+                return $meeting;
             }
+        );
 
-            if ($nextTransition === null || $startTime->lessThan($nextTransition)) {
-                $nextTransition = $startTime->copy();
-            }
-        }
-
-        return $nextTransition;
-    }
-
-    private function meetingStartUtc(Meeting $meeting): Carbon
-    {
-        $timezone = $meeting->timezone
-            ?: config('app.timezone', 'Asia/Karachi');
-
-        return Carbon::parse(
-            trim($meeting->date . ' ' . $meeting->time),
-            $timezone
-        )->utc();
+        return view(
+            'participant.dashboard',
+            compact(
+                'totalMeetings',
+                'todayMeetings',
+                'liveMeetings',
+                'upcomingMeetings',
+                'upcomingSchedule'
+            )
+        );
     }
 }
