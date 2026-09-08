@@ -205,14 +205,14 @@
         .btn-send{background:linear-gradient(135deg,#2563eb,#0891b2); border:none; color:#fff}
         .chat-voice-btn.listening{color:#ef4444; border-color:rgba(239,68,68,.5); background:rgba(239,68,68,.14)}
 
-        .people-scroll-shell{position:relative; flex:1; min-height:0; overflow:hidden}
+        .people-scroll-wrap{position:relative; flex:1; min-height:0; overflow:hidden}
         .people-body{height:100%; min-height:0; overflow-y:auto !important; overflow-x:hidden; overscroll-behavior:contain; padding:12px 20px 12px 12px; display:flex; flex-direction:column; gap:8px; scrollbar-width:none}
         .people-body::-webkit-scrollbar{display:none}
-        .people-grab-track{position:absolute; top:8px; right:5px; bottom:8px; width:10px; border-radius:999px; background:rgba(255,255,255,.06); z-index:40; display:none}
-        .people-grab-track.show{display:block}
-        .people-grab-thumb{position:absolute; top:0; left:1px; width:8px; min-height:44px; border-radius:999px; background:#e5e7eb; cursor:grab; touch-action:none; user-select:none; box-shadow:0 0 0 1px rgba(15,23,42,.65)}
-        .people-grab-thumb:hover{background:#fff}
-        .people-grab-thumb:active{cursor:grabbing; background:#fff}
+        .people-custom-scrollbar{position:absolute; top:10px; right:6px; bottom:10px; width:10px; border-radius:999px; background:rgba(255,255,255,.08); z-index:50; display:none}
+        .people-custom-scrollbar.show{display:block}
+        .people-custom-thumb{position:absolute; top:0; left:1px; width:8px; min-height:46px; border-radius:999px; background:#d1d5db; cursor:grab; touch-action:none; user-select:none; box-shadow:0 0 0 1px rgba(15,23,42,.6)}
+        .people-custom-thumb:hover{background:#f3f4f6}
+        .people-custom-thumb:active{cursor:grabbing; background:#fff}
         .person-row{display:flex; align-items:center; gap:10px; padding:10px; border-radius:13px; border:1px solid var(--line); background:rgba(255,255,255,.02); transition:opacity .2s, filter .2s, background .2s, border-color .2s}
         .person-row.joined{opacity:1; filter:none; background:rgba(34,197,94,.07); border-color:rgba(34,197,94,.22)}
         .person-row.pending{opacity:.5; filter:grayscale(.5) saturate(.4)}
@@ -721,10 +721,10 @@
                     </div>
                     <div class="room-invite-link" id="room-invite-link-preview" title="Meeting invite link"></div>
                 </div>
-                <div class="people-scroll-shell" id="people-scroll-shell">
+                <div class="people-scroll-wrap" id="people-scroll-wrap">
                     <div class="people-body" id="people-body"></div>
-                    <div class="people-grab-track" id="people-grab-track" aria-hidden="true">
-                        <div class="people-grab-thumb" id="people-grab-thumb"></div>
+                    <div class="people-custom-scrollbar" id="people-custom-scrollbar" aria-hidden="true">
+                        <div class="people-custom-thumb" id="people-custom-thumb"></div>
                     </div>
                 </div>
             </div>
@@ -3813,42 +3813,40 @@
 
 
 
-
-
 <script>
     (function(){
         const body = document.getElementById('people-body');
-        const shell = document.getElementById('people-scroll-shell');
-        const track = document.getElementById('people-grab-track');
-        const thumb = document.getElementById('people-grab-thumb');
+        const wrap = document.getElementById('people-scroll-wrap');
+        const rail = document.getElementById('people-custom-scrollbar');
+        const thumb = document.getElementById('people-custom-thumb');
         const peopleTab = document.getElementById('tab-people');
 
-        if (!body || !shell || !track || !thumb) return;
+        if (!body || !wrap || !rail || !thumb) return;
 
         let dragging = false;
-        let dragStartY = 0;
-        let dragStartScrollTop = 0;
+        let startY = 0;
+        let startScrollTop = 0;
 
-        function syncPeopleGrabHandle(){
+        function syncPeopleCustomScrollbar(){
             const clientHeight = body.clientHeight;
             const scrollHeight = body.scrollHeight;
             const maxScroll = scrollHeight - clientHeight;
 
             if (clientHeight <= 0 || maxScroll <= 1) {
-                track.classList.remove('show');
+                rail.classList.remove('show');
                 thumb.style.transform = 'translateY(0px)';
                 return;
             }
 
-            track.classList.add('show');
+            rail.classList.add('show');
 
-            const trackHeight = track.clientHeight;
+            const railHeight = rail.clientHeight;
             const thumbHeight = Math.max(
-                44,
-                Math.round(trackHeight * (clientHeight / scrollHeight))
+                46,
+                Math.round(railHeight * (clientHeight / scrollHeight))
             );
 
-            const maxThumbTop = Math.max(0, trackHeight - thumbHeight);
+            const maxThumbTop = Math.max(0, railHeight - thumbHeight);
             const thumbTop = maxScroll > 0
                 ? (body.scrollTop / maxScroll) * maxThumbTop
                 : 0;
@@ -3859,8 +3857,8 @@
 
         thumb.addEventListener('pointerdown', function(event){
             dragging = true;
-            dragStartY = event.clientY;
-            dragStartScrollTop = body.scrollTop;
+            startY = event.clientY;
+            startScrollTop = body.scrollTop;
             thumb.setPointerCapture(event.pointerId);
             event.preventDefault();
         });
@@ -3868,20 +3866,20 @@
         thumb.addEventListener('pointermove', function(event){
             if (!dragging) return;
 
-            const trackHeight = track.clientHeight;
+            const railHeight = rail.clientHeight;
             const thumbHeight = thumb.offsetHeight;
-            const maxThumbTravel = Math.max(1, trackHeight - thumbHeight);
+            const maxThumbTravel = Math.max(1, railHeight - thumbHeight);
             const maxScroll = Math.max(0, body.scrollHeight - body.clientHeight);
-            const deltaY = event.clientY - dragStartY;
+            const deltaY = event.clientY - startY;
 
             body.scrollTop =
-                dragStartScrollTop +
+                startScrollTop +
                 (deltaY / maxThumbTravel) * maxScroll;
 
             event.preventDefault();
         });
 
-        function endDrag(event){
+        function stopDrag(event){
             if (!dragging) return;
             dragging = false;
 
@@ -3890,18 +3888,17 @@
             } catch (_) {}
         }
 
-        thumb.addEventListener('pointerup', endDrag);
-        thumb.addEventListener('pointercancel', endDrag);
+        thumb.addEventListener('pointerup', stopDrag);
+        thumb.addEventListener('pointercancel', stopDrag);
 
-        track.addEventListener('pointerdown', function(event){
+        rail.addEventListener('pointerdown', function(event){
             if (event.target === thumb) return;
 
-            const rect = track.getBoundingClientRect();
+            const rect = rail.getBoundingClientRect();
             const thumbHeight = thumb.offsetHeight;
-            const maxThumbTravel = Math.max(1, track.clientHeight - thumbHeight);
+            const maxThumbTravel = Math.max(1, rail.clientHeight - thumbHeight);
             const maxScroll = Math.max(0, body.scrollHeight - body.clientHeight);
-
-            const targetTop = Math.max(
+            const desiredTop = Math.max(
                 0,
                 Math.min(
                     maxThumbTravel,
@@ -3909,32 +3906,59 @@
                 )
             );
 
-            body.scrollTop = (targetTop / maxThumbTravel) * maxScroll;
+            body.scrollTop = (desiredTop / maxThumbTravel) * maxScroll;
             event.preventDefault();
         });
 
-        body.addEventListener('scroll', syncPeopleGrabHandle, { passive: true });
-        window.addEventListener('resize', syncPeopleGrabHandle);
+        body.addEventListener(
+            'scroll',
+            syncPeopleCustomScrollbar,
+            { passive: true }
+        );
 
-        const listObserver = new MutationObserver(syncPeopleGrabHandle);
-        listObserver.observe(body, { childList: true, subtree: true });
+        window.addEventListener(
+            'resize',
+            syncPeopleCustomScrollbar
+        );
+
+        const contentObserver = new MutationObserver(
+            syncPeopleCustomScrollbar
+        );
+
+        contentObserver.observe(
+            body,
+            {
+                childList: true,
+                subtree: true
+            }
+        );
 
         if (peopleTab) {
             const tabObserver = new MutationObserver(function(){
-                requestAnimationFrame(syncPeopleGrabHandle);
+                requestAnimationFrame(syncPeopleCustomScrollbar);
             });
-            tabObserver.observe(peopleTab, { attributes: true, attributeFilter: ['style', 'class'] });
+
+            tabObserver.observe(
+                peopleTab,
+                {
+                    attributes: true,
+                    attributeFilter: ['style', 'class']
+                }
+            );
         }
 
         if ('ResizeObserver' in window) {
-            const resizeObserver = new ResizeObserver(syncPeopleGrabHandle);
+            const resizeObserver = new ResizeObserver(
+                syncPeopleCustomScrollbar
+            );
+
             resizeObserver.observe(body);
-            resizeObserver.observe(shell);
+            resizeObserver.observe(wrap);
         }
 
-        requestAnimationFrame(syncPeopleGrabHandle);
-        setTimeout(syncPeopleGrabHandle, 250);
-        setTimeout(syncPeopleGrabHandle, 700);
+        requestAnimationFrame(syncPeopleCustomScrollbar);
+        setTimeout(syncPeopleCustomScrollbar, 250);
+        setTimeout(syncPeopleCustomScrollbar, 700);
     })();
 </script>
 
