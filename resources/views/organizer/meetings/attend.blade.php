@@ -206,14 +206,11 @@
         .btn-send{background:linear-gradient(135deg,#2563eb,#0891b2); border:none; color:#fff}
         .chat-voice-btn.listening{color:#ef4444; border-color:rgba(239,68,68,.5); background:rgba(239,68,68,.14)}
 
-        .people-scroll-wrap{position:relative; flex:1; min-height:0; overflow:hidden}
-        .people-body{height:100%; min-height:0; overflow-y:auto !important; overflow-x:hidden; overscroll-behavior:contain; padding:12px 20px 12px 12px; display:flex; flex-direction:column; gap:8px; scrollbar-width:none}
-        .people-body::-webkit-scrollbar{display:none}
-        .people-custom-scrollbar{position:absolute; top:10px; right:6px; bottom:10px; width:10px; border-radius:999px; background:rgba(255,255,255,.08); z-index:50; display:none}
-        .people-custom-scrollbar.show{display:block}
-        .people-custom-thumb{position:absolute; top:0; left:1px; width:8px; min-height:46px; border-radius:999px; background:#d1d5db; cursor:grab; touch-action:none; user-select:none; box-shadow:0 0 0 1px rgba(15,23,42,.6)}
-        .people-custom-thumb:hover{background:#f3f4f6}
-        .people-custom-thumb:active{cursor:grabbing; background:#fff}
+        .people-body{flex:1; min-height:0; overflow-y:scroll !important; overflow-x:hidden; overscroll-behavior:contain; padding:12px 8px 12px 12px; display:flex; flex-direction:column; gap:8px; scrollbar-width:auto; scrollbar-color:#e5e7eb transparent}
+        .people-body::-webkit-scrollbar{width:10px}
+        .people-body::-webkit-scrollbar-track{background:transparent}
+        .people-body::-webkit-scrollbar-thumb{background:#e5e7eb; border-radius:999px; border:2px solid transparent; background-clip:padding-box}
+        .people-body::-webkit-scrollbar-thumb:hover{background:#ffffff; background-clip:padding-box}
         .person-row{display:flex; align-items:center; gap:10px; padding:10px; border-radius:13px; border:1px solid var(--line); background:rgba(255,255,255,.02); transition:opacity .2s, filter .2s, background .2s, border-color .2s}
         .person-row.joined{opacity:1; filter:none; background:rgba(34,197,94,.07); border-color:rgba(34,197,94,.22)}
         .person-row.pending{opacity:.5; filter:grayscale(.5) saturate(.4)}
@@ -805,12 +802,7 @@
                     </div>
                     <div class="room-invite-link" id="room-invite-link-preview" title="Meeting invite link"></div>
                 </div>
-                <div class="people-scroll-wrap" id="people-scroll-wrap">
-                    <div class="people-body" id="people-body"></div>
-                    <div class="people-custom-scrollbar" id="people-custom-scrollbar" aria-hidden="true">
-                        <div class="people-custom-thumb" id="people-custom-thumb"></div>
-                    </div>
-                </div>
+                <div class="people-body" id="people-body"></div>
             </div>
         </div>
     </div>
@@ -4184,154 +4176,6 @@
 
 
 
-<script>
-    (function(){
-        const body = document.getElementById('people-body');
-        const wrap = document.getElementById('people-scroll-wrap');
-        const rail = document.getElementById('people-custom-scrollbar');
-        const thumb = document.getElementById('people-custom-thumb');
-        const peopleTab = document.getElementById('tab-people');
-
-        if (!body || !wrap || !rail || !thumb) return;
-
-        let dragging = false;
-        let startY = 0;
-        let startScrollTop = 0;
-
-        function syncPeopleCustomScrollbar(){
-            const clientHeight = body.clientHeight;
-            const scrollHeight = body.scrollHeight;
-            const maxScroll = scrollHeight - clientHeight;
-
-            if (clientHeight <= 0 || maxScroll <= 1) {
-                rail.classList.remove('show');
-                thumb.style.transform = 'translateY(0px)';
-                return;
-            }
-
-            rail.classList.add('show');
-
-            const railHeight = rail.clientHeight;
-            const thumbHeight = Math.max(
-                46,
-                Math.round(railHeight * (clientHeight / scrollHeight))
-            );
-
-            const maxThumbTop = Math.max(0, railHeight - thumbHeight);
-            const thumbTop = maxScroll > 0
-                ? (body.scrollTop / maxScroll) * maxThumbTop
-                : 0;
-
-            thumb.style.height = thumbHeight + 'px';
-            thumb.style.transform = 'translateY(' + thumbTop + 'px)';
-        }
-
-        thumb.addEventListener('pointerdown', function(event){
-            dragging = true;
-            startY = event.clientY;
-            startScrollTop = body.scrollTop;
-            thumb.setPointerCapture(event.pointerId);
-            event.preventDefault();
-        });
-
-        thumb.addEventListener('pointermove', function(event){
-            if (!dragging) return;
-
-            const railHeight = rail.clientHeight;
-            const thumbHeight = thumb.offsetHeight;
-            const maxThumbTravel = Math.max(1, railHeight - thumbHeight);
-            const maxScroll = Math.max(0, body.scrollHeight - body.clientHeight);
-            const deltaY = event.clientY - startY;
-
-            body.scrollTop =
-                startScrollTop +
-                (deltaY / maxThumbTravel) * maxScroll;
-
-            event.preventDefault();
-        });
-
-        function stopDrag(event){
-            if (!dragging) return;
-            dragging = false;
-
-            try {
-                thumb.releasePointerCapture(event.pointerId);
-            } catch (_) {}
-        }
-
-        thumb.addEventListener('pointerup', stopDrag);
-        thumb.addEventListener('pointercancel', stopDrag);
-
-        rail.addEventListener('pointerdown', function(event){
-            if (event.target === thumb) return;
-
-            const rect = rail.getBoundingClientRect();
-            const thumbHeight = thumb.offsetHeight;
-            const maxThumbTravel = Math.max(1, rail.clientHeight - thumbHeight);
-            const maxScroll = Math.max(0, body.scrollHeight - body.clientHeight);
-            const desiredTop = Math.max(
-                0,
-                Math.min(
-                    maxThumbTravel,
-                    event.clientY - rect.top - (thumbHeight / 2)
-                )
-            );
-
-            body.scrollTop = (desiredTop / maxThumbTravel) * maxScroll;
-            event.preventDefault();
-        });
-
-        body.addEventListener(
-            'scroll',
-            syncPeopleCustomScrollbar,
-            { passive: true }
-        );
-
-        window.addEventListener(
-            'resize',
-            syncPeopleCustomScrollbar
-        );
-
-        const contentObserver = new MutationObserver(
-            syncPeopleCustomScrollbar
-        );
-
-        contentObserver.observe(
-            body,
-            {
-                childList: true,
-                subtree: true
-            }
-        );
-
-        if (peopleTab) {
-            const tabObserver = new MutationObserver(function(){
-                requestAnimationFrame(syncPeopleCustomScrollbar);
-            });
-
-            tabObserver.observe(
-                peopleTab,
-                {
-                    attributes: true,
-                    attributeFilter: ['style', 'class']
-                }
-            );
-        }
-
-        if ('ResizeObserver' in window) {
-            const resizeObserver = new ResizeObserver(
-                syncPeopleCustomScrollbar
-            );
-
-            resizeObserver.observe(body);
-            resizeObserver.observe(wrap);
-        }
-
-        requestAnimationFrame(syncPeopleCustomScrollbar);
-        setTimeout(syncPeopleCustomScrollbar, 250);
-        setTimeout(syncPeopleCustomScrollbar, 700);
-    })();
-</script>
 
 </body>
 </html>
