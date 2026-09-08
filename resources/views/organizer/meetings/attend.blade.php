@@ -206,11 +206,11 @@
         .btn-send{background:linear-gradient(135deg,#2563eb,#0891b2); border:none; color:#fff}
         .chat-voice-btn.listening{color:#ef4444; border-color:rgba(239,68,68,.5); background:rgba(239,68,68,.14)}
 
-        .people-body{flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; padding:12px; display:flex; flex-direction:column; gap:8px; scrollbar-width:thin; scrollbar-color:rgba(148,163,184,.45) transparent}
-        .people-body::-webkit-scrollbar{width:7px}
-        .people-body::-webkit-scrollbar-track{background:transparent}
-        .people-body::-webkit-scrollbar-thumb{background:rgba(148,163,184,.45); border-radius:999px}
-        .people-body::-webkit-scrollbar-thumb:hover{background:rgba(148,163,184,.65)}
+        .people-body{flex:1; min-height:0; overflow-y:scroll !important; overflow-x:hidden; overscroll-behavior:contain; scrollbar-gutter:stable; padding:12px; display:flex; flex-direction:column; gap:8px; scrollbar-width:thin; scrollbar-color:rgba(148,163,184,.75) rgba(255,255,255,.04)}
+        .people-body::-webkit-scrollbar{width:8px}
+        .people-body::-webkit-scrollbar-track{background:rgba(255,255,255,.04); border-radius:999px}
+        .people-body::-webkit-scrollbar-thumb{background:rgba(148,163,184,.75); border-radius:999px}
+        .people-body::-webkit-scrollbar-thumb:hover{background:rgba(203,213,225,.9)}
         .person-row{display:flex; align-items:center; gap:10px; padding:10px; border-radius:13px; border:1px solid var(--line); background:rgba(255,255,255,.02); transition:opacity .2s, filter .2s, background .2s, border-color .2s}
         .person-row.joined{opacity:1; filter:none; background:rgba(34,197,94,.07); border-color:rgba(34,197,94,.22)}
         .person-row.pending{opacity:.5; filter:grayscale(.5) saturate(.4)}
@@ -743,7 +743,7 @@
     </div>
     <div class="header-center"><i class="fa fa-clock"></i><span id="timer">00:00:00</span></div>
     <div class="header-right">
-        <div class="participants-count"><i class="fa fa-user-plus" style="color:var(--blue);font-size:10px;"></i><span>{{ $meeting->participants->count() }}</span> invited</div>
+
         <button class="btn-cancel" onclick="endMeeting()"><i class="fa-solid fa-circle-stop"></i><span>End Meeting</span></button>
         <button class="btn-leave" onclick="safeLeaveMeeting()"><i class="fa fa-phone-slash"></i><span>Leave</span></button>
     </div>
