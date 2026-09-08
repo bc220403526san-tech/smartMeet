@@ -20,21 +20,18 @@ class DashboardController extends Controller
         $scheduleEnd = $now->copy()->addHours(48);
 
         /*
-         * Keep participant meeting statuses fresh.
+         * Keep participant meetings fresh.
          *
-         * Only Upcoming -> Active is handled here.
-         * Active -> Completed is NOT done here because the existing
-         * meeting-room lifecycle remains responsible for completion.
+         * Only Upcoming -> Active is done here.
          */
         $this->syncParticipantMeetingStatuses($user->id);
 
         /*
-         * Get every meeting attached to this participant.
+         * Meetings attached to this participant.
          *
-         * IMPORTANT:
-         * MeetingJoinController saves invite-link users in
-         * meeting_participants, so link-joined meetings are also
-         * automatically included here.
+         * Invite-link joined meetings will also appear here
+         * because MeetingJoinController creates a
+         * meeting_participants record.
          */
         $meetingIds = MeetingParticipant::where('user_id', $user->id)
             ->pluck('meeting_id')
@@ -60,13 +57,7 @@ class DashboardController extends Controller
             ->count();
 
         /*
-         * Dashboard schedule.
-         *
-         * IMPORTANT:
-         * Variable name MUST remain $schedule because the existing
-         * participant.dashboard Blade already uses $schedule.
-         *
-         * Do not rename this to $upcomingSchedule.
+         * Upcoming Schedule
          */
         $schedule = Meeting::whereIn('id', $meetingIds)
             ->with([
@@ -77,8 +68,9 @@ class DashboardController extends Controller
                 $now,
                 $scheduleEnd
             ) {
+
                 /*
-                 * ACTIVE meetings for today.
+                 * Active meetings today.
                  */
                 $query->where(function ($active) use ($today) {
                     $active
@@ -87,7 +79,7 @@ class DashboardController extends Controller
                 })
 
                     /*
-                     * OR UPCOMING meetings within next 48 hours.
+                     * OR upcoming meetings within next 48 hours.
                      */
                     ->orWhere(function ($upcoming) use (
                         $today,
@@ -96,19 +88,19 @@ class DashboardController extends Controller
                     ) {
                         $upcoming
                             ->where('status', 'upcoming')
-
                             ->where(function ($dateQuery) use (
                                 $today,
                                 $now
                             ) {
+
                                 /*
-                                 * Future date meetings.
+                                 * Future date.
                                  */
                                 $dateQuery
                                     ->whereDate('date', '>', $today)
 
                                     /*
-                                     * OR meetings later today.
+                                     * OR later today.
                                      */
                                     ->orWhere(function ($sameDay) use (
                                         $today,
@@ -124,9 +116,6 @@ class DashboardController extends Controller
                                     });
                             })
 
-                            /*
-                             * Limit schedule to next 48 hours.
-                             */
                             ->whereDate(
                                 'date',
                                 '<=',
@@ -135,9 +124,6 @@ class DashboardController extends Controller
                     });
             })
 
-            /*
-             * Active first, Upcoming second.
-             */
             ->orderByRaw("
                 CASE
                     WHEN status = 'active' THEN 1
@@ -152,34 +138,34 @@ class DashboardController extends Controller
             ->get();
 
         /*
+         * REQUIRED BY dashboard.blade.php
+         */
+        $serverNowMs = now('UTC')->valueOf();
+
+        $nextTransitionMs = $this
+            ->getNextParticipantMeetingTransition($user->id)
+            ?->valueOf();
+
+        /*
          * IMPORTANT:
-         *
-         * Keep these variable names exactly the same because
-         * participant.dashboard Blade depends on them.
+         * dashboard.blade.php needs all 7 variables.
          */
         return view('participant.dashboard', compact(
             'totalMeetings',
             'todayMeetings',
             'liveMeetings',
             'upcomingMeetings',
-            'schedule'
+            'schedule',
+            'serverNowMs',
+            'nextTransitionMs'
         ));
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | Sync participant meetings
+    | Sync Upcoming -> Active
     |--------------------------------------------------------------------------
-    |
-    | This checks all Upcoming meetings belonging to this participant.
-    |
-    | When start time arrives:
-    |
-    | Upcoming -> Active
-    |
-    | It deliberately does NOT change Active -> Completed.
-    |
     */
     private function syncParticipantMeetingStatuses(
         int|string $userId
@@ -206,19 +192,10 @@ class DashboardController extends Controller
                 $meeting
             );
 
-            /*
-             * Meeting hasn't started yet.
-             */
             if (now('UTC')->lt($startTime)) {
                 continue;
             }
 
-            /*
-             * Atomic Upcoming -> Active update.
-             *
-             * If another process has already changed the meeting
-             * status, this query will not overwrite it.
-             */
             Meeting::query()
                 ->whereKey($meeting->id)
                 ->where('status', 'upcoming')
@@ -231,7 +208,64 @@ class DashboardController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | Meeting start time in UTC
+    | Next Upcoming Meeting Start
+    |--------------------------------------------------------------------------
+    */
+    private function getNextParticipantMeetingTransition(
+        int|string $userId
+    ): ?Carbon {
+        $now = now('UTC');
+
+        $nextTransition = null;
+
+        $meetings = Meeting::query()
+            ->whereHas(
+                'participants',
+                function ($query) use ($userId) {
+                    $query->where(
+                        'user_id',
+                        $userId
+                    );
+                }
+            )
+            ->where(
+                'status',
+                'upcoming'
+            )
+            ->get();
+
+        foreach ($meetings as $meeting) {
+
+            $startTime = $this->meetingStartUtc(
+                $meeting
+            );
+
+            /*
+             * Ignore meetings whose start time has already passed.
+             */
+            if ($startTime->lessThanOrEqualTo($now)) {
+                continue;
+            }
+
+            /*
+             * Keep nearest future meeting.
+             */
+            if (
+                $nextTransition === null
+                ||
+                $startTime->lessThan($nextTransition)
+            ) {
+                $nextTransition = $startTime->copy();
+            }
+        }
+
+        return $nextTransition;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Meeting Start UTC
     |--------------------------------------------------------------------------
     */
     private function meetingStartUtc(
