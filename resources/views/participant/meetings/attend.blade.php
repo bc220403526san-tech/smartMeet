@@ -205,11 +205,11 @@
         .btn-send{background:linear-gradient(135deg,#2563eb,#0891b2); border:none; color:#fff}
         .chat-voice-btn.listening{color:#ef4444; border-color:rgba(239,68,68,.5); background:rgba(239,68,68,.14)}
 
-        .people-body{flex:1; min-height:0; overflow-y:scroll !important; overflow-x:hidden; overscroll-behavior:contain; scrollbar-gutter:stable; padding:12px; display:flex; flex-direction:column; gap:8px; scrollbar-width:thin; scrollbar-color:rgba(148,163,184,.75) rgba(255,255,255,.04)}
-        .people-body::-webkit-scrollbar{width:8px}
-        .people-body::-webkit-scrollbar-track{background:rgba(255,255,255,.04); border-radius:999px}
-        .people-body::-webkit-scrollbar-thumb{background:rgba(148,163,184,.75); border-radius:999px}
-        .people-body::-webkit-scrollbar-thumb:hover{background:rgba(203,213,225,.9)}
+        .people-body{flex:1; min-height:0; max-height:100%; overflow-y:scroll !important; overflow-x:hidden; overscroll-behavior:contain; scrollbar-gutter:stable both-edges; padding:12px 16px 12px 12px; display:flex; flex-direction:column; gap:8px; scrollbar-width:auto; scrollbar-color:#94a3b8 rgba(255,255,255,.08)}
+        .people-body::-webkit-scrollbar{width:12px}
+        .people-body::-webkit-scrollbar-track{background:rgba(255,255,255,.08); border-radius:999px; margin:4px 0}
+        .people-body::-webkit-scrollbar-thumb{background:#94a3b8; border-radius:999px; border:3px solid rgba(13,22,42,.92)}
+        .people-body::-webkit-scrollbar-thumb:hover{background:#cbd5e1}
         .person-row{display:flex; align-items:center; gap:10px; padding:10px; border-radius:13px; border:1px solid var(--line); background:rgba(255,255,255,.02); transition:opacity .2s, filter .2s, background .2s, border-color .2s}
         .person-row.joined{opacity:1; filter:none; background:rgba(34,197,94,.07); border-color:rgba(34,197,94,.22)}
         .person-row.pending{opacity:.5; filter:grayscale(.5) saturate(.4)}
