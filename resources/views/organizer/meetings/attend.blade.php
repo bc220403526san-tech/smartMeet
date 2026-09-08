@@ -213,10 +213,10 @@
         .people-body::-webkit-scrollbar-thumb:hover{background:#cbd5e1}
         .people-scroll-wrap{position:relative; flex:1; min-height:0; overflow:hidden}
         .people-scroll-wrap .people-body{height:100%}
-        .people-drag-scrollbar{position:absolute; top:8px; right:3px; bottom:8px; width:10px; border-radius:999px; background:rgba(255,255,255,.08); z-index:30; display:none}
+        .people-drag-scrollbar{position:absolute; top:10px; right:20px; bottom:10px; width:7px; border-radius:999px; background:rgba(59,130,246,.18); border:1px solid rgba(96,165,250,.28); z-index:30; display:none}
         .people-drag-scrollbar.is-visible{display:block}
-        .people-drag-thumb{position:absolute; top:0; left:1px; width:8px; min-height:44px; border-radius:999px; background:#e2e8f0; cursor:grab; touch-action:none; user-select:none; box-shadow:0 0 0 1px rgba(15,23,42,.7)}
-        .people-drag-thumb:active{cursor:grabbing; background:#fff}
+        .people-drag-thumb{position:absolute; top:0; left:1px; width:3px; min-height:46px; border-radius:999px; background:#60a5fa; cursor:grab; touch-action:none; user-select:none; box-shadow:0 0 0 1px rgba(59,130,246,.25)}
+        .people-drag-thumb:active{cursor:grabbing; background:#93c5fd}
         .person-row{display:flex; align-items:center; gap:10px; padding:10px; border-radius:13px; border:1px solid var(--line); background:rgba(255,255,255,.02); transition:opacity .2s, filter .2s, background .2s, border-color .2s}
         .person-row.joined{opacity:1; filter:none; background:rgba(34,197,94,.07); border-color:rgba(34,197,94,.22)}
         .person-row.pending{opacity:.5; filter:grayscale(.5) saturate(.4)}
