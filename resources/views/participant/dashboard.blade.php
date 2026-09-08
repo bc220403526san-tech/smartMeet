@@ -17,10 +17,12 @@
 
         <div>
             <h1 class="text-2xl font-semibold">Overview</h1>
+
             <p class="text-gray-500 text-sm mt-1">
                 Your meetings and activities at a glance.
             </p>
         </div>
+
 
         <!-- Feature Cards -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -30,7 +32,9 @@
                 href="{{ route('participant.meetings.index') }}"
                 class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer group block"
             >
+
                 <div class="w-12 h-12 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-gradient-to-br group-hover:from-blue-500 group-hover:to-indigo-600 transition-all duration-300">
+
                     <svg
                         xmlns="http://www.w3.org/2000/svg"
                         fill="none"
@@ -45,7 +49,9 @@
                             d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"
                         />
                     </svg>
+
                 </div>
+
 
                 <h3 class="font-semibold text-gray-800 text-base mb-1">
                     My Meetings
@@ -56,16 +62,21 @@
                 </p>
 
                 <div class="mt-3 flex items-center gap-2">
+
                     <span class="text-xs text-blue-600 font-medium">
                         {{ $totalMeetings }} {{ Str::plural('meeting', $totalMeetings) }}
                     </span>
 
-                    <span class="text-xs text-gray-300">•</span>
+                    <span class="text-xs text-gray-300">
+                        •
+                    </span>
 
                     <span class="text-xs text-gray-400">
                         View all →
                     </span>
+
                 </div>
+
             </a>
 
 
@@ -74,7 +85,9 @@
                 href="{{ route('participant.meetings.index', ['filter' => 'today']) }}"
                 class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer group block"
             >
+
                 <div class="w-12 h-12 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-gradient-to-br group-hover:from-emerald-500 group-hover:to-teal-600 transition-all duration-300">
+
                     <svg
                         xmlns="http://www.w3.org/2000/svg"
                         fill="none"
@@ -89,7 +102,9 @@
                             d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
                         />
                     </svg>
+
                 </div>
+
 
                 <h3 class="font-semibold text-gray-800 text-base mb-1">
                     Today's Meetings
@@ -106,11 +121,19 @@
                         <span class="text-xs text-emerald-600 font-medium flex items-center gap-1">
 
                             <span class="relative flex h-2 w-2">
-                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+
+                                <span
+                                    class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"
+                                ></span>
+
+                                <span
+                                    class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"
+                                ></span>
+
                             </span>
 
                             {{ $liveMeetings }} live now
+
                         </span>
 
                     @else
@@ -121,13 +144,17 @@
 
                     @endif
 
-                    <span class="text-xs text-gray-300">•</span>
+
+                    <span class="text-xs text-gray-300">
+                        •
+                    </span>
 
                     <span class="text-xs text-gray-400">
                         View schedule →
                     </span>
 
                 </div>
+
             </a>
 
 
@@ -136,6 +163,7 @@
                 href="{{ route('participant.meetings.index', ['filter' => 'upcoming']) }}"
                 class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer group block"
             >
+
                 <div class="w-12 h-12 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-gradient-to-br group-hover:from-purple-500 group-hover:to-violet-600 transition-all duration-300">
 
                     <svg
@@ -155,6 +183,7 @@
 
                 </div>
 
+
                 <h3 class="font-semibold text-gray-800 text-base mb-1">
                     Upcoming Meetings
                 </h3>
@@ -169,13 +198,16 @@
                         {{ $upcomingMeetings }} upcoming
                     </span>
 
-                    <span class="text-xs text-gray-300">•</span>
+                    <span class="text-xs text-gray-300">
+                        •
+                    </span>
 
                     <span class="text-xs text-gray-400">
                         See all →
                     </span>
 
                 </div>
+
             </a>
 
         </div>
@@ -188,6 +220,7 @@
             <div class="px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
 
                 <div>
+
                     <h2 class="font-semibold text-gray-800 text-lg">
                         Upcoming Schedule
                     </h2>
@@ -195,6 +228,7 @@
                     <p class="text-xs text-gray-400 mt-0.5">
                         Confirmed meetings for the next 48 hours
                     </p>
+
                 </div>
 
             </div>
@@ -260,6 +294,7 @@
                         stroke="currentColor"
                         class="w-3.5 h-3.5"
                     >
+
                         <rect
                             x="3"
                             y="4"
@@ -288,6 +323,7 @@
                             x2="21"
                             y2="10"
                         />
+
                     </svg>
 
                     Date &amp; Time
@@ -339,6 +375,7 @@
                      * - Laravel storage
                      * - fallback avatar
                      */
+
                     $hostImage = $host
                         ? $host->image_url
                         : null;
@@ -346,11 +383,21 @@
                     /*
                      * Initials fallback
                      */
+
                     $hostInitials = $host
                         ? Str::of($host->name)
                             ->explode(' ')
                             ->filter()
-                            ->map(fn ($word) => Str::upper(Str::substr($word, 0, 1)))
+                            ->map(
+                                fn ($word) =>
+                                    Str::upper(
+                                        Str::substr(
+                                            $word,
+                                            0,
+                                            1
+                                        )
+                                    )
+                            )
                             ->take(2)
                             ->implode('')
                         : 'SM';
@@ -358,26 +405,35 @@
                 @endphp
 
 
-                <div class="grid grid-cols-4 items-center px-5 py-4 border-b border-gray-100 last:border-b-0 hover:bg-blue-50/30 transition duration-200 group"
-                     data-dashboard-meeting-id="{{ $meeting->id }}"
-                     data-current-status="{{ $meeting->status }}">
+                <div
+                    class="grid grid-cols-4 items-center px-5 py-4 border-b border-gray-100 last:border-b-0 hover:bg-blue-50/30 transition duration-200 group"
+                    data-dashboard-meeting-id="{{ $meeting->id }}"
+                    data-current-status="{{ $meeting->status }}"
+                >
 
                     <!-- Meeting Name -->
                     <div class="flex items-center gap-2 min-w-0">
 
-    <span class="relative flex h-2.5 w-2.5 flex-shrink-0">
+                        <span class="relative flex h-2.5 w-2.5 flex-shrink-0">
 
-        @if($isLive)
-            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-        @endif
+                            @if($isLive)
 
-        <span class="relative inline-flex rounded-full h-2.5 w-2.5 {{ $isLive ? 'bg-blue-600' : 'bg-gray-300' }}"></span>
+                                <span
+                                    class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"
+                                ></span>
 
-    </span>
+                            @endif
+
+                            <span
+                                class="relative inline-flex rounded-full h-2.5 w-2.5 {{ $isLive ? 'bg-blue-600' : 'bg-gray-300' }}"
+                            ></span>
+
+                        </span>
+
 
                         <span class="text-sm font-medium text-gray-800 group-hover:text-blue-600 transition truncate">
-        {{ $meeting->title }}
-    </span>
+                            {{ $meeting->title }}
+                        </span>
 
                     </div>
 
@@ -397,11 +453,13 @@
                                 onerror="
                                     this.style.display='none';
                                     const fallback = this.nextElementSibling;
+
                                     if (fallback) {
                                         fallback.style.display='flex';
                                     }
                                 "
                             >
+
 
                             <!-- Fallback Initials -->
                             <div
@@ -410,6 +468,7 @@
                             >
                                 {{ $hostInitials }}
                             </div>
+
 
                             <!-- Organizer Name -->
                             <span class="text-sm text-gray-600 hidden sm:block truncate">
@@ -458,21 +517,25 @@
                     <div class="text-right">
 
                         @if($isLive)
+
                             <a
                                 href="{{ route('participant.meetings.attend', $meeting->id) }}"
                                 class="inline-block px-5 py-2 rounded-lg text-xs font-semibold transition
-                   bg-gradient-to-r from-blue-600 to-indigo-600 text-white
-                   hover:from-blue-700 hover:to-indigo-700 shadow-sm hover:shadow"
+                                       bg-gradient-to-r from-blue-600 to-indigo-600 text-white
+                                       hover:from-blue-700 hover:to-indigo-700 shadow-sm hover:shadow"
                             >
                                 Join Session
                             </a>
+
                         @else
+
                             <span
                                 class="inline-block px-5 py-2 rounded-lg text-xs font-semibold
-                   bg-gray-100 text-gray-600 cursor-not-allowed"
+                                       bg-gray-100 text-gray-600 cursor-not-allowed"
                             >
-            Attend Meeting
-        </span>
+                                Attend Meeting
+                            </span>
+
                         @endif
 
                     </div>
@@ -510,119 +573,336 @@
 
 </x-layouts.app>
 
+
 <script>
     (function () {
-        const rows = Array.from(document.querySelectorAll('[data-dashboard-meeting-id]'));
-        if (!rows.length) return;
 
-        const ids = [...new Set(rows.map(row => row.dataset.dashboardMeetingId))];
-        let serverClockOffsetMs = Number(@json($serverNowMs)) - Date.now();
-        let nextTransitionMs = @json($nextTransitionMs);
+        const rows = Array.from(
+            document.querySelectorAll(
+                '[data-dashboard-meeting-id]'
+            )
+        );
+
+        if (!rows.length) {
+            return;
+        }
+
+        const ids = [
+            ...new Set(
+                rows.map(
+                    row =>
+                        row.dataset.dashboardMeetingId
+                )
+            )
+        ];
+
+        let serverClockOffsetMs =
+            Number(
+                @json($serverNowMs)
+            ) - Date.now();
+
+        let nextTransitionMs =
+            @json($nextTransitionMs);
+
         let exactTransitionTimer = null;
+
         let requestRunning = false;
+
         let pendingRefresh = false;
 
-        function currentServerTimeMs() {
-            return Date.now() + serverClockOffsetMs;
+
+        function currentServerTimeMs()
+        {
+            return Date.now()
+                + serverClockOffsetMs;
         }
 
-        function updateServerClock(serverNowMs) {
-            const timestamp = Number(serverNowMs);
-            if (Number.isFinite(timestamp)) {
-                serverClockOffsetMs = timestamp - Date.now();
+
+        function updateServerClock(
+            serverNowMs
+        )
+        {
+            const timestamp =
+                Number(serverNowMs);
+
+            if (
+                Number.isFinite(timestamp)
+            ) {
+                serverClockOffsetMs =
+                    timestamp
+                    - Date.now();
             }
         }
 
-        function scheduleExactStatusRefresh() {
+
+        function scheduleExactStatusRefresh()
+        {
             if (exactTransitionTimer) {
-                clearTimeout(exactTransitionTimer);
-                exactTransitionTimer = null;
+
+                clearTimeout(
+                    exactTransitionTimer
+                );
+
+                exactTransitionTimer =
+                    null;
             }
 
-            const transitionTimestamp = Number(nextTransitionMs);
-            if (!Number.isFinite(transitionTimestamp) || transitionTimestamp <= 0) return;
+            const transitionTimestamp =
+                Number(nextTransitionMs);
 
-            const delay = Math.max(0, transitionTimestamp - currentServerTimeMs() + 50);
-            const maximumTimeout = 2_147_000_000;
-
-            if (delay > maximumTimeout) {
-                exactTransitionTimer = setTimeout(scheduleExactStatusRefresh, maximumTimeout);
+            if (
+                !Number.isFinite(
+                    transitionTimestamp
+                )
+                ||
+                transitionTimestamp <= 0
+            ) {
                 return;
             }
 
-            exactTransitionTimer = setTimeout(() => syncStatuses('exact-meeting-time'), delay);
+            const delay =
+                Math.max(
+                    0,
+                    transitionTimestamp
+                    - currentServerTimeMs()
+                    + 50
+                );
+
+            const maximumTimeout =
+                2_147_000_000;
+
+            if (
+                delay > maximumTimeout
+            ) {
+                exactTransitionTimer =
+                    setTimeout(
+                        scheduleExactStatusRefresh,
+                        maximumTimeout
+                    );
+
+                return;
+            }
+
+            exactTransitionTimer =
+                setTimeout(
+                    () =>
+                        syncStatuses(
+                            'exact-meeting-time'
+                        ),
+                    delay
+                );
         }
 
-        async function syncStatuses(reason = 'manual') {
+
+        async function syncStatuses(
+            reason = 'manual'
+        )
+        {
             if (requestRunning) {
-                pendingRefresh = true;
+
+                pendingRefresh =
+                    true;
+
                 return;
             }
 
-            requestRunning = true;
+            requestRunning =
+                true;
 
             try {
-                const url = new URL(@json(route('participant.meetings.status-check')), window.location.origin);
-                url.searchParams.set('ids', ids.join(','));
-                url.searchParams.set('_', Date.now().toString());
 
-                const response = await fetch(url.toString(), {
-                    method: 'GET',
-                    cache: 'no-store',
-                    credentials: 'same-origin',
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Accept': 'application/json',
-                        'Cache-Control': 'no-cache'
-                    }
-                });
+                const url =
+                    new URL(
+                        @json(
+                            route(
+                                'participant.meetings.status-check'
+                            )
+                        ),
+                        window.location.origin
+                    );
+
+                url.searchParams.set(
+                    'ids',
+                    ids.join(',')
+                );
+
+                url.searchParams.set(
+                    '_',
+                    Date.now().toString()
+                );
+
+
+                const response =
+                    await fetch(
+                        url.toString(),
+                        {
+                            method: 'GET',
+
+                            cache:
+                                'no-store',
+
+                            credentials:
+                                'same-origin',
+
+                            headers: {
+                                'X-Requested-With':
+                                    'XMLHttpRequest',
+
+                                'Accept':
+                                    'application/json',
+
+                                'Cache-Control':
+                                    'no-cache'
+                            }
+                        }
+                    );
+
 
                 if (!response.ok) {
-                    throw new Error(`Dashboard status sync failed with HTTP ${response.status}`);
+
+                    throw new Error(
+                        `Dashboard status sync failed with HTTP ${response.status}`
+                    );
                 }
 
-                const data = await response.json();
-                updateServerClock(data.server_now_ms);
-                nextTransitionMs = data.next_transition_ms;
 
-                let realStatusChanged = false;
+                const data =
+                    await response.json();
 
-                Object.entries(data.meetings || {}).forEach(([id, status]) => {
-                    const row = document.querySelector(`[data-dashboard-meeting-id="${id}"]`);
-                    if (!row || row.dataset.currentStatus === status) return;
 
-                    // Reload only after a real database status transition.
-                    row.dataset.currentStatus = status;
-                    realStatusChanged = true;
-                });
+                updateServerClock(
+                    data.server_now_ms
+                );
+
+
+                nextTransitionMs =
+                    data.next_transition_ms;
+
+
+                let realStatusChanged =
+                    false;
+
+
+                Object.entries(
+                    data.meetings || {}
+                ).forEach(
+                    ([id, status]) => {
+
+                        const row =
+                            document.querySelector(
+                                `[data-dashboard-meeting-id="${id}"]`
+                            );
+
+                        if (
+                            !row
+                            ||
+                            row.dataset.currentStatus
+                            === status
+                        ) {
+                            return;
+                        }
+
+                        /*
+                         * Reload only after a real
+                         * database status transition.
+                         */
+                        row.dataset.currentStatus =
+                            status;
+
+                        realStatusChanged =
+                            true;
+                    }
+                );
+
 
                 if (realStatusChanged) {
+
                     window.location.reload();
+
                     return;
                 }
 
+
                 scheduleExactStatusRefresh();
+
             } catch (error) {
-                console.error(`Participant dashboard status sync failed (${reason}):`, error);
+
+                console.error(
+                    `Participant dashboard status sync failed (${reason}):`,
+                    error
+                );
+
             } finally {
-                requestRunning = false;
+
+                requestRunning =
+                    false;
+
                 if (pendingRefresh) {
-                    pendingRefresh = false;
-                    syncStatuses('queued-refresh');
+
+                    pendingRefresh =
+                        false;
+
+                    syncStatuses(
+                        'queued-refresh'
+                    );
                 }
             }
         }
 
-        syncStatuses('initial-load');
+
+        syncStatuses(
+            'initial-load'
+        );
+
+
         scheduleExactStatusRefresh();
 
-        // Backup only; page reloads solely when the database status actually changed.
-        setInterval(() => syncStatuses('backup-check'), 30_000);
-        window.addEventListener('focus', () => syncStatuses('window-focus'));
-        window.addEventListener('online', () => syncStatuses('network-online'));
-        document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) syncStatuses('tab-visible');
-        });
+
+        /*
+         * Backup only.
+         *
+         * Page reloads solely when the database
+         * status actually changed.
+         */
+        setInterval(
+            () =>
+                syncStatuses(
+                    'backup-check'
+                ),
+            30_000
+        );
+
+
+        window.addEventListener(
+            'focus',
+            () =>
+                syncStatuses(
+                    'window-focus'
+                )
+        );
+
+
+        window.addEventListener(
+            'online',
+            () =>
+                syncStatuses(
+                    'network-online'
+                )
+        );
+
+
+        document.addEventListener(
+            'visibilitychange',
+            () => {
+
+                if (!document.hidden) {
+
+                    syncStatuses(
+                        'tab-visible'
+                    );
+                }
+            }
+        );
+
     })();
 </script>
-
