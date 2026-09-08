@@ -172,7 +172,7 @@
             cursor:pointer; border-bottom:2px solid transparent; transition:color .15s, border-color .15s; background:none; border-top:none; border-left:none; border-right:none;
         }
         .panel-tabbtn.active{color:var(--text); border-bottom-color:var(--blue)}
-        .panel-body{flex:1; overflow:hidden; display:flex; flex-direction:column}
+        .panel-body{flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column}
 
         .transcript-body,.chat-body{flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:10px}
         .empty-note{text-align:center; color:var(--muted-2); font-size:12px; padding:26px 10px}
@@ -707,7 +707,7 @@
                     <button class="btn-send" onclick="sendChat()"><i class="fa fa-paper-plane"></i></button>
                 </div>
             </div>
-            <div id="tab-people" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
+            <div id="tab-people" style="display:none; flex-direction:column; flex:1; min-height:0; overflow:hidden;">
                 <div class="room-invite-card">
                     <div class="room-invite-title"><i class="fa-solid fa-user-plus"></i> Invite people</div>
                     <div class="room-invite-note">Share the secure meeting link without leaving the room. The invited user can sign in/register and join this meeting.</div>
