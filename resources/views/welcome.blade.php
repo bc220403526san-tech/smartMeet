@@ -3165,10 +3165,13 @@
                 <div class="hero-visual-glow"></div>
 
                 <div class="hero-image-card">
-                    <img
-                        src="{{ asset('images/smartmeet-hero-meeting.png') }}"
-                        alt="SmartMeet online meeting experience"
-                        class="hero-meeting-image"
+                    <img src="{{ asset('images/smartmeet-hero-meeting.webp') }}"
+                         alt="SmartMeet online meeting experience"
+                         class="hero-meeting-image"
+                         width="992"
+                         height="651"
+                         fetchpriority="high"
+                         decoding="async"
                     >
                 </div>
 
