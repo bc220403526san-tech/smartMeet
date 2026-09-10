@@ -32,7 +32,7 @@
     <!-- Structured Data -->
     <script type="application/ld+json">
         {
-            "@context": "https://schema.org",
+            "@@context": "https://schema.org",
         "@type": "WebApplication",
         "name": "SmartMeet",
         "url": "https://smartmeet.live/",
