@@ -94,3 +94,10 @@ Route::view('/terms', 'legal.terms')
 
 Route::view('/data-deletion', 'legal.data-deletion')
     ->name('data-deletion');
+
+
+Route::get('/sitemap.xml', function () {
+    return response()
+        ->view('sitemap')
+        ->header('Content-Type', 'application/xml');
+});
