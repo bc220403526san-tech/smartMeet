@@ -47,15 +47,8 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload"
-          href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap"
-          as="style"
-          onload="this.onload=null;this.rel='stylesheet'">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
 
-    <noscript>
-        <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap"
-              rel="stylesheet">
-    </noscript>
     <style>
         :root {
             --blue: #2563eb;
@@ -3089,7 +3082,7 @@
 
         <a href="{{ url('/') }}" class="brand">
             <span class="brand-mark">
-                <img src="{{ asset('images/s-logo.png') }}" alt="SmartMeet logo">
+                <img src="{{ asset('images/s-logo-small.webp') }}" alt="SmartMeet logo">
             </span>
             <span class="brand-name"><span class="smart">Smart</span><span class="meet">Meet</span></span>
         </a>
@@ -3172,13 +3165,10 @@
                 <div class="hero-visual-glow"></div>
 
                 <div class="hero-image-card">
-                    <img src="{{ asset('images/smartmeet-hero-meeting.webp') }}"
-                         alt="SmartMeet online meeting experience"
-                         class="hero-meeting-image"
-                         width="992"
-                         height="651"
-                         fetchpriority="high"
-                         decoding="async"
+                    <img
+                        src="{{ asset('images/smartmeet-hero-meeting.png') }}"
+                        alt="SmartMeet online meeting experience"
+                        class="hero-meeting-image"
                     >
                 </div>
 
@@ -3358,7 +3348,7 @@
                 <div class="dash-side">
 
                     <div class="dash-brand">
-                        <img src="{{ asset('images/s-logo.png') }}" alt="">
+                        <img src="{{ asset('images/s-logo-small.webp') }}" alt="">
                         SmartMeet
                     </div>
 
@@ -3635,7 +3625,7 @@
 
                 <a href="{{ url('/') }}" class="brand">
                     <span class="brand-mark">
-                        <img src="{{ asset('images/s-logo.png') }}" alt="SmartMeet logo">
+                        <img src="{{ asset('images/s-logo-small.webp') }}" alt="SmartMeet logo">
                     </span>
                     <span class="brand-name"><span class="smart">Smart</span><span class="meet">Meet</span></span>
                 </a>
