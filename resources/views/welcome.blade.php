@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <!-- Primary SEO -->
     <title>SmartMeet | Online Meetings & Video Conferencing</title>
 
     <meta name="description"
@@ -13,6 +12,22 @@
     <meta name="robots" content="index, follow">
 
     <link rel="canonical" href="https://smartmeet.live/">
+
+    <!-- Open Graph / Social Sharing -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="SmartMeet | Online Meetings & Video Conferencing">
+    <meta property="og:description"
+          content="SmartMeet is an online meeting platform for video and audio calls, meeting scheduling, participant invitations, real-time chat and live transcription.">
+    <meta property="og:url" content="https://smartmeet.live/">
+    <meta property="og:site_name" content="SmartMeet">
+    <meta property="og:image" content="{{ asset('images/s-logo.png') }}">
+
+    <!-- Twitter / X Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="SmartMeet | Online Meetings & Video Conferencing">
+    <meta name="twitter:description"
+          content="SmartMeet is an online meeting platform for video and audio calls, meeting scheduling, participant invitations, real-time chat and live transcription.">
+    <meta name="twitter:image" content="{{ asset('images/s-logo.png') }}">
 
     <link rel="icon" href="{{ asset('images/s-logo.png') }}">
 
