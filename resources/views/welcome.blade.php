@@ -4,10 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>SmartMeet</title>
+    <!-- Primary SEO -->
+    <title>SmartMeet | Online Meetings & Video Conferencing</title>
 
     <meta name="description"
-          content="SmartMeet makes online meetings simple with video, audio, scheduling, real-time chat and live transcription.">
+          content="SmartMeet is an online meeting platform for video and audio calls, meeting scheduling, participant invitations, real-time chat and live transcription.">
+
+    <meta name="robots" content="index, follow">
+
+    <link rel="canonical" href="https://smartmeet.live/">
 
     <link rel="icon" href="{{ asset('images/s-logo.png') }}">
 
