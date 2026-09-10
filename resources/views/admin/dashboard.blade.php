@@ -150,6 +150,25 @@
                                     <p class="text-xs text-gray-400 mt-0.5">
                                         {{ $activity['time'] }}
                                     </p>
+
+                                    <form
+                                        method="POST"
+                                        action="{{ url('/admin/activities/' . urlencode($activity['key'])) }}"
+                                        class="mt-2"
+                                        onsubmit="return confirm('Delete this activity from the dashboard?');"
+                                    >
+                                        @csrf
+                                        @method('DELETE')
+
+                                        <button
+                                            type="submit"
+                                            class="inline-flex items-center gap-1 text-xs font-medium text-red-500 hover:text-red-700 transition"
+                                            title="Delete activity"
+                                        >
+                                            <i class="fa-solid fa-trash-can"></i>
+                                            Delete
+                                        </button>
+                                    </form>
                                 </div>
 
                             </div>

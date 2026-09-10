@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\DismissedActivity;
 use App\Models\Meeting;
 use App\Models\User;
 use Carbon\Carbon;
@@ -70,7 +71,13 @@ class DashboardController extends Controller
         */
         $allActivities = $this->buildActivityHistory($timezone);
 
-        $perPage = 15;
+        // Admin-hidden activities are excluded from the dashboard timeline.
+        $dismissedKeys = DismissedActivity::pluck('activity_key')->all();
+        $allActivities = $allActivities
+            ->reject(fn (array $activity) => in_array($activity['key'], $dismissedKeys, true))
+            ->values();
+
+        $perPage = 7;
         $pageName = 'activity_page';
         $currentPage = max(1, (int) $request->query($pageName, 1));
 
@@ -117,16 +124,20 @@ class DashboardController extends Controller
 
     public function removeActivity(Request $request, string $key)
     {
-        // Route kept for compatibility, but dashboard history is not permanently hidden.
-        $timezone = config('app.timezone', 'Asia/Karachi');
-        $limit = max(1, min((int) $request->get('limit', 15), 100));
-
-        return response()->json([
-            'success' => true,
-            'activities' => $this->buildActivityHistory($timezone)
-                ->take($limit)
-                ->values(),
+        DismissedActivity::firstOrCreate([
+            'activity_key' => $key,
         ]);
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Activity removed from dashboard.',
+            ]);
+        }
+
+        return redirect()
+            ->to(route('admin.dashboard') . '#activity-history')
+            ->with('success', 'Activity removed from dashboard.');
     }
 
     private function buildActivityHistory(string $timezone): Collection
