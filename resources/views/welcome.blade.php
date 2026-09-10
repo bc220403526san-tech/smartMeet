@@ -4,13 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+    <!-- Primary SEO -->
     <title>SmartMeet | Online Meetings & Video Conferencing</title>
 
     <meta name="description"
           content="SmartMeet is an online meeting platform for video and audio calls, meeting scheduling, participant invitations, real-time chat and live transcription.">
 
     <meta name="robots" content="index, follow">
-
     <link rel="canonical" href="https://smartmeet.live/">
 
     <!-- Open Graph / Social Sharing -->
@@ -28,6 +28,20 @@
     <meta name="twitter:description"
           content="SmartMeet is an online meeting platform for video and audio calls, meeting scheduling, participant invitations, real-time chat and live transcription.">
     <meta name="twitter:image" content="{{ asset('images/s-logo.png') }}">
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "SmartMeet",
+        "url": "https://smartmeet.live/",
+        "description": "SmartMeet is an online meeting platform for video and audio calls, meeting scheduling, participant invitations, real-time chat and live transcription.",
+        "applicationCategory": "CommunicationApplication",
+        "operatingSystem": "Web",
+        "browserRequirements": "Requires a modern web browser"
+    }
+    </script>
 
     <link rel="icon" href="{{ asset('images/s-logo.png') }}">
 
