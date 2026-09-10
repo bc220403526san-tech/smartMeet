@@ -8,10 +8,11 @@ use App\Models\Meeting;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $timezone = config('app.timezone', 'Asia/Karachi');
         $now = Carbon::now($timezone);
@@ -73,7 +74,30 @@ class DashboardController extends Controller
             $now->copy()->subWeek()
         )->count();
 
-        $activities = $this->getActivities(20);
+        /*
+         * IMPORTANT:
+         * Do not use getActivities(20) here. That was limiting the dashboard
+         * to only the latest 20 combined activities.
+         *
+         * We build ALL available historical activities from the current
+         * SmartMeet data and paginate them.
+         */
+        $allActivities = $this->getActivities();
+
+        $perPage = 10;
+        $currentPage = max(1, (int) $request->query('activity_page', 1));
+
+        $activities = new LengthAwarePaginator(
+            $allActivities->forPage($currentPage, $perPage)->values(),
+            $allActivities->count(),
+            $perPage,
+            $currentPage,
+            [
+                'path' => $request->url(),
+                'pageName' => 'activity_page',
+                'query' => $request->query(),
+            ]
+        );
 
         return view('admin.dashboard', compact(
             'totalMeetings',
@@ -92,84 +116,110 @@ class DashboardController extends Controller
         return redirect()->route('admin.dashboard');
     }
 
+    /*
+     * Kept for compatibility with the existing admin activity fetch route.
+     * It returns the requested number of latest activities.
+     */
     public function fetchActivities(Request $request)
     {
-        $limit = max(1, min((int) $request->get('limit', 6), 100));
+        $limit = max(1, min((int) $request->get('limit', 10), 100));
 
         return response()->json(
-            $this->getActivities($limit)
+            $this->getActivities()->take($limit)->values()
         );
     }
 
+    /*
+     * Existing dismiss/remove route is also preserved.
+     * After dismissing an item it returns the latest visible activities.
+     */
     public function removeActivity(Request $request, string $key)
     {
         DismissedActivity::firstOrCreate([
             'activity_key' => $key,
         ]);
 
-        $limit = max(1, min((int) $request->get('limit', 6), 100));
+        $limit = max(1, min((int) $request->get('limit', 10), 100));
 
         return response()->json([
             'success' => true,
-            'activities' => $this->getActivities($limit)->values(),
+            'activities' => $this->getActivities()->take($limit)->values(),
         ]);
     }
 
-    private function getActivities(int $limit)
+    /*
+     * Build the COMPLETE activity history that can be reconstructed
+     * from the data currently stored by SmartMeet.
+     *
+     * No take(50), no take(20), and no dashboard-side truncation.
+     */
+    private function getActivities()
     {
         $activities = collect();
+
         $dismissedKeys = DismissedActivity::pluck('activity_key')->all();
 
-        $recentMeetings = Meeting::with('organizer')
-            ->latest()
-            ->take(50)
-            ->get();
+        /*
+         * Every stored meeting contributes a meeting-created activity.
+         */
+        Meeting::with('organizer')
+            ->orderByDesc('created_at')
+            ->get()
+            ->each(function (Meeting $meeting) use (&$activities, $dismissedKeys) {
+                $key = 'meeting-' . $meeting->id;
 
-        foreach ($recentMeetings as $meeting) {
-            $key = 'meeting-' . $meeting->id;
+                if (in_array($key, $dismissedKeys, true)) {
+                    return;
+                }
 
-            if (in_array($key, $dismissedKeys, true)) {
-                continue;
-            }
+                $activities->push([
+                    'key' => $key,
+                    'image' => optional($meeting->organizer)->image_url
+                        ?? asset('images/default-avatar.png'),
+                    'name' => optional($meeting->organizer)->name ?? 'Unknown',
+                    'message' => 'Created meeting: ' . $meeting->title,
+                    'time' => optional($meeting->created_at)->diffForHumans()
+                        ?? 'Unknown time',
+                    'date_time' => optional($meeting->created_at)
+                        ? $meeting->created_at->format('d M Y, h:i A')
+                        : '',
+                    'sort' => $meeting->created_at,
+                    'type' => 'meeting',
+                ]);
+            });
 
-            $activities->push([
-                'key' => $key,
-                'image' => optional($meeting->organizer)->image_url
-                    ?? asset('images/default-avatar.png'),
-                'name' => optional($meeting->organizer)->name ?? 'Unknown',
-                'message' => 'Created meeting: ' . $meeting->title,
-                'time' => optional($meeting->created_at)->diffForHumans() ?? 'Recently',
-                'sort' => $meeting->created_at,
-                'type' => 'meeting',
-            ]);
-        }
+        /*
+         * Every stored user contributes a registration/join activity.
+         */
+        User::orderByDesc('created_at')
+            ->get()
+            ->each(function (User $user) use (&$activities, $dismissedKeys) {
+                $key = 'user-' . $user->id;
 
-        $recentUsers = User::latest()
-            ->take(50)
-            ->get();
+                if (in_array($key, $dismissedKeys, true)) {
+                    return;
+                }
 
-        foreach ($recentUsers as $user) {
-            $key = 'user-' . $user->id;
-
-            if (in_array($key, $dismissedKeys, true)) {
-                continue;
-            }
-
-            $activities->push([
-                'key' => $key,
-                'image' => $user->image_url
-                    ?? asset('images/default-avatar.png'),
-                'name' => $user->name,
-                'message' => 'Joined as ' . ucfirst($user->role),
-                'time' => optional($user->created_at)->diffForHumans() ?? 'Recently',
-                'sort' => $user->created_at,
-                'type' => 'user',
-            ]);
-        }
+                $activities->push([
+                    'key' => $key,
+                    'image' => $user->image_url
+                        ?? asset('images/default-avatar.png'),
+                    'name' => $user->name,
+                    'message' => 'Joined as ' . ucfirst($user->role),
+                    'time' => optional($user->created_at)->diffForHumans()
+                        ?? 'Unknown time',
+                    'date_time' => optional($user->created_at)
+                        ? $user->created_at->format('d M Y, h:i A')
+                        : '',
+                    'sort' => $user->created_at,
+                    'type' => 'user',
+                ]);
+            });
 
         return $activities
-            ->sortByDesc('sort')
-            ->take($limit)
+            ->sortByDesc(function ($activity) {
+                return $activity['sort'];
+            })
             ->values();
     }
 }
