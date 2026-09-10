@@ -1,2 +1,13 @@
 User-agent: *
-Disallow:
+Allow: /
+
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /organizer
+Disallow: /participant
+Disallow: /notifications
+
+Sitemap: https://smartmeet.live/sitemap.xml
