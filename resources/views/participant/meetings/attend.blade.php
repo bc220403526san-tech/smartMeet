@@ -205,14 +205,14 @@
         .btn-send{background:linear-gradient(135deg,#2563eb,#0891b2); border:none; color:#fff}
         .chat-voice-btn.listening{color:#ef4444; border-color:rgba(239,68,68,.5); background:rgba(239,68,68,.14)}
 
-        .people-scroll-wrap{position:relative; flex:1; min-height:0; overflow:hidden}
+        .people-scroll-shell{position:relative; flex:1; min-height:0; overflow:hidden}
         .people-body{height:100%; min-height:0; overflow-y:auto !important; overflow-x:hidden; overscroll-behavior:contain; padding:12px 20px 12px 12px; display:flex; flex-direction:column; gap:8px; scrollbar-width:none}
         .people-body::-webkit-scrollbar{display:none}
-        .people-custom-scrollbar{position:absolute; top:10px; right:6px; bottom:10px; width:10px; border-radius:999px; background:rgba(255,255,255,.08); z-index:50; display:none}
-        .people-custom-scrollbar.show{display:block}
-        .people-custom-thumb{position:absolute; top:0; left:1px; width:8px; min-height:46px; border-radius:999px; background:#d1d5db; cursor:grab; touch-action:none; user-select:none; box-shadow:0 0 0 1px rgba(15,23,42,.6)}
-        .people-custom-thumb:hover{background:#f3f4f6}
-        .people-custom-thumb:active{cursor:grabbing; background:#fff}
+        .people-grab-track{position:absolute; top:8px; right:5px; bottom:8px; width:10px; border-radius:999px; background:rgba(255,255,255,.06); z-index:40; display:none}
+        .people-grab-track.show{display:block}
+        .people-grab-thumb{position:absolute; top:0; left:1px; width:8px; min-height:44px; border-radius:999px; background:#e5e7eb; cursor:grab; touch-action:none; user-select:none; box-shadow:0 0 0 1px rgba(15,23,42,.65)}
+        .people-grab-thumb:hover{background:#fff}
+        .people-grab-thumb:active{cursor:grabbing; background:#fff}
         .person-row{display:flex; align-items:center; gap:10px; padding:10px; border-radius:13px; border:1px solid var(--line); background:rgba(255,255,255,.02); transition:opacity .2s, filter .2s, background .2s, border-color .2s}
         .person-row.joined{opacity:1; filter:none; background:rgba(34,197,94,.07); border-color:rgba(34,197,94,.22)}
         .person-row.pending{opacity:.5; filter:grayscale(.5) saturate(.4)}
@@ -721,10 +721,10 @@
                     </div>
                     <div class="room-invite-link" id="room-invite-link-preview" title="Meeting invite link"></div>
                 </div>
-                <div class="people-scroll-wrap" id="people-scroll-wrap">
+                <div class="people-scroll-shell" id="people-scroll-shell">
                     <div class="people-body" id="people-body"></div>
-                    <div class="people-custom-scrollbar" id="people-custom-scrollbar" aria-hidden="true">
-                        <div class="people-custom-thumb" id="people-custom-thumb"></div>
+                    <div class="people-grab-track" id="people-grab-track" aria-hidden="true">
+                        <div class="people-grab-thumb" id="people-grab-thumb"></div>
                     </div>
                 </div>
             </div>
@@ -867,6 +867,15 @@
     const camStatus     = {};
     const receivedSignalIds = new Set();
     let localStream = null, isMicOn = false, isCameraOn = false;
+
+    // Mesh WebRTC becomes expensive as the room grows because every browser
+    // sends media to every other browser. Once 6 people are online, SmartMeet
+    // automatically enters audio-priority mode: camera transmission is stopped
+    // and bandwidth/CPU are reserved for reliable two-way voice.
+    const AUDIO_PRIORITY_THRESHOLD = 6;
+    let audioPriorityMode = false;
+    let audioPriorityNoticeShown = false;
+
     let screenStream = null, screenTrack = null, isScreenSharing = false, screenShareBusy = false;
     let maximizedUserId = null, maximizedPlaceholder = null;
     let activeTab = null, panelOpen = false, unreadChat = 0;
@@ -1001,13 +1010,22 @@
 
     /* ---------- Online count / people list ---------- */
     function updateOnlineCount(){ document.querySelectorAll('[data-online-count]').forEach(el=>el.textContent=onlineUsers.size); }
-    function markOnline(uid){ uid=String(uid); onlineUsers.add(uid); if(knownParticipants[uid]) knownParticipants[uid].hasJoined=true; updateOnlineCount(); renderPersonRow(uid); }
+    function markOnline(uid){
+        uid=String(uid);
+        onlineUsers.add(uid);
+        if(knownParticipants[uid]) knownParticipants[uid].hasJoined=true;
+        updateOnlineCount();
+        renderPersonRow(uid);
+        queueMicrotask(()=>applyRoomLoadPolicy());
+    }
+
     function markOffline(uid){
         uid=String(uid);
         onlineUsers.delete(uid);
         if(knownParticipants[uid]) knownParticipants[uid].hasJoined=false;
         updateOnlineCount();
         renderPersonRow(uid);
+        queueMicrotask(()=>applyRoomLoadPolicy());
     }
 
     function markUserLeft(uid){
@@ -1017,6 +1035,7 @@
         if(knownParticipants[uid]) knownParticipants[uid].hasJoined=false;
         updateOnlineCount();
         renderPersonRow(uid);
+        queueMicrotask(()=>applyRoomLoadPolicy());
     }
 
     function renderPeopleList(){
@@ -1760,7 +1779,23 @@
         }catch(e){ console.warn('[SmartMeet] video sender sync failed',uid,e); }
     }
 
-    async function syncTracksToEveryPeer(){ await Promise.allSettled(Object.keys(peers).map(uid=>syncLocalTracksToPeer(uid))); }
+    async function syncTracksToEveryPeer(){
+        const ids=Object.keys(peers).filter(uid=>{
+            const pc=peers[uid];
+            return pc && pc.signalingState!=='closed' && !leftUsers.has(String(uid));
+        });
+
+        // Updating every RTCPeerConnection at exactly the same millisecond can
+        // freeze the browser in a larger mesh. Small batches keep controls responsive.
+        const batchSize = audioPriorityMode ? 2 : 4;
+        for(let i=0;i<ids.length;i+=batchSize){
+            const batch=ids.slice(i,i+batchSize);
+            await Promise.allSettled(batch.map(uid=>syncLocalTracksToPeer(uid)));
+            if(i+batchSize<ids.length){
+                await new Promise(resolve=>setTimeout(resolve,35));
+            }
+        }
+    }
 
     async function ensureOutboundMediaNegotiated(uid){
         uid=String(uid);
@@ -2642,9 +2677,10 @@
 
             if(Array.isArray(params.encodings) && params.encodings.length){
                 params.encodings.forEach(enc=>{
-                    // Give Opus enough headroom for clean speech on laptop/mobile.
-                    // Audio is still mono and small compared with video bandwidth.
-                    enc.maxBitrate=128000;
+                    // Prioritize speech stability over raw bitrate. In larger
+                    // mesh rooms every user sends one audio stream per peer, so
+                    // 48 kbps keeps speech clear while drastically reducing uplink.
+                    enc.maxBitrate=audioPriorityMode ? 48000 : 64000;
 
                     // These are supported by Chromium where available.
                     try{ enc.priority='high'; }catch(e){}
@@ -2665,10 +2701,52 @@
         return list.find(t=>t.readyState==='live') || null;
     }
 
+    async function applyRoomLoadPolicy(){
+        const shouldPrioritizeAudio = onlineUsers.size >= AUDIO_PRIORITY_THRESHOLD;
+        if(shouldPrioritizeAudio === audioPriorityMode) return;
+
+        audioPriorityMode = shouldPrioritizeAudio;
+
+        if(audioPriorityMode){
+            // Stop camera capture/encoding completely. This is the biggest CPU and
+            // uplink saving in a peer-to-peer mesh and keeps microphone RTP healthy.
+            if(isCameraOn){
+                isCameraOn=false;
+                const cam=liveLocalTrack('video');
+                if(cam){
+                    try{ localStream?.removeTrack(cam); }catch(e){}
+                    try{ cam.stop(); }catch(e){}
+                }
+                setCameraButton(false);
+                broadcastMyCameraStatus();
+            }
+
+            if(!audioPriorityNoticeShown){
+                audioPriorityNoticeShown=true;
+                showToast('🎙️ Audio priority enabled for this larger meeting. Camera is paused to keep everyone’s voice stable.');
+            }
+
+            // Do not block UI while every peer sender is updated.
+            syncTracksToEveryPeer().catch(()=>{});
+            if(isMicOn){
+                Object.keys(peers).forEach((uid,index)=>{
+                    setTimeout(()=>ensureOutboundMediaNegotiated(uid).catch(()=>{}), index*120);
+                });
+            }
+        }else{
+            audioPriorityNoticeShown=false;
+            showToast('📷 Room load is lower now. Camera can be turned on again.');
+        }
+    }
+
     function activeOutgoingVideoTrack(){
         if(isScreenSharing && screenTrack && screenTrack.readyState==='live'){
             return screenTrack;
         }
+
+        // Camera video is intentionally not sent in audio-priority mode.
+        if(audioPriorityMode) return null;
+
         return liveLocalTrack('video');
     }
 
@@ -2860,7 +2938,13 @@
 
     function verifyAudioForAllPeers(){
         const ids=Object.keys(peers).filter(uid=>onlineUsers.has(String(uid)) && !leftUsers.has(String(uid)));
-        return Promise.allSettled(ids.map(uid=>verifyPeerAudioOutbound(uid)));
+
+        // Stagger stats/repair checks so several peers do not hammer the main thread
+        // at the same time. This matters most when 6+ users are connected.
+        ids.forEach((uid,index)=>{
+            setTimeout(()=>verifyPeerAudioOutbound(uid).catch(()=>{}), index*180);
+        });
+        return Promise.resolve();
     }
 
     async function toggleMic(){
@@ -2894,17 +2978,20 @@
             track.enabled=true;
             setMicButton(true);
 
-            // Attach the microphone to every current peer in parallel.
-            await syncTracksToEveryPeer();
+            // Update UI immediately, then propagate mic to the mesh in the
+            // background. Waiting for every peer here made the mic button look
+            // broken whenever several participants were negotiating at once.
+            syncTracksToEveryPeer()
+                .then(()=>{
+                    Object.keys(peers).forEach((uid,index)=>{
+                        setTimeout(()=>ensureOutboundMediaNegotiated(uid).catch(()=>{}), index*100);
+                    });
+                    setTimeout(()=>verifyAudioForAllPeers(),350);
+                })
+                .catch(()=>{});
 
             // The first click also satisfies mobile autoplay policy for remote audio.
             unlockRemoteMedia();
-
-            // Verify negotiated sender direction once, then verify real outbound RTP.
-            await Promise.allSettled(
-                Object.keys(peers).map(uid=>ensureOutboundMediaNegotiated(uid))
-            );
-            setTimeout(()=>verifyAudioForAllPeers(),350);
 
             broadcastMyMicStatus();
             startTranscript();
@@ -2984,6 +3071,11 @@
         try{
             const targetOn=!isCameraOn;
 
+            if(targetOn && audioPriorityMode){
+                showToast('🎙️ Camera is paused in larger meetings so everyone’s voice stays stable.');
+                return;
+            }
+
             if(!targetOn){
                 isCameraOn=false;
                 const old=liveLocalTrack('video');
@@ -2994,7 +3086,7 @@
                 setCameraButton(false);
                 const localVideo=document.getElementById('localVideo');
                 if(localVideo) localVideo.srcObject=localStream || new MediaStream();
-                await syncTracksToEveryPeer();
+                syncTracksToEveryPeer().catch(()=>{});
                 broadcastMyCameraStatus();
                 return;
             }
@@ -3015,9 +3107,10 @@
                 localVideo.play().catch(()=>{});
             }
 
-            // One sender update + at most one negotiation pass.
-            await syncTracksToEveryPeer();
-            ensureOutboundMediaForAll();
+            // Keep controls responsive; sender updates continue in background.
+            syncTracksToEveryPeer()
+                .then(()=>ensureOutboundMediaForAll())
+                .catch(()=>{});
             broadcastMyCameraStatus();
             unlockRemoteMedia();
         }finally{
@@ -3793,6 +3886,7 @@
         await startAudio();
         const realtimeReady=await listenForSignals();
         announceJoin(true);
+        applyRoomLoadPolicy();
         scheduleAutoEnd();
 
         // Bounded startup recovery only. Do not continuously resync tracks,
@@ -3813,40 +3907,42 @@
 
 
 
+
+
 <script>
     (function(){
         const body = document.getElementById('people-body');
-        const wrap = document.getElementById('people-scroll-wrap');
-        const rail = document.getElementById('people-custom-scrollbar');
-        const thumb = document.getElementById('people-custom-thumb');
+        const shell = document.getElementById('people-scroll-shell');
+        const track = document.getElementById('people-grab-track');
+        const thumb = document.getElementById('people-grab-thumb');
         const peopleTab = document.getElementById('tab-people');
 
-        if (!body || !wrap || !rail || !thumb) return;
+        if (!body || !shell || !track || !thumb) return;
 
         let dragging = false;
-        let startY = 0;
-        let startScrollTop = 0;
+        let dragStartY = 0;
+        let dragStartScrollTop = 0;
 
-        function syncPeopleCustomScrollbar(){
+        function syncPeopleGrabHandle(){
             const clientHeight = body.clientHeight;
             const scrollHeight = body.scrollHeight;
             const maxScroll = scrollHeight - clientHeight;
 
             if (clientHeight <= 0 || maxScroll <= 1) {
-                rail.classList.remove('show');
+                track.classList.remove('show');
                 thumb.style.transform = 'translateY(0px)';
                 return;
             }
 
-            rail.classList.add('show');
+            track.classList.add('show');
 
-            const railHeight = rail.clientHeight;
+            const trackHeight = track.clientHeight;
             const thumbHeight = Math.max(
-                46,
-                Math.round(railHeight * (clientHeight / scrollHeight))
+                44,
+                Math.round(trackHeight * (clientHeight / scrollHeight))
             );
 
-            const maxThumbTop = Math.max(0, railHeight - thumbHeight);
+            const maxThumbTop = Math.max(0, trackHeight - thumbHeight);
             const thumbTop = maxScroll > 0
                 ? (body.scrollTop / maxScroll) * maxThumbTop
                 : 0;
@@ -3857,8 +3953,8 @@
 
         thumb.addEventListener('pointerdown', function(event){
             dragging = true;
-            startY = event.clientY;
-            startScrollTop = body.scrollTop;
+            dragStartY = event.clientY;
+            dragStartScrollTop = body.scrollTop;
             thumb.setPointerCapture(event.pointerId);
             event.preventDefault();
         });
@@ -3866,20 +3962,20 @@
         thumb.addEventListener('pointermove', function(event){
             if (!dragging) return;
 
-            const railHeight = rail.clientHeight;
+            const trackHeight = track.clientHeight;
             const thumbHeight = thumb.offsetHeight;
-            const maxThumbTravel = Math.max(1, railHeight - thumbHeight);
+            const maxThumbTravel = Math.max(1, trackHeight - thumbHeight);
             const maxScroll = Math.max(0, body.scrollHeight - body.clientHeight);
-            const deltaY = event.clientY - startY;
+            const deltaY = event.clientY - dragStartY;
 
             body.scrollTop =
-                startScrollTop +
+                dragStartScrollTop +
                 (deltaY / maxThumbTravel) * maxScroll;
 
             event.preventDefault();
         });
 
-        function stopDrag(event){
+        function endDrag(event){
             if (!dragging) return;
             dragging = false;
 
@@ -3888,17 +3984,18 @@
             } catch (_) {}
         }
 
-        thumb.addEventListener('pointerup', stopDrag);
-        thumb.addEventListener('pointercancel', stopDrag);
+        thumb.addEventListener('pointerup', endDrag);
+        thumb.addEventListener('pointercancel', endDrag);
 
-        rail.addEventListener('pointerdown', function(event){
+        track.addEventListener('pointerdown', function(event){
             if (event.target === thumb) return;
 
-            const rect = rail.getBoundingClientRect();
+            const rect = track.getBoundingClientRect();
             const thumbHeight = thumb.offsetHeight;
-            const maxThumbTravel = Math.max(1, rail.clientHeight - thumbHeight);
+            const maxThumbTravel = Math.max(1, track.clientHeight - thumbHeight);
             const maxScroll = Math.max(0, body.scrollHeight - body.clientHeight);
-            const desiredTop = Math.max(
+
+            const targetTop = Math.max(
                 0,
                 Math.min(
                     maxThumbTravel,
@@ -3906,59 +4003,32 @@
                 )
             );
 
-            body.scrollTop = (desiredTop / maxThumbTravel) * maxScroll;
+            body.scrollTop = (targetTop / maxThumbTravel) * maxScroll;
             event.preventDefault();
         });
 
-        body.addEventListener(
-            'scroll',
-            syncPeopleCustomScrollbar,
-            { passive: true }
-        );
+        body.addEventListener('scroll', syncPeopleGrabHandle, { passive: true });
+        window.addEventListener('resize', syncPeopleGrabHandle);
 
-        window.addEventListener(
-            'resize',
-            syncPeopleCustomScrollbar
-        );
-
-        const contentObserver = new MutationObserver(
-            syncPeopleCustomScrollbar
-        );
-
-        contentObserver.observe(
-            body,
-            {
-                childList: true,
-                subtree: true
-            }
-        );
+        const listObserver = new MutationObserver(syncPeopleGrabHandle);
+        listObserver.observe(body, { childList: true, subtree: true });
 
         if (peopleTab) {
             const tabObserver = new MutationObserver(function(){
-                requestAnimationFrame(syncPeopleCustomScrollbar);
+                requestAnimationFrame(syncPeopleGrabHandle);
             });
-
-            tabObserver.observe(
-                peopleTab,
-                {
-                    attributes: true,
-                    attributeFilter: ['style', 'class']
-                }
-            );
+            tabObserver.observe(peopleTab, { attributes: true, attributeFilter: ['style', 'class'] });
         }
 
         if ('ResizeObserver' in window) {
-            const resizeObserver = new ResizeObserver(
-                syncPeopleCustomScrollbar
-            );
-
+            const resizeObserver = new ResizeObserver(syncPeopleGrabHandle);
             resizeObserver.observe(body);
-            resizeObserver.observe(wrap);
+            resizeObserver.observe(shell);
         }
 
-        requestAnimationFrame(syncPeopleCustomScrollbar);
-        setTimeout(syncPeopleCustomScrollbar, 250);
-        setTimeout(syncPeopleCustomScrollbar, 700);
+        requestAnimationFrame(syncPeopleGrabHandle);
+        setTimeout(syncPeopleGrabHandle, 250);
+        setTimeout(syncPeopleGrabHandle, 700);
     })();
 </script>
 

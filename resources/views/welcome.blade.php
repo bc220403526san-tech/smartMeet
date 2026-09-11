@@ -2106,7 +2106,7 @@
 
         .footer-col h4 {
             margin: 0 0 13px;
-            color: #98a2b3;
+            color: #667085;
             text-transform: uppercase;
             letter-spacing: .08em;
             font-size: 12px;
@@ -2124,7 +2124,7 @@
             margin-top: 34px;
             padding-top: 22px;
             border-top: 1px solid var(--line);
-            color: #98a2b3;
+            color: #667085;
             font-size: 12px;
         }
 

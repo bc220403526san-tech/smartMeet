@@ -927,6 +927,15 @@
     const camStatus     = {};
     const receivedSignalIds = new Set();
     let localStream = null, isMicOn = false, isCameraOn = false;
+
+    // Mesh WebRTC becomes expensive as the room grows because every browser
+    // sends media to every other browser. Once 6 people are online, SmartMeet
+    // automatically enters audio-priority mode: camera transmission is stopped
+    // and bandwidth/CPU are reserved for reliable two-way voice.
+    const AUDIO_PRIORITY_THRESHOLD = 6;
+    let audioPriorityMode = false;
+    let audioPriorityNoticeShown = false;
+
     let screenStream = null, screenTrack = null, isScreenSharing = false, screenShareBusy = false;
     let maximizedUserId = null, maximizedPlaceholder = null;
     let activeTab = null, panelOpen = false, unreadChat = 0;
@@ -1169,13 +1178,22 @@
 
     /* ---------- Online count / people list ---------- */
     function updateOnlineCount(){ document.querySelectorAll('[data-online-count]').forEach(el=>el.textContent=onlineUsers.size); }
-    function markOnline(uid){ uid=String(uid); onlineUsers.add(uid); if(knownParticipants[uid]) knownParticipants[uid].hasJoined=true; updateOnlineCount(); renderPersonRow(uid); }
+    function markOnline(uid){
+        uid=String(uid);
+        onlineUsers.add(uid);
+        if(knownParticipants[uid]) knownParticipants[uid].hasJoined=true;
+        updateOnlineCount();
+        renderPersonRow(uid);
+        queueMicrotask(()=>applyRoomLoadPolicy());
+    }
+
     function markOffline(uid){
         uid=String(uid);
         onlineUsers.delete(uid);
         if(knownParticipants[uid]) knownParticipants[uid].hasJoined=false;
         updateOnlineCount();
         renderPersonRow(uid);
+        queueMicrotask(()=>applyRoomLoadPolicy());
     }
 
     function markUserLeft(uid){
@@ -1185,6 +1203,7 @@
         if(knownParticipants[uid]) knownParticipants[uid].hasJoined=false;
         updateOnlineCount();
         renderPersonRow(uid);
+        queueMicrotask(()=>applyRoomLoadPolicy());
     }
 
     function renderPeopleList(){
@@ -2111,7 +2130,23 @@
         }catch(e){ console.warn('[SmartMeet] video sender sync failed',uid,e); }
     }
 
-    async function syncTracksToEveryPeer(){ await Promise.allSettled(Object.keys(peers).map(uid=>syncLocalTracksToPeer(uid))); }
+    async function syncTracksToEveryPeer(){
+        const ids=Object.keys(peers).filter(uid=>{
+            const pc=peers[uid];
+            return pc && pc.signalingState!=='closed' && !leftUsers.has(String(uid));
+        });
+
+        // Updating every RTCPeerConnection at exactly the same millisecond can
+        // freeze the browser in a larger mesh. Small batches keep controls responsive.
+        const batchSize = audioPriorityMode ? 2 : 4;
+        for(let i=0;i<ids.length;i+=batchSize){
+            const batch=ids.slice(i,i+batchSize);
+            await Promise.allSettled(batch.map(uid=>syncLocalTracksToPeer(uid)));
+            if(i+batchSize<ids.length){
+                await new Promise(resolve=>setTimeout(resolve,35));
+            }
+        }
+    }
 
     async function ensureOutboundMediaNegotiated(uid){
         uid=String(uid);
@@ -2972,9 +3007,10 @@
 
             if(Array.isArray(params.encodings) && params.encodings.length){
                 params.encodings.forEach(enc=>{
-                    // Give Opus enough headroom for clean speech on laptop/mobile.
-                    // Audio is still mono and small compared with video bandwidth.
-                    enc.maxBitrate=128000;
+                    // Prioritize speech stability over raw bitrate. In larger
+                    // mesh rooms every user sends one audio stream per peer, so
+                    // 48 kbps keeps speech clear while drastically reducing uplink.
+                    enc.maxBitrate=audioPriorityMode ? 48000 : 64000;
 
                     // These are supported by Chromium where available.
                     try{ enc.priority='high'; }catch(e){}
@@ -2995,10 +3031,52 @@
         return list.find(t=>t.readyState==='live') || null;
     }
 
+    async function applyRoomLoadPolicy(){
+        const shouldPrioritizeAudio = onlineUsers.size >= AUDIO_PRIORITY_THRESHOLD;
+        if(shouldPrioritizeAudio === audioPriorityMode) return;
+
+        audioPriorityMode = shouldPrioritizeAudio;
+
+        if(audioPriorityMode){
+            // Stop camera capture/encoding completely. This is the biggest CPU and
+            // uplink saving in a peer-to-peer mesh and keeps microphone RTP healthy.
+            if(isCameraOn){
+                isCameraOn=false;
+                const cam=liveLocalTrack('video');
+                if(cam){
+                    try{ localStream?.removeTrack(cam); }catch(e){}
+                    try{ cam.stop(); }catch(e){}
+                }
+                setCameraButton(false);
+                broadcastMyCameraStatus();
+            }
+
+            if(!audioPriorityNoticeShown){
+                audioPriorityNoticeShown=true;
+                showToast('🎙️ Audio priority enabled for this larger meeting. Camera is paused to keep everyone’s voice stable.');
+            }
+
+            // Do not block UI while every peer sender is updated.
+            syncTracksToEveryPeer().catch(()=>{});
+            if(isMicOn){
+                Object.keys(peers).forEach((uid,index)=>{
+                    setTimeout(()=>ensureOutboundMediaNegotiated(uid).catch(()=>{}), index*120);
+                });
+            }
+        }else{
+            audioPriorityNoticeShown=false;
+            showToast('📷 Room load is lower now. Camera can be turned on again.');
+        }
+    }
+
     function activeOutgoingVideoTrack(){
         if(isScreenSharing && screenTrack && screenTrack.readyState==='live'){
             return screenTrack;
         }
+
+        // Camera video is intentionally not sent in audio-priority mode.
+        if(audioPriorityMode) return null;
+
         return liveLocalTrack('video');
     }
 
@@ -3190,7 +3268,13 @@
 
     function verifyAudioForAllPeers(){
         const ids=Object.keys(peers).filter(uid=>onlineUsers.has(String(uid)) && !leftUsers.has(String(uid)));
-        return Promise.allSettled(ids.map(uid=>verifyPeerAudioOutbound(uid)));
+
+        // Stagger stats/repair checks so several peers do not hammer the main thread
+        // at the same time. This matters most when 6+ users are connected.
+        ids.forEach((uid,index)=>{
+            setTimeout(()=>verifyPeerAudioOutbound(uid).catch(()=>{}), index*180);
+        });
+        return Promise.resolve();
     }
 
     async function toggleMic(){
@@ -3224,17 +3308,20 @@
             track.enabled=true;
             setMicButton(true);
 
-            // Attach the microphone to every current peer in parallel.
-            await syncTracksToEveryPeer();
+            // Update UI immediately, then propagate mic to the mesh in the
+            // background. Waiting for every peer here made the mic button look
+            // broken whenever several participants were negotiating at once.
+            syncTracksToEveryPeer()
+                .then(()=>{
+                    Object.keys(peers).forEach((uid,index)=>{
+                        setTimeout(()=>ensureOutboundMediaNegotiated(uid).catch(()=>{}), index*100);
+                    });
+                    setTimeout(()=>verifyAudioForAllPeers(),350);
+                })
+                .catch(()=>{});
 
             // The first click also satisfies mobile autoplay policy for remote audio.
             unlockRemoteMedia();
-
-            // Verify negotiated sender direction once, then verify real outbound RTP.
-            await Promise.allSettled(
-                Object.keys(peers).map(uid=>ensureOutboundMediaNegotiated(uid))
-            );
-            setTimeout(()=>verifyAudioForAllPeers(),350);
 
             broadcastMyMicStatus();
             startTranscript();
@@ -3314,6 +3401,11 @@
         try{
             const targetOn=!isCameraOn;
 
+            if(targetOn && audioPriorityMode){
+                showToast('🎙️ Camera is paused in larger meetings so everyone’s voice stays stable.');
+                return;
+            }
+
             if(!targetOn){
                 isCameraOn=false;
                 const old=liveLocalTrack('video');
@@ -3324,7 +3416,7 @@
                 setCameraButton(false);
                 const localVideo=document.getElementById('localVideo');
                 if(localVideo) localVideo.srcObject=localStream || new MediaStream();
-                await syncTracksToEveryPeer();
+                syncTracksToEveryPeer().catch(()=>{});
                 broadcastMyCameraStatus();
                 return;
             }
@@ -3345,9 +3437,10 @@
                 localVideo.play().catch(()=>{});
             }
 
-            // One sender update + at most one negotiation pass.
-            await syncTracksToEveryPeer();
-            ensureOutboundMediaForAll();
+            // Keep controls responsive; sender updates continue in background.
+            syncTracksToEveryPeer()
+                .then(()=>ensureOutboundMediaForAll())
+                .catch(()=>{});
             broadcastMyCameraStatus();
             unlockRemoteMedia();
         }finally{
@@ -4164,6 +4257,7 @@
         await startAudio();
         const realtimeReady=await listenForSignals();
         announceJoin(true);
+        applyRoomLoadPolicy();
         scheduleAutoEnd();
 
         // Bounded startup recovery only. Do not continuously resync tracks,
