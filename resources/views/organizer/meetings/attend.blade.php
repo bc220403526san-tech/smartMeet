@@ -892,6 +892,7 @@
     const MY_NAME         = @json(auth()->user()->name);
     const MY_INITIALS     = @json($userInitials);
     const MY_AVATAR_URL   = @json($myAvatarUrl ?? null);
+    const LIVEKIT_TOKEN_URL = @json(route('organizer.meetings.livekit-token', $meeting));
     const SIGNAL_URL      = @json(route('organizer.meetings.signal', $meeting));
     const TRANSCRIPT_URL  = @json(route('organizer.meetings.transcript', $meeting));
     const MARK_LEFT_URL   = @json(route('organizer.meetings.markLeft', $meeting));
@@ -4243,8 +4244,27 @@
     // Autoplay recovery is armed only when playback actually fails (armAudioUnlock).
     // Do not run media-unlock work on every click/touch/key event.
 
+    async function connectLiveKitForTest(){
+        try{
+            if(!window.SmartMeetLiveKit){
+                console.warn('[LiveKit] client not loaded');
+                return;
+            }
+
+            await window.SmartMeetLiveKit.connect({
+                tokenUrl: LIVEKIT_TOKEN_URL,
+                csrfToken: CSRF,
+            });
+
+            console.log('[LiveKit] connection test successful');
+        }catch(error){
+            console.error('[LiveKit] connection test failed', error);
+        }
+    }
+
     /* ---------- Boot ---------- */
     window.addEventListener('load', async () => {
+        void connectLiveKitForTest();
         renderMyOwnTile();
         setupPanelResize();
         renderPeopleList();
