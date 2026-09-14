@@ -3,6 +3,7 @@
 use App\Http\Controllers\Participant\MeetingAttendController;
 use App\Http\Controllers\Participant\MeetingController;
 use App\Http\Controllers\Participant\SettingsController;
+use App\Http\Controllers\LiveKitTokenController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -46,6 +47,7 @@ Route::middleware(['auth', 'role:participant'])
 
             // Live session
             Route::get('/{meeting}/attend', [MeetingAttendController::class, 'attend'])->name('attend');
+            Route::post('/{meeting}/livekit-token', LiveKitTokenController::class)->name('livekit-token');
             Route::post('/{meeting}/session-metadata', [MeetingAttendController::class, 'updateSessionMetadata'])
                 ->name('session-metadata');
             Route::post('/{meeting}/signal', [MeetingAttendController::class, 'signal'])->name('signal');
