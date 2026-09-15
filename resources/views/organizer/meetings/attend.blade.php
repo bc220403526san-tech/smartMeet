@@ -3055,7 +3055,6 @@
             if(localStream) broadcastMyMicStatus();
             return;
         }
-        if(data.type==='unmute'){ showModerationNotice('🎙️ The organizer allowed your microphone. Tap Mic to speak.'); return; }
     }
 
     /* ---------- Media ---------- */

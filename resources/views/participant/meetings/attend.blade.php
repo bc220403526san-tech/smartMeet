@@ -2585,17 +2585,6 @@
                     return;
                 }
 
-                if(control==='camera-on' && controlUser===String(MY_USER_ID)){
-                    try{
-                        if(!isCameraOn) await toggleCamera();
-                        else setCameraButton(true);
-                        showModerationNotice('📹 Your camera was turned on by the organizer.');
-                    }catch(e){
-                        console.warn('[SmartMeet] organizer camera-on failed',e);
-                        showModerationNotice('Please allow camera access to turn it on.');
-                    }
-                    return;
-                }
 
                 if(control==='participant-removed' && controlUser===String(MY_USER_ID)){
                     if(window.__smartMeetRemovalInProgress) return;
@@ -2735,19 +2724,6 @@
                 );
             }
 
-            return;
-        }
-        if(data.type==='unmute'){
-            if(from===String(ORGANIZER_ID)){
-                try{
-                    if(!isMicOn) await toggleMic();
-                    else setMicButton(true);
-                    showModerationNotice('🎙️ Your microphone was unmuted by the organizer.');
-                }catch(e){
-                    console.warn('[SmartMeet] organizer unmute failed',e);
-                    showModerationNotice('Please allow microphone access to unmute.');
-                }
-            }
             return;
         }
     }
