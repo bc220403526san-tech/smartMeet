@@ -2635,12 +2635,46 @@
         if(data.type==='answer') return handleAnswer(from, data.data);
         if(data.type==='ice-candidate') return handleIceCandidate(from, data.data);
         if(data.type==='mute'){
-            isMicOn=false;
-            if(localStream) localStream.getAudioTracks().forEach(t=>t.enabled=false);
-            setMicButton(false);
-            stopRecognition();
-            showModerationNotice('🎙️ Your microphone was muted by the organizer.');
-            if(localStream) broadcastMyMicStatus();
+            try{
+                if(window.SmartMeetLiveKit?.connected){
+                    await window.SmartMeetLiveKit.setMicrophoneEnabled(false);
+                }else{
+                    const audioTrack=localStream?.getAudioTracks?.()[0];
+                    if(audioTrack) audioTrack.enabled=false;
+                }
+
+                isMicOn=false;
+                setMicButton(false);
+
+                await sendSignal('all','mic-status',{
+                    userId:MY_USER_ID,
+                    muted:true
+                });
+
+                stopRecognition?.();
+
+                showModerationNotice(
+                    '🔇 Your microphone was muted by the organizer.'
+                );
+
+                console.log('[LiveKit] microphone muted by organizer');
+            }catch(e){
+                console.warn('[SmartMeet] organizer mute failed',e);
+
+                // Keep local UI/state safe even if the media operation failed.
+                isMicOn=false;
+                setMicButton(false);
+
+                void sendSignal('all','mic-status',{
+                    userId:MY_USER_ID,
+                    muted:true
+                }).catch(()=>{});
+
+                showModerationNotice(
+                    '🔇 Your microphone was muted by the organizer.'
+                );
+            }
+
             return;
         }
         if(data.type==='unmute'){
