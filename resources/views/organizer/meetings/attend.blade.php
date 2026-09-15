@@ -1327,10 +1327,10 @@
          * and then broadcasts mic-status; that confirmed state updates all UI.
          */
         if(currentlyMuted){
-            await sendSignal(uid,'unmute',{});
+            await sendSignal(uid,'unmute',{ organizerId:MY_USER_ID });
             showToast(`🎙️ Unmute request sent to ${name}.`);
         }else{
-            await sendSignal(uid,'mute',{});
+            await sendSignal(uid,'mute',{ organizerId:MY_USER_ID });
             showToast(`🔇 Muting ${name}…`);
         }
     }
@@ -1356,21 +1356,24 @@
             return;
         }
 
-        const unmutedIds=ids.filter(uid=>micStatus[uid]===false);
+        // Always send the real mute command to every active participant.
+        // micStatus is UI state and can be briefly stale during join/reconnect.
+        flashMuteAll();
 
-        if(!unmutedIds.length){
-            flashMuteAll();
-            showToast('🔇 All active participants are already muted.');
+        const results=await Promise.allSettled(
+            ids.map(uid=>sendSignal(uid,'mute',{ organizerId:MY_USER_ID }))
+        );
+
+        const delivered=results.filter(result=>
+            result.status==='fulfilled' && result.value===true
+        ).length;
+
+        if(delivered===0){
+            showToast('Mute All could not be delivered. Please try again.');
             return;
         }
 
-        flashMuteAll();
-
-        await Promise.allSettled(
-            unmutedIds.map(uid=>sendSignal(uid,'mute',{}))
-        );
-
-        showToast(`🔇 Mute All applied to ${unmutedIds.length} participant${unmutedIds.length===1?'':'s'}.`);
+        showToast(`🔇 Mute All sent to ${delivered} active participant${delivered===1?'':'s'}.`);
     }
 
     async function moderateParticipant(uid, action){
@@ -1411,6 +1414,17 @@
         const ok=await moderateParticipant(uid,'camera-off');
         if(!ok) return;
 
+        const delivered=await sendSignal(uid,'chat',{
+            smartmeetControl:'camera-off',
+            userId:uid,
+            organizerId:MY_USER_ID
+        });
+
+        if(!delivered){
+            showToast(`Camera-off command for ${name} could not be delivered.`);
+            return;
+        }
+
         showToast(`📷 Turning off ${name}'s camera…`);
     }
 
@@ -1421,6 +1435,15 @@
         if(!window.confirm(`Restrict ${name} from this meeting? They will be removed and will not be able to rejoin unless invited again.`)) return;
         const ok=await moderateParticipant(uid,'remove');
         if(!ok) return;
+
+        // The backend action is authoritative for rejoin restriction. This targeted
+        // realtime command removes the currently connected client immediately.
+        await sendSignal(uid,'chat',{
+            smartmeetControl:'participant-removed',
+            userId:uid,
+            organizerId:MY_USER_ID
+        });
+
         raisedHands.delete(uid);
         markUserLeft(uid);
         removeParticipantTile(uid,false);
@@ -2621,8 +2644,6 @@
     // POSTs every time the media repair loop runs.
     var signalInFlight = signalInFlight || new Map();
     var COALESCED_SIGNAL_TYPES = COALESCED_SIGNAL_TYPES || new Set([
-        'mic-status',
-        'camera-status',
         'presence-request',
         'presence-response'
     ]);
@@ -2667,8 +2688,6 @@
         if(!(signalInFlight instanceof Map)) signalInFlight=new Map();
         if(!(COALESCED_SIGNAL_TYPES instanceof Set)){
             COALESCED_SIGNAL_TYPES=new Set([
-                'mic-status',
-                'camera-status',
                 'presence-request',
                 'presence-response'
             ]);
@@ -2976,16 +2995,8 @@
         if(data.type==='offer') return handleOffer(from, data.data);
         if(data.type==='answer') return handleAnswer(from, data.data);
         if(data.type==='ice-candidate') return handleIceCandidate(from, data.data);
-        if(data.type==='mute'){
-            isMicOn=false;
-            if(localStream) localStream.getAudioTracks().forEach(t=>t.enabled=false);
-            setMicButton(false);
-            stopRecognition();
-            showModerationNotice('🎙️ Your microphone was muted by the organizer.');
-            if(localStream) broadcastMyMicStatus();
-            return;
-        }
-        if(data.type==='unmute'){ showModerationNotice('🎙️ The organizer allowed your microphone. Tap Mic to speak.'); return; }
+        // Participants can never remotely moderate the organizer.
+        if(data.type==='mute' || data.type==='unmute') return;
     }
 
     /* ---------- Media ---------- */
@@ -3193,6 +3204,9 @@
     }
 
     function setMicButton(on){
+        on=Boolean(on);
+        micStatus[String(MY_USER_ID)]=!on;
+
         const btn=document.getElementById('ctrl-mic');
         const off=document.getElementById('micoff-'+MY_USER_ID);
         if(btn){
@@ -3201,10 +3215,12 @@
             btn.classList.toggle('active',on);
         }
         if(off) off.style.display=on?'none':'flex';
+        renderPersonRow(String(MY_USER_ID));
     }
 
     function setCameraButton(on){
         on=Boolean(on);
+        camStatus[String(MY_USER_ID)]=on;
 
         const btn=document.getElementById('ctrl-camera');
         const video=document.getElementById('localVideo');
@@ -3226,6 +3242,8 @@
         if(avatar){
             avatar.style.display=showVideo?'none':'flex';
         }
+
+        renderPersonRow(String(MY_USER_ID));
     }
 
 
@@ -3575,10 +3593,15 @@
     }
 
     function broadcastMyMicStatus(){
-        void sendSignal('all','mic-status',{userId:MY_USER_ID,muted:!isMicOn}).catch(()=>{});
+        micStatus[String(MY_USER_ID)]=!isMicOn;
+        renderPersonRow(String(MY_USER_ID));
+        return sendSignal('all','mic-status',{userId:MY_USER_ID,muted:!isMicOn});
     }
     function broadcastMyCameraStatus(){
-        void sendSignal('all','camera-status',{userId:MY_USER_ID,cameraOn:Boolean(isCameraOn || isScreenSharing)}).catch(()=>{});
+        const cameraOn=Boolean(isCameraOn || isScreenSharing);
+        camStatus[String(MY_USER_ID)]=cameraOn;
+        renderPersonRow(String(MY_USER_ID));
+        return sendSignal('all','camera-status',{userId:MY_USER_ID,cameraOn});
     }
 
     /* ---------- Mobile media recovery ---------- */
@@ -4356,6 +4379,9 @@
         if(mediaTrack.kind==='video'){
             camStatus[uid]=!mediaTrack.muted;
         }
+        if(mediaTrack.kind==='audio'){
+            micStatus[uid]=Boolean(mediaTrack.muted);
+        }
 
         // A LiveKit publication can mute/unmute without being unsubscribed.
         // Keep the existing SmartMeet video/avatar/audio UI synchronized.
@@ -4364,24 +4390,37 @@
 
             mediaTrack.addEventListener('mute',()=>{
                 if(mediaTrack.kind==='video') camStatus[uid]=false;
+                if(mediaTrack.kind==='audio') micStatus[uid]=true;
                 attachRemoteStream(uid);
+                const micOff=document.getElementById('micoff-'+uid);
+                if(micOff && mediaTrack.kind==='audio') micOff.style.display='flex';
+                renderPersonRow(uid);
             });
 
             mediaTrack.addEventListener('unmute',()=>{
                 if(mediaTrack.kind==='video') camStatus[uid]=true;
+                if(mediaTrack.kind==='audio') micStatus[uid]=false;
                 attachRemoteStream(uid);
+                const micOff=document.getElementById('micoff-'+uid);
+                if(micOff && mediaTrack.kind==='audio') micOff.style.display='none';
+                renderPersonRow(uid);
                 if(mediaTrack.kind==='audio') unlockRemoteMedia();
             });
 
             mediaTrack.addEventListener('ended',()=>{
                 if(mediaTrack.kind==='video') camStatus[uid]=false;
+                if(mediaTrack.kind==='audio') micStatus[uid]=true;
                 attachRemoteStream(uid);
+                renderPersonRow(uid);
             });
         }
 
         attachRemoteStream(uid);
+        renderPersonRow(uid);
 
         if(mediaTrack.kind==='audio'){
+            const micOff=document.getElementById('micoff-'+uid);
+            if(micOff) micOff.style.display=micStatus[uid]?'flex':'none';
             unlockRemoteMedia();
         }
 
