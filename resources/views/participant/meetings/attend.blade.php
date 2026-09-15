@@ -2522,7 +2522,7 @@
 
             // Moderation commands are trusted only when sent by the real organizer.
             if(from===String(ORGANIZER_ID)){
-                if(control==='force-mute' && controlUser===String(MY_USER_ID) && String(data.toUserId)===String(MY_USER_ID)){
+                if(control==='force-mute' && controlUser===String(MY_USER_ID)){
                     try{
                         if(window.SmartMeetLiveKit?.connected){
                             await window.SmartMeetLiveKit.setMicrophoneEnabled(false);
@@ -2532,6 +2532,9 @@
 
                         isMicOn=false;
                         setMicButton(false);
+                        const ownMicOff=document.getElementById('micoff-'+MY_USER_ID);
+                        if(ownMicOff) ownMicOff.style.display='flex';
+                        renderPersonRow(String(MY_USER_ID));
                         const sp=document.getElementById('speaking-'+MY_USER_ID);
                         if(sp) sp.style.display='none';
                         stopRecognition?.();
@@ -2553,8 +2556,22 @@
                     const action=String(data.data?.action || '');
                     const affectedName=String(data.data?.name || knownParticipants[controlUser]?.name || 'Participant');
                     if(controlUser!==String(MY_USER_ID)){
-                        if(action==='mute') showToast(`🔇 Organizer muted ${escapeHtml(affectedName)}.`);
-                        if(action==='camera-off') showToast(`📷 Organizer turned off ${escapeHtml(affectedName)}'s camera.`);
+                        if(action==='mute'){
+                            micStatus[controlUser]=true;
+                            const micOffEl=document.getElementById('micoff-'+controlUser);
+                            if(micOffEl) micOffEl.style.display='flex';
+                            renderPersonRow(controlUser);
+                            showToast(`🔇 Organizer muted ${escapeHtml(affectedName)}.`);
+                        }
+                        if(action==='camera-off'){
+                            camStatus[controlUser]=false;
+                            const remoteVideo=document.getElementById('rvideo-'+controlUser);
+                            const remoteAvatar=document.getElementById('avatar-'+controlUser);
+                            if(remoteVideo) remoteVideo.style.display='none';
+                            if(remoteAvatar) remoteAvatar.style.display='flex';
+                            renderPersonRow(controlUser);
+                            showToast(`📷 Organizer turned off ${escapeHtml(affectedName)}'s camera.`);
+                        }
                     }
                     return;
                 }
@@ -2572,6 +2589,9 @@
 
                     isCameraOn=false;
                     setCameraButton(false);
+                    const ownAvatar=document.getElementById('avatar-'+MY_USER_ID);
+                    if(ownAvatar) ownAvatar.style.display='flex';
+                    renderPersonRow(String(MY_USER_ID));
 
                     const localVideo=document.getElementById('localVideo');
                     if(localVideo && !isScreenSharing){

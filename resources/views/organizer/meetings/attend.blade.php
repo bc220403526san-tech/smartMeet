@@ -1340,6 +1340,13 @@
             return;
         }
 
+        // Immediate organizer-side visual state; target confirms via mic-status.
+        micStatus[uid]=true;
+        const micOffEl=document.getElementById('micoff-'+uid);
+        if(micOffEl) micOffEl.style.display='flex';
+        renderPersonRow(uid);
+        flashParticipantMediaState(uid,'mic');
+
         await sendSignal('all','chat',{
             smartmeetControl:'moderation-notice',
             action:'mute',
@@ -1349,7 +1356,7 @@
             text:''
         });
 
-        showToast(`🔇 Mute command sent to ${name}.`);
+        showToast(`🔇 Muted ${name}.`);
     }
 
     async function muteAllParticipants(){
@@ -1401,6 +1408,14 @@
             showToast('Mute All could not be delivered. Please try again.');
             return;
         }
+
+        deliveredIds.forEach(uid=>{
+            micStatus[uid]=true;
+            const micOffEl=document.getElementById('micoff-'+uid);
+            if(micOffEl) micOffEl.style.display='flex';
+            renderPersonRow(uid);
+            flashParticipantMediaState(uid,'mic');
+        });
 
         await Promise.allSettled(deliveredIds.map(uid=>{
             const name=knownParticipants[uid]?.name || 'Participant';
@@ -1456,6 +1471,14 @@
         const ok=await moderateParticipant(uid,'camera-off');
         if(!ok) return;
 
+        camStatus[uid]=false;
+        const remoteVideo=document.getElementById('rvideo-'+uid);
+        const remoteAvatar=document.getElementById('avatar-'+uid);
+        if(remoteVideo) remoteVideo.style.display='none';
+        if(remoteAvatar) remoteAvatar.style.display='flex';
+        renderPersonRow(uid);
+        flashParticipantMediaState(uid,'camera');
+
         await sendSignal('all','chat',{
             smartmeetControl:'moderation-notice',
             action:'camera-off',
@@ -1465,7 +1488,7 @@
             text:''
         });
 
-        showToast(`📷 Camera-off command sent to ${name}.`);
+        showToast(`📷 Turned off ${name}'s camera.`);
     }
 
     async function restrictParticipant(uid){
