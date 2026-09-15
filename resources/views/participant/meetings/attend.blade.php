@@ -3904,6 +3904,99 @@
     // Autoplay recovery is armed only when playback actually fails (armAudioUnlock).
     // Do not run media-unlock work on every click/touch/key event.
 
+    let liveKitMediaBound=false;
+
+    function liveKitMediaUserId(participant){
+        const identity=String(participant?.identity || '');
+        if(!identity.startsWith('user-')) return null;
+
+        const uid=identity.slice(5);
+        return uid || null;
+    }
+
+    function attachLiveKitRemoteTrack(track, participant){
+        const uid=liveKitMediaUserId(participant);
+        if(!uid || uid===String(MY_USER_ID) || !track) return;
+
+        registerLiveKitParticipant(uid);
+
+        const mediaTrack=track.mediaStreamTrack;
+        if(!mediaTrack) return;
+
+        const stream=getOrCreateRemoteStream(uid);
+
+        // Remove an older LiveKit track of the same kind before adding replacement.
+        stream.getTracks()
+            .filter(t=>t.__smartMeetLiveKit && t.kind===mediaTrack.kind && t.id!==mediaTrack.id)
+            .forEach(t=>{
+                try{ stream.removeTrack(t); }catch(e){}
+            });
+
+        if(!stream.getTracks().some(t=>t.id===mediaTrack.id)){
+            try{
+                mediaTrack.__smartMeetLiveKit=true;
+                stream.addTrack(mediaTrack);
+            }catch(e){}
+        }
+
+        if(mediaTrack.kind==='video'){
+            camStatus[uid]=true;
+        }
+
+        attachRemoteStream(uid);
+
+        if(mediaTrack.kind==='audio'){
+            unlockRemoteMedia();
+        }
+
+        console.log('[LiveKit] remote track attached', uid, mediaTrack.kind);
+    }
+
+    function detachLiveKitRemoteTrack(track, participant){
+        const uid=liveKitMediaUserId(participant);
+        if(!uid || !track) return;
+
+        const mediaTrack=track.mediaStreamTrack;
+        const stream=remoteStreams[uid];
+
+        if(stream && mediaTrack){
+            const existing=stream.getTracks().find(t=>t.id===mediaTrack.id);
+            if(existing){
+                try{ stream.removeTrack(existing); }catch(e){}
+            }
+        }
+
+        if(mediaTrack?.kind==='video'){
+            const stillHasVideo=(stream?.getVideoTracks?.() || [])
+                .some(t=>t.readyState==='live');
+
+            if(!stillHasVideo) camStatus[uid]=false;
+        }
+
+        attachRemoteStream(uid);
+
+        console.log('[LiveKit] remote track detached', uid, mediaTrack?.kind || '');
+    }
+
+    function bindLiveKitMedia(){
+        if(liveKitMediaBound) return;
+        liveKitMediaBound=true;
+
+        window.addEventListener('smartmeet:livekit-track-subscribed', event=>{
+            attachLiveKitRemoteTrack(
+                event.detail?.track,
+                event.detail?.participant
+            );
+        });
+
+        window.addEventListener('smartmeet:livekit-track-unsubscribed', event=>{
+            detachLiveKitRemoteTrack(
+                event.detail?.track,
+                event.detail?.participant
+            );
+        });
+    }
+
     let liveKitPresenceBound=false;
 
     function liveKitUserId(participant){
@@ -3947,6 +4040,7 @@
             }
 
             bindLiveKitPresence();
+            bindLiveKitMedia();
 
             await window.SmartMeetLiveKit.connect({
                 tokenUrl: LIVEKIT_TOKEN_URL,
