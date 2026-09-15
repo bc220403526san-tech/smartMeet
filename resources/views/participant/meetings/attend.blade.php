@@ -4121,7 +4121,7 @@
 
     /* ---------- Boot ---------- */
     window.addEventListener('load', async () => {
-        void connectLiveKitForTest();
+        await connectLiveKitForTest();
         renderMyOwnTile();
         setupPanelResize();
         renderPeopleList();
