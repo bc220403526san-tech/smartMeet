@@ -1346,34 +1346,39 @@
             setTimeout(()=>muteAllIcon.classList.remove('mute-all-fired'),1250);
         };
 
-        const ids=[...onlineUsers]
+        const activeIds=[...onlineUsers]
             .map(String)
             .filter(uid=>uid!==String(MY_USER_ID));
 
-        if(!ids.length){
+        if(!activeIds.length){
             flashMuteAll();
             showToast('There are no active participants to mute.');
             return;
         }
 
-        // Always send the real mute command to every active participant.
-        // micStatus is UI state and can be briefly stale during join/reconnect.
+        // Mute All must affect only users whose latest confirmed state is unmuted.
+        // Unknown/already-muted users are deliberately not sent another mute command.
+        const unmutedIds=activeIds.filter(uid=>micStatus[uid]===false);
+
+        if(!unmutedIds.length){
+            flashMuteAll();
+            showToast('🔇 All active participants are already muted.');
+            return;
+        }
+
         flashMuteAll();
 
         const results=await Promise.allSettled(
-            ids.map(uid=>sendSignal(uid,'mute',{ organizerId:MY_USER_ID }))
+            unmutedIds.map(uid=>sendSignal(uid,'mute',{ organizerId:MY_USER_ID }))
         );
+        const delivered=results.filter(result=>result.status==='fulfilled' && result.value===true).length;
 
-        const delivered=results.filter(result=>
-            result.status==='fulfilled' && result.value===true
-        ).length;
-
-        if(delivered===0){
+        if(!delivered){
             showToast('Mute All could not be delivered. Please try again.');
             return;
         }
 
-        showToast(`🔇 Mute All sent to ${delivered} active participant${delivered===1?'':'s'}.`);
+        showToast(`🔇 Muted ${delivered} unmuted participant${delivered===1?'':'s'}.`);
     }
 
     async function moderateParticipant(uid, action){
@@ -1414,17 +1419,6 @@
         const ok=await moderateParticipant(uid,'camera-off');
         if(!ok) return;
 
-        const delivered=await sendSignal(uid,'chat',{
-            smartmeetControl:'camera-off',
-            userId:uid,
-            organizerId:MY_USER_ID
-        });
-
-        if(!delivered){
-            showToast(`Camera-off command for ${name} could not be delivered.`);
-            return;
-        }
-
         showToast(`📷 Turning off ${name}'s camera…`);
     }
 
@@ -1433,22 +1427,29 @@
         const info=knownParticipants[uid];
         const name=info?.name || 'this participant';
         if(!window.confirm(`Restrict ${name} from this meeting? They will be removed and will not be able to rejoin unless invited again.`)) return;
-        const ok=await moderateParticipant(uid,'remove');
-        if(!ok) return;
 
-        // The backend action is authoritative for rejoin restriction. This targeted
-        // realtime command removes the currently connected client immediately.
+        // Tell the currently connected browser first, while the participant still has
+        // a valid meeting membership. The backend remove action below remains the
+        // authoritative restriction and prevents future access/rejoin.
         await sendSignal(uid,'chat',{
             smartmeetControl:'participant-removed',
             userId:uid,
-            organizerId:MY_USER_ID
+            organizerId:MY_USER_ID,
+            text:''
         });
 
+        const ok=await moderateParticipant(uid,'remove');
+        if(!ok) return;
+
         raisedHands.delete(uid);
+        micStatus[uid]=true;
+        camStatus[uid]=false;
         markUserLeft(uid);
         removeParticipantTile(uid,false);
         document.getElementById('person-row-'+uid)?.remove();
+        delete remoteStreams[uid];
         delete knownParticipants[uid];
+        renderPeopleList();
         showToast(`🚫 ${escapeHtml(name)} has been restricted from this meeting.`);
     }
 
@@ -2644,6 +2645,8 @@
     // POSTs every time the media repair loop runs.
     var signalInFlight = signalInFlight || new Map();
     var COALESCED_SIGNAL_TYPES = COALESCED_SIGNAL_TYPES || new Set([
+        'mic-status',
+        'camera-status',
         'presence-request',
         'presence-response'
     ]);
@@ -2688,6 +2691,8 @@
         if(!(signalInFlight instanceof Map)) signalInFlight=new Map();
         if(!(COALESCED_SIGNAL_TYPES instanceof Set)){
             COALESCED_SIGNAL_TYPES=new Set([
+                'mic-status',
+                'camera-status',
                 'presence-request',
                 'presence-response'
             ]);
@@ -2995,8 +3000,16 @@
         if(data.type==='offer') return handleOffer(from, data.data);
         if(data.type==='answer') return handleAnswer(from, data.data);
         if(data.type==='ice-candidate') return handleIceCandidate(from, data.data);
-        // Participants can never remotely moderate the organizer.
-        if(data.type==='mute' || data.type==='unmute') return;
+        if(data.type==='mute'){
+            isMicOn=false;
+            if(localStream) localStream.getAudioTracks().forEach(t=>t.enabled=false);
+            setMicButton(false);
+            stopRecognition();
+            showModerationNotice('🎙️ Your microphone was muted by the organizer.');
+            if(localStream) broadcastMyMicStatus();
+            return;
+        }
+        if(data.type==='unmute'){ showModerationNotice('🎙️ The organizer allowed your microphone. Tap Mic to speak.'); return; }
     }
 
     /* ---------- Media ---------- */
@@ -3204,9 +3217,6 @@
     }
 
     function setMicButton(on){
-        on=Boolean(on);
-        micStatus[String(MY_USER_ID)]=!on;
-
         const btn=document.getElementById('ctrl-mic');
         const off=document.getElementById('micoff-'+MY_USER_ID);
         if(btn){
@@ -3215,12 +3225,10 @@
             btn.classList.toggle('active',on);
         }
         if(off) off.style.display=on?'none':'flex';
-        renderPersonRow(String(MY_USER_ID));
     }
 
     function setCameraButton(on){
         on=Boolean(on);
-        camStatus[String(MY_USER_ID)]=on;
 
         const btn=document.getElementById('ctrl-camera');
         const video=document.getElementById('localVideo');
@@ -3242,8 +3250,6 @@
         if(avatar){
             avatar.style.display=showVideo?'none':'flex';
         }
-
-        renderPersonRow(String(MY_USER_ID));
     }
 
 
@@ -3593,15 +3599,10 @@
     }
 
     function broadcastMyMicStatus(){
-        micStatus[String(MY_USER_ID)]=!isMicOn;
-        renderPersonRow(String(MY_USER_ID));
-        return sendSignal('all','mic-status',{userId:MY_USER_ID,muted:!isMicOn});
+        void sendSignal('all','mic-status',{userId:MY_USER_ID,muted:!isMicOn}).catch(()=>{});
     }
     function broadcastMyCameraStatus(){
-        const cameraOn=Boolean(isCameraOn || isScreenSharing);
-        camStatus[String(MY_USER_ID)]=cameraOn;
-        renderPersonRow(String(MY_USER_ID));
-        return sendSignal('all','camera-status',{userId:MY_USER_ID,cameraOn});
+        void sendSignal('all','camera-status',{userId:MY_USER_ID,cameraOn:Boolean(isCameraOn || isScreenSharing)}).catch(()=>{});
     }
 
     /* ---------- Mobile media recovery ---------- */
@@ -4378,9 +4379,11 @@
 
         if(mediaTrack.kind==='video'){
             camStatus[uid]=!mediaTrack.muted;
-        }
-        if(mediaTrack.kind==='audio'){
+        }else if(mediaTrack.kind==='audio'){
             micStatus[uid]=Boolean(mediaTrack.muted);
+            const micEl=document.getElementById('micoff-'+uid);
+            if(micEl) micEl.style.display=micStatus[uid]?'flex':'none';
+            renderPersonRow(uid);
         }
 
         // A LiveKit publication can mute/unmute without being unsubscribed.
@@ -4390,21 +4393,25 @@
 
             mediaTrack.addEventListener('mute',()=>{
                 if(mediaTrack.kind==='video') camStatus[uid]=false;
-                if(mediaTrack.kind==='audio') micStatus[uid]=true;
+                if(mediaTrack.kind==='audio'){
+                    micStatus[uid]=true;
+                    const micEl=document.getElementById('micoff-'+uid);
+                    if(micEl) micEl.style.display='flex';
+                }
                 attachRemoteStream(uid);
-                const micOff=document.getElementById('micoff-'+uid);
-                if(micOff && mediaTrack.kind==='audio') micOff.style.display='flex';
                 renderPersonRow(uid);
             });
 
             mediaTrack.addEventListener('unmute',()=>{
                 if(mediaTrack.kind==='video') camStatus[uid]=true;
-                if(mediaTrack.kind==='audio') micStatus[uid]=false;
+                if(mediaTrack.kind==='audio'){
+                    micStatus[uid]=false;
+                    const micEl=document.getElementById('micoff-'+uid);
+                    if(micEl) micEl.style.display='none';
+                    unlockRemoteMedia();
+                }
                 attachRemoteStream(uid);
-                const micOff=document.getElementById('micoff-'+uid);
-                if(micOff && mediaTrack.kind==='audio') micOff.style.display='none';
                 renderPersonRow(uid);
-                if(mediaTrack.kind==='audio') unlockRemoteMedia();
             });
 
             mediaTrack.addEventListener('ended',()=>{
@@ -4416,11 +4423,8 @@
         }
 
         attachRemoteStream(uid);
-        renderPersonRow(uid);
 
         if(mediaTrack.kind==='audio'){
-            const micOff=document.getElementById('micoff-'+uid);
-            if(micOff) micOff.style.display=micStatus[uid]?'flex':'none';
             unlockRemoteMedia();
         }
 

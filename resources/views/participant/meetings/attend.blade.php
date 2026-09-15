@@ -2270,6 +2270,8 @@
     // POSTs every time the media repair loop runs.
     var signalInFlight = signalInFlight || new Map();
     var COALESCED_SIGNAL_TYPES = COALESCED_SIGNAL_TYPES || new Set([
+        'mic-status',
+        'camera-status',
         'presence-request',
         'presence-response'
     ]);
@@ -2314,6 +2316,8 @@
         if(!(signalInFlight instanceof Map)) signalInFlight=new Map();
         if(!(COALESCED_SIGNAL_TYPES instanceof Set)){
             COALESCED_SIGNAL_TYPES=new Set([
+                'mic-status',
+                'camera-status',
                 'presence-request',
                 'presence-response'
             ]);
@@ -2520,32 +2524,27 @@
             if(from===String(ORGANIZER_ID)){
                 if(control==='camera-off' && controlUser===String(MY_USER_ID)){
                     try{
-                        const liveKit=window.SmartMeetLiveKit;
-                        if(liveKit?.connected){
-                            await liveKit.setCameraEnabled(false);
+                        if(window.SmartMeetLiveKit?.connected){
+                            await window.SmartMeetLiveKit.setCameraEnabled(false);
                         }else{
                             localStream?.getVideoTracks?.().forEach(track=>{ track.enabled=false; });
                         }
-
-                        isCameraOn=false;
-                        setCameraButton(false);
-
-                        const localVideo=document.getElementById('localVideo');
-                        if(localVideo && !isScreenSharing){
-                            localVideo.srcObject=new MediaStream();
-                            localVideo.style.display='none';
-                        }
-
-                        await broadcastMyCameraStatus();
-                        showModerationNotice('📷 Your camera was turned off by the organizer.');
-                        console.log('[LiveKit] camera turned off by organizer');
                     }catch(e){
                         console.warn('[SmartMeet] organizer camera-off failed',e);
-                        isCameraOn=false;
-                        setCameraButton(false);
-                        void broadcastMyCameraStatus().catch(()=>{});
-                        showModerationNotice('📷 Your camera was turned off by the organizer.');
                     }
+
+                    isCameraOn=false;
+                    setCameraButton(false);
+
+                    const localVideo=document.getElementById('localVideo');
+                    if(localVideo && !isScreenSharing){
+                        try{ localVideo.srcObject=null; }catch(e){}
+                        localVideo.style.display='none';
+                    }
+
+                    await broadcastMyCameraStatus().catch(()=>{});
+                    showModerationNotice('📷 Your camera was turned off by the organizer.');
+                    console.log('[LiveKit] camera turned off by organizer');
                     return;
                 }
 
@@ -2562,8 +2561,14 @@
                 }
 
                 if(control==='participant-removed' && controlUser===String(MY_USER_ID)){
+                    if(window.__smartMeetRemovalInProgress) return;
+                    window.__smartMeetRemovalInProgress=true;
+
                     showModerationNotice('🚫 You were restricted from this meeting by the organizer.');
-                    setTimeout(()=>{ try{ cleanup(); }catch(e){} window.location.href=LEAVE_URL; },1700);
+                    try{ window.SmartMeetLiveKit?.disconnect?.(); }catch(e){}
+                    try{ cleanup(); }catch(e){}
+
+                    setTimeout(()=>{ window.location.replace(LEAVE_URL); },700);
                     return;
                 }
 
@@ -2652,32 +2657,44 @@
         if(data.type==='answer') return handleAnswer(from, data.data);
         if(data.type==='ice-candidate') return handleIceCandidate(from, data.data);
         if(data.type==='mute'){
-            if(from!==String(ORGANIZER_ID)) return;
-
             try{
                 if(window.SmartMeetLiveKit?.connected){
                     await window.SmartMeetLiveKit.setMicrophoneEnabled(false);
                 }else{
-                    localStream?.getAudioTracks?.().forEach(track=>{ track.enabled=false; });
+                    const audioTrack=localStream?.getAudioTracks?.()[0];
+                    if(audioTrack) audioTrack.enabled=false;
                 }
 
                 isMicOn=false;
                 setMicButton(false);
+
+                await sendSignal('all','mic-status',{
+                    userId:MY_USER_ID,
+                    muted:true
+                });
+
                 stopRecognition?.();
 
-                const sp=document.getElementById('speaking-'+MY_USER_ID);
-                if(sp) sp.style.display='none';
+                showModerationNotice(
+                    '🔇 Your microphone was muted by the organizer.'
+                );
 
-                await broadcastMyMicStatus();
-                showModerationNotice('🔇 Your microphone was muted by the organizer.');
                 console.log('[LiveKit] microphone muted by organizer');
             }catch(e){
                 console.warn('[SmartMeet] organizer mute failed',e);
+
+                // Keep local UI/state safe even if the media operation failed.
                 isMicOn=false;
                 setMicButton(false);
-                stopRecognition?.();
-                void broadcastMyMicStatus().catch(()=>{});
-                showModerationNotice('🔇 Your microphone was muted by the organizer.');
+
+                void sendSignal('all','mic-status',{
+                    userId:MY_USER_ID,
+                    muted:true
+                }).catch(()=>{});
+
+                showModerationNotice(
+                    '🔇 Your microphone was muted by the organizer.'
+                );
             }
 
             return;
@@ -2902,9 +2919,6 @@
     }
 
     function setMicButton(on){
-        on=Boolean(on);
-        micStatus[String(MY_USER_ID)]=!on;
-
         const btn=document.getElementById('ctrl-mic');
         const off=document.getElementById('micoff-'+MY_USER_ID);
         if(btn){
@@ -2913,12 +2927,10 @@
             btn.classList.toggle('active',on);
         }
         if(off) off.style.display=on?'none':'flex';
-        renderPersonRow(String(MY_USER_ID));
     }
 
     function setCameraButton(on){
         on=Boolean(on);
-        camStatus[String(MY_USER_ID)]=on;
 
         const btn=document.getElementById('ctrl-camera');
         const video=document.getElementById('localVideo');
@@ -2940,8 +2952,6 @@
         if(avatar){
             avatar.style.display=showVideo?'none':'flex';
         }
-
-        renderPersonRow(String(MY_USER_ID));
     }
 
 
@@ -3291,15 +3301,10 @@
     }
 
     function broadcastMyMicStatus(){
-        micStatus[String(MY_USER_ID)]=!isMicOn;
-        renderPersonRow(String(MY_USER_ID));
-        return sendSignal('all','mic-status',{userId:MY_USER_ID,muted:!isMicOn});
+        void sendSignal('all','mic-status',{userId:MY_USER_ID,muted:!isMicOn}).catch(()=>{});
     }
     function broadcastMyCameraStatus(){
-        const cameraOn=Boolean(isCameraOn || isScreenSharing);
-        camStatus[String(MY_USER_ID)]=cameraOn;
-        renderPersonRow(String(MY_USER_ID));
-        return sendSignal('all','camera-status',{userId:MY_USER_ID,cameraOn});
+        void sendSignal('all','camera-status',{userId:MY_USER_ID,cameraOn:Boolean(isCameraOn || isScreenSharing)}).catch(()=>{});
     }
 
     /* ---------- Mobile media recovery ---------- */
@@ -3781,6 +3786,7 @@
         Object.keys(remoteAudioNodes).forEach(disposeRemoteAudioBoost);
         try{ meetingAudioContext?.close?.(); }catch(e){}
         meetingAudioContext=null;
+        try{ window.SmartMeetLiveKit?.disconnect?.(); }catch(e){}
         localStream?.getTracks().forEach(t=>t.stop());
         stopRecognition();
     }
@@ -4034,9 +4040,11 @@
 
         if(mediaTrack.kind==='video'){
             camStatus[uid]=!mediaTrack.muted;
-        }
-        if(mediaTrack.kind==='audio'){
+        }else if(mediaTrack.kind==='audio'){
             micStatus[uid]=Boolean(mediaTrack.muted);
+            const micEl=document.getElementById('micoff-'+uid);
+            if(micEl) micEl.style.display=micStatus[uid]?'flex':'none';
+            renderPersonRow(uid);
         }
 
         // A LiveKit publication can mute/unmute without being unsubscribed.
@@ -4046,21 +4054,25 @@
 
             mediaTrack.addEventListener('mute',()=>{
                 if(mediaTrack.kind==='video') camStatus[uid]=false;
-                if(mediaTrack.kind==='audio') micStatus[uid]=true;
+                if(mediaTrack.kind==='audio'){
+                    micStatus[uid]=true;
+                    const micEl=document.getElementById('micoff-'+uid);
+                    if(micEl) micEl.style.display='flex';
+                }
                 attachRemoteStream(uid);
-                const micOff=document.getElementById('micoff-'+uid);
-                if(micOff && mediaTrack.kind==='audio') micOff.style.display='flex';
                 renderPersonRow(uid);
             });
 
             mediaTrack.addEventListener('unmute',()=>{
                 if(mediaTrack.kind==='video') camStatus[uid]=true;
-                if(mediaTrack.kind==='audio') micStatus[uid]=false;
+                if(mediaTrack.kind==='audio'){
+                    micStatus[uid]=false;
+                    const micEl=document.getElementById('micoff-'+uid);
+                    if(micEl) micEl.style.display='none';
+                    unlockRemoteMedia();
+                }
                 attachRemoteStream(uid);
-                const micOff=document.getElementById('micoff-'+uid);
-                if(micOff && mediaTrack.kind==='audio') micOff.style.display='none';
                 renderPersonRow(uid);
-                if(mediaTrack.kind==='audio') unlockRemoteMedia();
             });
 
             mediaTrack.addEventListener('ended',()=>{
@@ -4072,11 +4084,8 @@
         }
 
         attachRemoteStream(uid);
-        renderPersonRow(uid);
 
         if(mediaTrack.kind==='audio'){
-            const micOff=document.getElementById('micoff-'+uid);
-            if(micOff) micOff.style.display=micStatus[uid]?'flex':'none';
             unlockRemoteMedia();
         }
 
