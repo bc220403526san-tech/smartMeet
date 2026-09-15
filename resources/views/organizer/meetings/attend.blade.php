@@ -4092,6 +4092,38 @@
     }
 
     /* ---------- Presence / reconnection ---------- */
+    function registerLiveKitParticipant(uid){
+        uid=String(uid);
+        if(uid===String(MY_USER_ID)) return;
+
+        const info=knownParticipants[uid];
+        if(!info){
+            console.warn('[LiveKit] unknown participant identity:', uid);
+            return;
+        }
+
+        leftUsers.delete(uid);
+
+        addParticipantTile(
+            uid,
+            info.name,
+            info.initials,
+            Boolean(info.isOrganizer || uid===String(ORGANIZER_ID))
+        );
+
+        markOnline(uid);
+        renderPeopleList();
+    }
+
+    function unregisterLiveKitParticipant(uid){
+        uid=String(uid);
+        if(uid===String(MY_USER_ID)) return;
+
+        removeParticipantTile(uid, false);
+        markOffline(uid);
+        renderPeopleList();
+    }
+
     function registerJoinedUser(uid, name, initials, isOrganizer=false, avatarUrl=null){
         uid=String(uid);
         if(uid===String(MY_USER_ID)) return;
@@ -4244,6 +4276,41 @@
     // Autoplay recovery is armed only when playback actually fails (armAudioUnlock).
     // Do not run media-unlock work on every click/touch/key event.
 
+    let liveKitPresenceBound=false;
+
+    function liveKitUserId(participant){
+        const identity=String(participant?.identity || '');
+        if(!identity.startsWith('user-')) return null;
+
+        const uid=identity.slice(5);
+        return uid || null;
+    }
+
+    function bindLiveKitPresence(){
+        if(liveKitPresenceBound) return;
+        liveKitPresenceBound=true;
+
+        window.addEventListener('smartmeet:livekit-participant-connected', event=>{
+            const uid=liveKitUserId(event.detail?.participant);
+            if(uid) registerLiveKitParticipant(uid);
+        });
+
+        window.addEventListener('smartmeet:livekit-participant-disconnected', event=>{
+            const uid=liveKitUserId(event.detail?.participant);
+            if(uid) unregisterLiveKitParticipant(uid);
+        });
+    }
+
+    function syncExistingLiveKitParticipants(){
+        const room=window.SmartMeetLiveKit?.room;
+        if(!room) return;
+
+        room.remoteParticipants.forEach(participant=>{
+            const uid=liveKitUserId(participant);
+            if(uid) registerLiveKitParticipant(uid);
+        });
+    }
+
     async function connectLiveKitForTest(){
         try{
             if(!window.SmartMeetLiveKit){
@@ -4251,10 +4318,14 @@
                 return;
             }
 
+            bindLiveKitPresence();
+
             await window.SmartMeetLiveKit.connect({
                 tokenUrl: LIVEKIT_TOKEN_URL,
                 csrfToken: CSRF,
             });
+
+            syncExistingLiveKitParticipants();
 
             console.log('[LiveKit] connection test successful');
         }catch(error){
