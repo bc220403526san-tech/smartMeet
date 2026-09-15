@@ -2522,6 +2522,43 @@
 
             // Moderation commands are trusted only when sent by the real organizer.
             if(from===String(ORGANIZER_ID)){
+                if(control==='force-mute' && controlUser===String(MY_USER_ID) && String(data.toUserId)===String(MY_USER_ID)){
+                    try{
+                        if(window.SmartMeetLiveKit?.connected){
+                            await window.SmartMeetLiveKit.setMicrophoneEnabled(false);
+                        }else{
+                            localStream?.getAudioTracks?.().forEach(track=>{ track.enabled=false; });
+                        }
+
+                        isMicOn=false;
+                        setMicButton(false);
+                        const sp=document.getElementById('speaking-'+MY_USER_ID);
+                        if(sp) sp.style.display='none';
+                        stopRecognition?.();
+                        await broadcastMyMicStatus().catch(()=>{});
+                        showModerationNotice('🔇 Your microphone was muted by the organizer.');
+                        console.log('[LiveKit] microphone muted by organizer');
+                    }catch(e){
+                        console.warn('[SmartMeet] organizer force-mute failed',e);
+                        isMicOn=false;
+                        setMicButton(false);
+                        stopRecognition?.();
+                        void broadcastMyMicStatus().catch(()=>{});
+                        showModerationNotice('🔇 Your microphone was muted by the organizer.');
+                    }
+                    return;
+                }
+
+                if(control==='moderation-notice'){
+                    const action=String(data.data?.action || '');
+                    const affectedName=String(data.data?.name || knownParticipants[controlUser]?.name || 'Participant');
+                    if(controlUser!==String(MY_USER_ID)){
+                        if(action==='mute') showToast(`🔇 Organizer muted ${escapeHtml(affectedName)}.`);
+                        if(action==='camera-off') showToast(`📷 Organizer turned off ${escapeHtml(affectedName)}'s camera.`);
+                    }
+                    return;
+                }
+
                 if(control==='camera-off' && controlUser===String(MY_USER_ID)){
                     try{
                         if(window.SmartMeetLiveKit?.connected){
@@ -2657,6 +2694,7 @@
         if(data.type==='answer') return handleAnswer(from, data.data);
         if(data.type==='ice-candidate') return handleIceCandidate(from, data.data);
         if(data.type==='mute'){
+            if(from!==String(ORGANIZER_ID)) return;
             try{
                 if(window.SmartMeetLiveKit?.connected){
                     await window.SmartMeetLiveKit.setMicrophoneEnabled(false);

@@ -1320,19 +1320,36 @@
 
         const info=knownParticipants[uid];
         const name=info?.name || 'Participant';
-        const currentlyMuted = micStatus[uid] !== false;
 
-        /*
-         * Do not fake state here. The participant changes the real microphone
-         * and then broadcasts mic-status; that confirmed state updates all UI.
-         */
-        if(currentlyMuted){
-            await sendSignal(uid,'unmute',{ organizerId:MY_USER_ID });
-            showToast(`🎙️ Unmute request sent to ${name}.`);
-        }else{
-            await sendSignal(uid,'mute',{ organizerId:MY_USER_ID });
-            showToast(`🔇 Muting ${name}…`);
+        // Organizer controls are one-way for privacy: an organizer may mute a
+        // participant, but never remotely turn a participant microphone on.
+        if(micStatus[uid] !== false){
+            showToast(`🔇 ${name} is already muted.`);
+            return;
         }
+
+        const delivered=await sendSignal(uid,'chat',{
+            smartmeetControl:'force-mute',
+            userId:uid,
+            organizerId:MY_USER_ID,
+            text:''
+        });
+
+        if(!delivered){
+            showToast(`Could not mute ${name}. Please try again.`);
+            return;
+        }
+
+        await sendSignal('all','chat',{
+            smartmeetControl:'moderation-notice',
+            action:'mute',
+            userId:uid,
+            name,
+            organizerId:MY_USER_ID,
+            text:''
+        });
+
+        showToast(`🔇 Mute command sent to ${name}.`);
     }
 
     async function muteAllParticipants(){
@@ -1369,16 +1386,36 @@
         flashMuteAll();
 
         const results=await Promise.allSettled(
-            unmutedIds.map(uid=>sendSignal(uid,'mute',{ organizerId:MY_USER_ID }))
+            unmutedIds.map(uid=>sendSignal(uid,'chat',{
+                smartmeetControl:'force-mute',
+                userId:uid,
+                organizerId:MY_USER_ID,
+                text:''
+            }))
         );
-        const delivered=results.filter(result=>result.status==='fulfilled' && result.value===true).length;
+        const deliveredIds=unmutedIds.filter((uid,index)=>
+            results[index]?.status==='fulfilled' && results[index]?.value===true
+        );
 
-        if(!delivered){
+        if(!deliveredIds.length){
             showToast('Mute All could not be delivered. Please try again.');
             return;
         }
 
-        showToast(`🔇 Muted ${delivered} unmuted participant${delivered===1?'':'s'}.`);
+        await Promise.allSettled(deliveredIds.map(uid=>{
+            const name=knownParticipants[uid]?.name || 'Participant';
+            return sendSignal('all','chat',{
+                smartmeetControl:'moderation-notice',
+                action:'mute',
+                userId:uid,
+                name,
+                organizerId:MY_USER_ID,
+                text:''
+            });
+        }));
+
+        const names=deliveredIds.map(uid=>knownParticipants[uid]?.name || 'Participant');
+        showToast(`🔇 Muted ${deliveredIds.length} participant${deliveredIds.length===1?'':'s'}: ${names.join(', ')}.`);
     }
 
     async function moderateParticipant(uid, action){
@@ -1419,7 +1456,16 @@
         const ok=await moderateParticipant(uid,'camera-off');
         if(!ok) return;
 
-        showToast(`📷 Turning off ${name}'s camera…`);
+        await sendSignal('all','chat',{
+            smartmeetControl:'moderation-notice',
+            action:'camera-off',
+            userId:uid,
+            name,
+            organizerId:MY_USER_ID,
+            text:''
+        });
+
+        showToast(`📷 Camera-off command sent to ${name}.`);
     }
 
     async function restrictParticipant(uid){
