@@ -2315,6 +2315,24 @@
             .filter(t=>t && t.readyState!=='ended' && !localIds.has(t.id));
 
         const pickBest=(kind)=>{
+            // LiveKit is the media source of truth once the SFU connection is up.
+            // A legacy P2P receiver may still exist briefly during migration, but
+            // it must never outrank a subscribed LiveKit track.
+            if(window.SmartMeetLiveKit?.connected){
+                const liveKitTracks=cachedTracks
+                    .filter(t=>t.kind===kind && t.__smartMeetLiveKit)
+                    .sort((a,b)=>{
+                        const score=(t)=>
+                            (t.readyState==='live'?40:0) +
+                            (!t.muted?80:0);
+                        return score(b)-score(a);
+                    });
+
+                if(liveKitTracks.length){
+                    return liveKitTracks[0];
+                }
+            }
+
             const candidates=[];
 
             const preferred = kind==='audio'
@@ -3183,6 +3201,31 @@
             btn.classList.toggle('active',on);
         }
         if(off) off.style.display=on?'none':'flex';
+    }
+
+    function setCameraButton(on){
+        on=Boolean(on);
+
+        const btn=document.getElementById('ctrl-camera');
+        const video=document.getElementById('localVideo');
+        const avatar=document.getElementById('avatar-'+MY_USER_ID);
+        const showVideo=Boolean(on || isScreenSharing);
+
+        if(btn){
+            btn.innerHTML=on
+                ? '<i class="fa fa-video"></i>'
+                : '<i class="fa fa-video-slash"></i>';
+            btn.classList.toggle('off',!on);
+            btn.classList.toggle('active',on);
+        }
+
+        if(video){
+            video.style.display=showVideo?'block':'none';
+        }
+
+        if(avatar){
+            avatar.style.display=showVideo?'none':'flex';
+        }
     }
 
 
@@ -4311,7 +4354,29 @@
         }
 
         if(mediaTrack.kind==='video'){
-            camStatus[uid]=true;
+            camStatus[uid]=!mediaTrack.muted;
+        }
+
+        // A LiveKit publication can mute/unmute without being unsubscribed.
+        // Keep the existing SmartMeet video/avatar/audio UI synchronized.
+        if(!mediaTrack.__smartMeetLiveKitStateBound){
+            mediaTrack.__smartMeetLiveKitStateBound=true;
+
+            mediaTrack.addEventListener('mute',()=>{
+                if(mediaTrack.kind==='video') camStatus[uid]=false;
+                attachRemoteStream(uid);
+            });
+
+            mediaTrack.addEventListener('unmute',()=>{
+                if(mediaTrack.kind==='video') camStatus[uid]=true;
+                attachRemoteStream(uid);
+                if(mediaTrack.kind==='audio') unlockRemoteMedia();
+            });
+
+            mediaTrack.addEventListener('ended',()=>{
+                if(mediaTrack.kind==='video') camStatus[uid]=false;
+                attachRemoteStream(uid);
+            });
         }
 
         attachRemoteStream(uid);
