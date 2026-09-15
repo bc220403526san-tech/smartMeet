@@ -2933,6 +2933,17 @@
         if(!data.data) return;
         if(leftUsers.has(from) && ['offer','ice-candidate'].includes(data.type)) return;
 
+        // LiveKit owns media transport once connected.
+        // Ignore only legacy mesh WebRTC signaling; Reverb still handles
+        // presence, chat, moderation and UI status events.
+        if(
+            window.SmartMeetLiveKit?.connected &&
+            ['reconnect-request','offer','answer','ice-candidate'].includes(data.type)
+        ){
+            console.log('[LiveKit] ignored legacy P2P signal:', data.type, 'from', from);
+            return;
+        }
+
         if(data.type==='reconnect-request'){
             if(shouldInitiate(from)){
                 const pc=peers[String(from)] || createPeerConnection(String(from));
@@ -3281,124 +3292,44 @@
     async function toggleMic(){
         if(toggleMic.busy) return;
         toggleMic.busy=true;
+
         try{
             const targetOn=!isMicOn;
+            const liveKit=window.SmartMeetLiveKit;
 
-            if(!targetOn){
-                isMicOn=false;
-
-                // Keep the already-negotiated microphone track attached and only
-                // disable samples. Removing/stopping it on every mute forced sender
-                // replacement across all peers and caused one-way audio after unmute.
-                const old=liveLocalTrack('audio');
-                if(old) old.enabled=false;
-
-                setMicButton(false);
-                stopRecognition();
-                const sp=document.getElementById('speaking-'+MY_USER_ID);
-                if(sp) sp.style.display='none';
-
-                // No renegotiation is needed for mute; senders keep the same track.
-                broadcastMyMicStatus();
+            if(!liveKit?.connected || !liveKit?.room){
+                showToast('🎙️ Media connection is still starting. Please try again.');
                 return;
             }
 
-            const track=await ensureAudioTrack(true);
-            if(!track) return;
-            isMicOn=true;
-            track.enabled=true;
-            setMicButton(true);
+            await liveKit.setMicrophoneEnabled(targetOn);
 
-            // Update UI immediately, then propagate mic to the mesh in the
-            // background. Waiting for every peer here made the mic button look
-            // broken whenever several participants were negotiating at once.
-            syncTracksToEveryPeer()
-                .then(()=>{
-                    Object.keys(peers).forEach((uid,index)=>{
-                        setTimeout(()=>ensureOutboundMediaNegotiated(uid).catch(()=>{}), index*100);
-                    });
-                    setTimeout(()=>verifyAudioForAllPeers(),350);
-                })
-                .catch(()=>{});
+            isMicOn=targetOn;
+            setMicButton(targetOn);
 
-            // The first click also satisfies mobile autoplay policy for remote audio.
-            unlockRemoteMedia();
+            if(!targetOn){
+                stopRecognition();
+                const sp=document.getElementById('speaking-'+MY_USER_ID);
+                if(sp) sp.style.display='none';
+            }else{
+                unlockRemoteMedia();
+                startTranscript();
+                startRecognition();
+            }
 
+            // Keep existing SmartMeet status/moderation UI in sync.
             broadcastMyMicStatus();
-            startTranscript();
-            startRecognition();
+
+            console.log('[LiveKit] microphone',targetOn?'enabled':'disabled');
         }finally{
             toggleMic.busy=false;
         }
     }
 
-    async function ensureVideoTrack(enableNow=false){
-        if(!window.isSecureContext || !navigator.mediaDevices?.getUserMedia){
-            showToast('⚠️ Mic/Camera needs HTTPS and browser permission.');
-            return null;
-        }
-
-        removeDeadLocalTracks('video');
-        let track=liveLocalTrack('video');
-        if(!track){
-            try{
-                const s=await navigator.mediaDevices.getUserMedia({
-                    audio:false,
-                    video:{
-                        width:{ideal:640,max:640},
-                        height:{ideal:360,max:480},
-                        frameRate:{ideal:15,max:15},
-                        facingMode:'user'
-                    }
-                });
-                track=s.getVideoTracks().find(t=>t.readyState==='live') || null;
-                if(!track) throw new Error('No live camera track returned');
-
-                if(!localStream) localStream=new MediaStream();
-                localStream.getVideoTracks().forEach(old=>{
-                    if(old!==track){
-                        try{ localStream.removeTrack(old); }catch(e){}
-                        try{ old.stop(); }catch(e){}
-                    }
-                });
-                localStream.addTrack(track);
-
-                track.onended=async ()=>{
-                    try{ localStream?.removeTrack(track); }catch(e){}
-                    if(!isCameraOn) return;
-                    isCameraOn=false;
-                    setCameraButton(false);
-                    await syncTracksToEveryPeer();
-                    broadcastMyCameraStatus();
-                };
-            }catch(err){
-                console.error('[SmartMeet] camera error',err);
-                if(err?.name==='NotAllowedError') showToast('📷 Allow camera permission in browser settings.');
-                else if(err?.name==='NotFoundError') showToast('📷 No camera found.');
-                else showToast('📷 Camera could not start.');
-                return null;
-            }
-        }
-        track.enabled=Boolean(enableNow);
-        return track;
-    }
-
-    function setCameraButton(on){
-        const btn=document.getElementById('ctrl-camera');
-        const localVideo=document.getElementById('localVideo');
-        const avatar=document.getElementById('avatar-'+MY_USER_ID);
-        if(btn){
-            btn.innerHTML=on?'<i class="fa fa-video"></i>':'<i class="fa fa-video-slash"></i>';
-            btn.classList.toggle('off',!on);
-            btn.classList.toggle('active',on);
-        }
-        if(localVideo) localVideo.style.display=(on || isScreenSharing)?'block':'none';
-        if(avatar) avatar.style.display=(on || isScreenSharing)?'none':'flex';
-    }
-
     async function toggleCamera(){
         if(toggleCamera.busy) return;
         toggleCamera.busy=true;
+
         try{
             const targetOn=!isCameraOn;
 
@@ -3407,43 +3338,46 @@
                 return;
             }
 
-            if(!targetOn){
-                isCameraOn=false;
-                const old=liveLocalTrack('video');
-                if(old){
-                    try{ localStream?.removeTrack(old); }catch(e){}
-                    try{ old.stop(); }catch(e){}
-                }
-                setCameraButton(false);
-                const localVideo=document.getElementById('localVideo');
-                if(localVideo) localVideo.srcObject=localStream || new MediaStream();
-                syncTracksToEveryPeer().catch(()=>{});
-                broadcastMyCameraStatus();
+            const liveKit=window.SmartMeetLiveKit;
+
+            if(!liveKit?.connected || !liveKit?.room){
+                showToast('📷 Media connection is still starting. Please try again.');
                 return;
             }
 
-            const track=await ensureVideoTrack(true);
-            if(!track) return;
-            isCameraOn=true;
-            track.enabled=true;
-            setCameraButton(true);
+            await liveKit.setCameraEnabled(targetOn);
+
+            isCameraOn=targetOn;
+            setCameraButton(targetOn);
+
+            const publication=liveKit.room.localParticipant
+                .getTrackPublication?.('camera');
+
+            const localTrack=publication?.track;
+            const mediaTrack=localTrack?.mediaStreamTrack;
 
             const localVideo=document.getElementById('localVideo');
-            if(localVideo && localStream){
-                localVideo.srcObject=localStream;
+
+            if(targetOn && localVideo && mediaTrack){
+                localVideo.srcObject=new MediaStream([mediaTrack]);
                 localVideo.muted=true;
                 localVideo.autoplay=true;
                 localVideo.playsInline=true;
                 localVideo.setAttribute('playsinline','');
+                localVideo.style.display='block';
                 localVideo.play().catch(()=>{});
             }
 
-            // Keep controls responsive; sender updates continue in background.
-            syncTracksToEveryPeer()
-                .then(()=>ensureOutboundMediaForAll())
-                .catch(()=>{});
+            if(!targetOn && localVideo){
+                localVideo.srcObject=new MediaStream();
+                localVideo.style.display=isScreenSharing?'block':'none';
+            }
+
             broadcastMyCameraStatus();
-            unlockRemoteMedia();
+
+            if(targetOn) unlockRemoteMedia();
+
+            console.log('[LiveKit] camera',targetOn?'enabled':'disabled');
         }finally{
             toggleCamera.busy=false;
         }
@@ -3613,6 +3547,45 @@
         if(!IS_MOBILE_BROWSER || mobileRecoveryBusy || document.visibilityState!=='visible') return;
         mobileRecoveryBusy=true;
         try{
+            const liveKit=window.SmartMeetLiveKit;
+
+            // Once LiveKit is connected, it owns microphone/camera recovery.
+            // Do not recreate or republish the old mesh-P2P local tracks.
+            if(liveKit?.connected && liveKit?.room){
+                try{
+                    if(isMicOn){
+                        await liveKit.setMicrophoneEnabled(true);
+                    }
+
+                    if(isCameraOn && !audioPriorityMode){
+                        await liveKit.setCameraEnabled(true);
+
+                        const publication=liveKit.room.localParticipant
+                            .getTrackPublication?.('camera');
+                        const mediaTrack=publication?.track?.mediaStreamTrack;
+                        const lv=document.getElementById('localVideo');
+
+                        if(lv && mediaTrack){
+                            lv.srcObject=new MediaStream([mediaTrack]);
+                            lv.muted=true;
+                            lv.autoplay=true;
+                            lv.playsInline=true;
+                            lv.setAttribute('playsinline','');
+                            lv.style.display='block';
+                            lv.play().catch(()=>{});
+                        }
+                    }
+
+                    broadcastMyMicStatus();
+                    broadcastMyCameraStatus();
+                    unlockRemoteMedia();
+                }catch(error){
+                    console.warn('[LiveKit] mobile media recovery failed',error);
+                }
+
+                return;
+            }
+
             if(isMicOn){
                 let a=liveLocalTrack('audio');
                 if(!a || a.readyState!=='live'){
@@ -4140,7 +4113,12 @@
         addParticipantTile(uid, knownParticipants[uid].name, knownParticipants[uid].initials, knownParticipants[uid].isOrganizer);
         markOnline(uid);
         renderPeopleList();
-        createPeerConnection(uid);
+
+        // LiveKit owns media transport once connected.
+        // Keep Reverb presence/UI updates, but do not create a legacy mesh peer.
+        if(!window.SmartMeetLiveKit?.connected){
+            createPeerConnection(uid);
+        }
     }
     function sendPresence(to='all'){
         return sendSignal(to,'presence-response',{
@@ -4210,6 +4188,22 @@
         lastRecoveryAt=now;
 
         try{
+            const liveKit=window.SmartMeetLiveKit;
+
+            if(liveKit?.connected && liveKit?.room){
+                // LiveKit owns media transport. Keep SmartMeet presence/UI recovery,
+                // but do not rebuild the legacy mesh-P2P media connections.
+                syncExistingLiveKitParticipants();
+                requestPresence(forcePresence);
+                unlockRemoteMedia();
+
+                if(IS_MOBILE_BROWSER){
+                    await recoverMobileLocalMedia();
+                }
+
+                return;
+            }
+
             connectToAll();
 
             Object.keys(peers).forEach(uid=>{
@@ -4266,6 +4260,11 @@
             clearTimeout(mediaDeviceChangeTimer);
             mediaDeviceChangeTimer=setTimeout(()=>{
                 if(document.visibilityState!=='visible') return;
+                if(window.SmartMeetLiveKit?.connected){
+                    repairMeetingMedia(true);
+                    return;
+                }
+
                 if((isMicOn && !liveLocalTrack('audio')) || (isCameraOn && !liveLocalTrack('video'))){
                     repairMeetingMedia(true);
                 }
