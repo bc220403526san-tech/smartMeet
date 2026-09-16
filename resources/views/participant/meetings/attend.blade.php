@@ -3532,12 +3532,18 @@
     if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',hideMobileTranscriptUI,{once:true});
     else hideMobileTranscriptUI();
 
-    /* ---------- Transcript (continuous Web Speech API) ---------- */
-    let recognition=null, recognitionRunning=false, recognitionStopping=false, recognitionRestartTimer=null;
+    /* ---------- Transcript (resilient continuous Web Speech API) ---------- */
+    let recognition=null, recognitionRunning=false, recognitionStarting=false, recognitionStopping=false, recognitionRestartTimer=null;
     let transcriptLanguage='en-US';
     let transcriptPermissionBlocked=false;
     let transcriptLastFinal='';
     let transcriptLastFinalAt=0;
+    let transcriptNetworkFailures=0;
+
+    try{
+        const savedTranscriptLanguage=localStorage.getItem('smartmeet-transcript-language');
+        if(savedTranscriptLanguage==='ur-PK' || savedTranscriptLanguage==='en-US') transcriptLanguage=savedTranscriptLanguage;
+    }catch(e){}
 
     function setTranscriptListening(on,label='Listening for your speech…'){
         const ind=document.getElementById('listening-indicator');
@@ -3545,6 +3551,10 @@
         ind.style.display=on?'flex':'none';
         const text=ind.querySelector('[data-listening-text]') || ind.querySelector('span:last-child');
         if(text) text.textContent=label;
+    }
+
+    function shouldRecognitionRun(){
+        return !!isMicOn && !transcriptPermissionBlocked && document.visibilityState==='visible';
     }
 
     function startTranscript(){
@@ -3556,38 +3566,45 @@
         }
         if(recognition || transcriptPermissionBlocked) return;
 
-        recognition=new SR();
-        recognition.continuous=true;
-        recognition.interimResults=true;
-        recognition.maxAlternatives=1;
-        recognition.lang=transcriptLanguage;
+        const instance=new SR();
+        recognition=instance;
+        instance.continuous=true;
+        instance.interimResults=true;
+        instance.maxAlternatives=1;
+        instance.lang=transcriptLanguage;
 
-        recognition.onstart=()=>{
+        instance.onstart=()=>{
+            if(recognition!==instance) return;
+            recognitionStarting=false;
             recognitionRunning=true;
             recognitionStopping=false;
+            transcriptNetworkFailures=0;
             setTranscriptListening(true,'Listening for your speech…');
         };
 
-        recognition.onspeechstart=()=>{
+        instance.onspeechstart=()=>{
+            if(recognition!==instance) return;
             const sp=document.getElementById('speaking-'+MY_USER_ID);
             if(sp) sp.style.display='flex';
             setTranscriptListening(true,'Transcribing your speech…');
         };
 
-        recognition.onspeechend=()=>{
+        instance.onspeechend=()=>{
+            if(recognition!==instance) return;
             const sp=document.getElementById('speaking-'+MY_USER_ID);
             if(sp) sp.style.display='none';
-            setTranscriptListening(true,'Listening for your speech…');
+            if(shouldRecognitionRun()) setTranscriptListening(true,'Listening for your speech…');
         };
 
-        recognition.onresult=(e)=>{
+        instance.onresult=(e)=>{
+            if(recognition!==instance) return;
             if(!isMicOn){ stopRecognition(); return; }
+
             let interim='';
             const finals=[];
-
             for(let i=e.resultIndex;i<e.results.length;i++){
                 const result=e.results[i];
-                const text=String(result?.[0]?.transcript||'').trim();
+                const text=String(result?.[0]?.transcript||'').replace(/\s+/g,' ').trim();
                 if(!text) continue;
                 if(result.isFinal) finals.push(text);
                 else interim+=(interim?' ':'')+text;
@@ -3595,70 +3612,89 @@
 
             if(interim) showLocalTranscript(interim,true);
 
-            for(const text of finals){
-                const normalized=text.replace(/\s+/g,' ').trim();
-                if(!normalized) continue;
+            for(const normalized of finals){
                 const now=Date.now();
-                if(normalized===transcriptLastFinal && now-transcriptLastFinalAt<2500) continue;
+                if(normalized.toLocaleLowerCase()===transcriptLastFinal.toLocaleLowerCase() && now-transcriptLastFinalAt<3000) continue;
                 transcriptLastFinal=normalized;
                 transcriptLastFinalAt=now;
                 showLocalTranscript(normalized,false);
-                void saveTranscript(normalized);
+                Promise.resolve(saveTranscript(normalized)).catch(error=>{
+                    console.error('[SmartMeet] Transcript sync failed:',error);
+                });
             }
         };
 
-        recognition.onerror=(e)=>{
+        instance.onerror=(e)=>{
+            if(recognition!==instance) return;
+            recognitionStarting=false;
             recognitionRunning=false;
             const error=String(e?.error||'unknown');
+
             if(error==='not-allowed'||error==='service-not-allowed'){
                 transcriptPermissionBlocked=true;
                 setTranscriptListening(false);
                 showToast('🎙️ Allow microphone permission to use live transcription.');
                 return;
             }
-            if(error==='no-speech'){
-                scheduleRecognitionRestart(250);
+
+            // Silence is normal. Chrome may end the current recognition session;
+            // onend below immediately creates the next listening session.
+            if(error==='no-speech' || error==='aborted') return;
+
+            if(error==='network'){
+                transcriptNetworkFailures=Math.min(transcriptNetworkFailures+1,5);
+                console.warn('[SmartMeet] SpeechRecognition network error; retrying.');
                 return;
             }
+
             if(error==='audio-capture'){
-                console.warn('[SmartMeet] Transcription could not access microphone audio.');
-                scheduleRecognitionRestart(1200);
+                console.warn('[SmartMeet] Transcription could not access microphone audio; retrying.');
                 return;
             }
+
             console.warn('[SmartMeet] SpeechRecognition error:',error);
-            scheduleRecognitionRestart(error==='network'?1500:600);
         };
 
-        recognition.onend=()=>{
+        instance.onend=()=>{
+            if(recognition!==instance) return;
+            recognitionStarting=false;
             recognitionRunning=false;
             const sp=document.getElementById('speaking-'+MY_USER_ID);
             if(sp) sp.style.display='none';
-            if(!recognitionStopping && isMicOn && !transcriptPermissionBlocked){
+
+            if(recognitionStopping || !shouldRecognitionRun()){
                 setTranscriptListening(false);
-                scheduleRecognitionRestart(300);
-            }else{
-                setTranscriptListening(false);
+                return;
             }
+
+            // Browser speech services periodically close even continuous sessions.
+            // Re-open them automatically so silence does not permanently stop transcription.
+            setTranscriptListening(true,'Reconnecting transcription…');
+            const retryDelay=transcriptNetworkFailures>0 ? Math.min(1000*transcriptNetworkFailures,5000) : 250;
+            scheduleRecognitionRestart(retryDelay);
         };
     }
 
     function scheduleRecognitionRestart(delay=300){
-        if(!recognition || recognitionStopping || transcriptPermissionBlocked || !isMicOn || document.visibilityState!=='visible') return;
+        if(recognitionStopping || !shouldRecognitionRun()) return;
         if(recognitionRestartTimer) clearTimeout(recognitionRestartTimer);
         recognitionRestartTimer=setTimeout(()=>{
             recognitionRestartTimer=null;
-            startRecognition();
+            if(shouldRecognitionRun()) startRecognition();
         },delay);
     }
 
     function startRecognition(){
-        if(transcriptPermissionBlocked || !isMicOn || document.visibilityState!=='visible') return;
+        if(!shouldRecognitionRun()) return;
         if(!recognition) startTranscript();
-        if(!recognition || recognitionRunning || recognitionStopping) return;
+        if(!recognition || recognitionRunning || recognitionStarting || recognitionStopping) return;
+
+        recognitionStarting=true;
         try{
             recognition.lang=transcriptLanguage;
             recognition.start();
         }catch(e){
+            recognitionStarting=false;
             if(e?.name!=='InvalidStateError') console.warn('[SmartMeet] transcription start failed',e);
             scheduleRecognitionRestart(600);
         }
@@ -3667,28 +3703,61 @@
     function stopRecognition(){
         if(recognitionRestartTimer){ clearTimeout(recognitionRestartTimer); recognitionRestartTimer=null; }
         recognitionStopping=true;
+        recognitionStarting=false;
         const sp=document.getElementById('speaking-'+MY_USER_ID);
         if(sp) sp.style.display='none';
+        document.getElementById('live-entry-'+MY_USER_ID)?.remove();
         setTranscriptListening(false);
-        if(recognition){
-            try{ if(recognitionRunning) recognition.abort(); }catch(e){}
+
+        const instance=recognition;
+        if(instance){
+            try{ instance.abort(); }catch(e){}
         }
         recognitionRunning=false;
-        setTimeout(()=>{ recognitionStopping=false; },300);
+        setTimeout(()=>{ recognitionStopping=false; },350);
+    }
+
+    function resetRecognitionForLanguageChange(){
+        if(recognitionRestartTimer){ clearTimeout(recognitionRestartTimer); recognitionRestartTimer=null; }
+        recognitionStopping=true;
+        recognitionStarting=false;
+        const old=recognition;
+        recognition=null;
+        recognitionRunning=false;
+        if(old){
+            old.onstart=null;
+            old.onspeechstart=null;
+            old.onspeechend=null;
+            old.onresult=null;
+            old.onerror=null;
+            old.onend=null;
+            try{ old.abort(); }catch(e){}
+        }
+        setTimeout(()=>{
+            recognitionStopping=false;
+            if(shouldRecognitionRun()){
+                startTranscript();
+                startRecognition();
+            }
+        },350);
+    }
+
+    function updateTranscriptLanguageButton(){
+        const btn=document.getElementById('lang-toggle-btn');
+        if(btn) btn.textContent=transcriptLanguage==='en-US'?'🌐 English':'🌐 Urdu';
     }
 
     function toggleTranscriptLanguage(){
-        const btn=document.getElementById('lang-toggle-btn');
         transcriptLanguage=transcriptLanguage==='en-US'?'ur-PK':'en-US';
-        if(btn) btn.textContent=transcriptLanguage==='en-US'?'🌐 English':'🌐 Urdu';
-        const shouldRestart=isMicOn;
-        stopRecognition();
-        recognition=null;
+        try{ localStorage.setItem('smartmeet-transcript-language',transcriptLanguage); }catch(e){}
+        updateTranscriptLanguageButton();
         transcriptPermissionBlocked=false;
-        startTranscript();
         showToast('Transcription language: '+(transcriptLanguage==='en-US'?'English':'Urdu'));
-        if(shouldRestart) setTimeout(startRecognition,400);
+        resetRecognitionForLanguageChange();
     }
+
+    if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',updateTranscriptLanguageButton,{once:true});
+    else updateTranscriptLanguageButton();
 
     function transcriptUserColor(userId,name=''){
         const key=String(userId||name||'user');
