@@ -23,3 +23,9 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# LiveKit local secrets
+/livekit/.api_key
+/livekit/.api_secret
+/livekit/livekit.yaml
+/livekit/

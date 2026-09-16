@@ -59,6 +59,7 @@ return [
                 'allowed_origins' => [
                     'smartmeet.live',
                     'www.smartmeet.live',
+                    'dev.smartmeet.live',
                 ],
 
                 'ping_interval' => env('REVERB_APP_PING_INTERVAL', 60),

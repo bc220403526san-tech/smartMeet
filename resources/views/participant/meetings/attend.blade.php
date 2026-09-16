@@ -188,16 +188,34 @@
         .listening-indicator{display:none; align-items:center; gap:8px; margin:0 12px 10px; padding:7px 11px; border-radius:11px; background:rgba(34,197,94,.1); border:1px solid rgba(34,197,94,.22); font-size:11px; color:#86efac}
         .listening-dot{width:7px; height:7px; border-radius:50%; background:var(--green); animation:pulse-dot 1.4s infinite}
 
-        .chat-message-row{display:flex; width:100%; gap:0}
-        .chat-message-row.is-me{justify-content:flex-end}
-        .chat-message-row.is-other{justify-content:flex-start}
-        .chat-message-content{max-width:82%; min-width:80px}
-        .chat-message-row.is-me .chat-message-content{text-align:right}
-        .chat-message-meta{display:flex; gap:7px; align-items:center; margin:0 4px 4px; font-size:9px; color:var(--muted-2)}
-        .chat-message-row.is-me .chat-message-meta{justify-content:flex-end}
-        .chat-message-meta strong{color:#e2e8f0; font-size:10px; font-weight:700}
-        .chat-message-bubble{padding:9px 12px; border-radius:14px 14px 4px 14px; background:rgba(30,41,59,.85); border:1px solid var(--line); font-size:12px; line-height:1.5; word-break:break-word; display:inline-block; text-align:left}
-        .chat-message-row.is-me .chat-message-bubble{border-radius:14px 14px 14px 4px; background:linear-gradient(135deg,#2563eb,#0891b2); border-color:rgba(125,211,252,.3)}
+        .chat-body{min-height:0;overflow-y:auto !important;overflow-x:hidden !important;scrollbar-width:thin;scrollbar-color:rgba(148,163,184,.42) transparent;overscroll-behavior:contain}
+        .chat-body::-webkit-scrollbar{width:7px}
+        .chat-body::-webkit-scrollbar-track{background:transparent}
+        .chat-body::-webkit-scrollbar-thumb{background:rgba(148,163,184,.36);border-radius:999px}
+        .chat-body::-webkit-scrollbar-thumb:hover{background:rgba(148,163,184,.58)}
+        .chat-message-row{display:flex;width:100%;gap:8px;align-items:flex-end;margin-bottom:2px}
+        .chat-message-row.is-me{justify-content:flex-start}
+        .chat-message-row.is-other{justify-content:flex-end}
+        .chat-message-avatar{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:0 0 30px;color:#fff;font-size:9px;font-weight:800;box-shadow:0 4px 12px rgba(0,0,0,.22);overflow:hidden;user-select:none}
+        .chat-message-content{max-width:78%;min-width:90px}
+        .chat-message-row.is-me .chat-message-content{text-align:left}
+        .chat-message-row.is-other .chat-message-content{text-align:right}
+        .chat-message-meta{display:flex;gap:7px;align-items:center;margin:0 5px 4px;font-size:9px;color:var(--muted-2)}
+        .chat-message-row.is-me .chat-message-meta{justify-content:flex-start}
+        .chat-message-row.is-other .chat-message-meta{justify-content:flex-end}
+        .chat-message-meta strong{font-size:10.5px;font-weight:800;color:#f8fafc}
+        .chat-message-bubble{padding:9px 12px;border-radius:5px 14px 14px 14px;border:1px solid rgba(255,255,255,.12);font-size:12px;line-height:1.5;word-break:break-word;display:inline-block;text-align:left;color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.16)}
+        .chat-message-row.is-other .chat-message-bubble{border-radius:14px 5px 14px 14px}
+        .chat-message-receipt{min-height:14px;margin:4px 5px 0;font-size:8.5px;line-height:1.35;color:var(--muted-2)}
+        .chat-message-row.is-me .chat-message-receipt{text-align:left}
+        .chat-message-row.is-other .chat-message-receipt{text-align:right}
+        .chat-typing-indicator{display:none;align-items:center;gap:7px;min-height:28px;padding:5px 14px 7px;color:var(--muted);font-size:10.5px;border-top:1px solid rgba(148,163,184,.07);background:rgba(2,6,16,.2)}
+        .chat-typing-indicator.show{display:flex}
+        .chat-typing-dots{display:inline-flex;align-items:center;gap:3px}
+        .chat-typing-dots span{width:4px;height:4px;border-radius:50%;background:#94a3b8;animation:chatTypingDot 1s infinite ease-in-out}
+        .chat-typing-dots span:nth-child(2){animation-delay:.15s}
+        .chat-typing-dots span:nth-child(3){animation-delay:.3s}
+        @keyframes chatTypingDot{0%,60%,100%{transform:translateY(0);opacity:.45}30%{transform:translateY(-3px);opacity:1}}
         .chat-input-area{display:flex; align-items:center; gap:8px; padding:12px; border-top:1px solid var(--line); background:rgba(2,6,16,.4)}
         .chat-input{flex:1; min-height:40px; padding:8px 12px; border-radius:12px; background:rgba(255,255,255,.04); border:1px solid var(--line); color:var(--text); font-size:12.5px; outline:none}
         .chat-input:focus{border-color:rgba(56,189,248,.55); box-shadow:0 0 0 3px rgba(56,189,248,.08)}
@@ -205,9 +223,30 @@
         .btn-send{background:linear-gradient(135deg,#2563eb,#0891b2); border:none; color:#fff}
         .chat-voice-btn.listening{color:#ef4444; border-color:rgba(239,68,68,.5); background:rgba(239,68,68,.14)}
 
+
+        /* People tab: the tab itself is the real overflow container. */
+        #tab-people{
+            min-height:0;
+            overflow-y:auto !important;
+            overflow-x:hidden !important;
+            overscroll-behavior:contain;
+            scrollbar-gutter:stable;
+            scrollbar-width:thin;
+            scrollbar-color:rgba(148,163,184,.65) transparent;
+            -webkit-overflow-scrolling:touch;
+        }
+        #tab-people::-webkit-scrollbar{width:7px}
+        #tab-people::-webkit-scrollbar-track{background:transparent}
+        #tab-people::-webkit-scrollbar-thumb{background:rgba(148,163,184,.65);border-radius:999px}
+        #tab-people::-webkit-scrollbar-thumb:hover{background:rgba(100,116,139,.85)}
+
         .people-scroll-shell{position:relative; flex:1; min-height:0; overflow:hidden}
-        .people-body{height:100%; min-height:0; overflow-y:auto !important; overflow-x:hidden; overscroll-behavior:contain; padding:12px 20px 12px 12px; display:flex; flex-direction:column; gap:8px; scrollbar-width:none}
-        .people-body::-webkit-scrollbar{display:none}
+        .people-body{height:100%; min-height:0; overflow-y:auto !important; overflow-x:hidden !important; overscroll-behavior:contain; padding:12px 20px 12px 12px; display:flex; flex-direction:column; gap:8px; scrollbar-width:thin; scrollbar-color:rgba(148,163,184,.42) transparent; -webkit-overflow-scrolling:touch}
+        .people-body::-webkit-scrollbar{width:7px}
+        .people-body::-webkit-scrollbar-track{background:transparent}
+        .people-body::-webkit-scrollbar-thumb{background:rgba(148,163,184,.36);border-radius:999px}
+        .people-body::-webkit-scrollbar-thumb:hover{background:rgba(148,163,184,.58)}
+        .people-grab-track{display:none !important}
         .people-grab-track{position:absolute; top:8px; right:5px; bottom:8px; width:10px; border-radius:999px; background:rgba(255,255,255,.06); z-index:40; display:none}
         .people-grab-track.show{display:block}
         .people-grab-thumb{position:absolute; top:0; left:1px; width:8px; min-height:44px; border-radius:999px; background:#e5e7eb; cursor:grab; touch-action:none; user-select:none; box-shadow:0 0 0 1px rgba(15,23,42,.65)}
@@ -701,9 +740,13 @@
                 </div>
                 <div class="listening-indicator" id="listening-indicator"><div class="listening-dot"></div><span id="listening-text">Listening…</span></div>
             </div>
-            <div id="tab-chat" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
+            <div id="tab-chat" style="display:none; flex-direction:column; flex:1; min-height:0; overflow:hidden;">
                 <div class="chat-body" id="chat-body">
                     <div class="empty-note" data-empty>No messages yet — say hello 👋</div>
+                </div>
+                <div class="chat-typing-indicator" id="chat-typing-indicator" aria-live="polite">
+                    <span class="chat-typing-dots"><span></span><span></span><span></span></span>
+                    <span id="chat-typing-text"></span>
                 </div>
                 <div class="chat-input-area">
                     <input class="chat-input" id="chat-input" placeholder="Type a message…" onkeydown="if(event.key==='Enter') sendChat()">
@@ -759,6 +802,7 @@
     const MY_NAME         = @json(auth()->user()->name);
     const MY_INITIALS     = @json($userInitials);
     const MY_AVATAR_URL   = @json($myAvatarUrl ?? null);
+    const LIVEKIT_TOKEN_URL = @json(route('participant.meetings.livekit-token', $meeting));
     const SIGNAL_URL      = @json(route('participant.meetings.signal', $meeting));
     const TRANSCRIPT_URL  = @json(route('participant.meetings.transcript', $meeting));
     const MARK_LEFT_URL   = @json(route('participant.meetings.markLeft', $meeting));
@@ -1258,7 +1302,7 @@
         if(active) active.style.display = tab==='people' ? 'block' : 'flex';
         activeTab=tab;
         document.getElementById('ctrl-'+tab)?.classList.add('active');
-        if(tab==='chat'){ unreadChat=0; updateChatBadge(); }
+        if(tab==='chat'){ unreadChat=0; updateChatBadge(); setTimeout(markPendingChatSeen,0); }
         if(tab==='people') renderPeopleList();
     }
     function updateChatBadge(){
@@ -1963,6 +2007,24 @@
             .filter(t=>t && t.readyState!=='ended' && !localIds.has(t.id));
 
         const pickBest=(kind)=>{
+            // LiveKit is the media source of truth once the SFU connection is up.
+            // A legacy P2P receiver may still exist briefly during migration, but
+            // it must never outrank a subscribed LiveKit track.
+            if(window.SmartMeetLiveKit?.connected){
+                const liveKitTracks=cachedTracks
+                    .filter(t=>t.kind===kind && t.__smartMeetLiveKit)
+                    .sort((a,b)=>{
+                        const score=(t)=>
+                            (t.readyState==='live'?40:0) +
+                            (!t.muted?80:0);
+                        return score(b)-score(a);
+                    });
+
+                if(liveKitTracks.length){
+                    return liveKitTracks[0];
+                }
+            }
+
             const candidates=[];
 
             const preferred = kind==='audio'
@@ -2503,31 +2565,99 @@
 
             // Moderation commands are trusted only when sent by the real organizer.
             if(from===String(ORGANIZER_ID)){
-                if(control==='camera-off' && controlUser===String(MY_USER_ID)){
-                    if(isCameraOn){
-                        try{ await toggleCamera(); }catch(e){}
-                    }else{
-                        setCameraButton(false);
+                if(control==='force-mute' && controlUser===String(MY_USER_ID)){
+                    try{
+                        if(window.SmartMeetLiveKit?.connected){
+                            await window.SmartMeetLiveKit.setMicrophoneEnabled(false);
+                        }else{
+                            localStream?.getAudioTracks?.().forEach(track=>{ track.enabled=false; });
+                        }
+
+                        isMicOn=false;
+                        setMicButton(false);
+                        const ownMicOff=document.getElementById('micoff-'+MY_USER_ID);
+                        if(ownMicOff) ownMicOff.style.display='flex';
+                        renderPersonRow(String(MY_USER_ID));
+                        const sp=document.getElementById('speaking-'+MY_USER_ID);
+                        if(sp) sp.style.display='none';
+                        stopRecognition?.();
+                        await broadcastMyMicStatus().catch(()=>{});
+                        showModerationNotice('🔇 Your microphone was muted by the organizer.');
+                        console.log('[LiveKit] microphone muted by organizer');
+                    }catch(e){
+                        console.warn('[SmartMeet] organizer force-mute failed',e);
+                        isMicOn=false;
+                        setMicButton(false);
+                        stopRecognition?.();
+                        void broadcastMyMicStatus().catch(()=>{});
+                        showModerationNotice('🔇 Your microphone was muted by the organizer.');
                     }
-                    showModerationNotice('📹 Your camera was turned off by the organizer.');
                     return;
                 }
 
-                if(control==='camera-on' && controlUser===String(MY_USER_ID)){
-                    try{
-                        if(!isCameraOn) await toggleCamera();
-                        else setCameraButton(true);
-                        showModerationNotice('📹 Your camera was turned on by the organizer.');
-                    }catch(e){
-                        console.warn('[SmartMeet] organizer camera-on failed',e);
-                        showModerationNotice('Please allow camera access to turn it on.');
+                if(control==='moderation-notice'){
+                    const action=String(data.data?.action || '');
+                    const affectedName=String(data.data?.name || knownParticipants[controlUser]?.name || 'Participant');
+                    if(controlUser!==String(MY_USER_ID)){
+                        if(action==='mute'){
+                            micStatus[controlUser]=true;
+                            const micOffEl=document.getElementById('micoff-'+controlUser);
+                            if(micOffEl) micOffEl.style.display='flex';
+                            renderPersonRow(controlUser);
+                            showToast(`🔇 Organizer muted ${escapeHtml(affectedName)}.`);
+                        }
+                        if(action==='camera-off'){
+                            camStatus[controlUser]=false;
+                            const remoteVideo=document.getElementById('rvideo-'+controlUser);
+                            const remoteAvatar=document.getElementById('avatar-'+controlUser);
+                            if(remoteVideo) remoteVideo.style.display='none';
+                            if(remoteAvatar) remoteAvatar.style.display='flex';
+                            renderPersonRow(controlUser);
+                            showToast(`📷 Organizer turned off ${escapeHtml(affectedName)}'s camera.`);
+                        }
                     }
                     return;
                 }
+
+                if(control==='camera-off' && controlUser===String(MY_USER_ID)){
+                    try{
+                        if(window.SmartMeetLiveKit?.connected){
+                            await window.SmartMeetLiveKit.setCameraEnabled(false);
+                        }else{
+                            localStream?.getVideoTracks?.().forEach(track=>{ track.enabled=false; });
+                        }
+                    }catch(e){
+                        console.warn('[SmartMeet] organizer camera-off failed',e);
+                    }
+
+                    isCameraOn=false;
+                    setCameraButton(false);
+                    const ownAvatar=document.getElementById('avatar-'+MY_USER_ID);
+                    if(ownAvatar) ownAvatar.style.display='flex';
+                    renderPersonRow(String(MY_USER_ID));
+
+                    const localVideo=document.getElementById('localVideo');
+                    if(localVideo && !isScreenSharing){
+                        try{ localVideo.srcObject=null; }catch(e){}
+                        localVideo.style.display='none';
+                    }
+
+                    await broadcastMyCameraStatus().catch(()=>{});
+                    showModerationNotice('📷 Your camera was turned off by the organizer.');
+                    console.log('[LiveKit] camera turned off by organizer');
+                    return;
+                }
+
 
                 if(control==='participant-removed' && controlUser===String(MY_USER_ID)){
+                    if(window.__smartMeetRemovalInProgress) return;
+                    window.__smartMeetRemovalInProgress=true;
+
                     showModerationNotice('🚫 You were restricted from this meeting by the organizer.');
-                    setTimeout(()=>{ try{ cleanup(); }catch(e){} window.location.href=LEAVE_URL; },1700);
+                    try{ window.SmartMeetLiveKit?.disconnect?.(); }catch(e){}
+                    try{ cleanup(); }catch(e){}
+
+                    setTimeout(()=>{ window.location.replace(LEAVE_URL); },700);
                     return;
                 }
 
@@ -2542,8 +2672,28 @@
             }
 
             const text=data.data?.text||''; if(!text) return;
-            addChatBubble(data.data?.name||'User', text, false);
+            const messageId=String(data.data?.messageId||'').trim();
+            const senderName=chatDisplayName(from,data.data?.name||'User');
+            addChatBubble(senderName,text,false,from,messageId||null);
+            if(messageId){
+                if(chatIsVisible()) void sendChatSeen(messageId);
+                else pendingChatSeen.add(messageId);
+            }
             if(activeTab!=='chat'){ unreadChat++; updateChatBadge(); }
+            return;
+        }
+        if(data.type==='chat-typing'){
+            if(isSelf) return;
+            setRemoteChatTyping(from,data.data?.name||'User',Boolean(data.data?.isTyping));
+            return;
+        }
+        if(data.type==='chat-seen'){
+            if(isSelf) return;
+            const messageId=String(data.data?.messageId||'').trim();
+            const state=chatOwnMessages.get(messageId);
+            if(!state) return;
+            state.seenBy.set(String(from),chatDisplayName(from,data.data?.name||'User'));
+            updateChatReceipt(messageId);
             return;
         }
         if(data.type==='mic-status'){
@@ -2590,6 +2740,17 @@
         if(!data.data) return;
         if(leftUsers.has(from) && ['offer','ice-candidate'].includes(data.type)) return;
 
+        // LiveKit owns media transport once connected.
+        // Ignore only legacy mesh WebRTC signaling; Reverb still handles
+        // presence, chat, moderation and UI status events.
+        if(
+            window.SmartMeetLiveKit?.connected &&
+            ['reconnect-request','offer','answer','ice-candidate'].includes(data.type)
+        ){
+            console.log('[LiveKit] ignored legacy P2P signal:', data.type, 'from', from);
+            return;
+        }
+
         if(data.type==='reconnect-request'){
             if(shouldInitiate(from)){
                 const pc=peers[String(from)] || createPeerConnection(String(from));
@@ -2605,25 +2766,47 @@
         if(data.type==='answer') return handleAnswer(from, data.data);
         if(data.type==='ice-candidate') return handleIceCandidate(from, data.data);
         if(data.type==='mute'){
-            isMicOn=false;
-            if(localStream) localStream.getAudioTracks().forEach(t=>t.enabled=false);
-            setMicButton(false);
-            stopRecognition();
-            showModerationNotice('🎙️ Your microphone was muted by the organizer.');
-            if(localStream) broadcastMyMicStatus();
-            return;
-        }
-        if(data.type==='unmute'){
-            if(from===String(ORGANIZER_ID)){
-                try{
-                    if(!isMicOn) await toggleMic();
-                    else setMicButton(true);
-                    showModerationNotice('🎙️ Your microphone was unmuted by the organizer.');
-                }catch(e){
-                    console.warn('[SmartMeet] organizer unmute failed',e);
-                    showModerationNotice('Please allow microphone access to unmute.');
+            if(from!==String(ORGANIZER_ID)) return;
+            try{
+                if(window.SmartMeetLiveKit?.connected){
+                    await window.SmartMeetLiveKit.setMicrophoneEnabled(false);
+                }else{
+                    const audioTrack=localStream?.getAudioTracks?.()[0];
+                    if(audioTrack) audioTrack.enabled=false;
                 }
+
+                isMicOn=false;
+                setMicButton(false);
+
+                await sendSignal('all','mic-status',{
+                    userId:MY_USER_ID,
+                    muted:true
+                });
+
+                stopRecognition?.();
+
+                showModerationNotice(
+                    '🔇 Your microphone was muted by the organizer.'
+                );
+
+                console.log('[LiveKit] microphone muted by organizer');
+            }catch(e){
+                console.warn('[SmartMeet] organizer mute failed',e);
+
+                // Keep local UI/state safe even if the media operation failed.
+                isMicOn=false;
+                setMicButton(false);
+
+                void sendSignal('all','mic-status',{
+                    userId:MY_USER_ID,
+                    muted:true
+                }).catch(()=>{});
+
+                showModerationNotice(
+                    '🔇 Your microphone was muted by the organizer.'
+                );
             }
+
             return;
         }
     }
@@ -2843,6 +3026,31 @@
         if(off) off.style.display=on?'none':'flex';
     }
 
+    function setCameraButton(on){
+        on=Boolean(on);
+
+        const btn=document.getElementById('ctrl-camera');
+        const video=document.getElementById('localVideo');
+        const avatar=document.getElementById('avatar-'+MY_USER_ID);
+        const showVideo=Boolean(on || isScreenSharing);
+
+        if(btn){
+            btn.innerHTML=on
+                ? '<i class="fa fa-video"></i>'
+                : '<i class="fa fa-video-slash"></i>';
+            btn.classList.toggle('off',!on);
+            btn.classList.toggle('active',on);
+        }
+
+        if(video){
+            video.style.display=showVideo?'block':'none';
+        }
+
+        if(avatar){
+            avatar.style.display=showVideo?'none':'flex';
+        }
+    }
+
 
     async function getOutboundAudioBytes(sender){
         if(!sender?.getStats) return null;
@@ -2950,124 +3158,44 @@
     async function toggleMic(){
         if(toggleMic.busy) return;
         toggleMic.busy=true;
+
         try{
             const targetOn=!isMicOn;
+            const liveKit=window.SmartMeetLiveKit;
 
-            if(!targetOn){
-                isMicOn=false;
-
-                // Keep the already-negotiated microphone track attached and only
-                // disable samples. Removing/stopping it on every mute forced sender
-                // replacement across all peers and caused one-way audio after unmute.
-                const old=liveLocalTrack('audio');
-                if(old) old.enabled=false;
-
-                setMicButton(false);
-                stopRecognition();
-                const sp=document.getElementById('speaking-'+MY_USER_ID);
-                if(sp) sp.style.display='none';
-
-                // No renegotiation is needed for mute; senders keep the same track.
-                broadcastMyMicStatus();
+            if(!liveKit?.connected || !liveKit?.room){
+                showToast('🎙️ Media connection is still starting. Please try again.');
                 return;
             }
 
-            const track=await ensureAudioTrack(true);
-            if(!track) return;
-            isMicOn=true;
-            track.enabled=true;
-            setMicButton(true);
+            await liveKit.setMicrophoneEnabled(targetOn);
 
-            // Update UI immediately, then propagate mic to the mesh in the
-            // background. Waiting for every peer here made the mic button look
-            // broken whenever several participants were negotiating at once.
-            syncTracksToEveryPeer()
-                .then(()=>{
-                    Object.keys(peers).forEach((uid,index)=>{
-                        setTimeout(()=>ensureOutboundMediaNegotiated(uid).catch(()=>{}), index*100);
-                    });
-                    setTimeout(()=>verifyAudioForAllPeers(),350);
-                })
-                .catch(()=>{});
+            isMicOn=targetOn;
+            setMicButton(targetOn);
 
-            // The first click also satisfies mobile autoplay policy for remote audio.
-            unlockRemoteMedia();
+            if(!targetOn){
+                stopRecognition();
+                const sp=document.getElementById('speaking-'+MY_USER_ID);
+                if(sp) sp.style.display='none';
+            }else{
+                unlockRemoteMedia();
+                startTranscript();
+                startRecognition();
+            }
 
+            // Keep existing SmartMeet status/moderation UI in sync.
             broadcastMyMicStatus();
-            startTranscript();
-            startRecognition();
+
+            console.log('[LiveKit] microphone',targetOn?'enabled':'disabled');
         }finally{
             toggleMic.busy=false;
         }
     }
 
-    async function ensureVideoTrack(enableNow=false){
-        if(!window.isSecureContext || !navigator.mediaDevices?.getUserMedia){
-            showToast('⚠️ Mic/Camera needs HTTPS and browser permission.');
-            return null;
-        }
-
-        removeDeadLocalTracks('video');
-        let track=liveLocalTrack('video');
-        if(!track){
-            try{
-                const s=await navigator.mediaDevices.getUserMedia({
-                    audio:false,
-                    video:{
-                        width:{ideal:640,max:640},
-                        height:{ideal:360,max:480},
-                        frameRate:{ideal:15,max:15},
-                        facingMode:'user'
-                    }
-                });
-                track=s.getVideoTracks().find(t=>t.readyState==='live') || null;
-                if(!track) throw new Error('No live camera track returned');
-
-                if(!localStream) localStream=new MediaStream();
-                localStream.getVideoTracks().forEach(old=>{
-                    if(old!==track){
-                        try{ localStream.removeTrack(old); }catch(e){}
-                        try{ old.stop(); }catch(e){}
-                    }
-                });
-                localStream.addTrack(track);
-
-                track.onended=async ()=>{
-                    try{ localStream?.removeTrack(track); }catch(e){}
-                    if(!isCameraOn) return;
-                    isCameraOn=false;
-                    setCameraButton(false);
-                    await syncTracksToEveryPeer();
-                    broadcastMyCameraStatus();
-                };
-            }catch(err){
-                console.error('[SmartMeet] camera error',err);
-                if(err?.name==='NotAllowedError') showToast('📷 Allow camera permission in browser settings.');
-                else if(err?.name==='NotFoundError') showToast('📷 No camera found.');
-                else showToast('📷 Camera could not start.');
-                return null;
-            }
-        }
-        track.enabled=Boolean(enableNow);
-        return track;
-    }
-
-    function setCameraButton(on){
-        const btn=document.getElementById('ctrl-camera');
-        const localVideo=document.getElementById('localVideo');
-        const avatar=document.getElementById('avatar-'+MY_USER_ID);
-        if(btn){
-            btn.innerHTML=on?'<i class="fa fa-video"></i>':'<i class="fa fa-video-slash"></i>';
-            btn.classList.toggle('off',!on);
-            btn.classList.toggle('active',on);
-        }
-        if(localVideo) localVideo.style.display=(on || isScreenSharing)?'block':'none';
-        if(avatar) avatar.style.display=(on || isScreenSharing)?'none':'flex';
-    }
-
     async function toggleCamera(){
         if(toggleCamera.busy) return;
         toggleCamera.busy=true;
+
         try{
             const targetOn=!isCameraOn;
 
@@ -3076,43 +3204,46 @@
                 return;
             }
 
-            if(!targetOn){
-                isCameraOn=false;
-                const old=liveLocalTrack('video');
-                if(old){
-                    try{ localStream?.removeTrack(old); }catch(e){}
-                    try{ old.stop(); }catch(e){}
-                }
-                setCameraButton(false);
-                const localVideo=document.getElementById('localVideo');
-                if(localVideo) localVideo.srcObject=localStream || new MediaStream();
-                syncTracksToEveryPeer().catch(()=>{});
-                broadcastMyCameraStatus();
+            const liveKit=window.SmartMeetLiveKit;
+
+            if(!liveKit?.connected || !liveKit?.room){
+                showToast('📷 Media connection is still starting. Please try again.');
                 return;
             }
 
-            const track=await ensureVideoTrack(true);
-            if(!track) return;
-            isCameraOn=true;
-            track.enabled=true;
-            setCameraButton(true);
+            await liveKit.setCameraEnabled(targetOn);
+
+            isCameraOn=targetOn;
+            setCameraButton(targetOn);
+
+            const publication=liveKit.room.localParticipant
+                .getTrackPublication?.('camera');
+
+            const localTrack=publication?.track;
+            const mediaTrack=localTrack?.mediaStreamTrack;
 
             const localVideo=document.getElementById('localVideo');
-            if(localVideo && localStream){
-                localVideo.srcObject=localStream;
+
+            if(targetOn && localVideo && mediaTrack){
+                localVideo.srcObject=new MediaStream([mediaTrack]);
                 localVideo.muted=true;
                 localVideo.autoplay=true;
                 localVideo.playsInline=true;
                 localVideo.setAttribute('playsinline','');
+                localVideo.style.display='block';
                 localVideo.play().catch(()=>{});
             }
 
-            // Keep controls responsive; sender updates continue in background.
-            syncTracksToEveryPeer()
-                .then(()=>ensureOutboundMediaForAll())
-                .catch(()=>{});
+            if(!targetOn && localVideo){
+                localVideo.srcObject=new MediaStream();
+                localVideo.style.display=isScreenSharing?'block':'none';
+            }
+
             broadcastMyCameraStatus();
-            unlockRemoteMedia();
+
+            if(targetOn) unlockRemoteMedia();
+
+            console.log('[LiveKit] camera',targetOn?'enabled':'disabled');
         }finally{
             toggleCamera.busy=false;
         }
@@ -3139,70 +3270,54 @@
             return;
         }
 
-        if(!window.isSecureContext || !navigator.mediaDevices?.getDisplayMedia){
-            showToast('🖥️ Screen sharing is not supported by this browser.');
+        const liveKit=window.SmartMeetLiveKit;
+        if(!liveKit?.connected || !liveKit?.room){
+            showToast('🖥️ Media connection is still starting. Please try again.');
             return;
         }
 
         screenShareBusy=true;
         try{
-            /*
-             * Request VIDEO ONLY. Meeting microphone/audio remains exactly on the
-             * existing SmartMeet audio path, preventing duplicate/echo audio.
-             */
-            const displayStream=await navigator.mediaDevices.getDisplayMedia({
-                video:{
-                    frameRate:{ideal:15,max:30}
-                },
-                audio:false
-            });
+            // LiveKit SFU owns screen-share transport. Do not publish the screen
+            // through the legacy per-peer WebRTC mesh.
+            await liveKit.setScreenShareEnabled(true);
 
-            const displayTrack=displayStream.getVideoTracks()[0] || null;
-            if(!displayTrack){
-                displayStream.getTracks().forEach(t=>{ try{t.stop();}catch(e){} });
-                return;
-            }
+            const publication=liveKit.room.localParticipant
+                .getTrackPublication?.('screen_share');
+            const mediaTrack=publication?.track?.mediaStreamTrack || null;
 
-            screenStream=displayStream;
-            screenTrack=displayTrack;
             isScreenSharing=true;
+            screenTrack=mediaTrack;
+            screenStream=mediaTrack ? new MediaStream([mediaTrack]) : null;
 
-            try{
-                if('contentHint' in screenTrack) screenTrack.contentHint='detail';
-            }catch(e){}
+            if(mediaTrack){
+                mediaTrack.addEventListener('ended',()=>{
+                    if(isScreenSharing) void stopScreenShare(true);
+                },{once:true});
 
-            screenTrack.onended=()=>{
-                if(isScreenSharing) void stopScreenShare(true);
-            };
-
-            const localVideo=document.getElementById('localVideo');
-            const avatar=document.getElementById('avatar-'+MY_USER_ID);
-            if(localVideo){
-                localVideo.srcObject=screenStream;
-                localVideo.muted=true;
-                localVideo.autoplay=true;
-                localVideo.playsInline=true;
-                localVideo.setAttribute('playsinline','');
-                localVideo.classList.remove('mirrored');
-                localVideo.style.display='block';
-                localVideo.play().catch(()=>{});
+                const localVideo=document.getElementById('localVideo');
+                const avatar=document.getElementById('avatar-'+MY_USER_ID);
+                if(localVideo){
+                    localVideo.srcObject=new MediaStream([mediaTrack]);
+                    localVideo.muted=true;
+                    localVideo.autoplay=true;
+                    localVideo.playsInline=true;
+                    localVideo.setAttribute('playsinline','');
+                    localVideo.classList.remove('mirrored');
+                    localVideo.style.display='block';
+                    localVideo.play().catch(()=>{});
+                }
+                if(avatar) avatar.style.display='none';
             }
-            if(avatar) avatar.style.display='none';
 
             setScreenShareButton(true);
-
-            /*
-             * Existing negotiated video transceiver is reused with replaceTrack().
-             * No new peer connection and no second audio path are created.
-             */
-            await syncTracksToEveryPeer();
-            ensureOutboundMediaForAll();
             broadcastMyCameraStatus();
             unlockRemoteMedia();
             showToast('🖥️ Screen sharing started.');
+            console.log('[LiveKit] screen sharing enabled');
         }catch(err){
+            console.error('[SmartMeet] LiveKit screen share error',err);
             if(err?.name!=='NotAllowedError' && err?.name!=='AbortError'){
-                console.error('[SmartMeet] screen share error',err);
                 showToast('🖥️ Could not start screen sharing.');
             }
         }finally{
@@ -3216,51 +3331,50 @@
 
         screenShareBusy=true;
         try{
-            const oldTrack=screenTrack;
-            const oldStream=screenStream;
+            const liveKit=window.SmartMeetLiveKit;
 
-            /*
-             * Clear screen state BEFORE peer sync so activeOutgoingVideoTrack()
-             * automatically falls back to the existing camera track (or null).
-             */
+            // Clear local state first so camera-status reflects the camera only.
             isScreenSharing=false;
             screenTrack=null;
             screenStream=null;
 
-            if(oldTrack) oldTrack.onended=null;
-            if(oldStream){
-                oldStream.getTracks().forEach(t=>{
-                    try{
-                        if(t.readyState!=='ended') t.stop();
-                    }catch(e){}
-                });
+            if(liveKit?.connected && liveKit?.room){
+                try{
+                    await liveKit.setScreenShareEnabled(false);
+                }catch(err){
+                    console.warn('[SmartMeet] LiveKit stop screen share failed',err);
+                }
             }
 
-            await syncTracksToEveryPeer();
-            ensureOutboundMediaForAll();
-
             const localVideo=document.getElementById('localVideo');
+            const avatar=document.getElementById('avatar-'+MY_USER_ID);
+            const cameraPublication=liveKit?.room?.localParticipant
+                ?.getTrackPublication?.('camera');
+            const cameraTrack=cameraPublication?.track?.mediaStreamTrack || null;
+
             if(localVideo){
-                localVideo.srcObject=localStream || new MediaStream();
                 localVideo.muted=true;
                 localVideo.autoplay=true;
                 localVideo.playsInline=true;
                 localVideo.setAttribute('playsinline','');
                 localVideo.classList.add('mirrored');
-                if(isCameraOn){
+
+                if(isCameraOn && cameraTrack){
+                    localVideo.srcObject=new MediaStream([cameraTrack]);
                     localVideo.style.display='block';
                     localVideo.play().catch(()=>{});
                 }else{
+                    localVideo.srcObject=new MediaStream();
                     localVideo.style.display='none';
                 }
             }
 
-            const avatar=document.getElementById('avatar-'+MY_USER_ID);
             if(avatar) avatar.style.display=isCameraOn?'none':'flex';
 
             setScreenShareButton(false);
             broadcastMyCameraStatus();
             if(!fromBrowser) showToast('Screen sharing stopped.');
+            console.log('[LiveKit] screen sharing disabled');
         }finally{
             screenShareBusy=false;
         }
@@ -3282,6 +3396,45 @@
         if(!IS_MOBILE_BROWSER || mobileRecoveryBusy || document.visibilityState!=='visible') return;
         mobileRecoveryBusy=true;
         try{
+            const liveKit=window.SmartMeetLiveKit;
+
+            // Once LiveKit is connected, it owns microphone/camera recovery.
+            // Do not recreate or republish the old mesh-P2P local tracks.
+            if(liveKit?.connected && liveKit?.room){
+                try{
+                    if(isMicOn){
+                        await liveKit.setMicrophoneEnabled(true);
+                    }
+
+                    if(isCameraOn && !audioPriorityMode){
+                        await liveKit.setCameraEnabled(true);
+
+                        const publication=liveKit.room.localParticipant
+                            .getTrackPublication?.('camera');
+                        const mediaTrack=publication?.track?.mediaStreamTrack;
+                        const lv=document.getElementById('localVideo');
+
+                        if(lv && mediaTrack){
+                            lv.srcObject=new MediaStream([mediaTrack]);
+                            lv.muted=true;
+                            lv.autoplay=true;
+                            lv.playsInline=true;
+                            lv.setAttribute('playsinline','');
+                            lv.style.display='block';
+                            lv.play().catch(()=>{});
+                        }
+                    }
+
+                    broadcastMyMicStatus();
+                    broadcastMyCameraStatus();
+                    unlockRemoteMedia();
+                }catch(error){
+                    console.warn('[LiveKit] mobile media recovery failed',error);
+                }
+
+                return;
+            }
+
             if(isMicOn){
                 let a=liveLocalTrack('audio');
                 if(!a || a.readyState!=='live'){
@@ -3378,133 +3531,299 @@
     }
 
     function hideMobileTranscriptUI(){
-        if(!IS_MOBILE_BROWSER) return;
-        ['#transcript-btn','#transcriptBtn','[data-panel="transcript"]','[data-tab="transcript"]',
-            '.ctrl-btn[onclick*="transcript"]','#tab-transcript',
-            'button[aria-label*="transcript" i]','button[title*="transcript" i]']
-            .forEach(sel=>document.querySelectorAll(sel).forEach(el=>el.style.setProperty('display','none','important')));
+        // Transcription remains visible on mobile; unsupported browsers simply receive remote transcripts.
     }
     if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',hideMobileTranscriptUI,{once:true});
     else hideMobileTranscriptUI();
 
-    /* ---------- Transcript (Web Speech API) ---------- */
-    let recognition=null, recognitionRunning=false, recognitionStopping=false, recognitionRestartTimer=null;
+    /* ---------- Transcript (resilient continuous Web Speech API) ---------- */
+    let recognition=null, recognitionRunning=false, recognitionStarting=false, recognitionStopping=false, recognitionRestartTimer=null;
+    let transcriptLanguage='en-US';
+    let transcriptPermissionBlocked=false;
+    let transcriptLastFinal='';
+    let transcriptLastFinalAt=0;
+    let transcriptNetworkFailures=0;
+
+    try{
+        const savedTranscriptLanguage=localStorage.getItem('smartmeet-transcript-language');
+        if(savedTranscriptLanguage==='ur-PK' || savedTranscriptLanguage==='en-US') transcriptLanguage=savedTranscriptLanguage;
+    }catch(e){}
+
+    function setTranscriptListening(on,label='Listening for your speech…'){
+        const ind=document.getElementById('listening-indicator');
+        if(!ind) return;
+        ind.style.display=on?'flex':'none';
+        const text=ind.querySelector('[data-listening-text]') || ind.querySelector('span:last-child');
+        if(text) text.textContent=label;
+    }
+
+    function shouldRecognitionRun(){
+        return !!isMicOn && !transcriptPermissionBlocked && document.visibilityState==='visible';
+    }
+
     function startTranscript(){
-        if(IS_MOBILE_BROWSER) return;
-        // Chrome Android can block Web Speech while WebRTC owns the microphone.
-        // Keep meeting audio/video stable there; mobile still receives everyone else's
-        // broadcast transcripts. Desktop Chrome/Edge can produce local captions.
         const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-        if(!SR){ showToast('⚠️ Live captions require Chrome or Edge.'); return; }
-        if(recognition) return;
-        recognition=new SR();
-        recognition.continuous=true; recognition.interimResults=true; recognition.maxAlternatives=1; recognition.lang='en-US';
-        recognition.onstart=()=>{ recognitionRunning=true; const ind=document.getElementById('listening-indicator'); if(ind) ind.style.display='flex'; };
-        recognition.onresult=(e)=>{
+        if(!SR){
+            setTranscriptListening(false);
+            console.warn('[SmartMeet] SpeechRecognition is not supported in this browser.');
+            return;
+        }
+        if(recognition || transcriptPermissionBlocked) return;
+
+        const instance=new SR();
+        recognition=instance;
+        instance.continuous=true;
+        instance.interimResults=true;
+        instance.maxAlternatives=1;
+        instance.lang=transcriptLanguage;
+
+        instance.onstart=()=>{
+            if(recognition!==instance) return;
+            recognitionStarting=false;
+            recognitionRunning=true;
+            recognitionStopping=false;
+            transcriptNetworkFailures=0;
+            setTranscriptListening(true,'Listening for your speech…');
+        };
+
+        instance.onspeechstart=()=>{
+            if(recognition!==instance) return;
+            const sp=document.getElementById('speaking-'+MY_USER_ID);
+            if(sp) sp.style.display='flex';
+            setTranscriptListening(true,'Transcribing your speech…');
+        };
+
+        instance.onspeechend=()=>{
+            if(recognition!==instance) return;
+            const sp=document.getElementById('speaking-'+MY_USER_ID);
+            if(sp) sp.style.display='none';
+            if(shouldRecognitionRun()) setTranscriptListening(true,'Listening for your speech…');
+        };
+
+        instance.onresult=(e)=>{
+            if(recognition!==instance) return;
             if(!isMicOn){ stopRecognition(); return; }
+
             let interim='';
+            const finals=[];
             for(let i=e.resultIndex;i<e.results.length;i++){
-                const r=e.results[i]; const text=r[0].transcript.trim(); if(!text) continue;
-                if(r.isFinal){
-                    const sp=document.getElementById('speaking-'+MY_USER_ID); if(sp) sp.style.display='none';
-                    showLocalTranscript(text,false); saveTranscript(text);
-                } else interim += (interim?' ':'')+text;
+                const result=e.results[i];
+                const text=String(result?.[0]?.transcript||'').replace(/\s+/g,' ').trim();
+                if(!text) continue;
+                if(result.isFinal) finals.push(text);
+                else interim+=(interim?' ':'')+text;
             }
-            if(interim){ const sp=document.getElementById('speaking-'+MY_USER_ID); if(sp) sp.style.display='flex'; showLocalTranscript(interim,true); }
+
+            if(interim) showLocalTranscript(interim,true);
+
+            for(const normalized of finals){
+                const now=Date.now();
+                if(normalized.toLocaleLowerCase()===transcriptLastFinal.toLocaleLowerCase() && now-transcriptLastFinalAt<3000) continue;
+                transcriptLastFinal=normalized;
+                transcriptLastFinalAt=now;
+                showLocalTranscript(normalized,false);
+                Promise.resolve(saveTranscript(normalized)).catch(error=>{
+                    console.error('[SmartMeet] Transcript sync failed:',error);
+                });
+            }
         };
-        recognition.onerror=(e)=>{
+
+        instance.onerror=(e)=>{
+            if(recognition!==instance) return;
+            recognitionStarting=false;
             recognitionRunning=false;
-            if(e.error==='not-allowed'||e.error==='service-not-allowed'){
-                showToast('Microphone/caption permission is required.');
+            const error=String(e?.error||'unknown');
+
+            if(error==='not-allowed'||error==='service-not-allowed'){
+                transcriptPermissionBlocked=true;
+                setTranscriptListening(false);
+                showToast('🎙️ Allow microphone permission to use live transcription.');
                 return;
             }
-            if(e.error==='audio-capture'){
-                console.warn('[SmartMeet] SpeechRecognition audio capture unavailable; WebRTC audio stays active.');
-                scheduleRecognitionRestart(IS_MOBILE_BROWSER?2500:900);
+
+            // Silence is normal. Chrome may end the current recognition session;
+            // onend below immediately creates the next listening session.
+            if(error==='no-speech' || error==='aborted') return;
+
+            if(error==='network'){
+                transcriptNetworkFailures=Math.min(transcriptNetworkFailures+1,5);
+                console.warn('[SmartMeet] SpeechRecognition network error; retrying.');
                 return;
             }
-            scheduleRecognitionRestart(e.error==='network'?1200:500);
+
+            if(error==='audio-capture'){
+                console.warn('[SmartMeet] Transcription could not access microphone audio; retrying.');
+                return;
+            }
+
+            console.warn('[SmartMeet] SpeechRecognition error:',error);
         };
-        recognition.onend=()=>{ recognitionRunning=false; const ind=document.getElementById('listening-indicator'); if(ind) ind.style.display='none'; scheduleRecognitionRestart(400); };
+
+        instance.onend=()=>{
+            if(recognition!==instance) return;
+            recognitionStarting=false;
+            recognitionRunning=false;
+            const sp=document.getElementById('speaking-'+MY_USER_ID);
+            if(sp) sp.style.display='none';
+
+            if(recognitionStopping || !shouldRecognitionRun()){
+                setTranscriptListening(false);
+                return;
+            }
+
+            // Browser speech services periodically close even continuous sessions.
+            // Re-open them automatically so silence does not permanently stop transcription.
+            setTranscriptListening(true,'Reconnecting transcription…');
+            const retryDelay=transcriptNetworkFailures>0 ? Math.min(1000*transcriptNetworkFailures,5000) : 250;
+            scheduleRecognitionRestart(retryDelay);
+        };
     }
-    function scheduleRecognitionRestart(delay=400){
-        if(!recognition || recognitionStopping || !isMicOn || document.visibilityState!=='visible') return;
+
+    function scheduleRecognitionRestart(delay=300){
+        if(recognitionStopping || !shouldRecognitionRun()) return;
         if(recognitionRestartTimer) clearTimeout(recognitionRestartTimer);
-        recognitionRestartTimer=setTimeout(()=>{ recognitionRestartTimer=null; startRecognition(); }, delay);
+        recognitionRestartTimer=setTimeout(()=>{
+            recognitionRestartTimer=null;
+            if(shouldRecognitionRun()) startRecognition();
+        },delay);
     }
+
     function startRecognition(){
-        if(IS_MOBILE_BROWSER) return;
-        if(!recognition || recognitionRunning || recognitionStopping || !isMicOn || document.visibilityState!=='visible') return;
-        const mic=liveLocalTrack('audio');
-        if(!mic || !mic.enabled || mic.readyState!=='live') return;
-        try{ recognition.start(); recognitionRunning=true; }
-        catch(e){
-            recognitionRunning=false;
-            scheduleRecognitionRestart(500);
+        if(!shouldRecognitionRun()) return;
+        if(!recognition) startTranscript();
+        if(!recognition || recognitionRunning || recognitionStarting || recognitionStopping) return;
+
+        recognitionStarting=true;
+        try{
+            recognition.lang=transcriptLanguage;
+            recognition.start();
+        }catch(e){
+            recognitionStarting=false;
+            if(e?.name!=='InvalidStateError') console.warn('[SmartMeet] transcription start failed',e);
+            scheduleRecognitionRestart(600);
         }
     }
 
     function stopRecognition(){
-        if(!recognition) return;
         if(recognitionRestartTimer){ clearTimeout(recognitionRestartTimer); recognitionRestartTimer=null; }
         recognitionStopping=true;
-        try{ if(recognitionRunning) recognition.abort(); }catch(e){}
+        recognitionStarting=false;
+        const sp=document.getElementById('speaking-'+MY_USER_ID);
+        if(sp) sp.style.display='none';
+        document.getElementById('live-entry-'+MY_USER_ID)?.remove();
+        setTranscriptListening(false);
+
+        const instance=recognition;
+        if(instance){
+            try{ instance.abort(); }catch(e){}
+        }
         recognitionRunning=false;
-        setTimeout(()=>{ recognitionStopping=false; },250);
+        setTimeout(()=>{ recognitionStopping=false; },350);
     }
-    function toggleTranscriptLanguage(){
+
+    function resetRecognitionForLanguageChange(){
+        if(recognitionRestartTimer){ clearTimeout(recognitionRestartTimer); recognitionRestartTimer=null; }
+        recognitionStopping=true;
+        recognitionStarting=false;
+        const old=recognition;
+        recognition=null;
+        recognitionRunning=false;
+        if(old){
+            old.onstart=null;
+            old.onspeechstart=null;
+            old.onspeechend=null;
+            old.onresult=null;
+            old.onerror=null;
+            old.onend=null;
+            try{ old.abort(); }catch(e){}
+        }
+        setTimeout(()=>{
+            recognitionStopping=false;
+            if(shouldRecognitionRun()){
+                startTranscript();
+                startRecognition();
+            }
+        },350);
+    }
+
+    function updateTranscriptLanguageButton(){
         const btn=document.getElementById('lang-toggle-btn');
-        const langs=[['en-US','🌐 English'],['ur-PK','🌐 Urdu']];
-        const current = recognition?.lang || 'en-US';
-        const next = current==='en-US' ? langs[1] : langs[0];
-        stopRecognition(); recognition=null; startTranscript();
-        if(recognition) recognition.lang=next[0];
-        if(btn) btn.textContent=next[1];
-        showToast('Captions language: '+(next[0]==='en-US'?'English':'Urdu'));
-        if(isMicOn) scheduleRecognitionRestart(300);
+        if(btn) btn.textContent=transcriptLanguage==='en-US'?'🌐 English':'🌐 Urdu';
     }
-    function showLocalTranscript(text, isInterim){
+
+    function toggleTranscriptLanguage(){
+        transcriptLanguage=transcriptLanguage==='en-US'?'ur-PK':'en-US';
+        try{ localStorage.setItem('smartmeet-transcript-language',transcriptLanguage); }catch(e){}
+        updateTranscriptLanguageButton();
+        transcriptPermissionBlocked=false;
+        showToast('Transcription language: '+(transcriptLanguage==='en-US'?'English':'Urdu'));
+        resetRecognitionForLanguageChange();
+    }
+
+    if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',updateTranscriptLanguageButton,{once:true});
+    else updateTranscriptLanguageButton();
+
+    function transcriptUserColor(userId,name=''){
+        const key=String(userId||name||'user');
+        let hash=0;
+        for(const ch of key) hash=((hash*31)+ch.charCodeAt(0))>>>0;
+        const hue=hash%360;
+        return `hsl(${hue} 62% 42%)`;
+    }
+
+    function transcriptInitials(name){
+        return (String(name||'User').trim().split(/\s+/).filter(Boolean).slice(0,2).map(v=>v.charAt(0)).join('')||'U').toUpperCase();
+    }
+
+    function showLocalTranscript(text,isInterim){
         const body=document.getElementById('transcript-body'); if(!body) return;
         body.querySelector('[data-empty]')?.remove();
         let live=document.getElementById('live-entry-'+MY_USER_ID);
+        const color=transcriptUserColor(MY_USER_ID,MY_NAME);
+
         if(isInterim){
             if(!live){
-                live=document.createElement('div'); live.className='transcript-entry'; live.id='live-entry-'+MY_USER_ID;
-                live.innerHTML=`<div class="transcript-avatar" style="background:linear-gradient(135deg,#3b82f6,#06b6d4)">${escapeHtml(MY_INITIALS)}</div>
-            <div class="transcript-content"><div class="transcript-meta"><span class="transcript-name">${escapeHtml(MY_NAME)} (You)</span><span class="transcript-time">${new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</span></div>
-            <div class="transcript-text" style="opacity:.6;font-style:italic;"></div></div>`;
+                live=document.createElement('div');
+                live.className='transcript-entry is-interim';
+                live.id='live-entry-'+MY_USER_ID;
+                live.innerHTML=`<div class="transcript-avatar" style="background:${color}">${escapeHtml(MY_INITIALS||transcriptInitials(MY_NAME))}</div><div class="transcript-content"><div class="transcript-meta"><span class="transcript-name">${escapeHtml(MY_NAME)} (You)</span><span class="transcript-live-badge">LIVE</span><span class="transcript-time">Now</span></div><div class="transcript-text"></div></div>`;
                 body.appendChild(live);
             }
-            live.querySelector('.transcript-text').textContent=text;
-        } else {
-            if(live){ const t=live.querySelector('.transcript-text'); t.style.opacity='1'; t.style.fontStyle='normal'; t.textContent=text; live.removeAttribute('id'); }
-            else {
-                const div=document.createElement('div'); div.className='transcript-entry';
-                div.innerHTML=`<div class="transcript-avatar" style="background:linear-gradient(135deg,#3b82f6,#06b6d4)">${escapeHtml(MY_INITIALS)}</div>
-            <div class="transcript-content"><div class="transcript-meta"><span class="transcript-name">${escapeHtml(MY_NAME)} (You)</span><span class="transcript-time">${new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</span></div>
-            <div class="transcript-text">${escapeHtml(text)}</div></div>`;
-                body.appendChild(div);
-            }
+            const t=live.querySelector('.transcript-text');
+            if(t) t.textContent=text;
+        }else{
+            if(live){ live.remove(); live=null; }
+            const div=document.createElement('div');
+            div.className='transcript-entry';
+            div.innerHTML=`<div class="transcript-avatar" style="background:${color}">${escapeHtml(MY_INITIALS||transcriptInitials(MY_NAME))}</div><div class="transcript-content"><div class="transcript-meta"><span class="transcript-name">${escapeHtml(MY_NAME)} (You)</span><span class="transcript-time">${new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</span></div><div class="transcript-text">${escapeHtml(text)}</div></div>`;
+            body.appendChild(div);
         }
         body.scrollTop=body.scrollHeight;
     }
+
     function handleRemoteTranscript(data){
-        if(String(data.userId)===String(MY_USER_ID)) return;
+        if(!data || String(data.userId)===String(MY_USER_ID)) return;
+        const text=String(data.text||'').trim();
+        if(!text) return;
         const body=document.getElementById('transcript-body'); if(!body) return;
         body.querySelector('[data-empty]')?.remove();
-        const div=document.createElement('div'); div.className='transcript-entry';
-        div.innerHTML = `<div class="transcript-avatar" style="background:linear-gradient(135deg,#8b5cf6,#ec4899)">${escapeHtml(data.userInitials||'?')}</div>
-    <div class="transcript-content"><div class="transcript-meta"><span class="transcript-name">${escapeHtml(data.userName||'User')}</span><span class="transcript-time">${data.spokenAt||''}</span></div>
-    <div class="transcript-text">${escapeHtml(data.text||'')}</div></div>`;
-        body.appendChild(div); body.scrollTop=body.scrollHeight;
+        const name=String(data.userName||knownParticipants?.[String(data.userId)]?.name||'User');
+        const color=transcriptUserColor(data.userId,name);
+        const div=document.createElement('div');
+        div.className='transcript-entry';
+        div.innerHTML=`<div class="transcript-avatar" style="background:${color}">${escapeHtml(data.userInitials||transcriptInitials(name))}</div><div class="transcript-content"><div class="transcript-meta"><span class="transcript-name">${escapeHtml(name)}</span><span class="transcript-time">${escapeHtml(data.spokenAt||'')}</span></div><div class="transcript-text">${escapeHtml(text)}</div></div>`;
+        body.appendChild(div);
+        body.scrollTop=body.scrollHeight;
     }
+
     async function saveTranscript(text){
-        const clean=String(text||'').trim();
+        const clean=String(text||'').replace(/\s+/g,' ').trim();
         if(!clean) return false;
-        for(let attempt=0; attempt<2; attempt++){
+        for(let attempt=0;attempt<3;attempt++){
+            let timer=null;
             try{
                 const ctrl=new AbortController();
-                const timer=setTimeout(()=>ctrl.abort(),6500);
+                timer=setTimeout(()=>ctrl.abort(),7000);
                 const res=await fetch(TRANSCRIPT_URL,{
                     method:'POST',
                     headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':CSRF},
@@ -3513,15 +3832,17 @@
                 });
                 clearTimeout(timer);
                 if(res.ok) return true;
-                console.error('transcript save failed',res.status);
+                console.error('[SmartMeet] transcript save failed',res.status);
+                if(res.status>=400 && res.status<500) return false;
             }catch(e){
-                if(e?.name!=='AbortError') console.error('transcript save error',e);
+                if(timer) clearTimeout(timer);
+                if(e?.name!=='AbortError') console.error('[SmartMeet] transcript save error',e);
             }
-            await new Promise(r=>setTimeout(r,350));
+            await new Promise(r=>setTimeout(r,400*(attempt+1)));
         }
+        showToast('📝 A transcript line could not be saved.');
         return false;
     }
-
     async function toggleRaiseHand(){
         const previous=myHandRaised;
         myHandRaised=!myHandRaised;
@@ -3563,28 +3884,183 @@
     }
 
     /* ---------- Chat ---------- */
-    function addChatBubble(name, text, isMe){
-        const body=document.getElementById('chat-body'); if(!body) return;
+    const chatOwnMessages=new Map();
+    const pendingChatSeen=new Set();
+    const chatTypingUsers=new Map();
+    const chatTypingTimers=new Map();
+    let chatTypingLastSentAt=0;
+    let chatTypingStopTimer=null;
+    let chatTypingState=false;
+
+    function chatInitials(name){
+        const parts=String(name||'User').trim().split(/\s+/).filter(Boolean);
+        return (parts.slice(0,2).map(part=>part.charAt(0)).join('')||'U').toUpperCase();
+    }
+    function chatSenderColor(userId,name=''){
+        const numericId=Number(userId);
+        let seed;
+        if(Number.isFinite(numericId)){
+            seed=Math.abs(numericId);
+        }else{
+            const key=String(userId||name||'user');
+            let hash=0;
+            for(const ch of key) hash=((hash*31)+ch.charCodeAt(0))>>>0;
+            seed=hash;
+        }
+        const hue=((seed*137.508)%360+360)%360;
+        const saturation=58+(seed%9);
+        const lightness=32+(seed%5);
+        return `hsl(${hue.toFixed(1)} ${saturation}% ${lightness}%)`;
+    }
+    function createChatMessageId(){
+        if(window.crypto?.randomUUID) return window.crypto.randomUUID();
+        return `${MY_USER_ID}-${Date.now()}-${Math.random().toString(36).slice(2,10)}`;
+    }
+    function chatIsVisible(){
+        return Boolean(panelOpen && activeTab==='chat' && document.visibilityState==='visible');
+    }
+    function chatDisplayName(userId,fallback='User'){
+        const uid=String(userId||'');
+        if(uid===String(MY_USER_ID)) return MY_NAME;
+        return String(knownParticipants[uid]?.name||fallback||'User').trim()||'User';
+    }
+    function addChatBubble(name,text,isMe,userId=null,messageId=null){
+        const body=document.getElementById('chat-body'); if(!body) return null;
         body.querySelector('[data-empty]')?.remove();
         const safeName=String(name||(isMe?MY_NAME:'User')).trim()||'User';
+        const senderId=String(userId||(isMe?MY_USER_ID:'')||safeName);
+        const senderColor=chatSenderColor(senderId,safeName);
         const time=new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
-        const row=document.createElement('div'); row.className='chat-message-row '+(isMe?'is-me':'is-other');
-        row.innerHTML = `<div class="chat-message-content"><div class="chat-message-meta"><strong>${escapeHtml(isMe?MY_NAME+' (You)':safeName)}</strong><span>${time}</span></div><div class="chat-message-bubble">${escapeHtml(text)}</div></div>`;
-        body.appendChild(row); body.scrollTop=body.scrollHeight;
+        const row=document.createElement('div');
+        row.className='chat-message-row '+(isMe?'is-me':'is-other');
+        if(messageId) row.dataset.messageId=String(messageId);
+        row.dataset.userId=senderId;
+
+        const avatar=`<div class="chat-message-avatar" style="background:${senderColor}" title="${escapeHtml(safeName)}">${escapeHtml(chatInitials(safeName))}</div>`;
+        const receipt=isMe&&messageId?`<div class="chat-message-receipt" id="chat-receipt-${escapeHtml(String(messageId))}">Sent</div>`:'';
+        const content=`<div class="chat-message-content"><div class="chat-message-meta"><strong>${escapeHtml(isMe?MY_NAME+' (You)':safeName)}</strong><span>${time}</span></div><div class="chat-message-bubble" style="background:${senderColor}">${escapeHtml(text)}</div>${receipt}</div>`;
+
+        // Requested layout: my messages on the LEFT, everyone else's on the RIGHT.
+        row.innerHTML=isMe?(avatar+content):(content+avatar);
+        body.appendChild(row);
+        body.scrollTop=body.scrollHeight;
+
+        if(isMe&&messageId){
+            chatOwnMessages.set(String(messageId),{seenBy:new Map()});
+        }
+        return row;
+    }
+    function updateChatReceipt(messageId){
+        const state=chatOwnMessages.get(String(messageId));
+        const el=document.getElementById(`chat-receipt-${String(messageId)}`);
+        if(!state||!el) return;
+        const names=[...state.seenBy.values()].filter(Boolean);
+        el.textContent=names.length?`Seen by ${names.join(', ')}`:'Sent';
+    }
+    async function sendChatSeen(messageId){
+        const id=String(messageId||'').trim();
+        if(!id) return;
+        pendingChatSeen.delete(id);
+        try{
+            await sendSignal('all','chat-seen',{messageId:id});
+        }catch(e){
+            pendingChatSeen.add(id);
+        }
+    }
+    function markPendingChatSeen(){
+        if(!chatIsVisible()) return;
+        [...pendingChatSeen].forEach(id=>void sendChatSeen(id));
+    }
+    function renderChatTypingIndicator(){
+        const el=document.getElementById('chat-typing-indicator');
+        const textEl=document.getElementById('chat-typing-text');
+        if(!el||!textEl) return;
+        const names=[...chatTypingUsers.values()].filter(Boolean);
+        if(!names.length){
+            el.classList.remove('show');
+            textEl.textContent='';
+            return;
+        }
+        let label='';
+        if(names.length===1) label=`${names[0]} is typing`;
+        else if(names.length===2) label=`${names[0]} and ${names[1]} are typing`;
+        else label=`${names[0]}, ${names[1]} and ${names.length-2} more are typing`;
+        textEl.textContent=label;
+        el.classList.add('show');
+    }
+    function setRemoteChatTyping(userId,name,isTyping){
+        const uid=String(userId||'');
+        if(!uid||uid===String(MY_USER_ID)) return;
+        if(chatTypingTimers.has(uid)) clearTimeout(chatTypingTimers.get(uid));
+        if(!isTyping){
+            chatTypingUsers.delete(uid);
+            chatTypingTimers.delete(uid);
+            renderChatTypingIndicator();
+            return;
+        }
+        chatTypingUsers.set(uid,chatDisplayName(uid,name));
+        chatTypingTimers.set(uid,setTimeout(()=>{
+            chatTypingUsers.delete(uid);
+            chatTypingTimers.delete(uid);
+            renderChatTypingIndicator();
+        },2200));
+        renderChatTypingIndicator();
+    }
+    function sendChatTypingState(isTyping){
+        const next=Boolean(isTyping);
+        if(next===chatTypingState && (!next || Date.now()-chatTypingLastSentAt<700)) return;
+        chatTypingState=next;
+        chatTypingLastSentAt=Date.now();
+        void sendSignal('all','chat-typing',{isTyping:next}).catch(()=>{});
+    }
+    function handleChatTypingInput(){
+        const input=document.getElementById('chat-input');
+        if(!input) return;
+        const hasText=input.value.trim().length>0;
+        if(hasText && (!chatTypingState || Date.now()-chatTypingLastSentAt>=700)) sendChatTypingState(true);
+        if(chatTypingStopTimer) clearTimeout(chatTypingStopTimer);
+        chatTypingStopTimer=setTimeout(()=>sendChatTypingState(false),1300);
+        if(!hasText) sendChatTypingState(false);
+    }
+    function stopChatTyping(){
+        if(chatTypingStopTimer){ clearTimeout(chatTypingStopTimer); chatTypingStopTimer=null; }
+        if(chatTypingState) sendChatTypingState(false);
+    }
+    function setupChatRealtimeUi(){
+        const input=document.getElementById('chat-input');
+        if(input && !input.dataset.realtimeBound){
+            input.dataset.realtimeBound='1';
+            input.addEventListener('input',handleChatTypingInput);
+            input.addEventListener('blur',stopChatTyping);
+        }
+        document.addEventListener('visibilitychange',()=>{
+            if(document.visibilityState==='visible') markPendingChatSeen();
+            else stopChatTyping();
+        });
     }
     let chatSending=false;
     async function sendChat(){
-        const input=document.getElementById('chat-input'); if(!input || chatSending) return;
+        const input=document.getElementById('chat-input'); if(!input||chatSending) return;
         const text=input.value.trim(); if(!text) return;
+        const messageId=createChatMessageId();
         chatSending=true;
-        const ok=await sendSignal('all','chat',{text,name:MY_NAME});
-        chatSending=false;
-        if(ok){
-            addChatBubble(MY_NAME,text,true);
-            input.value='';
-        }else{
+        try{
+            const ok=await sendSignal('all','chat',{text,messageId});
+            if(ok){
+                addChatBubble(MY_NAME,text,true,String(MY_USER_ID),messageId);
+                input.value='';
+                stopChatTyping();
+                input.focus();
+            }else{
+                showToast('💬 Message could not be sent. Check your connection.');
+                input.focus();
+            }
+        }catch(e){
+            console.error('[SmartMeet] chat send failed',e);
             showToast('💬 Message could not be sent. Check your connection.');
             input.focus();
+        }finally{
+            chatSending=false;
         }
     }
     function setupChatVoiceInput(){
@@ -3595,7 +4071,7 @@
         const rec=new SR(); rec.lang='en-US'; rec.continuous=false; rec.interimResults=true; rec.maxAlternatives=1;
         let baseText='';
         btn.addEventListener('click', ()=>{ try{ baseText=input.value.trim(); btn.classList.add('listening'); rec.start(); }catch(e){} });
-        rec.onresult=(e)=>{ let spoken=''; for(let i=e.resultIndex;i<e.results.length;i++) spoken+=e.results[i][0].transcript; input.value=[baseText,spoken.trim()].filter(Boolean).join(' '); };
+        rec.onresult=(e)=>{ let spoken=''; for(let i=e.resultIndex;i<e.results.length;i++) spoken+=e.results[i][0].transcript; input.value=[baseText,spoken.trim()].filter(Boolean).join(' '); handleChatTypingInput(); };
         rec.onend=()=>btn.classList.remove('listening');
         rec.onerror=()=>btn.classList.remove('listening');
     }
@@ -3713,11 +4189,44 @@
         Object.keys(remoteAudioNodes).forEach(disposeRemoteAudioBoost);
         try{ meetingAudioContext?.close?.(); }catch(e){}
         meetingAudioContext=null;
+        try{ window.SmartMeetLiveKit?.disconnect?.(); }catch(e){}
         localStream?.getTracks().forEach(t=>t.stop());
         stopRecognition();
     }
 
     /* ---------- Presence / reconnection ---------- */
+    function registerLiveKitParticipant(uid){
+        uid=String(uid);
+        if(uid===String(MY_USER_ID)) return;
+
+        const info=knownParticipants[uid];
+        if(!info){
+            console.warn('[LiveKit] unknown participant identity:', uid);
+            return;
+        }
+
+        leftUsers.delete(uid);
+
+        addParticipantTile(
+            uid,
+            info.name,
+            info.initials,
+            Boolean(info.isOrganizer || uid===String(ORGANIZER_ID))
+        );
+
+        markOnline(uid);
+        renderPeopleList();
+    }
+
+    function unregisterLiveKitParticipant(uid){
+        uid=String(uid);
+        if(uid===String(MY_USER_ID)) return;
+
+        removeParticipantTile(uid, false);
+        markOffline(uid);
+        renderPeopleList();
+    }
+
     function registerJoinedUser(uid, name, initials, isOrganizer=false, avatarUrl=null){
         uid=String(uid);
         if(uid===String(MY_USER_ID)) return;
@@ -3734,7 +4243,12 @@
         addParticipantTile(uid, knownParticipants[uid].name, knownParticipants[uid].initials, knownParticipants[uid].isOrganizer);
         markOnline(uid);
         renderPeopleList();
-        createPeerConnection(uid);
+
+        // LiveKit owns media transport once connected.
+        // Keep Reverb presence/UI updates, but do not create a legacy mesh peer.
+        if(!window.SmartMeetLiveKit?.connected){
+            createPeerConnection(uid);
+        }
     }
     function sendPresence(to='all'){
         return sendSignal(to,'presence-response',{
@@ -3805,6 +4319,22 @@
         lastRecoveryAt=now;
 
         try{
+            const liveKit=window.SmartMeetLiveKit;
+
+            if(liveKit?.connected && liveKit?.room){
+                // LiveKit owns media transport. Keep SmartMeet presence/UI recovery,
+                // but do not rebuild the legacy mesh-P2P media connections.
+                syncExistingLiveKitParticipants();
+                requestPresence(forcePresence);
+                unlockRemoteMedia();
+
+                if(IS_MOBILE_BROWSER){
+                    await recoverMobileLocalMedia();
+                }
+
+                return;
+            }
+
             connectToAll();
 
             Object.keys(peers).forEach(uid=>{
@@ -3861,6 +4391,11 @@
             clearTimeout(mediaDeviceChangeTimer);
             mediaDeviceChangeTimer=setTimeout(()=>{
                 if(document.visibilityState!=='visible') return;
+                if(window.SmartMeetLiveKit?.connected){
+                    repairMeetingMedia(true);
+                    return;
+                }
+
                 if((isMicOn && !liveLocalTrack('audio')) || (isCameraOn && !liveLocalTrack('video'))){
                     repairMeetingMedia(true);
                 }
@@ -3871,10 +4406,205 @@
     // Autoplay recovery is armed only when playback actually fails (armAudioUnlock).
     // Do not run media-unlock work on every click/touch/key event.
 
+    let liveKitMediaBound=false;
+
+    function liveKitMediaUserId(participant){
+        const identity=String(participant?.identity || '');
+        if(!identity.startsWith('user-')) return null;
+
+        const uid=identity.slice(5);
+        return uid || null;
+    }
+
+    function attachLiveKitRemoteTrack(track, participant){
+        const uid=liveKitMediaUserId(participant);
+        if(!uid || uid===String(MY_USER_ID) || !track) return;
+
+        registerLiveKitParticipant(uid);
+
+        const mediaTrack=track.mediaStreamTrack;
+        if(!mediaTrack) return;
+
+        const stream=getOrCreateRemoteStream(uid);
+
+        // Remove an older LiveKit track of the same kind before adding replacement.
+        stream.getTracks()
+            .filter(t=>t.__smartMeetLiveKit && t.kind===mediaTrack.kind && t.id!==mediaTrack.id)
+            .forEach(t=>{
+                try{ stream.removeTrack(t); }catch(e){}
+            });
+
+        if(!stream.getTracks().some(t=>t.id===mediaTrack.id)){
+            try{
+                mediaTrack.__smartMeetLiveKit=true;
+                stream.addTrack(mediaTrack);
+            }catch(e){}
+        }
+
+        if(mediaTrack.kind==='video'){
+            camStatus[uid]=!mediaTrack.muted;
+        }else if(mediaTrack.kind==='audio'){
+            micStatus[uid]=Boolean(mediaTrack.muted);
+            const micEl=document.getElementById('micoff-'+uid);
+            if(micEl) micEl.style.display=micStatus[uid]?'flex':'none';
+            renderPersonRow(uid);
+        }
+
+        // A LiveKit publication can mute/unmute without being unsubscribed.
+        // Keep the existing SmartMeet video/avatar/audio UI synchronized.
+        if(!mediaTrack.__smartMeetLiveKitStateBound){
+            mediaTrack.__smartMeetLiveKitStateBound=true;
+
+            mediaTrack.addEventListener('mute',()=>{
+                if(mediaTrack.kind==='video') camStatus[uid]=false;
+                if(mediaTrack.kind==='audio'){
+                    micStatus[uid]=true;
+                    const micEl=document.getElementById('micoff-'+uid);
+                    if(micEl) micEl.style.display='flex';
+                }
+                attachRemoteStream(uid);
+                renderPersonRow(uid);
+            });
+
+            mediaTrack.addEventListener('unmute',()=>{
+                if(mediaTrack.kind==='video') camStatus[uid]=true;
+                if(mediaTrack.kind==='audio'){
+                    micStatus[uid]=false;
+                    const micEl=document.getElementById('micoff-'+uid);
+                    if(micEl) micEl.style.display='none';
+                    unlockRemoteMedia();
+                }
+                attachRemoteStream(uid);
+                renderPersonRow(uid);
+            });
+
+            mediaTrack.addEventListener('ended',()=>{
+                if(mediaTrack.kind==='video') camStatus[uid]=false;
+                if(mediaTrack.kind==='audio') micStatus[uid]=true;
+                attachRemoteStream(uid);
+                renderPersonRow(uid);
+            });
+        }
+
+        attachRemoteStream(uid);
+
+        if(mediaTrack.kind==='audio'){
+            unlockRemoteMedia();
+        }
+
+        console.log('[LiveKit] remote track attached', uid, mediaTrack.kind);
+    }
+
+    function detachLiveKitRemoteTrack(track, participant){
+        const uid=liveKitMediaUserId(participant);
+        if(!uid || !track) return;
+
+        const mediaTrack=track.mediaStreamTrack;
+        const stream=remoteStreams[uid];
+
+        if(stream && mediaTrack){
+            const existing=stream.getTracks().find(t=>t.id===mediaTrack.id);
+            if(existing){
+                try{ stream.removeTrack(existing); }catch(e){}
+            }
+        }
+
+        if(mediaTrack?.kind==='video'){
+            const stillHasVideo=(stream?.getVideoTracks?.() || [])
+                .some(t=>t.readyState==='live');
+
+            if(!stillHasVideo) camStatus[uid]=false;
+        }
+
+        attachRemoteStream(uid);
+
+        console.log('[LiveKit] remote track detached', uid, mediaTrack?.kind || '');
+    }
+
+    function bindLiveKitMedia(){
+        if(liveKitMediaBound) return;
+        liveKitMediaBound=true;
+
+        window.addEventListener('smartmeet:livekit-track-subscribed', event=>{
+            attachLiveKitRemoteTrack(
+                event.detail?.track,
+                event.detail?.participant
+            );
+        });
+
+        window.addEventListener('smartmeet:livekit-track-unsubscribed', event=>{
+            detachLiveKitRemoteTrack(
+                event.detail?.track,
+                event.detail?.participant
+            );
+        });
+    }
+
+    let liveKitPresenceBound=false;
+
+    function liveKitUserId(participant){
+        const identity=String(participant?.identity || '');
+        if(!identity.startsWith('user-')) return null;
+
+        const uid=identity.slice(5);
+        return uid || null;
+    }
+
+    function bindLiveKitPresence(){
+        if(liveKitPresenceBound) return;
+        liveKitPresenceBound=true;
+
+        window.addEventListener('smartmeet:livekit-participant-connected', event=>{
+            const uid=liveKitUserId(event.detail?.participant);
+            if(uid) registerLiveKitParticipant(uid);
+        });
+
+        window.addEventListener('smartmeet:livekit-participant-disconnected', event=>{
+            const uid=liveKitUserId(event.detail?.participant);
+            if(uid) unregisterLiveKitParticipant(uid);
+        });
+    }
+
+    function syncExistingLiveKitParticipants(){
+        const room=window.SmartMeetLiveKit?.room;
+        if(!room) return;
+
+        room.remoteParticipants.forEach(participant=>{
+            const uid=liveKitUserId(participant);
+            if(uid) registerLiveKitParticipant(uid);
+        });
+    }
+
+    async function connectLiveKitForTest(){
+        try{
+            if(!window.SmartMeetLiveKit){
+                console.warn('[LiveKit] client not loaded');
+                return;
+            }
+
+            bindLiveKitPresence();
+            bindLiveKitMedia();
+
+            await window.SmartMeetLiveKit.connect({
+                tokenUrl: LIVEKIT_TOKEN_URL,
+                csrfToken: CSRF,
+            });
+
+            syncExistingLiveKitParticipants();
+
+            console.log('[LiveKit] connection test successful');
+        }catch(error){
+            console.error('[LiveKit] connection test failed', error);
+        }
+    }
+
     /* ---------- Boot ---------- */
     window.addEventListener('load', async () => {
+        await connectLiveKitForTest();
         renderMyOwnTile();
         setupPanelResize();
+        setupChatRealtimeUi();
+        setupChatVoiceInput();
         renderPeopleList();
 
         if(ORGANIZER_JOINED){ addParticipantTile(ORGANIZER_ID, ORGANIZER_NAME, ORGANIZER_INITIALS, true); markOnline(ORGANIZER_ID); }
@@ -4034,3 +4764,4 @@
 
 </body>
 </html>
+

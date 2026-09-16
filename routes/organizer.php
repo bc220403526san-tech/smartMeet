@@ -4,6 +4,7 @@ use App\Http\Controllers\Organizer\MeetingAttendController;
 use App\Http\Controllers\Organizer\MeetingController;
 use App\Http\Controllers\Organizer\ParticipantController;
 use App\Http\Controllers\Organizer\MeetingModerationController;
+use App\Http\Controllers\LiveKitTokenController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'role:organizer'])
@@ -42,6 +43,7 @@ Route::middleware(['auth', 'role:organizer'])
             Route::post('/{meeting}/end', [MeetingController::class, 'end'])->name('end');
 
             Route::get('/{meeting}/attend', [MeetingAttendController::class, 'attend'])->name('attend');
+            Route::post('/{meeting}/livekit-token', LiveKitTokenController::class)->name('livekit-token');
             Route::post('/{meeting}/complete-by-time', [MeetingAttendController::class, 'completeByTime'])->name('completeByTime');
             Route::post('/{meeting}/signal', [MeetingAttendController::class, 'signal'])->name('signal');
             Route::post('/{meeting}/transcript', [MeetingAttendController::class, 'saveTranscript'])->name('transcript');
