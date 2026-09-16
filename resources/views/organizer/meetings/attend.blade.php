@@ -224,12 +224,6 @@
         .btn-send{background:linear-gradient(135deg,#2563eb,#0891b2); border:none; color:#fff}
         .chat-voice-btn.listening{color:#ef4444; border-color:rgba(239,68,68,.5); background:rgba(239,68,68,.14)}
 
-        /* Verified People tab scroll container: #tab-people is the element that actually overflows. */
-        #tab-people{overflow-y:auto !important;overflow-x:hidden !important;overscroll-behavior:contain;scrollbar-gutter:stable;scrollbar-width:thin;scrollbar-color:rgba(148,163,184,.42) transparent;-webkit-overflow-scrolling:touch}
-        #tab-people::-webkit-scrollbar{width:7px}
-        #tab-people::-webkit-scrollbar-track{background:transparent}
-        #tab-people::-webkit-scrollbar-thumb{background:rgba(148,163,184,.36);border-radius:999px}
-        #tab-people::-webkit-scrollbar-thumb:hover{background:rgba(148,163,184,.58)}
         .people-scroll-shell{position:relative; flex:1; min-height:0; overflow:hidden}
         .people-body{height:100%; min-height:0; overflow-y:auto !important; overflow-x:hidden !important; overscroll-behavior:contain; padding:12px 20px 12px 12px; display:flex; flex-direction:column; gap:8px; scrollbar-width:thin; scrollbar-color:rgba(148,163,184,.42) transparent; -webkit-overflow-scrolling:touch}
         .people-body::-webkit-scrollbar{width:7px}
@@ -823,7 +817,7 @@
                     <button class="btn-send" onclick="sendChat()"><i class="fa fa-paper-plane"></i></button>
                 </div>
             </div>
-            <div id="tab-people" style="display:none; flex-direction:column; flex:1; min-height:0; overflow-y:auto; overflow-x:hidden;">
+            <div id="tab-people" style="display:none; flex-direction:column; flex:1; min-height:0; overflow:hidden;">
                 <div class="room-invite-card">
                     <div class="room-invite-title"><i class="fa-solid fa-user-plus"></i> Invite people</div>
                     <div class="room-invite-note">Invite someone without leaving the live meeting. Copy the link for WhatsApp/SMS, or send it by email.</div>
@@ -3591,70 +3585,54 @@
             return;
         }
 
-        if(!window.isSecureContext || !navigator.mediaDevices?.getDisplayMedia){
-            showToast('🖥️ Screen sharing is not supported by this browser.');
+        const liveKit=window.SmartMeetLiveKit;
+        if(!liveKit?.connected || !liveKit?.room){
+            showToast('🖥️ Media connection is still starting. Please try again.');
             return;
         }
 
         screenShareBusy=true;
         try{
-            /*
-             * Request VIDEO ONLY. Meeting microphone/audio remains exactly on the
-             * existing SmartMeet audio path, preventing duplicate/echo audio.
-             */
-            const displayStream=await navigator.mediaDevices.getDisplayMedia({
-                video:{
-                    frameRate:{ideal:15,max:30}
-                },
-                audio:false
-            });
+            // LiveKit SFU owns screen-share transport. Do not publish the screen
+            // through the legacy per-peer WebRTC mesh.
+            await liveKit.setScreenShareEnabled(true);
 
-            const displayTrack=displayStream.getVideoTracks()[0] || null;
-            if(!displayTrack){
-                displayStream.getTracks().forEach(t=>{ try{t.stop();}catch(e){} });
-                return;
-            }
+            const publication=liveKit.room.localParticipant
+                .getTrackPublication?.('screen_share');
+            const mediaTrack=publication?.track?.mediaStreamTrack || null;
 
-            screenStream=displayStream;
-            screenTrack=displayTrack;
             isScreenSharing=true;
+            screenTrack=mediaTrack;
+            screenStream=mediaTrack ? new MediaStream([mediaTrack]) : null;
 
-            try{
-                if('contentHint' in screenTrack) screenTrack.contentHint='detail';
-            }catch(e){}
+            if(mediaTrack){
+                mediaTrack.addEventListener('ended',()=>{
+                    if(isScreenSharing) void stopScreenShare(true);
+                },{once:true});
 
-            screenTrack.onended=()=>{
-                if(isScreenSharing) void stopScreenShare(true);
-            };
-
-            const localVideo=document.getElementById('localVideo');
-            const avatar=document.getElementById('avatar-'+MY_USER_ID);
-            if(localVideo){
-                localVideo.srcObject=screenStream;
-                localVideo.muted=true;
-                localVideo.autoplay=true;
-                localVideo.playsInline=true;
-                localVideo.setAttribute('playsinline','');
-                localVideo.classList.remove('mirrored');
-                localVideo.style.display='block';
-                localVideo.play().catch(()=>{});
+                const localVideo=document.getElementById('localVideo');
+                const avatar=document.getElementById('avatar-'+MY_USER_ID);
+                if(localVideo){
+                    localVideo.srcObject=new MediaStream([mediaTrack]);
+                    localVideo.muted=true;
+                    localVideo.autoplay=true;
+                    localVideo.playsInline=true;
+                    localVideo.setAttribute('playsinline','');
+                    localVideo.classList.remove('mirrored');
+                    localVideo.style.display='block';
+                    localVideo.play().catch(()=>{});
+                }
+                if(avatar) avatar.style.display='none';
             }
-            if(avatar) avatar.style.display='none';
 
             setScreenShareButton(true);
-
-            /*
-             * Existing negotiated video transceiver is reused with replaceTrack().
-             * No new peer connection and no second audio path are created.
-             */
-            await syncTracksToEveryPeer();
-            ensureOutboundMediaForAll();
             broadcastMyCameraStatus();
             unlockRemoteMedia();
             showToast('🖥️ Screen sharing started.');
+            console.log('[LiveKit] screen sharing enabled');
         }catch(err){
+            console.error('[SmartMeet] LiveKit screen share error',err);
             if(err?.name!=='NotAllowedError' && err?.name!=='AbortError'){
-                console.error('[SmartMeet] screen share error',err);
                 showToast('🖥️ Could not start screen sharing.');
             }
         }finally{
@@ -3668,51 +3646,50 @@
 
         screenShareBusy=true;
         try{
-            const oldTrack=screenTrack;
-            const oldStream=screenStream;
+            const liveKit=window.SmartMeetLiveKit;
 
-            /*
-             * Clear screen state BEFORE peer sync so activeOutgoingVideoTrack()
-             * automatically falls back to the existing camera track (or null).
-             */
+            // Clear local state first so camera-status reflects the camera only.
             isScreenSharing=false;
             screenTrack=null;
             screenStream=null;
 
-            if(oldTrack) oldTrack.onended=null;
-            if(oldStream){
-                oldStream.getTracks().forEach(t=>{
-                    try{
-                        if(t.readyState!=='ended') t.stop();
-                    }catch(e){}
-                });
+            if(liveKit?.connected && liveKit?.room){
+                try{
+                    await liveKit.setScreenShareEnabled(false);
+                }catch(err){
+                    console.warn('[SmartMeet] LiveKit stop screen share failed',err);
+                }
             }
 
-            await syncTracksToEveryPeer();
-            ensureOutboundMediaForAll();
-
             const localVideo=document.getElementById('localVideo');
+            const avatar=document.getElementById('avatar-'+MY_USER_ID);
+            const cameraPublication=liveKit?.room?.localParticipant
+                ?.getTrackPublication?.('camera');
+            const cameraTrack=cameraPublication?.track?.mediaStreamTrack || null;
+
             if(localVideo){
-                localVideo.srcObject=localStream || new MediaStream();
                 localVideo.muted=true;
                 localVideo.autoplay=true;
                 localVideo.playsInline=true;
                 localVideo.setAttribute('playsinline','');
                 localVideo.classList.add('mirrored');
-                if(isCameraOn){
+
+                if(isCameraOn && cameraTrack){
+                    localVideo.srcObject=new MediaStream([cameraTrack]);
                     localVideo.style.display='block';
                     localVideo.play().catch(()=>{});
                 }else{
+                    localVideo.srcObject=new MediaStream();
                     localVideo.style.display='none';
                 }
             }
 
-            const avatar=document.getElementById('avatar-'+MY_USER_ID);
             if(avatar) avatar.style.display=isCameraOn?'none':'flex';
 
             setScreenShareButton(false);
             broadcastMyCameraStatus();
             if(!fromBrowser) showToast('Screen sharing stopped.');
+            console.log('[LiveKit] screen sharing disabled');
         }finally{
             screenShareBusy=false;
         }
@@ -4570,6 +4547,7 @@
         Object.keys(remoteAudioNodes).forEach(disposeRemoteAudioBoost);
         try{ meetingAudioContext?.close?.(); }catch(e){}
         meetingAudioContext=null;
+        try{ window.SmartMeetLiveKit?.disconnect?.(); }catch(e){}
         localStream?.getTracks().forEach(t=>t.stop());
         stopRecognition();
     }
@@ -5142,4 +5120,3 @@
 
 </body>
 </html>
-
