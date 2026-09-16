@@ -3859,133 +3859,235 @@
     }
 
     function hideMobileTranscriptUI(){
-        if(!IS_MOBILE_BROWSER) return;
-        ['#transcript-btn','#transcriptBtn','[data-panel="transcript"]','[data-tab="transcript"]',
-            '.ctrl-btn[onclick*="transcript"]','#tab-transcript',
-            'button[aria-label*="transcript" i]','button[title*="transcript" i]']
-            .forEach(sel=>document.querySelectorAll(sel).forEach(el=>el.style.setProperty('display','none','important')));
+        // Transcription remains visible on mobile; unsupported browsers simply receive remote transcripts.
     }
     if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',hideMobileTranscriptUI,{once:true});
     else hideMobileTranscriptUI();
 
-    /* ---------- Transcript (Web Speech API) ---------- */
+    /* ---------- Transcript (continuous Web Speech API) ---------- */
     let recognition=null, recognitionRunning=false, recognitionStopping=false, recognitionRestartTimer=null;
+    let transcriptLanguage='en-US';
+    let transcriptPermissionBlocked=false;
+    let transcriptLastFinal='';
+    let transcriptLastFinalAt=0;
+
+    function setTranscriptListening(on,label='Listening for your speech…'){
+        const ind=document.getElementById('listening-indicator');
+        if(!ind) return;
+        ind.style.display=on?'flex':'none';
+        const text=ind.querySelector('[data-listening-text]') || ind.querySelector('span:last-child');
+        if(text) text.textContent=label;
+    }
+
     function startTranscript(){
-        if(IS_MOBILE_BROWSER) return;
-        // Chrome Android can block Web Speech while WebRTC owns the microphone.
-        // Keep meeting audio/video stable there; mobile still receives everyone else's
-        // broadcast transcripts. Desktop Chrome/Edge can produce local captions.
         const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-        if(!SR){ showToast('⚠️ Live captions require Chrome or Edge.'); return; }
-        if(recognition) return;
+        if(!SR){
+            setTranscriptListening(false);
+            console.warn('[SmartMeet] SpeechRecognition is not supported in this browser.');
+            return;
+        }
+        if(recognition || transcriptPermissionBlocked) return;
+
         recognition=new SR();
-        recognition.continuous=true; recognition.interimResults=true; recognition.maxAlternatives=1; recognition.lang='en-US';
-        recognition.onstart=()=>{ recognitionRunning=true; const ind=document.getElementById('listening-indicator'); if(ind) ind.style.display='flex'; };
+        recognition.continuous=true;
+        recognition.interimResults=true;
+        recognition.maxAlternatives=1;
+        recognition.lang=transcriptLanguage;
+
+        recognition.onstart=()=>{
+            recognitionRunning=true;
+            recognitionStopping=false;
+            setTranscriptListening(true,'Listening for your speech…');
+        };
+
+        recognition.onspeechstart=()=>{
+            const sp=document.getElementById('speaking-'+MY_USER_ID);
+            if(sp) sp.style.display='flex';
+            setTranscriptListening(true,'Transcribing your speech…');
+        };
+
+        recognition.onspeechend=()=>{
+            const sp=document.getElementById('speaking-'+MY_USER_ID);
+            if(sp) sp.style.display='none';
+            setTranscriptListening(true,'Listening for your speech…');
+        };
+
         recognition.onresult=(e)=>{
             if(!isMicOn){ stopRecognition(); return; }
             let interim='';
+            const finals=[];
+
             for(let i=e.resultIndex;i<e.results.length;i++){
-                const r=e.results[i]; const text=r[0].transcript.trim(); if(!text) continue;
-                if(r.isFinal){
-                    const sp=document.getElementById('speaking-'+MY_USER_ID); if(sp) sp.style.display='none';
-                    showLocalTranscript(text,false); saveTranscript(text);
-                } else interim += (interim?' ':'')+text;
+                const result=e.results[i];
+                const text=String(result?.[0]?.transcript||'').trim();
+                if(!text) continue;
+                if(result.isFinal) finals.push(text);
+                else interim+=(interim?' ':'')+text;
             }
-            if(interim){ const sp=document.getElementById('speaking-'+MY_USER_ID); if(sp) sp.style.display='flex'; showLocalTranscript(interim,true); }
+
+            if(interim) showLocalTranscript(interim,true);
+
+            for(const text of finals){
+                const normalized=text.replace(/\s+/g,' ').trim();
+                if(!normalized) continue;
+                const now=Date.now();
+                if(normalized===transcriptLastFinal && now-transcriptLastFinalAt<2500) continue;
+                transcriptLastFinal=normalized;
+                transcriptLastFinalAt=now;
+                showLocalTranscript(normalized,false);
+                void saveTranscript(normalized);
+            }
         };
+
         recognition.onerror=(e)=>{
             recognitionRunning=false;
-            if(e.error==='not-allowed'||e.error==='service-not-allowed'){
-                showToast('Microphone/caption permission is required.');
+            const error=String(e?.error||'unknown');
+            if(error==='not-allowed'||error==='service-not-allowed'){
+                transcriptPermissionBlocked=true;
+                setTranscriptListening(false);
+                showToast('🎙️ Allow microphone permission to use live transcription.');
                 return;
             }
-            if(e.error==='audio-capture'){
-                console.warn('[SmartMeet] SpeechRecognition audio capture unavailable; WebRTC audio stays active.');
-                scheduleRecognitionRestart(IS_MOBILE_BROWSER?2500:900);
+            if(error==='no-speech'){
+                scheduleRecognitionRestart(250);
                 return;
             }
-            scheduleRecognitionRestart(e.error==='network'?1200:500);
+            if(error==='audio-capture'){
+                console.warn('[SmartMeet] Transcription could not access microphone audio.');
+                scheduleRecognitionRestart(1200);
+                return;
+            }
+            console.warn('[SmartMeet] SpeechRecognition error:',error);
+            scheduleRecognitionRestart(error==='network'?1500:600);
         };
-        recognition.onend=()=>{ recognitionRunning=false; const ind=document.getElementById('listening-indicator'); if(ind) ind.style.display='none'; scheduleRecognitionRestart(400); };
-    }
-    function scheduleRecognitionRestart(delay=400){
-        if(!recognition || recognitionStopping || !isMicOn || document.visibilityState!=='visible') return;
-        if(recognitionRestartTimer) clearTimeout(recognitionRestartTimer);
-        recognitionRestartTimer=setTimeout(()=>{ recognitionRestartTimer=null; startRecognition(); }, delay);
-    }
-    function startRecognition(){
-        if(IS_MOBILE_BROWSER) return;
-        if(!recognition || recognitionRunning || recognitionStopping || !isMicOn || document.visibilityState!=='visible') return;
-        const mic=liveLocalTrack('audio');
-        if(!mic || !mic.enabled || mic.readyState!=='live') return;
-        try{ recognition.start(); recognitionRunning=true; }
-        catch(e){
+
+        recognition.onend=()=>{
             recognitionRunning=false;
-            scheduleRecognitionRestart(500);
+            const sp=document.getElementById('speaking-'+MY_USER_ID);
+            if(sp) sp.style.display='none';
+            if(!recognitionStopping && isMicOn && !transcriptPermissionBlocked){
+                setTranscriptListening(false);
+                scheduleRecognitionRestart(300);
+            }else{
+                setTranscriptListening(false);
+            }
+        };
+    }
+
+    function scheduleRecognitionRestart(delay=300){
+        if(!recognition || recognitionStopping || transcriptPermissionBlocked || !isMicOn || document.visibilityState!=='visible') return;
+        if(recognitionRestartTimer) clearTimeout(recognitionRestartTimer);
+        recognitionRestartTimer=setTimeout(()=>{
+            recognitionRestartTimer=null;
+            startRecognition();
+        },delay);
+    }
+
+    function startRecognition(){
+        if(transcriptPermissionBlocked || !isMicOn || document.visibilityState!=='visible') return;
+        if(!recognition) startTranscript();
+        if(!recognition || recognitionRunning || recognitionStopping) return;
+        const mic=liveLocalTrack('audio');
+        if(!mic || !mic.enabled || mic.readyState!=='live'){
+            scheduleRecognitionRestart(700);
+            return;
+        }
+        try{
+            recognition.lang=transcriptLanguage;
+            recognition.start();
+        }catch(e){
+            if(e?.name!=='InvalidStateError') console.warn('[SmartMeet] transcription start failed',e);
+            scheduleRecognitionRestart(600);
         }
     }
 
     function stopRecognition(){
-        if(!recognition) return;
         if(recognitionRestartTimer){ clearTimeout(recognitionRestartTimer); recognitionRestartTimer=null; }
         recognitionStopping=true;
-        try{ if(recognitionRunning) recognition.abort(); }catch(e){}
+        const sp=document.getElementById('speaking-'+MY_USER_ID);
+        if(sp) sp.style.display='none';
+        setTranscriptListening(false);
+        if(recognition){
+            try{ if(recognitionRunning) recognition.abort(); }catch(e){}
+        }
         recognitionRunning=false;
-        setTimeout(()=>{ recognitionStopping=false; },250);
+        setTimeout(()=>{ recognitionStopping=false; },300);
     }
+
     function toggleTranscriptLanguage(){
         const btn=document.getElementById('lang-toggle-btn');
-        const langs=[['en-US','🌐 English'],['ur-PK','🌐 Urdu']];
-        const current = recognition?.lang || 'en-US';
-        const next = current==='en-US' ? langs[1] : langs[0];
-        stopRecognition(); recognition=null; startTranscript();
-        if(recognition) recognition.lang=next[0];
-        if(btn) btn.textContent=next[1];
-        showToast('Captions language: '+(next[0]==='en-US'?'English':'Urdu'));
-        if(isMicOn) scheduleRecognitionRestart(300);
+        transcriptLanguage=transcriptLanguage==='en-US'?'ur-PK':'en-US';
+        if(btn) btn.textContent=transcriptLanguage==='en-US'?'🌐 English':'🌐 Urdu';
+        const shouldRestart=isMicOn;
+        stopRecognition();
+        recognition=null;
+        transcriptPermissionBlocked=false;
+        startTranscript();
+        showToast('Transcription language: '+(transcriptLanguage==='en-US'?'English':'Urdu'));
+        if(shouldRestart) setTimeout(startRecognition,400);
     }
-    function showLocalTranscript(text, isInterim){
+
+    function transcriptUserColor(userId,name=''){
+        const key=String(userId||name||'user');
+        let hash=0;
+        for(const ch of key) hash=((hash*31)+ch.charCodeAt(0))>>>0;
+        const hue=hash%360;
+        return `hsl(${hue} 62% 42%)`;
+    }
+
+    function transcriptInitials(name){
+        return (String(name||'User').trim().split(/\s+/).filter(Boolean).slice(0,2).map(v=>v.charAt(0)).join('')||'U').toUpperCase();
+    }
+
+    function showLocalTranscript(text,isInterim){
         const body=document.getElementById('transcript-body'); if(!body) return;
         body.querySelector('[data-empty]')?.remove();
         let live=document.getElementById('live-entry-'+MY_USER_ID);
+        const color=transcriptUserColor(MY_USER_ID,MY_NAME);
+
         if(isInterim){
             if(!live){
-                live=document.createElement('div'); live.className='transcript-entry'; live.id='live-entry-'+MY_USER_ID;
-                live.innerHTML=`<div class="transcript-avatar" style="background:linear-gradient(135deg,#3b82f6,#06b6d4)">${escapeHtml(MY_INITIALS)}</div>
-            <div class="transcript-content"><div class="transcript-meta"><span class="transcript-name">${escapeHtml(MY_NAME)} (You)</span><span class="transcript-time">${new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</span></div>
-            <div class="transcript-text" style="opacity:.6;font-style:italic;"></div></div>`;
+                live=document.createElement('div');
+                live.className='transcript-entry is-interim';
+                live.id='live-entry-'+MY_USER_ID;
+                live.innerHTML=`<div class="transcript-avatar" style="background:${color}">${escapeHtml(MY_INITIALS||transcriptInitials(MY_NAME))}</div><div class="transcript-content"><div class="transcript-meta"><span class="transcript-name">${escapeHtml(MY_NAME)} (You)</span><span class="transcript-live-badge">LIVE</span><span class="transcript-time">Now</span></div><div class="transcript-text"></div></div>`;
                 body.appendChild(live);
             }
-            live.querySelector('.transcript-text').textContent=text;
-        } else {
-            if(live){ const t=live.querySelector('.transcript-text'); t.style.opacity='1'; t.style.fontStyle='normal'; t.textContent=text; live.removeAttribute('id'); }
-            else {
-                const div=document.createElement('div'); div.className='transcript-entry';
-                div.innerHTML=`<div class="transcript-avatar" style="background:linear-gradient(135deg,#3b82f6,#06b6d4)">${escapeHtml(MY_INITIALS)}</div>
-            <div class="transcript-content"><div class="transcript-meta"><span class="transcript-name">${escapeHtml(MY_NAME)} (You)</span><span class="transcript-time">${new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</span></div>
-            <div class="transcript-text">${escapeHtml(text)}</div></div>`;
-                body.appendChild(div);
-            }
+            const t=live.querySelector('.transcript-text');
+            if(t) t.textContent=text;
+        }else{
+            if(live){ live.remove(); live=null; }
+            const div=document.createElement('div');
+            div.className='transcript-entry';
+            div.innerHTML=`<div class="transcript-avatar" style="background:${color}">${escapeHtml(MY_INITIALS||transcriptInitials(MY_NAME))}</div><div class="transcript-content"><div class="transcript-meta"><span class="transcript-name">${escapeHtml(MY_NAME)} (You)</span><span class="transcript-time">${new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</span></div><div class="transcript-text">${escapeHtml(text)}</div></div>`;
+            body.appendChild(div);
         }
         body.scrollTop=body.scrollHeight;
     }
+
     function handleRemoteTranscript(data){
-        if(String(data.userId)===String(MY_USER_ID)) return;
+        if(!data || String(data.userId)===String(MY_USER_ID)) return;
+        const text=String(data.text||'').trim();
+        if(!text) return;
         const body=document.getElementById('transcript-body'); if(!body) return;
         body.querySelector('[data-empty]')?.remove();
-        const div=document.createElement('div'); div.className='transcript-entry';
-        div.innerHTML = `<div class="transcript-avatar" style="background:linear-gradient(135deg,#8b5cf6,#ec4899)">${escapeHtml(data.userInitials||'?')}</div>
-    <div class="transcript-content"><div class="transcript-meta"><span class="transcript-name">${escapeHtml(data.userName||'User')}</span><span class="transcript-time">${data.spokenAt||''}</span></div>
-    <div class="transcript-text">${escapeHtml(data.text||'')}</div></div>`;
-        body.appendChild(div); body.scrollTop=body.scrollHeight;
+        const name=String(data.userName||knownParticipants?.[String(data.userId)]?.name||'User');
+        const color=transcriptUserColor(data.userId,name);
+        const div=document.createElement('div');
+        div.className='transcript-entry';
+        div.innerHTML=`<div class="transcript-avatar" style="background:${color}">${escapeHtml(data.userInitials||transcriptInitials(name))}</div><div class="transcript-content"><div class="transcript-meta"><span class="transcript-name">${escapeHtml(name)}</span><span class="transcript-time">${escapeHtml(data.spokenAt||'')}</span></div><div class="transcript-text">${escapeHtml(text)}</div></div>`;
+        body.appendChild(div);
+        body.scrollTop=body.scrollHeight;
     }
+
     async function saveTranscript(text){
-        const clean=String(text||'').trim();
+        const clean=String(text||'').replace(/\s+/g,' ').trim();
         if(!clean) return false;
-        for(let attempt=0; attempt<2; attempt++){
+        for(let attempt=0;attempt<3;attempt++){
+            let timer=null;
             try{
                 const ctrl=new AbortController();
-                const timer=setTimeout(()=>ctrl.abort(),6500);
+                timer=setTimeout(()=>ctrl.abort(),7000);
                 const res=await fetch(TRANSCRIPT_URL,{
                     method:'POST',
                     headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':CSRF},
@@ -3994,15 +4096,17 @@
                 });
                 clearTimeout(timer);
                 if(res.ok) return true;
-                console.error('transcript save failed',res.status);
+                console.error('[SmartMeet] transcript save failed',res.status);
+                if(res.status>=400 && res.status<500) return false;
             }catch(e){
-                if(e?.name!=='AbortError') console.error('transcript save error',e);
+                if(timer) clearTimeout(timer);
+                if(e?.name!=='AbortError') console.error('[SmartMeet] transcript save error',e);
             }
-            await new Promise(r=>setTimeout(r,350));
+            await new Promise(r=>setTimeout(r,400*(attempt+1)));
         }
+        showToast('📝 A transcript line could not be saved.');
         return false;
     }
-
     /* ---------- Chat ---------- */
     const chatOwnMessages=new Map();
     const pendingChatSeen=new Set();
@@ -4964,4 +5068,3 @@
 
 </body>
 </html>
-
