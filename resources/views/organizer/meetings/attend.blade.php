@@ -189,16 +189,17 @@
         .listening-indicator{display:none; align-items:center; gap:8px; margin:0 12px 10px; padding:7px 11px; border-radius:11px; background:rgba(34,197,94,.1); border:1px solid rgba(34,197,94,.22); font-size:11px; color:#86efac}
         .listening-dot{width:7px; height:7px; border-radius:50%; background:var(--green); animation:pulse-dot 1.4s infinite}
 
-        .chat-message-row{display:flex; width:100%; gap:0}
+        .chat-message-row{display:flex; width:100%; gap:8px; align-items:flex-end}
         .chat-message-row.is-me{justify-content:flex-end}
         .chat-message-row.is-other{justify-content:flex-start}
+        .chat-message-avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:0 0 28px;color:#fff;font-size:9px;font-weight:800;box-shadow:0 4px 12px rgba(0,0,0,.22);overflow:hidden}
         .chat-message-content{max-width:82%; min-width:80px}
         .chat-message-row.is-me .chat-message-content{text-align:right}
         .chat-message-meta{display:flex; gap:7px; align-items:center; margin:0 4px 4px; font-size:9px; color:var(--muted-2)}
         .chat-message-row.is-me .chat-message-meta{justify-content:flex-end}
-        .chat-message-meta strong{color:#e2e8f0; font-size:10px; font-weight:700}
+        .chat-message-meta strong{font-size:10px; font-weight:800}
         .chat-message-bubble{padding:9px 12px; border-radius:14px 14px 4px 14px; background:rgba(30,41,59,.85); border:1px solid var(--line); font-size:12px; line-height:1.5; word-break:break-word; display:inline-block; text-align:left}
-        .chat-message-row.is-me .chat-message-bubble{border-radius:14px 14px 14px 4px; background:linear-gradient(135deg,#2563eb,#0891b2); border-color:rgba(125,211,252,.3)}
+        .chat-message-row.is-me .chat-message-bubble{border-radius:14px 14px 14px 4px; border-color:rgba(125,211,252,.3)}
         .chat-input-area{display:flex; align-items:center; gap:8px; padding:12px; border-top:1px solid var(--line); background:rgba(2,6,16,.4)}
         .chat-input{flex:1; min-height:40px; padding:8px 12px; border-radius:12px; background:rgba(255,255,255,.04); border:1px solid var(--line); color:var(--text); font-size:12.5px; outline:none}
         .chat-input:focus{border-color:rgba(56,189,248,.55); box-shadow:0 0 0 3px rgba(56,189,248,.08)}
@@ -2978,7 +2979,7 @@
             }
 
             const text=data.data?.text||''; if(!text) return;
-            addChatBubble(data.data?.name||'User', text, false);
+            addChatBubble(data.data?.name||'User', text, false, String(data.data?.userId||from));
             if(activeTab!=='chat'){ unreadChat++; updateChatBadge(); }
             return;
         }
@@ -3962,24 +3963,42 @@
     }
 
     /* ---------- Chat ---------- */
-    function addChatBubble(name, text, isMe){
+    function chatInitials(name){
+        const parts=String(name||'User').trim().split(/\s+/).filter(Boolean);
+        return (parts.slice(0,2).map(part=>part.charAt(0)).join('')||'U').toUpperCase();
+    }
+    function chatSenderColor(userId, name){
+        const key=String(userId||name||'user');
+        let hash=0;
+        for(const ch of key) hash=((hash*31)+ch.charCodeAt(0))>>>0;
+        const palette=['#2563eb','#7c3aed','#0891b2','#059669','#d97706','#db2777','#4f46e5','#0f766e','#9333ea','#c2410c'];
+        return palette[hash%palette.length];
+    }
+    function addChatBubble(name, text, isMe, userId=null){
         const body=document.getElementById('chat-body'); if(!body) return;
         body.querySelector('[data-empty]')?.remove();
         const safeName=String(name||(isMe?MY_NAME:'User')).trim()||'User';
+        const senderId=String(userId||(isMe?MY_USER_ID:'')||safeName);
+        const senderColor=chatSenderColor(senderId,safeName);
         const time=new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
-        const row=document.createElement('div'); row.className='chat-message-row '+(isMe?'is-me':'is-other');
-        row.innerHTML = `<div class="chat-message-content"><div class="chat-message-meta"><strong>${escapeHtml(isMe?MY_NAME+' (You)':safeName)}</strong><span>${time}</span></div><div class="chat-message-bubble">${escapeHtml(text)}</div></div>`;
-        body.appendChild(row); body.scrollTop=body.scrollHeight;
+        const row=document.createElement('div');
+        row.className='chat-message-row '+(isMe?'is-me':'is-other');
+
+        const avatar=`<div class="chat-message-avatar" style="background:${senderColor}">${escapeHtml(chatInitials(safeName))}</div>`;
+        const content=`<div class="chat-message-content"><div class="chat-message-meta"><strong style="color:${senderColor}">${escapeHtml(isMe?MY_NAME+' (You)':safeName)}</strong><span>${time}</span></div><div class="chat-message-bubble" style="${isMe?`background:${senderColor};border-color:${senderColor}`:`border-color:${senderColor}55`}">${escapeHtml(text)}</div></div>`;
+        row.innerHTML=isMe?(content+avatar):(avatar+content);
+        body.appendChild(row);
+        body.scrollTop=body.scrollHeight;
     }
     let chatSending=false;
     async function sendChat(){
         const input=document.getElementById('chat-input'); if(!input || chatSending) return;
         const text=input.value.trim(); if(!text) return;
         chatSending=true;
-        const ok=await sendSignal('all','chat',{text,name:MY_NAME});
+        const ok=await sendSignal('all','chat',{text,name:MY_NAME,userId:String(MY_USER_ID)});
         chatSending=false;
         if(ok){
-            addChatBubble(MY_NAME,text,true);
+            addChatBubble(MY_NAME,text,true,String(MY_USER_ID));
             input.value='';
         }else{
             showToast('💬 Message could not be sent. Check your connection.');
