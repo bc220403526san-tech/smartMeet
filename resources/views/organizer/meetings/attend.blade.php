@@ -225,8 +225,12 @@
         .chat-voice-btn.listening{color:#ef4444; border-color:rgba(239,68,68,.5); background:rgba(239,68,68,.14)}
 
         .people-scroll-shell{position:relative; flex:1; min-height:0; overflow:hidden}
-        .people-body{height:100%; min-height:0; overflow-y:auto !important; overflow-x:hidden; overscroll-behavior:contain; padding:12px 20px 12px 12px; display:flex; flex-direction:column; gap:8px; scrollbar-width:none}
-        .people-body::-webkit-scrollbar{display:none}
+        .people-body{height:100%; min-height:0; overflow-y:auto !important; overflow-x:hidden !important; overscroll-behavior:contain; padding:12px 20px 12px 12px; display:flex; flex-direction:column; gap:8px; scrollbar-width:thin; scrollbar-color:rgba(148,163,184,.42) transparent; -webkit-overflow-scrolling:touch}
+        .people-body::-webkit-scrollbar{width:7px}
+        .people-body::-webkit-scrollbar-track{background:transparent}
+        .people-body::-webkit-scrollbar-thumb{background:rgba(148,163,184,.36);border-radius:999px}
+        .people-body::-webkit-scrollbar-thumb:hover{background:rgba(148,163,184,.58)}
+        .people-grab-track{display:none !important}
         .people-grab-track{position:absolute; top:8px; right:5px; bottom:8px; width:10px; border-radius:999px; background:rgba(255,255,255,.06); z-index:40; display:none}
         .people-grab-track.show{display:block}
         .people-grab-thumb{position:absolute; top:0; left:1px; width:8px; min-height:44px; border-radius:999px; background:#e5e7eb; cursor:grab; touch-action:none; user-select:none; box-shadow:0 0 0 1px rgba(15,23,42,.65)}
