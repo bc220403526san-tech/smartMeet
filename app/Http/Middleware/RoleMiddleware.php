@@ -87,6 +87,7 @@ class RoleMiddleware
                 'participant.meetings.transcript',
                 'participant.meetings.completeByTime',
                 'participant.meetings.markLeft',
+                'participant.meetings.livekit-token',
             ],
             true
         );
