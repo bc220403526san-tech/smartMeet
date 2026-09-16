@@ -224,6 +224,12 @@
         .btn-send{background:linear-gradient(135deg,#2563eb,#0891b2); border:none; color:#fff}
         .chat-voice-btn.listening{color:#ef4444; border-color:rgba(239,68,68,.5); background:rgba(239,68,68,.14)}
 
+        /* Verified People tab scroll container: #tab-people is the element that actually overflows. */
+        #tab-people{overflow-y:auto !important;overflow-x:hidden !important;overscroll-behavior:contain;scrollbar-gutter:stable;scrollbar-width:thin;scrollbar-color:rgba(148,163,184,.42) transparent;-webkit-overflow-scrolling:touch}
+        #tab-people::-webkit-scrollbar{width:7px}
+        #tab-people::-webkit-scrollbar-track{background:transparent}
+        #tab-people::-webkit-scrollbar-thumb{background:rgba(148,163,184,.36);border-radius:999px}
+        #tab-people::-webkit-scrollbar-thumb:hover{background:rgba(148,163,184,.58)}
         .people-scroll-shell{position:relative; flex:1; min-height:0; overflow:hidden}
         .people-body{height:100%; min-height:0; overflow-y:auto !important; overflow-x:hidden !important; overscroll-behavior:contain; padding:12px 20px 12px 12px; display:flex; flex-direction:column; gap:8px; scrollbar-width:thin; scrollbar-color:rgba(148,163,184,.42) transparent; -webkit-overflow-scrolling:touch}
         .people-body::-webkit-scrollbar{width:7px}
@@ -817,7 +823,7 @@
                     <button class="btn-send" onclick="sendChat()"><i class="fa fa-paper-plane"></i></button>
                 </div>
             </div>
-            <div id="tab-people" style="display:none; flex-direction:column; flex:1; min-height:0; overflow:hidden;">
+            <div id="tab-people" style="display:none; flex-direction:column; flex:1; min-height:0; overflow-y:auto; overflow-x:hidden;">
                 <div class="room-invite-card">
                     <div class="room-invite-title"><i class="fa-solid fa-user-plus"></i> Invite people</div>
                     <div class="room-invite-note">Invite someone without leaving the live meeting. Copy the link for WhatsApp/SMS, or send it by email.</div>
@@ -5136,3 +5142,4 @@
 
 </body>
 </html>
+
