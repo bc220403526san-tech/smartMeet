@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -222,6 +223,23 @@
         .chat-voice-btn,.btn-send{width:40px; height:40px; flex-shrink:0; border-radius:12px; border:1px solid var(--line); background:rgba(255,255,255,.04); color:#e2e8f0; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:13px}
         .btn-send{background:linear-gradient(135deg,#2563eb,#0891b2); border:none; color:#fff}
         .chat-voice-btn.listening{color:#ef4444; border-color:rgba(239,68,68,.5); background:rgba(239,68,68,.14)}
+
+
+        /* People tab: the tab itself is the real overflow container. */
+        #tab-people{
+            min-height:0;
+            overflow-y:auto !important;
+            overflow-x:hidden !important;
+            overscroll-behavior:contain;
+            scrollbar-gutter:stable;
+            scrollbar-width:thin;
+            scrollbar-color:rgba(148,163,184,.65) transparent;
+            -webkit-overflow-scrolling:touch;
+        }
+        #tab-people::-webkit-scrollbar{width:7px}
+        #tab-people::-webkit-scrollbar-track{background:transparent}
+        #tab-people::-webkit-scrollbar-thumb{background:rgba(148,163,184,.65);border-radius:999px}
+        #tab-people::-webkit-scrollbar-thumb:hover{background:rgba(100,116,139,.85)}
 
         .people-scroll-shell{position:relative; flex:1; min-height:0; overflow:hidden}
         .people-body{height:100%; min-height:0; overflow-y:auto !important; overflow-x:hidden !important; overscroll-behavior:contain; padding:12px 20px 12px 12px; display:flex; flex-direction:column; gap:8px; scrollbar-width:thin; scrollbar-color:rgba(148,163,184,.42) transparent; -webkit-overflow-scrolling:touch}
@@ -4747,3 +4765,4 @@
 
 </body>
 </html>
+
