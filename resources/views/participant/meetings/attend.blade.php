@@ -3655,11 +3655,6 @@
         if(transcriptPermissionBlocked || !isMicOn || document.visibilityState!=='visible') return;
         if(!recognition) startTranscript();
         if(!recognition || recognitionRunning || recognitionStopping) return;
-        const mic=liveLocalTrack('audio');
-        if(!mic || !mic.enabled || mic.readyState!=='live'){
-            scheduleRecognitionRestart(700);
-            return;
-        }
         try{
             recognition.lang=transcriptLanguage;
             recognition.start();
