@@ -207,7 +207,7 @@ class MeetingAttendController extends Controller
             'type' => [
                 'required',
                 'string',
-                'in:offer,answer,ice-candidate,reconnect-request,presence-request,presence-response,chat,mute,unmute,mic-status,camera-status,transcript,user-joined,user-left,meeting-cancelled,meeting-ended',
+                'in:offer,answer,ice-candidate,reconnect-request,presence-request,presence-response,chat,chat-typing,chat-seen,mute,unmute,mic-status,camera-status,transcript,user-joined,user-left,meeting-cancelled,meeting-ended',
             ],
             'data' => ['required', 'array'],
         ]);
@@ -216,8 +216,23 @@ class MeetingAttendController extends Controller
         $type = $validated['type'];
         $data = $validated['data'];
 
+        /*
+         * Realtime chat identity is server-authenticated. Normal chat, typing,
+         * and seen receipts may not impersonate another meeting user.
+         * Organizer moderation controls intentionally keep their existing
+         * target userId payload unchanged.
+         */
+        $isChatControl = $type === 'chat' && filled($data['smartmeetControl'] ?? null);
+        if (in_array($type, ['chat', 'chat-typing', 'chat-seen'], true) && ! $isChatControl) {
+            $user = auth()->user();
+            $data['userId'] = $fromUserId;
+            $data['name'] = $user?->name ?: 'User';
+        }
+
         $broadcastTypes = [
             'chat',
+            'chat-typing',
+            'chat-seen',
             'mic-status',
             'camera-status',
             'presence-request',
@@ -500,3 +515,4 @@ class MeetingAttendController extends Controller
         return strtoupper($initials);
     }
 }
+

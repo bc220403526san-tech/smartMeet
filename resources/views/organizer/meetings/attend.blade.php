@@ -189,17 +189,34 @@
         .listening-indicator{display:none; align-items:center; gap:8px; margin:0 12px 10px; padding:7px 11px; border-radius:11px; background:rgba(34,197,94,.1); border:1px solid rgba(34,197,94,.22); font-size:11px; color:#86efac}
         .listening-dot{width:7px; height:7px; border-radius:50%; background:var(--green); animation:pulse-dot 1.4s infinite}
 
-        .chat-message-row{display:flex; width:100%; gap:8px; align-items:flex-end}
-        .chat-message-row.is-me{justify-content:flex-end}
-        .chat-message-row.is-other{justify-content:flex-start}
-        .chat-message-avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:0 0 28px;color:#fff;font-size:9px;font-weight:800;box-shadow:0 4px 12px rgba(0,0,0,.22);overflow:hidden}
-        .chat-message-content{max-width:82%; min-width:80px}
-        .chat-message-row.is-me .chat-message-content{text-align:right}
-        .chat-message-meta{display:flex; gap:7px; align-items:center; margin:0 4px 4px; font-size:9px; color:var(--muted-2)}
-        .chat-message-row.is-me .chat-message-meta{justify-content:flex-end}
-        .chat-message-meta strong{font-size:10px; font-weight:800}
-        .chat-message-bubble{padding:9px 12px; border-radius:14px 14px 4px 14px; background:rgba(30,41,59,.85); border:1px solid var(--line); font-size:12px; line-height:1.5; word-break:break-word; display:inline-block; text-align:left}
-        .chat-message-row.is-me .chat-message-bubble{border-radius:14px 14px 14px 4px; border-color:rgba(125,211,252,.3)}
+        .chat-body{min-height:0;overflow-y:auto !important;overflow-x:hidden !important;scrollbar-width:thin;scrollbar-color:rgba(148,163,184,.42) transparent;overscroll-behavior:contain}
+        .chat-body::-webkit-scrollbar{width:7px}
+        .chat-body::-webkit-scrollbar-track{background:transparent}
+        .chat-body::-webkit-scrollbar-thumb{background:rgba(148,163,184,.36);border-radius:999px}
+        .chat-body::-webkit-scrollbar-thumb:hover{background:rgba(148,163,184,.58)}
+        .chat-message-row{display:flex;width:100%;gap:8px;align-items:flex-end;margin-bottom:2px}
+        .chat-message-row.is-me{justify-content:flex-start}
+        .chat-message-row.is-other{justify-content:flex-end}
+        .chat-message-avatar{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:0 0 30px;color:#fff;font-size:9px;font-weight:800;box-shadow:0 4px 12px rgba(0,0,0,.22);overflow:hidden;user-select:none}
+        .chat-message-content{max-width:78%;min-width:90px}
+        .chat-message-row.is-me .chat-message-content{text-align:left}
+        .chat-message-row.is-other .chat-message-content{text-align:right}
+        .chat-message-meta{display:flex;gap:7px;align-items:center;margin:0 5px 4px;font-size:9px;color:var(--muted-2)}
+        .chat-message-row.is-me .chat-message-meta{justify-content:flex-start}
+        .chat-message-row.is-other .chat-message-meta{justify-content:flex-end}
+        .chat-message-meta strong{font-size:10.5px;font-weight:800;color:#f8fafc}
+        .chat-message-bubble{padding:9px 12px;border-radius:5px 14px 14px 14px;border:1px solid rgba(255,255,255,.12);font-size:12px;line-height:1.5;word-break:break-word;display:inline-block;text-align:left;color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.16)}
+        .chat-message-row.is-other .chat-message-bubble{border-radius:14px 5px 14px 14px}
+        .chat-message-receipt{min-height:14px;margin:4px 5px 0;font-size:8.5px;line-height:1.35;color:var(--muted-2)}
+        .chat-message-row.is-me .chat-message-receipt{text-align:left}
+        .chat-message-row.is-other .chat-message-receipt{text-align:right}
+        .chat-typing-indicator{display:none;align-items:center;gap:7px;min-height:28px;padding:5px 14px 7px;color:var(--muted);font-size:10.5px;border-top:1px solid rgba(148,163,184,.07);background:rgba(2,6,16,.2)}
+        .chat-typing-indicator.show{display:flex}
+        .chat-typing-dots{display:inline-flex;align-items:center;gap:3px}
+        .chat-typing-dots span{width:4px;height:4px;border-radius:50%;background:#94a3b8;animation:chatTypingDot 1s infinite ease-in-out}
+        .chat-typing-dots span:nth-child(2){animation-delay:.15s}
+        .chat-typing-dots span:nth-child(3){animation-delay:.3s}
+        @keyframes chatTypingDot{0%,60%,100%{transform:translateY(0);opacity:.45}30%{transform:translateY(-3px);opacity:1}}
         .chat-input-area{display:flex; align-items:center; gap:8px; padding:12px; border-top:1px solid var(--line); background:rgba(2,6,16,.4)}
         .chat-input{flex:1; min-height:40px; padding:8px 12px; border-radius:12px; background:rgba(255,255,255,.04); border:1px solid var(--line); color:var(--text); font-size:12.5px; outline:none}
         .chat-input:focus{border-color:rgba(56,189,248,.55); box-shadow:0 0 0 3px rgba(56,189,248,.08)}
@@ -783,9 +800,13 @@
                 </div>
                 <div class="listening-indicator" id="listening-indicator"><div class="listening-dot"></div><span id="listening-text">Listening…</span></div>
             </div>
-            <div id="tab-chat" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
+            <div id="tab-chat" style="display:none; flex-direction:column; flex:1; min-height:0; overflow:hidden;">
                 <div class="chat-body" id="chat-body">
                     <div class="empty-note" data-empty>No messages yet — say hello 👋</div>
+                </div>
+                <div class="chat-typing-indicator" id="chat-typing-indicator" aria-live="polite">
+                    <span class="chat-typing-dots"><span></span><span></span><span></span></span>
+                    <span id="chat-typing-text"></span>
                 </div>
                 <div class="chat-input-area">
                     <input class="chat-input" id="chat-input" placeholder="Type a message…" onkeydown="if(event.key==='Enter') sendChat()">
@@ -1704,7 +1725,7 @@
         if(active) active.style.display = tab==='people' ? 'block' : 'flex';
         activeTab=tab;
         document.getElementById('ctrl-'+tab)?.classList.add('active');
-        if(tab==='chat'){ unreadChat=0; updateChatBadge(); }
+        if(tab==='chat'){ unreadChat=0; updateChatBadge(); setTimeout(markPendingChatSeen,0); }
         if(tab==='people') renderPeopleList();
     }
     function updateChatBadge(){
@@ -2979,8 +3000,28 @@
             }
 
             const text=data.data?.text||''; if(!text) return;
-            addChatBubble(data.data?.name||'User', text, false, String(data.data?.userId||from));
+            const messageId=String(data.data?.messageId||'').trim();
+            const senderName=chatDisplayName(from,data.data?.name||'User');
+            addChatBubble(senderName,text,false,from,messageId||null);
+            if(messageId){
+                if(chatIsVisible()) void sendChatSeen(messageId);
+                else pendingChatSeen.add(messageId);
+            }
             if(activeTab!=='chat'){ unreadChat++; updateChatBadge(); }
+            return;
+        }
+        if(data.type==='chat-typing'){
+            if(isSelf) return;
+            setRemoteChatTyping(from,data.data?.name||'User',Boolean(data.data?.isTyping));
+            return;
+        }
+        if(data.type==='chat-seen'){
+            if(isSelf) return;
+            const messageId=String(data.data?.messageId||'').trim();
+            const state=chatOwnMessages.get(messageId);
+            if(!state) return;
+            state.seenBy.set(String(from),chatDisplayName(from,data.data?.name||'User'));
+            updateChatReceipt(messageId);
             return;
         }
         if(data.type==='mic-status'){
@@ -3963,19 +4004,48 @@
     }
 
     /* ---------- Chat ---------- */
+    const chatOwnMessages=new Map();
+    const pendingChatSeen=new Set();
+    const chatTypingUsers=new Map();
+    const chatTypingTimers=new Map();
+    let chatTypingLastSentAt=0;
+    let chatTypingStopTimer=null;
+    let chatTypingState=false;
+
     function chatInitials(name){
         const parts=String(name||'User').trim().split(/\s+/).filter(Boolean);
         return (parts.slice(0,2).map(part=>part.charAt(0)).join('')||'U').toUpperCase();
     }
-    function chatSenderColor(userId, name){
-        const key=String(userId||name||'user');
-        let hash=0;
-        for(const ch of key) hash=((hash*31)+ch.charCodeAt(0))>>>0;
-        const palette=['#2563eb','#7c3aed','#0891b2','#059669','#d97706','#db2777','#4f46e5','#0f766e','#9333ea','#c2410c'];
-        return palette[hash%palette.length];
+    function chatSenderColor(userId,name=''){
+        const numericId=Number(userId);
+        let seed;
+        if(Number.isFinite(numericId)){
+            seed=Math.abs(numericId);
+        }else{
+            const key=String(userId||name||'user');
+            let hash=0;
+            for(const ch of key) hash=((hash*31)+ch.charCodeAt(0))>>>0;
+            seed=hash;
+        }
+        const hue=((seed*137.508)%360+360)%360;
+        const saturation=58+(seed%9);
+        const lightness=32+(seed%5);
+        return `hsl(${hue.toFixed(1)} ${saturation}% ${lightness}%)`;
     }
-    function addChatBubble(name, text, isMe, userId=null){
-        const body=document.getElementById('chat-body'); if(!body) return;
+    function createChatMessageId(){
+        if(window.crypto?.randomUUID) return window.crypto.randomUUID();
+        return `${MY_USER_ID}-${Date.now()}-${Math.random().toString(36).slice(2,10)}`;
+    }
+    function chatIsVisible(){
+        return Boolean(panelOpen && activeTab==='chat' && document.visibilityState==='visible');
+    }
+    function chatDisplayName(userId,fallback='User'){
+        const uid=String(userId||'');
+        if(uid===String(MY_USER_ID)) return MY_NAME;
+        return String(knownParticipants[uid]?.name||fallback||'User').trim()||'User';
+    }
+    function addChatBubble(name,text,isMe,userId=null,messageId=null){
+        const body=document.getElementById('chat-body'); if(!body) return null;
         body.querySelector('[data-empty]')?.remove();
         const safeName=String(name||(isMe?MY_NAME:'User')).trim()||'User';
         const senderId=String(userId||(isMe?MY_USER_ID:'')||safeName);
@@ -3983,26 +4053,134 @@
         const time=new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
         const row=document.createElement('div');
         row.className='chat-message-row '+(isMe?'is-me':'is-other');
+        if(messageId) row.dataset.messageId=String(messageId);
+        row.dataset.userId=senderId;
 
-        const avatar=`<div class="chat-message-avatar" style="background:${senderColor}">${escapeHtml(chatInitials(safeName))}</div>`;
-        const content=`<div class="chat-message-content"><div class="chat-message-meta"><strong style="color:${senderColor}">${escapeHtml(isMe?MY_NAME+' (You)':safeName)}</strong><span>${time}</span></div><div class="chat-message-bubble" style="${isMe?`background:${senderColor};border-color:${senderColor}`:`border-color:${senderColor}55`}">${escapeHtml(text)}</div></div>`;
-        row.innerHTML=isMe?(content+avatar):(avatar+content);
+        const avatar=`<div class="chat-message-avatar" style="background:${senderColor}" title="${escapeHtml(safeName)}">${escapeHtml(chatInitials(safeName))}</div>`;
+        const receipt=isMe&&messageId?`<div class="chat-message-receipt" id="chat-receipt-${escapeHtml(String(messageId))}">Sent</div>`:'';
+        const content=`<div class="chat-message-content"><div class="chat-message-meta"><strong>${escapeHtml(isMe?MY_NAME+' (You)':safeName)}</strong><span>${time}</span></div><div class="chat-message-bubble" style="background:${senderColor}">${escapeHtml(text)}</div>${receipt}</div>`;
+
+        // Requested layout: my messages on the LEFT, everyone else's on the RIGHT.
+        row.innerHTML=isMe?(avatar+content):(content+avatar);
         body.appendChild(row);
         body.scrollTop=body.scrollHeight;
+
+        if(isMe&&messageId){
+            chatOwnMessages.set(String(messageId),{seenBy:new Map()});
+        }
+        return row;
+    }
+    function updateChatReceipt(messageId){
+        const state=chatOwnMessages.get(String(messageId));
+        const el=document.getElementById(`chat-receipt-${String(messageId)}`);
+        if(!state||!el) return;
+        const names=[...state.seenBy.values()].filter(Boolean);
+        el.textContent=names.length?`Seen by ${names.join(', ')}`:'Sent';
+    }
+    async function sendChatSeen(messageId){
+        const id=String(messageId||'').trim();
+        if(!id) return;
+        pendingChatSeen.delete(id);
+        try{
+            await sendSignal('all','chat-seen',{messageId:id});
+        }catch(e){
+            pendingChatSeen.add(id);
+        }
+    }
+    function markPendingChatSeen(){
+        if(!chatIsVisible()) return;
+        [...pendingChatSeen].forEach(id=>void sendChatSeen(id));
+    }
+    function renderChatTypingIndicator(){
+        const el=document.getElementById('chat-typing-indicator');
+        const textEl=document.getElementById('chat-typing-text');
+        if(!el||!textEl) return;
+        const names=[...chatTypingUsers.values()].filter(Boolean);
+        if(!names.length){
+            el.classList.remove('show');
+            textEl.textContent='';
+            return;
+        }
+        let label='';
+        if(names.length===1) label=`${names[0]} is typing`;
+        else if(names.length===2) label=`${names[0]} and ${names[1]} are typing`;
+        else label=`${names[0]}, ${names[1]} and ${names.length-2} more are typing`;
+        textEl.textContent=label;
+        el.classList.add('show');
+    }
+    function setRemoteChatTyping(userId,name,isTyping){
+        const uid=String(userId||'');
+        if(!uid||uid===String(MY_USER_ID)) return;
+        if(chatTypingTimers.has(uid)) clearTimeout(chatTypingTimers.get(uid));
+        if(!isTyping){
+            chatTypingUsers.delete(uid);
+            chatTypingTimers.delete(uid);
+            renderChatTypingIndicator();
+            return;
+        }
+        chatTypingUsers.set(uid,chatDisplayName(uid,name));
+        chatTypingTimers.set(uid,setTimeout(()=>{
+            chatTypingUsers.delete(uid);
+            chatTypingTimers.delete(uid);
+            renderChatTypingIndicator();
+        },2200));
+        renderChatTypingIndicator();
+    }
+    function sendChatTypingState(isTyping){
+        const next=Boolean(isTyping);
+        if(next===chatTypingState && (!next || Date.now()-chatTypingLastSentAt<700)) return;
+        chatTypingState=next;
+        chatTypingLastSentAt=Date.now();
+        void sendSignal('all','chat-typing',{isTyping:next}).catch(()=>{});
+    }
+    function handleChatTypingInput(){
+        const input=document.getElementById('chat-input');
+        if(!input) return;
+        const hasText=input.value.trim().length>0;
+        if(hasText && (!chatTypingState || Date.now()-chatTypingLastSentAt>=700)) sendChatTypingState(true);
+        if(chatTypingStopTimer) clearTimeout(chatTypingStopTimer);
+        chatTypingStopTimer=setTimeout(()=>sendChatTypingState(false),1300);
+        if(!hasText) sendChatTypingState(false);
+    }
+    function stopChatTyping(){
+        if(chatTypingStopTimer){ clearTimeout(chatTypingStopTimer); chatTypingStopTimer=null; }
+        if(chatTypingState) sendChatTypingState(false);
+    }
+    function setupChatRealtimeUi(){
+        const input=document.getElementById('chat-input');
+        if(input && !input.dataset.realtimeBound){
+            input.dataset.realtimeBound='1';
+            input.addEventListener('input',handleChatTypingInput);
+            input.addEventListener('blur',stopChatTyping);
+        }
+        document.addEventListener('visibilitychange',()=>{
+            if(document.visibilityState==='visible') markPendingChatSeen();
+            else stopChatTyping();
+        });
     }
     let chatSending=false;
     async function sendChat(){
-        const input=document.getElementById('chat-input'); if(!input || chatSending) return;
+        const input=document.getElementById('chat-input'); if(!input||chatSending) return;
         const text=input.value.trim(); if(!text) return;
+        const messageId=createChatMessageId();
         chatSending=true;
-        const ok=await sendSignal('all','chat',{text,name:MY_NAME,userId:String(MY_USER_ID)});
-        chatSending=false;
-        if(ok){
-            addChatBubble(MY_NAME,text,true,String(MY_USER_ID));
-            input.value='';
-        }else{
+        try{
+            const ok=await sendSignal('all','chat',{text,messageId});
+            if(ok){
+                addChatBubble(MY_NAME,text,true,String(MY_USER_ID),messageId);
+                input.value='';
+                stopChatTyping();
+                input.focus();
+            }else{
+                showToast('💬 Message could not be sent. Check your connection.');
+                input.focus();
+            }
+        }catch(e){
+            console.error('[SmartMeet] chat send failed',e);
             showToast('💬 Message could not be sent. Check your connection.');
             input.focus();
+        }finally{
+            chatSending=false;
         }
     }
     function setupChatVoiceInput(){
@@ -4013,7 +4191,7 @@
         const rec=new SR(); rec.lang='en-US'; rec.continuous=false; rec.interimResults=true; rec.maxAlternatives=1;
         let baseText='';
         btn.addEventListener('click', ()=>{ try{ baseText=input.value.trim(); btn.classList.add('listening'); rec.start(); }catch(e){} });
-        rec.onresult=(e)=>{ let spoken=''; for(let i=e.resultIndex;i<e.results.length;i++) spoken+=e.results[i][0].transcript; input.value=[baseText,spoken.trim()].filter(Boolean).join(' '); };
+        rec.onresult=(e)=>{ let spoken=''; for(let i=e.resultIndex;i<e.results.length;i++) spoken+=e.results[i][0].transcript; input.value=[baseText,spoken.trim()].filter(Boolean).join(' '); handleChatTypingInput(); };
         rec.onend=()=>btn.classList.remove('listening');
         rec.onerror=()=>btn.classList.remove('listening');
     }
@@ -4626,6 +4804,8 @@
         await connectLiveKitForTest();
         renderMyOwnTile();
         setupPanelResize();
+        setupChatRealtimeUi();
+        setupChatVoiceInput();
         renderPeopleList();
 
         // Live roster comes only from current Reverb presence.
@@ -4784,3 +4964,4 @@
 
 </body>
 </html>
+
