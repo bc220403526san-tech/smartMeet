@@ -194,22 +194,25 @@
         .chat-body::-webkit-scrollbar-track{background:transparent}
         .chat-body::-webkit-scrollbar-thumb{background:rgba(148,163,184,.36);border-radius:999px}
         .chat-body::-webkit-scrollbar-thumb:hover{background:rgba(148,163,184,.58)}
-        .chat-message-row{display:flex;width:100%;gap:8px;align-items:flex-end;margin-bottom:2px}
-        .chat-message-row.is-me{justify-content:flex-start}
-        .chat-message-row.is-other{justify-content:flex-end}
-        .chat-message-avatar{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:0 0 30px;color:#fff;font-size:9px;font-weight:800;box-shadow:0 4px 12px rgba(0,0,0,.22);overflow:hidden;user-select:none}
+        .chat-message-row{display:flex;width:100%;gap:8px;align-items:flex-end;margin-bottom:4px}
+        .chat-message-row.is-me{justify-content:flex-end}
+        .chat-message-row.is-other{justify-content:flex-start;animation:chatMessageArrive .22s ease-out}
+        .chat-message-avatar{width:30px;height:30px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:0 0 30px;color:#eaf2ff;font-size:9px;font-weight:800;border:1px solid rgba(148,163,184,.16);box-shadow:0 4px 12px rgba(0,0,0,.16);overflow:hidden;user-select:none}
         .chat-message-content{max-width:78%;min-width:90px}
-        .chat-message-row.is-me .chat-message-content{text-align:left}
-        .chat-message-row.is-other .chat-message-content{text-align:right}
-        .chat-message-meta{display:flex;gap:7px;align-items:center;margin:0 5px 4px;font-size:9px;color:var(--muted-2)}
-        .chat-message-row.is-me .chat-message-meta{justify-content:flex-start}
-        .chat-message-row.is-other .chat-message-meta{justify-content:flex-end}
-        .chat-message-meta strong{font-size:10.5px;font-weight:800;color:#f8fafc}
-        .chat-message-bubble{padding:9px 12px;border-radius:5px 14px 14px 14px;border:1px solid rgba(255,255,255,.12);font-size:12px;line-height:1.5;word-break:break-word;display:inline-block;text-align:left;color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.16)}
-        .chat-message-row.is-other .chat-message-bubble{border-radius:14px 5px 14px 14px}
-        .chat-message-receipt{min-height:14px;margin:4px 5px 0;font-size:8.5px;line-height:1.35;color:var(--muted-2)}
-        .chat-message-row.is-me .chat-message-receipt{text-align:left}
-        .chat-message-row.is-other .chat-message-receipt{text-align:right}
+        .chat-message-row.is-me .chat-message-content{text-align:right}
+        .chat-message-row.is-other .chat-message-content{text-align:left}
+        .chat-message-meta{display:flex;gap:7px;align-items:center;margin:0 5px 4px;font-size:9px;color:#718096}
+        .chat-message-row.is-me .chat-message-meta{justify-content:flex-end}
+        .chat-message-row.is-other .chat-message-meta{justify-content:flex-start}
+        .chat-message-meta strong{font-size:10.5px;font-weight:750;color:#dbe7f7}
+        .chat-message-row.is-me .chat-message-meta strong{color:#bfdbfe}
+        .chat-message-bubble{padding:9px 12px;border-radius:14px 14px 14px 5px;border:1px solid rgba(148,163,184,.14);font-size:12px;line-height:1.5;word-break:break-word;display:inline-block;text-align:left;color:#e8eef8;background:rgba(30,41,59,.72);box-shadow:0 4px 12px rgba(0,0,0,.12)}
+        .chat-message-row.is-me .chat-message-bubble{border-radius:14px 14px 5px 14px;background:linear-gradient(135deg,#2563eb,#1d4ed8);border-color:rgba(96,165,250,.26);color:#fff;box-shadow:0 6px 16px rgba(37,99,235,.16)}
+        .chat-message-row.is-other .chat-message-bubble{background:rgba(30,41,59,.72)}
+        .chat-message-receipt{min-height:14px;margin:4px 5px 0;font-size:8.5px;line-height:1.35;color:#64748b}
+        .chat-message-row.is-me .chat-message-receipt{text-align:right}
+        .chat-message-row.is-other .chat-message-receipt{text-align:left}
+        @keyframes chatMessageArrive{from{opacity:.55;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
         .chat-typing-indicator{display:none;align-items:center;gap:7px;min-height:28px;padding:5px 14px 7px;color:var(--muted);font-size:10.5px;border-top:1px solid rgba(148,163,184,.07);background:rgba(2,6,16,.2)}
         .chat-typing-indicator.show{display:flex}
         .chat-typing-dots{display:inline-flex;align-items:center;gap:3px}
@@ -4200,8 +4203,8 @@
             seed=hash;
         }
         const hue=((seed*137.508)%360+360)%360;
-        const saturation=58+(seed%9);
-        const lightness=32+(seed%5);
+        const saturation=38+(seed%7);
+        const lightness=27+(seed%4);
         return `hsl(${hue.toFixed(1)} ${saturation}% ${lightness}%)`;
     }
     function createChatMessageId(){
@@ -4230,10 +4233,10 @@
 
         const avatar=`<div class="chat-message-avatar" style="background:${senderColor}" title="${escapeHtml(safeName)}">${escapeHtml(chatInitials(safeName))}</div>`;
         const receipt=isMe&&messageId?`<div class="chat-message-receipt" id="chat-receipt-${escapeHtml(String(messageId))}">Sent</div>`:'';
-        const content=`<div class="chat-message-content"><div class="chat-message-meta"><strong>${escapeHtml(isMe?MY_NAME+' (You)':safeName)}</strong><span>${time}</span></div><div class="chat-message-bubble" style="background:${senderColor}">${escapeHtml(text)}</div>${receipt}</div>`;
+        const content=`<div class="chat-message-content"><div class="chat-message-meta"><strong>${escapeHtml(isMe?'You':safeName)}</strong><span>${time}</span></div><div class="chat-message-bubble">${escapeHtml(text)}</div>${receipt}</div>`;
 
-        // Requested layout: my messages on the LEFT, everyone else's on the RIGHT.
-        row.innerHTML=isMe?(avatar+content):(content+avatar);
+        // Clean meeting-chat layout: incoming messages on the left, your messages on the right.
+        row.innerHTML=isMe?(content+avatar):(avatar+content);
         body.appendChild(row);
         body.scrollTop=body.scrollHeight;
 
