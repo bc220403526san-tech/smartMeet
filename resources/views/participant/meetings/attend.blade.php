@@ -193,14 +193,14 @@
         .chat-body::-webkit-scrollbar-track{background:transparent}
         .chat-body::-webkit-scrollbar-thumb{background:rgba(148,163,184,.36);border-radius:999px}
         .chat-body::-webkit-scrollbar-thumb:hover{background:rgba(148,163,184,.58)}
-        .chat-message-row{display:flex;width:100%;gap:8px;align-items:flex-end;margin-bottom:4px}
+        .chat-message-row{display:flex;width:100%;gap:8px;align-items:flex-end;margin-bottom:8px}
         .chat-message-row.is-me{justify-content:flex-start}
         .chat-message-row.is-other{justify-content:flex-end;animation:chatMessageArrive .22s ease-out}
-        .chat-message-avatar{width:30px;height:30px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:0 0 30px;color:#eaf2ff;font-size:9px;font-weight:800;border:1px solid rgba(148,163,184,.16);box-shadow:0 4px 12px rgba(0,0,0,.16);overflow:hidden;user-select:none}
-        .chat-message-content{max-width:78%;min-width:90px}
-        .chat-message-row.is-me .chat-message-content{text-align:left}
-        .chat-message-row.is-other .chat-message-content{text-align:right}
-        .chat-message-meta{display:flex;gap:7px;align-items:center;margin:0 5px 4px;font-size:9px;color:#718096}
+        .chat-message-avatar{width:30px;height:30px;border-radius:10px;display:flex;align-items:center;justify-content:center;align-self:flex-end;flex:0 0 30px;color:#eaf2ff;font-size:9px;font-weight:800;border:1px solid rgba(148,163,184,.16);box-shadow:0 4px 12px rgba(0,0,0,.16);overflow:hidden;user-select:none;margin-bottom:18px}
+        .chat-message-content{display:flex;flex-direction:column;max-width:78%;min-width:0}
+        .chat-message-row.is-me .chat-message-content{align-items:flex-start;text-align:left}
+        .chat-message-row.is-other .chat-message-content{align-items:flex-end;text-align:right}
+        .chat-message-meta{display:flex;gap:7px;align-items:center;margin:0 3px 4px;font-size:9px;color:#718096;max-width:100%}
         .chat-message-row.is-me .chat-message-meta{justify-content:flex-start}
         .chat-message-row.is-other .chat-message-meta{justify-content:flex-end}
         .chat-message-meta strong{font-size:10.5px;font-weight:750;color:#dbe7f7}
@@ -208,7 +208,7 @@
         .chat-message-bubble{padding:9px 12px;border-radius:14px 14px 14px 5px;border:1px solid rgba(148,163,184,.14);font-size:12px;line-height:1.5;word-break:break-word;display:inline-block;text-align:left;color:#e8eef8;background:rgba(30,41,59,.72);box-shadow:0 4px 12px rgba(0,0,0,.12)}
         .chat-message-row.is-me .chat-message-bubble{border-radius:14px 14px 14px 5px;background:linear-gradient(135deg,#2563eb,#1d4ed8);border-color:rgba(96,165,250,.26);color:#fff;box-shadow:0 6px 16px rgba(37,99,235,.16)}
         .chat-message-row.is-other .chat-message-bubble{border-radius:14px 14px 5px 14px;background:rgba(30,41,59,.72)}
-        .chat-message-receipt{min-height:14px;margin:4px 5px 0;font-size:8.5px;line-height:1.35;color:#64748b}
+        .chat-message-receipt{min-height:14px;margin:4px 3px 0;font-size:8.5px;line-height:1.35;color:#64748b;max-width:100%}
         .chat-message-row.is-me .chat-message-receipt{text-align:left}
         .chat-message-row.chat-send-failed .chat-message-bubble{opacity:.68}
         .chat-message-row.chat-send-failed .chat-message-receipt{color:#fca5a5}
@@ -2070,9 +2070,14 @@
         const bestVideo=pickBest('video');
 
         // Keep one canonical live audio and video track for this remote user.
+        // Preserve a still-live track during a transient selection gap so remote
+        // audio does not briefly disappear while LiveKit replaces publications.
         const keepIds=new Set([bestAudio?.id,bestVideo?.id].filter(Boolean));
         source.getTracks().forEach(t=>{
-            if(t.readyState==='ended' || (keepIds.size && !keepIds.has(t.id))){
+            const selectedForKind=t.kind==='audio' ? bestAudio : bestVideo;
+            const shouldRemove=t.readyState==='ended'
+                || (selectedForKind && t.id!==selectedForKind.id);
+            if(shouldRemove){
                 try{ source.removeTrack(t); }catch(e){}
             }
         });
@@ -2126,7 +2131,22 @@
                 audio.muted=false;
                 audio.defaultMuted=false;
                 audio.volume=1;
-                const tryPlay=()=>audio.play().catch(()=>armAudioUnlock());
+                const tryPlay=()=>{
+                    audio.muted=false;
+                    audio.defaultMuted=false;
+                    audio.volume=1;
+                    const playPromise=audio.play();
+                    if(playPromise?.catch){
+                        playPromise.catch(()=>{
+                            armAudioUnlock();
+                            setTimeout(()=>{
+                                if((audio.srcObject?.getAudioTracks?.()||[]).some(t=>t.readyState==='live')){
+                                    audio.play().catch(()=>{});
+                                }
+                            },250);
+                        });
+                    }
+                };
                 tryPlay();
                 if(!audio.__smartMeetResumeBound){
                     audio.__smartMeetResumeBound=true;
