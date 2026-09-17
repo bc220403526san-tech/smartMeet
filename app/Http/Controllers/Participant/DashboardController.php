@@ -70,30 +70,20 @@ class DashboardController extends Controller
             ->with([
                 'organizer:id,name,email,image,avatar'
             ])
-            ->withExists([
-                'participants as is_restricted' => function ($query) use ($user) {
-                    $query->where('user_id', $user->id)
-                        ->whereNotNull('restricted_at');
-                },
-            ])
             ->where('status', 'upcoming')
-            ->where(function ($dateQuery) use ($today, $now) {
+            ->where(function ($dateQuery) use ($today, $now, $scheduleEnd) {
                 $dateQuery
-                    ->whereDate('date', '>', $today)
-                    ->orWhere(function ($sameDay) use ($today, $now) {
+                    ->where(function ($sameDay) use ($today, $now) {
                         $sameDay
                             ->whereDate('date', $today)
-                            ->whereTime(
-                                'time',
-                                '>=',
-                                $now->format('H:i:s')
-                            );
+                            ->whereTime('time', '>=', $now->format('H:i:s'));
+                    })
+                    ->orWhere(function ($future) use ($today, $scheduleEnd) {
+                        $future
+                            ->whereDate('date', '>', $today)
+                            ->whereDate('date', '<=', $scheduleEnd->toDateString());
                     });
             })
-            ->whereRaw(
-                "CONVERT_TZ(CONCAT(`date`, ' ', `time`), `timezone`, 'UTC') <= ?",
-                [$scheduleEnd->copy()->utc()->format('Y-m-d H:i:s')]
-            )
             ->orderBy('date', 'asc')
             ->orderBy('time', 'asc')
             ->take(10)

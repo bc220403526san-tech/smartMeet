@@ -194,23 +194,23 @@
         .chat-body::-webkit-scrollbar-thumb{background:rgba(148,163,184,.36);border-radius:999px}
         .chat-body::-webkit-scrollbar-thumb:hover{background:rgba(148,163,184,.58)}
         .chat-message-row{display:flex;width:100%;gap:8px;align-items:flex-end;margin-bottom:4px}
-        .chat-message-row.is-me{justify-content:flex-end}
-        .chat-message-row.is-other{justify-content:flex-start;animation:chatMessageArrive .22s ease-out}
+        .chat-message-row.is-me{justify-content:flex-start}
+        .chat-message-row.is-other{justify-content:flex-end;animation:chatMessageArrive .22s ease-out}
         .chat-message-avatar{width:30px;height:30px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:0 0 30px;color:#eaf2ff;font-size:9px;font-weight:800;border:1px solid rgba(148,163,184,.16);box-shadow:0 4px 12px rgba(0,0,0,.16);overflow:hidden;user-select:none}
         .chat-message-content{max-width:78%;min-width:90px}
-        .chat-message-row.is-me .chat-message-content{text-align:right}
-        .chat-message-row.is-other .chat-message-content{text-align:left}
+        .chat-message-row.is-me .chat-message-content{text-align:left}
+        .chat-message-row.is-other .chat-message-content{text-align:right}
         .chat-message-meta{display:flex;gap:7px;align-items:center;margin:0 5px 4px;font-size:9px;color:#718096}
-        .chat-message-row.is-me .chat-message-meta{justify-content:flex-end}
-        .chat-message-row.is-other .chat-message-meta{justify-content:flex-start}
+        .chat-message-row.is-me .chat-message-meta{justify-content:flex-start}
+        .chat-message-row.is-other .chat-message-meta{justify-content:flex-end}
         .chat-message-meta strong{font-size:10.5px;font-weight:750;color:#dbe7f7}
         .chat-message-row.is-me .chat-message-meta strong{color:#bfdbfe}
         .chat-message-bubble{padding:9px 12px;border-radius:14px 14px 14px 5px;border:1px solid rgba(148,163,184,.14);font-size:12px;line-height:1.5;word-break:break-word;display:inline-block;text-align:left;color:#e8eef8;background:rgba(30,41,59,.72);box-shadow:0 4px 12px rgba(0,0,0,.12)}
         .chat-message-row.is-me .chat-message-bubble{border-radius:14px 14px 5px 14px;background:linear-gradient(135deg,#2563eb,#1d4ed8);border-color:rgba(96,165,250,.26);color:#fff;box-shadow:0 6px 16px rgba(37,99,235,.16)}
         .chat-message-row.is-other .chat-message-bubble{background:rgba(30,41,59,.72)}
         .chat-message-receipt{min-height:14px;margin:4px 5px 0;font-size:8.5px;line-height:1.35;color:#64748b}
-        .chat-message-row.is-me .chat-message-receipt{text-align:right}
-        .chat-message-row.is-other .chat-message-receipt{text-align:left}
+        .chat-message-row.is-me .chat-message-receipt{text-align:left}
+        .chat-message-row.is-other .chat-message-receipt{text-align:right}
         @keyframes chatMessageArrive{from{opacity:.55;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
         .chat-typing-indicator{display:none;align-items:center;gap:7px;min-height:28px;padding:5px 14px 7px;color:var(--muted);font-size:10.5px;border-top:1px solid rgba(148,163,184,.07);background:rgba(2,6,16,.2)}
         .chat-typing-indicator.show{display:flex}
@@ -3655,7 +3655,11 @@
             }
 
             if(error==='audio-capture'){
-                console.warn('[SmartMeet] Transcription could not access microphone audio; retrying.');
+                console.warn('[SmartMeet] Transcription could not access microphone audio; rebuilding recognizer.');
+                recognition=null;
+                recognitionRunning=false;
+                recognitionStarting=false;
+                if(shouldRecognitionRun()) scheduleRecognitionRestart(700);
                 return;
             }
 
@@ -3717,11 +3721,26 @@
         setTranscriptListening(false);
 
         const instance=recognition;
+        recognition=null;
+        recognitionRunning=false;
+
         if(instance){
+            instance.onstart=null;
+            instance.onspeechstart=null;
+            instance.onspeechend=null;
+            instance.onresult=null;
+            instance.onerror=null;
+            instance.onend=null;
             try{ instance.abort(); }catch(e){}
         }
-        recognitionRunning=false;
-        setTimeout(()=>{ recognitionStopping=false; },350);
+
+        setTimeout(()=>{
+            recognitionStopping=false;
+            if(shouldRecognitionRun()){
+                startTranscript();
+                startRecognition();
+            }
+        },350);
     }
 
     function resetRecognitionForLanguageChange(){
@@ -3943,8 +3962,8 @@
         const receipt=isMe&&messageId?`<div class="chat-message-receipt" id="chat-receipt-${escapeHtml(String(messageId))}">Sent</div>`:'';
         const content=`<div class="chat-message-content"><div class="chat-message-meta"><strong>${escapeHtml(isMe?'You':safeName)}</strong><span>${time}</span></div><div class="chat-message-bubble">${escapeHtml(text)}</div>${receipt}</div>`;
 
-        // Clean meeting-chat layout: incoming messages on the left, your messages on the right.
-        row.innerHTML=isMe?(content+avatar):(avatar+content);
+        // SmartMeet chat layout: your messages on the LEFT, other participants on the RIGHT.
+        row.innerHTML=isMe?(avatar+content):(content+avatar);
         body.appendChild(row);
         body.scrollTop=body.scrollHeight;
 
@@ -4767,3 +4786,4 @@
 
 </body>
 </html>
+
