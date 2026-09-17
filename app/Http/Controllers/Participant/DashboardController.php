@@ -29,9 +29,9 @@ class DashboardController extends Controller
         /*
          * Meetings attached to this participant.
          *
-         * Invite-link joined meetings will also appear here
-         * because MeetingJoinController creates a
-         * meeting_participants record.
+         * This intentionally reads meeting_participants directly.
+         * A registered/logged-in user who joined through an invite link
+         * is included as soon as MeetingJoinController creates that row.
          */
         $meetingIds = MeetingParticipant::where('user_id', $user->id)
             ->pluck('meeting_id')
@@ -58,80 +58,36 @@ class DashboardController extends Controller
 
         /*
          * Upcoming Schedule
+         *
+         * IMPORTANT:
+         * - Upcoming meetings only.
+         * - Active meetings are deliberately excluded.
+         * - Same-day meetings must not already have passed their start time.
+         * - Future meetings are limited to the next 48-hour window.
+         * - Invite-link participants are included through $meetingIds above.
          */
         $schedule = Meeting::whereIn('id', $meetingIds)
             ->with([
                 'organizer:id,name,email,image,avatar'
             ])
-            ->where(function ($query) use (
-                $today,
-                $now,
-                $scheduleEnd
-            ) {
-
-                /*
-                 * Active meetings today.
-                 */
-                $query->where(function ($active) use ($today) {
-                    $active
-                        ->where('status', 'active')
-                        ->whereDate('date', $today);
-                })
-
-                    /*
-                     * OR upcoming meetings within next 48 hours.
-                     */
-                    ->orWhere(function ($upcoming) use (
-                        $today,
-                        $now,
-                        $scheduleEnd
-                    ) {
-                        $upcoming
-                            ->where('status', 'upcoming')
-                            ->where(function ($dateQuery) use (
-                                $today,
-                                $now
-                            ) {
-
-                                /*
-                                 * Future date.
-                                 */
-                                $dateQuery
-                                    ->whereDate('date', '>', $today)
-
-                                    /*
-                                     * OR later today.
-                                     */
-                                    ->orWhere(function ($sameDay) use (
-                                        $today,
-                                        $now
-                                    ) {
-                                        $sameDay
-                                            ->whereDate('date', $today)
-                                            ->whereTime(
-                                                'time',
-                                                '>=',
-                                                $now->format('H:i:s')
-                                            );
-                                    });
-                            })
-
-                            ->whereDate(
-                                'date',
-                                '<=',
-                                $scheduleEnd->toDateString()
+            ->where('status', 'upcoming')
+            ->where(function ($dateQuery) use ($today, $now) {
+                $dateQuery
+                    ->whereDate('date', '>', $today)
+                    ->orWhere(function ($sameDay) use ($today, $now) {
+                        $sameDay
+                            ->whereDate('date', $today)
+                            ->whereTime(
+                                'time',
+                                '>=',
+                                $now->format('H:i:s')
                             );
                     });
             })
-
-            ->orderByRaw("
-                CASE
-                    WHEN status = 'active' THEN 1
-                    WHEN status = 'upcoming' THEN 2
-                    ELSE 3
-                END
-            ")
-
+            ->whereRaw(
+                "CONVERT_TZ(CONCAT(`date`, ' ', `time`), `timezone`, 'UTC') <= ?",
+                [$scheduleEnd->copy()->utc()->format('Y-m-d H:i:s')]
+            )
             ->orderBy('date', 'asc')
             ->orderBy('time', 'asc')
             ->take(10)

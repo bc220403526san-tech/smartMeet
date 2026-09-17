@@ -344,8 +344,6 @@
 
                     $meetingDate = \Carbon\Carbon::parse($meeting->date);
 
-                    $isLive = $meeting->status === 'active';
-
                     $dayLabel = $meetingDate->isToday()
                         ? 'Today'
                         : (
@@ -416,16 +414,8 @@
 
                         <span class="relative flex h-2.5 w-2.5 flex-shrink-0">
 
-                            @if($isLive)
-
-                                <span
-                                    class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"
-                                ></span>
-
-                            @endif
-
                             <span
-                                class="relative inline-flex rounded-full h-2.5 w-2.5 {{ $isLive ? 'bg-blue-600' : 'bg-gray-300' }}"
+                                class="relative inline-flex rounded-full h-2.5 w-2.5 bg-gray-300"
                             ></span>
 
                         </span>
@@ -516,27 +506,12 @@
                     <!-- Action -->
                     <div class="text-right">
 
-                        @if($isLive)
-
-                            <a
-                                href="{{ route('participant.meetings.attend', $meeting->id) }}"
-                                class="inline-block px-5 py-2 rounded-lg text-xs font-semibold transition
-                                       bg-gradient-to-r from-blue-600 to-indigo-600 text-white
-                                       hover:from-blue-700 hover:to-indigo-700 shadow-sm hover:shadow"
-                            >
-                                Join Session
-                            </a>
-
-                        @else
-
-                            <span
-                                class="inline-block px-5 py-2 rounded-lg text-xs font-semibold
-                                       bg-gray-100 text-gray-600 cursor-not-allowed"
-                            >
-                                Attend Meeting
-                            </span>
-
-                        @endif
+                        <span
+                            class="inline-block px-5 py-2 rounded-lg text-xs font-semibold
+                                   bg-gray-100 text-gray-600 cursor-not-allowed"
+                        >
+                            Attend Meeting
+                        </span>
 
                     </div>
 
