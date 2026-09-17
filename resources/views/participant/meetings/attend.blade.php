@@ -206,10 +206,12 @@
         .chat-message-meta strong{font-size:10.5px;font-weight:750;color:#dbe7f7}
         .chat-message-row.is-me .chat-message-meta strong{color:#bfdbfe}
         .chat-message-bubble{padding:9px 12px;border-radius:14px 14px 14px 5px;border:1px solid rgba(148,163,184,.14);font-size:12px;line-height:1.5;word-break:break-word;display:inline-block;text-align:left;color:#e8eef8;background:rgba(30,41,59,.72);box-shadow:0 4px 12px rgba(0,0,0,.12)}
-        .chat-message-row.is-me .chat-message-bubble{border-radius:14px 14px 5px 14px;background:linear-gradient(135deg,#2563eb,#1d4ed8);border-color:rgba(96,165,250,.26);color:#fff;box-shadow:0 6px 16px rgba(37,99,235,.16)}
-        .chat-message-row.is-other .chat-message-bubble{background:rgba(30,41,59,.72)}
+        .chat-message-row.is-me .chat-message-bubble{border-radius:14px 14px 14px 5px;background:linear-gradient(135deg,#2563eb,#1d4ed8);border-color:rgba(96,165,250,.26);color:#fff;box-shadow:0 6px 16px rgba(37,99,235,.16)}
+        .chat-message-row.is-other .chat-message-bubble{border-radius:14px 14px 5px 14px;background:rgba(30,41,59,.72)}
         .chat-message-receipt{min-height:14px;margin:4px 5px 0;font-size:8.5px;line-height:1.35;color:#64748b}
         .chat-message-row.is-me .chat-message-receipt{text-align:left}
+        .chat-message-row.chat-send-failed .chat-message-bubble{opacity:.68}
+        .chat-message-row.chat-send-failed .chat-message-receipt{color:#fca5a5}
         .chat-message-row.is-other .chat-message-receipt{text-align:right}
         @keyframes chatMessageArrive{from{opacity:.55;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
         .chat-typing-indicator{display:none;align-items:center;gap:7px;min-height:28px;padding:5px 14px 7px;color:var(--muted);font-size:10.5px;border-top:1px solid rgba(148,163,184,.07);background:rgba(2,6,16,.2)}
@@ -2550,6 +2552,22 @@
             if(isSelf) return;
 
             const control=String(data.data?.smartmeetControl || '');
+            const incomingMessageId=String(data.data?.messageId||'').trim();
+
+            if(!control && incomingMessageId){
+                window.__smartmeetSeenChatIds=window.__smartmeetSeenChatIds||new Set();
+                if(window.__smartmeetSeenChatIds.has(incomingMessageId)) return;
+                window.__smartmeetSeenChatIds.add(incomingMessageId);
+                if(window.__smartmeetSeenChatIds.size>1000){
+                    const first=window.__smartmeetSeenChatIds.values().next().value;
+                    if(first) window.__smartmeetSeenChatIds.delete(first);
+                }
+            }
+
+            if(control==='transcript-line'){
+                handleRemoteTranscript(data.data || {});
+                return;
+            }
             const controlUser=String(data.data?.userId || from);
 
             if(control==='raise-hand'){
@@ -3823,7 +3841,18 @@
         body.scrollTop=body.scrollHeight;
     }
 
+    const receivedTranscriptIds=new Set();
+
     function handleRemoteTranscript(data){
+        const transcriptId=String(data?.transcriptId||'').trim();
+        if(transcriptId){
+            if(receivedTranscriptIds.has(transcriptId)) return;
+            receivedTranscriptIds.add(transcriptId);
+            if(receivedTranscriptIds.size>500){
+                const first=receivedTranscriptIds.values().next().value;
+                if(first) receivedTranscriptIds.delete(first);
+            }
+        }
         if(!data || String(data.userId)===String(MY_USER_ID)) return;
         const text=String(data.text||'').trim();
         if(!text) return;
@@ -3853,7 +3882,23 @@
                     signal:ctrl.signal
                 });
                 clearTimeout(timer);
-                if(res.ok) return true;
+                if(res.ok){
+                    const transcriptId=`${MY_USER_ID}:${Date.now()}:${clean.slice(0,48)}`;
+                    try{
+                        await sendSignal('all','chat',{
+                            smartmeetControl:'transcript-line',
+                            transcriptId,
+                            userId:MY_USER_ID,
+                            userName:MY_NAME,
+                            userInitials:MY_INITIALS,
+                            text:clean,
+                            spokenAt:new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})
+                        });
+                    }catch(e){
+                        console.warn('[SmartMeet] transcript realtime fallback failed',e);
+                    }
+                    return true;
+                }
                 console.error('[SmartMeet] transcript save failed',res.status);
                 if(res.status>=400 && res.status<500) return false;
             }catch(e){
@@ -4064,23 +4109,30 @@
     async function sendChat(){
         const input=document.getElementById('chat-input'); if(!input||chatSending) return;
         const text=input.value.trim(); if(!text) return;
+
         const messageId=createChatMessageId();
         chatSending=true;
+
+        // Render instantly; transport happens immediately after.
+        const row=addChatBubble(MY_NAME,text,true,String(MY_USER_ID),messageId);
+        input.value='';
+        stopChatTyping();
+        input.focus();
+
         try{
             const ok=await sendSignal('all','chat',{text,messageId});
-            if(ok){
-                addChatBubble(MY_NAME,text,true,String(MY_USER_ID),messageId);
-                input.value='';
-                stopChatTyping();
-                input.focus();
-            }else{
-                showToast('💬 Message could not be sent. Check your connection.');
-                input.focus();
+            if(!ok){
+                row?.classList.add('chat-send-failed');
+                const receipt=document.getElementById(`chat-receipt-${messageId}`);
+                if(receipt) receipt.textContent='Not sent';
+                showToast('💬 Message could not be delivered. Check your connection.');
             }
         }catch(e){
             console.error('[SmartMeet] chat send failed',e);
-            showToast('💬 Message could not be sent. Check your connection.');
-            input.focus();
+            row?.classList.add('chat-send-failed');
+            const receipt=document.getElementById(`chat-receipt-${messageId}`);
+            if(receipt) receipt.textContent='Not sent';
+            showToast('💬 Message could not be delivered. Check your connection.');
         }finally{
             chatSending=false;
         }
@@ -4786,4 +4838,3 @@
 
 </body>
 </html>
-
