@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
 class MeetingParticipant extends Model
 {
@@ -12,7 +12,12 @@ class MeetingParticipant extends Model
     protected $fillable = [
         'meeting_id',
         'user_id',
-        'status'
+        'status',
+        'restricted_at',
+    ];
+
+    protected $casts = [
+        'restricted_at' => 'datetime',
     ];
 
     public function meeting()

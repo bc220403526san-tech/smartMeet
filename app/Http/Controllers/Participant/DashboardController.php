@@ -70,6 +70,12 @@ class DashboardController extends Controller
             ->with([
                 'organizer:id,name,email,image,avatar'
             ])
+            ->withExists([
+                'participants as is_restricted' => function ($query) use ($user) {
+                    $query->where('user_id', $user->id)
+                        ->whereNotNull('restricted_at');
+                },
+            ])
             ->where('status', 'upcoming')
             ->where(function ($dateQuery) use ($today, $now) {
                 $dateQuery

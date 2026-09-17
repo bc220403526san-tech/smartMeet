@@ -29,7 +29,13 @@
                     Review meeting logistics, participants and agenda.
                 </p>
             </div>
-            @if($meeting->status === 'active')
+            @if($meeting->is_restricted)
+                <div class="mt-3 sm:mt-0 inline-flex items-center gap-2 bg-red-50 text-red-600 px-4 py-2.5 rounded-xl text-sm font-semibold border border-red-200"
+                     title="You can't join this meeting because the organizer has restricted your access.">
+                    <i class="fa-solid fa-ban"></i>
+                    Restricted
+                </div>
+            @elseif($meeting->status === 'active')
                 <a href="{{ route('participant.meetings.attend', $meeting) }}"
                    class="mt-3 sm:mt-0 inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm hover:shadow-md transition-all">
                     <i class="fa-solid fa-video"></i>
@@ -190,3 +196,4 @@
         </div>
     </div>
 </x-layouts.app>
+

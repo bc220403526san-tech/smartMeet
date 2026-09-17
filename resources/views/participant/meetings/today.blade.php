@@ -57,6 +57,7 @@
                     class="group bg-white rounded-2xl p-6 border shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5 {{ $isActive ? 'border-l-4 border-l-red-500 border-gray-200' : 'border-l-4 border-l-blue-500 border-gray-200' }}"
                     data-today-meeting-id="{{ $meeting->id }}"
                     data-current-status="{{ $meeting->status }}"
+                    data-restricted="{{ $meeting->is_restricted ? '1' : '0' }}"
                 >
                     <div class="flex items-center justify-between mb-4 gap-3 flex-wrap">
                         <div id="today-status-{{ $meeting->id }}">
@@ -110,7 +111,13 @@
                         </div>
 
                         <div id="today-action-{{ $meeting->id }}">
-                            @if($isActive)
+                            @if($meeting->is_restricted)
+                                <span title="Organizer restricted your access"
+                                      class="bg-red-50 text-red-600 px-5 py-2.5 rounded-xl text-sm font-semibold border border-red-200 cursor-not-allowed inline-flex items-center gap-2">
+                                    <i class="fa-solid fa-ban"></i>
+                                    Restricted
+                                </span>
+                            @elseif($isActive)
                                 <a href="{{ route('participant.meetings.attend', $meeting) }}"
                                    class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-md hover:shadow-lg transition flex items-center gap-2">
                                     <i class="fa-solid fa-circle-play"></i>
@@ -195,6 +202,11 @@
         }
 
         function actionHtml(status, id) {
+            const row = document.querySelector(`[data-today-meeting-id="${id}"]`);
+            if (row?.dataset.restricted === '1') {
+                return `<span title="Organizer restricted your access" class="bg-red-50 text-red-600 px-5 py-2.5 rounded-xl text-sm font-semibold border border-red-200 cursor-not-allowed inline-flex items-center gap-2"><i class="fa-solid fa-ban"></i>Restricted</span>`;
+            }
+
             if (status === 'active') {
                 return `<a href="/participant/meetings/${id}/attend" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-md hover:shadow-lg transition flex items-center gap-2"><i class="fa-solid fa-circle-play"></i>Join Live</a>`;
             }
@@ -296,4 +308,5 @@
         });
     })();
 </script>
+
 

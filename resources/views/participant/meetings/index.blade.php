@@ -170,7 +170,8 @@
                 @endphp
                 <div class="meeting-row grid grid-cols-6 items-center px-5 py-4 border-b border-gray-100 hover:bg-blue-50/30 transition duration-200 group"
                      data-meeting-id="{{ $meeting->id }}"
-                     data-current-status="{{ $meeting->status }}">
+                     data-current-status="{{ $meeting->status }}"
+                     data-restricted="{{ $meeting->is_restricted ? '1' : '0' }}">
                     <!-- TITLE -->
                     <div class="meeting-cell" data-label="Meeting">
                         <h3 class="meeting-title-text text-sm font-semibold text-gray-800 group-hover:text-blue-600 transition">
@@ -233,7 +234,13 @@
                     <!-- ACTIONS -->
                     <div class="meeting-cell meeting-actions flex items-center justify-end gap-2" data-label="Actions">
                         <div id="attend-col-{{ $meeting->id }}">
-                            @if($meeting->status === 'active')
+                            @if($meeting->is_restricted)
+                                <span title="Organizer restricted your access"
+                                      class="flex items-center gap-2 bg-red-50 text-red-600 px-4 py-2 rounded-xl text-xs font-semibold cursor-not-allowed border border-red-200">
+                                    <i class="fa-solid fa-ban text-[11px]"></i>
+                                    Restricted
+                                </span>
+                            @elseif($meeting->status === 'active')
                                 <a href="{{ route('participant.meetings.attend', $meeting) }}"
                                    class="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-semibold transition shadow-sm hover:shadow">
                                     <i class="fa-solid fa-video text-[11px]"></i>
@@ -799,6 +806,11 @@
         }
 
         function attendHtml(status, id) {
+            const row = document.querySelector(`[data-meeting-id="${id}"]`);
+            if (row?.dataset.restricted === '1') {
+                return `<span title="Organizer restricted your access" class="flex items-center gap-2 bg-red-50 text-red-600 px-4 py-2 rounded-xl text-xs font-semibold cursor-not-allowed border border-red-200"><i class="fa-solid fa-ban text-[11px]"></i> Restricted</span>`;
+            }
+
             if (status === 'active') {
                 return `<a href="/participant/meetings/${id}/attend" class="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-semibold transition shadow-sm hover:shadow"><i class="fa-solid fa-video text-[11px]"></i> Attend</a>`;
             }
@@ -970,4 +982,5 @@
         scheduleExactStatusRefresh();
     })();
 </script>
+
 

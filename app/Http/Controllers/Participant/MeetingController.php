@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Participant;
 
 use App\Http\Controllers\Controller;
 use App\Models\Meeting;
+use App\Models\MeetingParticipant;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -56,6 +57,12 @@ class MeetingController extends Controller
             'organizer',
             'participants',
         ])
+            ->withExists([
+                'participants as is_restricted' => function ($q) use ($userId) {
+                    $q->where('user_id', $userId)
+                        ->whereNotNull('restricted_at');
+                },
+            ])
             ->whereHas(
                 'participants',
                 function ($q) use ($userId) {
@@ -233,6 +240,12 @@ class MeetingController extends Controller
             'organizer',
             'participants.user',
         ])
+            ->withExists([
+                'participants as is_restricted' => function ($q) use ($userId) {
+                    $q->where('user_id', $userId)
+                        ->whereNotNull('restricted_at');
+                },
+            ])
             ->whereHas(
                 'participants',
                 function ($q) use ($userId) {
@@ -458,6 +471,12 @@ class MeetingController extends Controller
                 'You are not invited to this meeting.'
             );
         }
+
+        $meeting->is_restricted = MeetingParticipant::query()
+            ->where('meeting_id', $meeting->id)
+            ->where('user_id', auth()->id())
+            ->whereNotNull('restricted_at')
+            ->exists();
 
         $this->syncSingleMeetingStatus(
             $meeting
@@ -1024,3 +1043,4 @@ class MeetingController extends Controller
         )->utc();
     }
 }
+

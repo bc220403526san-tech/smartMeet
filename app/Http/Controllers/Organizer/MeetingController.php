@@ -193,13 +193,14 @@ class MeetingController extends Controller
         ]);
 
         foreach ($request->participants ?? [] as $userId) {
-            MeetingParticipant::firstOrCreate(
+            MeetingParticipant::updateOrCreate(
                 [
                     'meeting_id' => $meeting->id,
                     'user_id' => $userId,
                 ],
                 [
                     'status' => 'invited',
+                    'restricted_at' => null,
                 ]
             );
         }
@@ -366,14 +367,20 @@ class MeetingController extends Controller
 
         $meeting->participants()
             ->whereNotIn('user_id', $newIds)
+            ->whereNull('restricted_at')
             ->delete();
 
-        foreach ($newIds->diff($existingIds) as $userId) {
-            MeetingParticipant::create([
-                'meeting_id' => $meeting->id,
-                'user_id' => $userId,
-                'status' => 'invited',
-            ]);
+        foreach ($newIds as $userId) {
+            MeetingParticipant::updateOrCreate(
+                [
+                    'meeting_id' => $meeting->id,
+                    'user_id' => $userId,
+                ],
+                [
+                    'status' => 'invited',
+                    'restricted_at' => null,
+                ]
+            );
         }
 
         return redirect()
@@ -667,9 +674,15 @@ class MeetingController extends Controller
                 if ($existingUser) {
                     $recipientType = 'registered_user';
 
-                    $meeting->participants()->firstOrCreate(
-                        ['user_id' => $existingUser->id],
-                        ['status' => 'invited']
+                    MeetingParticipant::updateOrCreate(
+                        [
+                            'meeting_id' => $meeting->id,
+                            'user_id' => $existingUser->id,
+                        ],
+                        [
+                            'status' => 'invited',
+                            'restricted_at' => null,
+                        ]
                     );
 
                     $link = route(
@@ -964,3 +977,4 @@ class MeetingController extends Controller
     }
 
 }
+

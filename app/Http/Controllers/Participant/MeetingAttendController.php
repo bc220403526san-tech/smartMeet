@@ -6,6 +6,7 @@ use App\Events\MeetingSignal;
 use App\Events\TranscriptUpdated;
 use App\Http\Controllers\Controller;
 use App\Models\Meeting;
+use App\Models\MeetingParticipant;
 use App\Models\MeetingParticipantLog;
 use App\Models\MeetingTranscript;
 use Carbon\Carbon;
@@ -402,11 +403,21 @@ class MeetingAttendController extends Controller
 
     private function authorizeParticipant(Meeting $meeting): void
     {
+        $participant = MeetingParticipant::query()
+            ->where('meeting_id', $meeting->id)
+            ->where('user_id', auth()->id())
+            ->first();
+
         abort_unless(
-            $meeting->participants()
-                ->where('user_id', auth()->id())
-                ->exists(),
-            403
+            $participant !== null,
+            403,
+            'You are not invited to this meeting.'
+        );
+
+        abort_if(
+            $participant->restricted_at !== null,
+            403,
+            'You cannot join this meeting because the organizer has restricted your access.'
         );
     }
 
@@ -515,4 +526,5 @@ class MeetingAttendController extends Controller
         return strtoupper($initials);
     }
 }
+
 

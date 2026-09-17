@@ -39,8 +39,15 @@ class MeetingModerationController extends Controller
         abort_if(!$participant, 404, 'Participant is not part of this meeting.');
 
         if ($action === 'remove') {
-            // Removing membership also prevents re-entry through participant attend authorization.
-            $participant->delete();
+            /*
+             * Keep the membership row so participant pages can show a persistent
+             * Restricted state. restricted_at is also the authoritative access
+             * check used by participant meeting endpoints.
+             */
+            $participant->forceFill([
+                'restricted_at' => now(),
+                'left_at' => now(),
+            ])->save();
 
             broadcast(new MeetingSignal(
                 meetingId: (string) $meeting->id,
@@ -54,7 +61,7 @@ class MeetingModerationController extends Controller
                 ]
             ))->toOthers();
 
-            return response()->json(['status' => 'removed']);
+            return response()->json(['status' => 'restricted']);
         }
 
         broadcast(new MeetingSignal(

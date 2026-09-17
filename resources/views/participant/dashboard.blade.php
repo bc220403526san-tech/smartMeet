@@ -506,12 +506,22 @@
                     <!-- Action -->
                     <div class="text-right">
 
-                        <span
-                            class="inline-block px-5 py-2 rounded-lg text-xs font-semibold
+                        @if($meeting->is_restricted)
+                            <span
+                                title="Organizer restricted your access"
+                                class="inline-flex items-center gap-2 px-5 py-2 rounded-lg text-xs font-semibold bg-red-50 text-red-600 border border-red-200 cursor-not-allowed"
+                            >
+                                <i class="fa-solid fa-ban"></i>
+                                Restricted
+                            </span>
+                        @else
+                            <span
+                                class="inline-block px-5 py-2 rounded-lg text-xs font-semibold
                                    bg-gray-100 text-gray-600 cursor-not-allowed"
-                        >
+                            >
                             Attend Meeting
                         </span>
+                        @endif
 
                     </div>
 
@@ -881,3 +891,4 @@
 
     })();
 </script>
+
