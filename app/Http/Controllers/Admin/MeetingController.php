@@ -65,6 +65,65 @@ class MeetingController extends Controller
         ));
     }
 
+    /**
+     * Show meetings where the logged-in admin has been invited
+     * as a meeting participant.
+     *
+     * Active and upcoming meetings are displayed separately.
+     */
+    public function invited(Request $request)
+    {
+        $userId = auth()->id();
+
+        // Keep statuses synchronized before displaying the page.
+        $this->syncScheduledMeetingStatuses();
+
+        $baseQuery = Meeting::query()
+            ->with([
+                'organizer',
+                'participants.user',
+            ])
+            ->whereHas('participants', function ($q) use ($userId) {
+                $q->where('user_id', $userId);
+            })
+            ->whereIn('status', ['upcoming', 'active']);
+
+        /*
+         * Optional status filter.
+         *
+         * Only allow the two statuses used by this page.
+         */
+        if (
+            $request->filled('status') &&
+            in_array($request->status, ['upcoming', 'active'], true)
+        ) {
+            $baseQuery->where('status', $request->status);
+        }
+
+        /*
+         * Active meetings
+         */
+        $activeMeetings = (clone $baseQuery)
+            ->where('status', 'active')
+            ->orderBy('date')
+            ->orderBy('time')
+            ->get();
+
+        /*
+         * Upcoming meetings
+         */
+        $upcomingMeetings = (clone $baseQuery)
+            ->where('status', 'upcoming')
+            ->orderBy('date')
+            ->orderBy('time')
+            ->get();
+
+        return view('admin.meetings.invited', [
+            'activeMeetings' => $activeMeetings,
+            'upcomingMeetings' => $upcomingMeetings,
+        ]);
+    }
+
     public function create()
     {
         abort(403, 'Meetings can only be created by organizers.');

@@ -14,7 +14,8 @@ Route::middleware(['auth', 'role:admin'])
     ->name('admin.')
     ->group(function () {
 
-        Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+        Route::get('/dashboard', [DashboardController::class, 'index'])
+            ->name('dashboard');
 
         Route::delete('/activities/{key}', [DashboardController::class, 'removeActivity'])
             ->name('activities.remove');
@@ -23,51 +24,126 @@ Route::middleware(['auth', 'role:admin'])
             ->name('activities.fetch');
 
         // Direct Admin Audit page: resources/views/admin/audit.blade.php
-        Route::get('/audit', [AuditLogController::class, 'index'])->name('audit');
+        Route::get('/audit', [AuditLogController::class, 'index'])
+            ->name('audit');
 
         Route::prefix('reports')->name('reports.')->group(function () {
-            Route::get('/', [ReportController::class, 'index'])->name('index');
-            Route::get('/export', [ReportController::class, 'export'])->name('export');
+            Route::get('/', [ReportController::class, 'index'])
+                ->name('index');
+
+            Route::get('/export', [ReportController::class, 'export'])
+                ->name('export');
         });
 
         Route::prefix('settings')->name('settings.')->group(function () {
-            Route::get('/', [SettingsController::class, 'index'])->name('index');
-            Route::patch('/profile', [SettingsController::class, 'updateProfile'])->name('profile.update');
-            Route::post('/avatar', [SettingsController::class, 'updateAvatar'])->name('avatar.update');
-            Route::put('/password', [SettingsController::class, 'updatePassword'])->name('password.update');
-            Route::patch('/notifications', [SettingsController::class, 'updateNotifications'])->name('notifications.update');
-            Route::delete('/deactivate', [SettingsController::class, 'deactivate'])->name('deactivate');
-            Route::post('/flash', [SettingsController::class, 'storeFlash'])->name('flash');
+            Route::get('/', [SettingsController::class, 'index'])
+                ->name('index');
+
+            Route::patch('/profile', [SettingsController::class, 'updateProfile'])
+                ->name('profile.update');
+
+            Route::post('/avatar', [SettingsController::class, 'updateAvatar'])
+                ->name('avatar.update');
+
+            Route::put('/password', [SettingsController::class, 'updatePassword'])
+                ->name('password.update');
+
+            Route::patch('/notifications', [SettingsController::class, 'updateNotifications'])
+                ->name('notifications.update');
+
+            Route::delete('/deactivate', [SettingsController::class, 'deactivate'])
+                ->name('deactivate');
+
+            Route::post('/flash', [SettingsController::class, 'storeFlash'])
+                ->name('flash');
         });
 
         Route::prefix('role-requests')->name('role-requests.')->group(function () {
-            Route::get('/', [RoleRequestController::class, 'index'])->name('index');
-            Route::patch('/{roleRequest}/approve', [RoleRequestController::class, 'approve'])->name('approve');
-            Route::patch('/{roleRequest}/reject', [RoleRequestController::class, 'reject'])->name('reject');
-            Route::delete('/{roleRequest}', [RoleRequestController::class, 'destroy'])->name('destroy');
+            Route::get('/', [RoleRequestController::class, 'index'])
+                ->name('index');
+
+            Route::patch('/{roleRequest}/approve', [RoleRequestController::class, 'approve'])
+                ->name('approve');
+
+            Route::patch('/{roleRequest}/reject', [RoleRequestController::class, 'reject'])
+                ->name('reject');
+
+            Route::delete('/{roleRequest}', [RoleRequestController::class, 'destroy'])
+                ->name('destroy');
         });
+
+        /*
+        |--------------------------------------------------------------------------
+        | Meetings
+        |--------------------------------------------------------------------------
+        */
 
         Route::prefix('meetings')->name('meetings.')->group(function () {
-            Route::get('/', [MeetingController::class, 'index'])->name('index');
-            Route::get('/{meeting}', [MeetingController::class, 'show'])->name('show');
-            Route::get('/{meeting}/edit', [MeetingController::class, 'edit'])->name('edit');
-            Route::delete('/{meeting}', [MeetingController::class, 'destroy'])->name('destroy');
-            Route::patch('/{meeting}/cancel', [MeetingController::class, 'cancel'])->name('cancel');
-            Route::patch('/{meeting}/flag', [MeetingController::class, 'flag'])->name('flag');
+
+            /*
+             * IMPORTANT:
+             * This route must come before /{meeting}
+             * so "invited-meetings" is not treated as a meeting ID.
+             */
+            Route::get('/invited-meetings', [MeetingController::class, 'invited'])
+                ->name('invited');
+
+            Route::get('/', [MeetingController::class, 'index'])
+                ->name('index');
+
+            Route::get('/{meeting}', [MeetingController::class, 'show'])
+                ->name('show');
+
+            Route::get('/{meeting}/edit', [MeetingController::class, 'edit'])
+                ->name('edit');
+
+            Route::delete('/{meeting}', [MeetingController::class, 'destroy'])
+                ->name('destroy');
+
+            Route::patch('/{meeting}/cancel', [MeetingController::class, 'cancel'])
+                ->name('cancel');
+
+            Route::patch('/{meeting}/flag', [MeetingController::class, 'flag'])
+                ->name('flag');
         });
 
+        /*
+        |--------------------------------------------------------------------------
+        | Users
+        |--------------------------------------------------------------------------
+        */
+
         Route::prefix('users')->name('users.')->group(function () {
-            Route::get('/', [UserController::class, 'index'])->name('index');
-            Route::get('/create', [UserController::class, 'create'])->name('create');
-            Route::post('/', [UserController::class, 'store'])->name('store');
+
+            Route::get('/', [UserController::class, 'index'])
+                ->name('index');
+
+            Route::get('/create', [UserController::class, 'create'])
+                ->name('create');
+
+            Route::post('/', [UserController::class, 'store'])
+                ->name('store');
+
             // Participant Meeting History
             Route::get('/{user}/meetings', [UserController::class, 'meetingHistory'])
                 ->name('meetings');
-            Route::get('/{user}', [UserController::class, 'show'])->name('show');
-            Route::get('/{user}/edit', [UserController::class, 'edit'])->name('edit');
-            Route::put('/{user}', [UserController::class, 'update'])->name('update');
-            Route::delete('/{user}', [UserController::class, 'destroy'])->name('destroy');
-            Route::patch('/{user}/change-role', [UserController::class, 'changeRole'])->name('change-role');
-            Route::patch('/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('toggle-status');
+
+            Route::get('/{user}', [UserController::class, 'show'])
+                ->name('show');
+
+            Route::get('/{user}/edit', [UserController::class, 'edit'])
+                ->name('edit');
+
+            Route::put('/{user}', [UserController::class, 'update'])
+                ->name('update');
+
+            Route::delete('/{user}', [UserController::class, 'destroy'])
+                ->name('destroy');
+
+            Route::patch('/{user}/change-role', [UserController::class, 'changeRole'])
+                ->name('change-role');
+
+            Route::patch('/{user}/toggle-status', [UserController::class, 'toggleStatus'])
+                ->name('toggle-status');
         });
     });
