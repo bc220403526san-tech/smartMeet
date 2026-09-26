@@ -4,11 +4,6 @@
         <x-header.page-title title="Organizer Dashboard" />
     </x-slot>
 
-    @php
-        $isMeetingOwner = $isMeetingOwner
-            ?? ((string) $meeting->organizer_id === (string) auth()->id());
-    @endphp
-
     <div class="p-4 bg-gray-50 rounded-2xl m-2 mt-0 space-y-4 overflow-y-auto min-h-screen">
 
         <!-- TOP BAR -->
@@ -22,49 +17,30 @@
                 <span>/</span>
                 <span class="text-gray-700 font-medium">Meeting Details</span>
             </div>
-            <div class="flex items-center gap-2 flex-wrap">
-                @if($isMeetingOwner)
-                    {{-- Owner controls --}}
-                    @if($meeting->status === 'upcoming')
-                        <a href="{{ route('organizer.meetings.edit', $meeting) }}"
-                           class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200
-                                  rounded-lg hover:bg-gray-50 hover:border-gray-300 transition shadow-sm">
-                            Edit Meeting
-                        </a>
-                    @endif
-
-                    @if(in_array($meeting->status, ['upcoming', 'active']))
-                        <form action="{{ route('organizer.meetings.cancel', $meeting) }}"
-                              method="POST"
-                              onsubmit="return confirm('Cancel this meeting?')">
-                            @csrf
-                            @method('PATCH')
-                            <button type="submit"
-                                    class="px-4 py-2 text-sm font-medium text-red-500 bg-white
-                                           border border-red-200 rounded-lg hover:bg-red-50 transition shadow-sm">
-                                <i class="fa-solid fa-xmark text-xs mr-1"></i>
-                                Cancel Meeting
-                            </button>
-                        </form>
-                    @endif
-                @else
-                    {{-- Invited organizer is a normal participant in this meeting --}}
-                    <span class="px-3 py-2 text-xs font-semibold text-blue-600 bg-blue-50
-                                 border border-blue-100 rounded-lg">
-                        <i class="fa-solid fa-user-group mr-1"></i>
-                        Invited as Participant
-                    </span>
-
-                    @if($meeting->status === 'active')
-                        <a href="{{ route('participant.meetings.attend', $meeting) }}"
-                           class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold
-                                  text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition shadow-sm">
-                            <i class="fa-solid fa-video text-xs"></i>
-                            Attend
-                        </a>
-                    @endif
+            <div class="flex items-center gap-2">
+                {{-- Edit — sirf upcoming --}}
+                @if($meeting->status === 'upcoming')
+                    <a href="{{ route('organizer.meetings.edit', $meeting) }}"
+                       class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200
+                              rounded-lg hover:bg-gray-50 hover:border-gray-300 transition shadow-sm">
+                        Edit Meeting
+                    </a>
                 @endif
-
+                {{-- Cancel — upcoming ya active --}}
+                @if(in_array($meeting->status, ['upcoming', 'active']))
+                    <form action="{{ route('organizer.meetings.cancel', $meeting) }}"
+                          method="POST"
+                          onsubmit="return confirm('Cancel this meeting?')">
+                        @csrf
+                        @method('PATCH')
+                        <button type="submit"
+                                class="px-4 py-2 text-sm font-medium text-red-500 bg-white
+                                       border border-red-200 rounded-lg hover:bg-red-50 transition shadow-sm">
+                            <i class="fa-solid fa-xmark text-xs mr-1"></i>
+                            Cancel Meeting
+                        </button>
+                    </form>
+                @endif
                 {{-- Status Badge --}}
                 <span class="px-4 py-2 text-sm font-semibold rounded-lg
                     {{ $meeting->status == 'upcoming'  ? 'bg-blue-50 text-blue-600'     : '' }}
@@ -224,193 +200,138 @@
             </div>
 
             <!-- RIGHT: Participants -->
-            <div class="lg:col-span-1">
-                <div class="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-
-                    {{-- Header --}}
-                    <div class="flex items-center justify-between gap-3">
-
-                        <div>
-                            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-blue-500">
-                                Team Members
-                            </p>
-
-                            <h2 class="mt-0.5 text-lg font-bold text-gray-900">
-                                Participants
-                            </h2>
-                        </div>
-
-                        <div class="rounded-lg bg-blue-50 px-3 py-1.5 text-center">
-                            <p class="text-base font-bold leading-none text-blue-600">
-                                {{ $meeting->participants->count() }}
-                            </p>
-
-                            <p class="mt-1 text-[8px] font-semibold uppercase tracking-wider text-gray-400">
-                                Total
-                            </p>
-                        </div>
-
-                    </div>
-
-
-                    {{-- Organizer --}}
-                    <div class="mt-4 rounded-xl border border-blue-100 bg-blue-50/70 p-3">
-
-                        <div class="flex items-center gap-3">
-
-                            <img
-                                src="{{ $meeting->organizer->image_url }}"
-                                alt="{{ $meeting->organizer->name }}"
-                                class="h-10 w-10 shrink-0 rounded-full object-cover shadow-sm"
-                            >
-
-                            <div class="min-w-0 flex-1">
-
-                                <div class="flex flex-wrap items-center gap-2">
-
-                                    <p class="truncate text-sm font-bold text-gray-900">
-                                        {{ $meeting->organizer->name }}
-                                    </p>
-
-                                    <span class="inline-flex rounded-full bg-blue-600 px-2 py-0.5
-                                     text-[8px] font-bold uppercase tracking-wide text-white">
-                            Organizer
-                        </span>
-
-                                </div>
-
-                                <p class="mt-0.5 text-[9px] font-medium text-blue-500">
-                                    Meeting host
+            <div class="lg:col-span-1 flex flex-col">
+                <div class="relative overflow-hidden bg-white rounded-3xl shadow-lg border border-blue-100 p-5 flex flex-col h-full">
+                    <div class="absolute top-0 left-0 w-full h-28 bg-gradient-to-r from-blue-600 via-indigo-500 to-cyan-400 opacity-95"></div>
+                    <div class="absolute -top-10 -right-10 w-40 h-40 bg-white/20 rounded-full blur-3xl"></div>
+                    <div class="absolute top-16 -left-8 w-28 h-28 bg-cyan-300/20 rounded-full blur-2xl"></div>
+                    <div class="relative z-10 flex flex-col h-full">
+                        <!-- Header -->
+                        <div class="flex items-center justify-between mb-6">
+                            <div>
+                                <p class="text-xs uppercase tracking-[3px] text-blue-100 font-semibold mb-1">
+                                    Team Members
                                 </p>
+                                <h2 class="text-2xl font-bold text-white leading-tight">Participants</h2>
+                                @php
+                                    $joinedParticipantsCount = $meeting->participants->filter(function ($participant) {
+                                        $joinedAt = $participant->joined_at ?? $participant->pivot?->joined_at;
+                                        $leftAt   = $participant->left_at ?? $participant->pivot?->left_at;
 
+                                        // Attendance history:
+                                        // joined_at OR left_at existing means this participant
+                                        // attended the meeting at least once.
+                                        return $joinedAt !== null || $leftAt !== null;
+                                    })->count();
+                                @endphp
+
+                                <p class="text-sm text-blue-100 mt-1">
+                                    {{ $joinedParticipantsCount }} joined · {{ $meeting->participants->count() }} total
+                                </p>
                             </div>
-
+                            <div class="bg-white/20 backdrop-blur-md border border-white/20
+                                        rounded-2xl px-4 py-3 text-center min-w-[80px]">
+                                <p class="text-2xl font-bold text-white">
+                                    {{ $meeting->participants->count() }}
+                                </p>
+                                <p class="text-[10px] uppercase tracking-widest text-blue-100">Total</p>
+                            </div>
                         </div>
-
-                    </div>
-
-
-                    {{-- Scrollable Participants List --}}
-                    <div class="mt-3 max-h-[330px] overflow-y-auto pr-1 space-y-2
-                    scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
-
-                        @forelse($meeting->participants as $participant)
-
-                            @php
-                                $joinedAt = $participant->joined_at;
-                                $leftAt = $participant->left_at;
-
-                                if (is_null($joinedAt) && isset($participant->pivot)) {
-                                    $joinedAt = $participant->pivot->joined_at;
-                                }
-
-                                if (is_null($leftAt) && isset($participant->pivot)) {
-                                    $leftAt = $participant->pivot->left_at;
-                                }
-
-                                $hasAttended =
-                                    !is_null($joinedAt) ||
-                                    !is_null($leftAt);
-                            @endphp
-
-
-                            <div class="rounded-xl border border-gray-100 bg-white p-3
-                            transition hover:border-blue-100 hover:bg-blue-50/30">
-
-                                <div class="flex items-center gap-2.5">
-
-                                    {{-- Avatar --}}
-                                    <img
-                                        src="{{ $participant->user->image_url }}"
-                                        alt="{{ $participant->user->name }}"
-                                        class="h-9 w-9 shrink-0 rounded-full object-cover shadow-sm"
-                                    >
-
-
-                                    {{-- Participant Info --}}
-                                    <div class="min-w-0 flex-1">
-
-                                        <p class="truncate text-xs font-bold text-gray-900">
-                                            {{ $participant->user->name }}
-                                        </p>
-
-                                        <div class="mt-1 flex flex-wrap items-center gap-1.5">
-
-                                <span class="text-[8px] font-semibold uppercase
-                                             tracking-wider text-gray-400">
-                                    {{ ucfirst($participant->user->role) }}
-                                </span>
-
-
-                                            @if($hasAttended)
-
-                                                <span class="inline-flex items-center gap-1 rounded-full
-                                                 bg-emerald-50 px-2 py-0.5
-                                                 text-[8px] font-bold uppercase
-                                                 tracking-wide text-emerald-600">
-
-                                        <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-
-                                        Attended
-
-                                    </span>
-
-                                            @else
-
-                                                <span class="inline-flex items-center gap-1 rounded-full
-                                                 bg-amber-50 px-2 py-0.5
-                                                 text-[8px] font-bold uppercase
-                                                 tracking-wide text-amber-600">
-
-                                        <span class="h-1.5 w-1.5 rounded-full bg-amber-400"></span>
-
-                                        Not Joined
-
-                                    </span>
-
-                                            @endif
-
+                        <!-- WHITE INNER CARD -->
+                        <div class="bg-white rounded-2xl p-4 shadow-inner flex-1 overflow-hidden flex flex-col">
+                            @if($meeting->participants->count() > 0)
+                                <div class="flex flex-col divide-y divide-gray-100 overflow-y-auto max-h-[360px] pr-1">
+                                    {{-- Organizer --}}
+                                    <div class="flex items-center gap-3 py-3 hover:bg-blue-50 rounded-xl px-2 transition">
+                                        <div class="relative w-11 h-11 flex-shrink-0">
+                                            <img src="{{ $meeting->organizer->image_url }}"
+                                                 class="w-11 h-11 rounded-full object-cover ring-2 ring-blue-100">
+                                            <span class="absolute bottom-0 right-0 w-[18px] h-[18px]
+                                                         bg-gradient-to-r from-pink-400 to-red-400
+                                                         rounded-full flex items-center justify-center
+                                                         border-2 border-white shadow-sm">
+                                                <i class="fa-solid fa-crown text-white text-[7px]"></i>
+                                            </span>
                                         </div>
-
+                                        <div class="flex-1 min-w-0">
+                                            <p class="text-sm font-semibold text-gray-800 truncate">
+                                                {{ $meeting->organizer->name }}
+                                            </p>
+                                            <p class="text-[10px] font-semibold text-blue-500 uppercase tracking-[2px] mt-0.5">
+                                                Meeting Organizer
+                                            </p>
+                                        </div>
                                     </div>
+                                    {{-- Participants — ab sab dikhengay, list scrollable hai --}}
+                                    @foreach($meeting->participants as $participant)
+                                        <div class="flex items-center gap-3 py-3 hover:bg-blue-50 rounded-xl px-2 transition">
+                                            <div class="w-11 h-11 flex-shrink-0">
+                                                <img src="{{ $participant->user->image_url }}"
+                                                     class="w-11 h-11 rounded-full object-cover ring-2 ring-gray-100">
+                                            </div>
 
+                                            <div class="flex-1 min-w-0">
+                                                <p class="text-sm font-semibold text-gray-800 truncate">
+                                                    {{ $participant->user->name }}
+                                                </p>
 
-                                    {{-- View Button --}}
-                                    <a
-                                        href="{{ route('organizer.participants.show', $participant->user->id) }}"
-                                        title="View participant"
-                                        class="inline-flex h-8 w-8 shrink-0 items-center justify-center
-                                   rounded-lg border border-blue-100 bg-blue-50
-                                   text-blue-600 transition
-                                   hover:bg-blue-600 hover:text-white"
-                                    >
-                                        <i class="fa-regular fa-eye text-[10px]"></i>
-                                    </a>
+                                                <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-[2px] mt-0.5 truncate">
+                                                    {{ ucfirst($participant->user->role) }}
+                                                </p>
 
+                                                @php
+                                                    $joinedAt = $participant->joined_at
+                                                        ?? $participant->pivot?->joined_at;
+
+                                                    $leftAt = $participant->left_at
+                                                        ?? $participant->pivot?->left_at;
+
+                                                    $hasAttended = $joinedAt !== null || $leftAt !== null;
+                                                @endphp
+
+                                                <div class="mt-1.5 flex items-center gap-1.5">
+                                                    @if($hasAttended)
+                                                        <span class="relative flex h-2 w-2">
+                                                            <span class="absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-30"></span>
+                                                            <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                                        </span>
+
+                                                        <span class="text-[10px] font-semibold text-green-600 uppercase tracking-wider">
+                                                            Joined
+                                                        </span>
+                                                    @else
+                                                        <span class="inline-flex rounded-full h-2 w-2 bg-amber-400"></span>
+
+                                                        <span class="text-[10px] font-semibold text-amber-600 uppercase tracking-wider">
+                                                            Not Joined
+                                                        </span>
+                                                    @endif
+                                                </div>
+                                            </div>
+
+                                            <a href="{{ route('organizer.participants.show', $participant->user->id) }}"
+                                               class="inline-flex h-8 shrink-0 items-center justify-center gap-1.5
+                                                      rounded-lg bg-blue-50 px-2.5 text-[10px] font-semibold
+                                                      text-blue-600 transition hover:bg-blue-600 hover:text-white"
+                                               title="View participant details">
+                                                <i class="fa-regular fa-eye text-[9px]"></i>
+                                                View
+                                            </a>
+                                        </div>
+                                    @endforeach
                                 </div>
-
-                            </div>
-
-                        @empty
-
-                            <div class="rounded-xl border border-dashed border-gray-200
-                            bg-gray-50 py-8 text-center text-gray-400">
-
-                                <i class="fa fa-users text-xl"></i>
-
-                                <p class="mt-2 text-xs">
-                                    No participants added.
-                                </p>
-
-                            </div>
-
-                        @endforelse
-
+                            @else
+                                <div class="text-center py-10 text-gray-400">
+                                    <i class="fa fa-users text-3xl mb-2"></i>
+                                    <p class="text-sm">No participants added.</p>
+                                </div>
+                            @endif
+                        </div>
                     </div>
-
                 </div>
             </div>
         </div>
+    </div>
 
 </x-layouts.app>
 
@@ -437,5 +358,3 @@
         });
     }
 </script>
-
-

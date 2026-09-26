@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <!-- Primary SEO -->
-    <title>SmartMeet | Online Meetings & Video Conferencing</title>
+    <title>SmartMeet</title>
 
     <meta name="description"
           content="SmartMeet is an online meeting platform for video and audio calls, meeting scheduling, participant invitations, real-time chat and live transcription.">

@@ -19,7 +19,6 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use Illuminate\Validation\Rule;
 
 class MeetingController extends Controller
 {
@@ -98,8 +97,6 @@ class MeetingController extends Controller
 
     public function create()
     {
-        $this->authorizeOrganizerUser();
-
         $participants = User::where('role', 'participant')
             ->where('is_active', 1)
             ->get();
@@ -109,37 +106,23 @@ class MeetingController extends Controller
 
     public function store(Request $request)
     {
-        $this->authorizeOrganizerUser();
-
         $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'description' => ['required', 'string', 'max:2000'],
-            'date' => ['required', 'date', 'after_or_equal:today'],
-            'time' => ['required', 'date_format:H:i'],
-            'duration' => ['required', 'integer', Rule::in([15, 30, 45, 60, 90, 120])],
-            'timezone' => ['required', 'string', 'timezone:all'],
-
-            // Selecting existing participants is optional, but any submitted ID
-            // must belong to an active participant account.
-            'participants' => ['nullable', 'array'],
-            'participants.*' => [
-                'integer',
-                'distinct',
-                Rule::exists('users', 'id')->where(fn ($query) =>
-                $query->where('role', 'participant')->where('is_active', 1)
-                ),
-            ],
-
-            // Email invitations are optional. If supplied, the list is validated below.
-            'invite_emails' => ['nullable', 'string', 'max:5000'],
-            'invite_subject' => ['nullable', 'string', 'max:255'],
-            'invite_message' => ['nullable', 'string', 'max:1500'],
-
-            // Agenda is optional.
-            'agenda_title' => ['nullable', 'array', 'max:20'],
-            'agenda_title.*' => ['nullable', 'string', 'max:255'],
-            'agenda_description' => ['nullable', 'array', 'max:20'],
-            'agenda_description.*' => ['nullable', 'string', 'max:1000'],
+            'title' => 'required|string|max:255',
+            'agenda' => 'nullable|string',
+            'description' => 'nullable|string|max:2000',
+            'date' => 'required|date|after_or_equal:today',
+            'time' => 'required',
+            'duration' => 'required|integer|min:15',
+            'timezone' => 'nullable|string|max:100',
+            'participants' => 'nullable|array',
+            'participants.*' => 'exists:users,id',
+            'invite_emails' => 'nullable|string|max:5000',
+            'invite_subject' => 'nullable|string|max:255',
+            'invite_message' => 'nullable|string|max:1500',
+            'agenda_title' => 'nullable|array',
+            'agenda_title.*' => 'nullable|string|max:255',
+            'agenda_description' => 'nullable|array',
+            'agenda_description.*' => 'nullable|string',
         ]);
 
         if (trim((string) $request->invite_emails) !== '') {
@@ -193,14 +176,13 @@ class MeetingController extends Controller
         ]);
 
         foreach ($request->participants ?? [] as $userId) {
-            MeetingParticipant::updateOrCreate(
+            MeetingParticipant::firstOrCreate(
                 [
                     'meeting_id' => $meeting->id,
                     'user_id' => $userId,
                 ],
                 [
                     'status' => 'invited',
-                    'restricted_at' => null,
                 ]
             );
         }
@@ -367,20 +349,14 @@ class MeetingController extends Controller
 
         $meeting->participants()
             ->whereNotIn('user_id', $newIds)
-            ->whereNull('restricted_at')
             ->delete();
 
-        foreach ($newIds as $userId) {
-            MeetingParticipant::updateOrCreate(
-                [
-                    'meeting_id' => $meeting->id,
-                    'user_id' => $userId,
-                ],
-                [
-                    'status' => 'invited',
-                    'restricted_at' => null,
-                ]
-            );
+        foreach ($newIds->diff($existingIds) as $userId) {
+            MeetingParticipant::create([
+                'meeting_id' => $meeting->id,
+                'user_id' => $userId,
+                'status' => 'invited',
+            ]);
         }
 
         return redirect()
@@ -674,15 +650,9 @@ class MeetingController extends Controller
                 if ($existingUser) {
                     $recipientType = 'registered_user';
 
-                    MeetingParticipant::updateOrCreate(
-                        [
-                            'meeting_id' => $meeting->id,
-                            'user_id' => $existingUser->id,
-                        ],
-                        [
-                            'status' => 'invited',
-                            'restricted_at' => null,
-                        ]
+                    $meeting->participants()->firstOrCreate(
+                        ['user_id' => $existingUser->id],
+                        ['status' => 'invited']
                     );
 
                     $link = route(
@@ -818,14 +788,11 @@ class MeetingController extends Controller
     private function syncMeetingStatuses(int|string $organizerId): void
     {
         /*
-         * Reconcile all accessible meetings, not only "upcoming" ones.
-         * This repairs a meeting that was marked "completed" too early while
-         * its scheduled duration is still running.
-         *
-         * Explicit final states "ended" and "cancelled" are preserved.
+         * Includes both owned meetings and meetings this organizer joined
+         * through an invite link.
          */
         $meetings = (clone $this->accessibleMeetingQuery($organizerId))
-            ->whereNotIn('status', ['ended', 'cancelled'])
+            ->where('status', 'upcoming')
             ->get();
 
         foreach ($meetings as $meeting) {
@@ -837,31 +804,22 @@ class MeetingController extends Controller
     {
         $meeting->refresh();
 
-        if (in_array($meeting->status, ['ended', 'cancelled'], true)) {
+        if ($meeting->status !== 'upcoming') {
             return;
         }
 
         $now = now('UTC');
         $startTime = $this->getMeetingStartTime($meeting);
-        $endTime = $startTime->copy()->addMinutes((int) $meeting->duration);
 
         if ($now->lt($startTime)) {
-            $targetStatus = 'upcoming';
-        } elseif ($now->lt($endTime)) {
-            $targetStatus = 'active';
-        } else {
-            $targetStatus = 'completed';
-        }
-
-        if ($meeting->status === $targetStatus) {
             return;
         }
 
         Meeting::query()
             ->whereKey($meeting->id)
-            ->whereNotIn('status', ['ended', 'cancelled'])
+            ->where('status', 'upcoming')
             ->update([
-                'status' => $targetStatus,
+                'status' => 'active',
             ]);
 
         $meeting->refresh();
@@ -964,17 +922,4 @@ class MeetingController extends Controller
             403
         );
     }
-
-    private function authorizeOrganizerUser(): void
-    {
-        abort_unless(
-            auth()->check()
-            && auth()->user()->role === 'organizer'
-            && (bool) auth()->user()->is_active,
-            403,
-            'Unauthorized action.'
-        );
-    }
-
 }
-
