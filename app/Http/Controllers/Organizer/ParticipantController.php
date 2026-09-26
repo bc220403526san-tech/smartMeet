@@ -73,10 +73,9 @@ class ParticipantController extends Controller
          */
         $meetingIds = Meeting::where('organizer_id', $organizerId)->pluck('id');
 
-        $participant = User::where('id', '!=', $organizerId)
-            ->whereHas('joinedMeetings', function ($q) use ($meetingIds) {
-                $q->whereIn('meeting_id', $meetingIds);
-            })
+        $participant = User::whereHas('joinedMeetings', function ($q) use ($meetingIds) {
+            $q->whereIn('meeting_id', $meetingIds);
+        })
             ->with(['joinedMeetings' => function ($q) use ($meetingIds) {
                 $q->whereIn('meeting_id', $meetingIds)
                     ->with('meeting:id,title,status,date,time,duration')
