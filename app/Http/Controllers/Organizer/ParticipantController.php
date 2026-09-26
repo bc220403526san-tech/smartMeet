@@ -67,18 +67,44 @@ class ParticipantController extends Controller
         $organizerId = auth()->id();
 
         /*
-         * Security rule:
-         * Organizer can only view users who participated in / were attached
-         * to one of THIS organizer's meetings.
+         * Security rules:
+         *
+         * 1. An organizer can always view THEIR OWN profile/details.
+         *    This is required when the organizer is also attached to
+         *    a meeting as a participant.
+         *
+         * 2. For any OTHER user, the user must be attached to at least
+         *    one meeting owned by the currently logged-in organizer.
          */
         $meetingIds = Meeting::where('organizer_id', $organizerId)->pluck('id');
 
-        $participant = User::whereHas('joinedMeetings', function ($q) use ($meetingIds) {
-            $q->whereIn('meeting_id', $meetingIds);
-        })
-            ->with(['joinedMeetings' => function ($q) use ($meetingIds) {
-                $q->whereIn('meeting_id', $meetingIds)
-                    ->with('meeting:id,title,status,date,time,duration')
+        $isSelf = (string) $id === (string) $organizerId;
+
+        $participantQuery = User::whereKey($id);
+
+        if (! $isSelf) {
+            $participantQuery->whereHas('joinedMeetings', function ($q) use ($meetingIds) {
+                $q->whereIn('meeting_id', $meetingIds);
+            });
+        }
+
+        $participant = $participantQuery
+            ->with(['joinedMeetings' => function ($q) use (
+                $meetingIds,
+                $isSelf
+            ) {
+                /*
+                 * For the organizer viewing their OWN profile,
+                 * show their complete participant/meeting history.
+                 *
+                 * For other users, keep the existing security scope:
+                 * only meetings belonging to the current organizer.
+                 */
+                if (! $isSelf) {
+                    $q->whereIn('meeting_id', $meetingIds);
+                }
+
+                $q->with('meeting:id,title,status,date,time,duration')
                     ->latest('updated_at');
             }])
             ->findOrFail($id);
