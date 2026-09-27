@@ -7,10 +7,13 @@ use App\Events\TranscriptUpdated;
 use App\Http\Controllers\Controller;
 use App\Models\Meeting;
 use App\Models\MeetingTranscript;
+use App\Models\MeetingParticipantLog;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class MeetingAttendController extends Controller
@@ -110,6 +113,27 @@ class MeetingAttendController extends Controller
                 ?: $scheduledStart->copy()->utc(),
         ]);
 
+        $auditSessionUuid = (string) Str::uuid();
+
+        try {
+            MeetingParticipantLog::create([
+                'meeting_id' => $meeting->id,
+                'user_id' => $user->id,
+                'session_uuid' => $auditSessionUuid,
+                'public_ip' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+                'joined_at' => now(),
+            ]);
+        } catch (\Throwable $exception) {
+            Log::warning('Admin meeting audit log creation failed', [
+                'meeting_id' => $meeting->id,
+                'user_id' => $user->id,
+                'session_uuid' => $auditSessionUuid,
+                'error' => $exception->getMessage(),
+                'exception' => get_class($exception),
+            ]);
+        }
+
         /*
          * Mark the current Admin/Organizer as joined.
          *
@@ -126,18 +150,27 @@ class MeetingAttendController extends Controller
         /*
          * Tell everyone already inside the room that this user joined.
          */
-        broadcast(new MeetingSignal(
-            meetingId: (string) $meeting->id,
-            fromUserId: (string) $user->id,
-            toUserId: 'all',
-            type: 'user-joined',
-            data: [
-                'userId' => (string) $user->id,
-                'name' => $user->name,
-                'initials' => $this->initials($user->name),
-                'isOrganizer' => false,
-            ]
-        ))->toOthers();
+        try {
+            broadcast(new MeetingSignal(
+                meetingId: (string) $meeting->id,
+                fromUserId: (string) $user->id,
+                toUserId: 'all',
+                type: 'user-joined',
+                data: [
+                    'userId' => (string) $user->id,
+                    'name' => $user->name,
+                    'initials' => $this->initials($user->name),
+                    'isOrganizer' => false,
+                ]
+            ))->toOthers();
+        } catch (\Throwable $exception) {
+            Log::warning('Admin meeting initial room presence broadcast failed', [
+                'meeting_id' => $meeting->id,
+                'user_id' => $user->id,
+                'error' => $exception->getMessage(),
+                'exception' => get_class($exception),
+            ]);
+        }
 
         $meeting->load([
             'participants.user',
@@ -183,6 +216,7 @@ class MeetingAttendController extends Controller
                     'initials' => $this->initials(
                         $participant->user->name
                     ),
+                    'avatarUrl' => $this->avatarUrl($participant->user),
                     'hasJoined' => true,
                 ]
             )
@@ -204,6 +238,7 @@ class MeetingAttendController extends Controller
                     'initials' => $this->initials(
                         $participant->user->name
                     ),
+                    'avatarUrl' => $this->avatarUrl($participant->user),
                     'hasJoined' => $isCurrentlyJoined($participant),
                 ]
             )
@@ -236,13 +271,65 @@ class MeetingAttendController extends Controller
             $organizerJoined = true;
         }
 
+        $organizer = $meeting->organizer;
+        $myAvatarUrl = $this->avatarUrl($user);
+        $organizerAvatarUrl = $this->avatarUrl($organizer);
+        $userInitials = $this->initials($user->name);
+        $orgInitials = $this->initials($organizer?->name);
+
         return view('participant.meetings.attend', compact(
             'meeting',
             'allUserIds',
             'alreadyJoined',
             'allParticipants',
-            'organizerJoined'
+            'organizerJoined',
+            'organizer',
+            'myAvatarUrl',
+            'organizerAvatarUrl',
+            'userInitials',
+            'orgInitials',
+            'auditSessionUuid'
         ));
+    }
+
+    public function updateSessionMetadata(
+        Request $request,
+        Meeting $meeting
+    ): JsonResponse {
+        $this->authorizeMeetingParticipant($meeting);
+
+        $validated = $request->validate([
+            'session_uuid' => ['required', 'uuid'],
+            'device_type' => ['nullable', 'string', 'max:50'],
+            'system_name' => ['nullable', 'string', 'max:100'],
+            'operating_system' => ['nullable', 'string', 'max:100'],
+            'browser' => ['nullable', 'string', 'max:100'],
+            'local_ip' => ['nullable', 'ip'],
+            'network_type' => ['nullable', 'string', 'max:50'],
+            'network_effective_type' => ['nullable', 'string', 'max:50'],
+            'network_downlink' => ['nullable', 'numeric', 'min:0', 'max:100000'],
+            'network_rtt' => ['nullable', 'integer', 'min:0', 'max:600000'],
+        ]);
+
+        $log = MeetingParticipantLog::query()
+            ->where('meeting_id', $meeting->id)
+            ->where('user_id', auth()->id())
+            ->where('session_uuid', $validated['session_uuid'])
+            ->firstOrFail();
+
+        $log->update([
+            'device_type' => $validated['device_type'] ?? null,
+            'system_name' => $validated['system_name'] ?? null,
+            'operating_system' => $validated['operating_system'] ?? null,
+            'browser' => $validated['browser'] ?? null,
+            'local_ip' => $validated['local_ip'] ?? null,
+            'network_type' => $validated['network_type'] ?? null,
+            'network_effective_type' => $validated['network_effective_type'] ?? null,
+            'network_downlink' => $validated['network_downlink'] ?? null,
+            'network_rtt' => $validated['network_rtt'] ?? null,
+        ]);
+
+        return response()->json(['status' => 'updated']);
     }
 
     public function signal(
@@ -352,7 +439,7 @@ class MeetingAttendController extends Controller
         ]);
     }
 
-    public function markLeft(Meeting $meeting): JsonResponse
+    public function markLeft(Request $request, Meeting $meeting): JsonResponse
     {
         $this->authorizeMeetingParticipant($meeting);
 
@@ -368,6 +455,17 @@ class MeetingAttendController extends Controller
             ->update([
                 'left_at' => now(),
             ]);
+
+        $sessionUuid = trim((string) $request->input('session_uuid', ''));
+
+        if ($sessionUuid !== '') {
+            MeetingParticipantLog::query()
+                ->where('meeting_id', $meeting->id)
+                ->where('user_id', $user->id)
+                ->where('session_uuid', $sessionUuid)
+                ->whereNull('left_at')
+                ->update(['left_at' => now()]);
+        }
 
         /*
          * If this Admin/Organizer happens to be the actual organizer,
@@ -468,6 +566,42 @@ class MeetingAttendController extends Controller
         );
     }
 
+    private function avatarUrl($user): ?string
+    {
+        if ($user === null) {
+            return null;
+        }
+
+        $path = null;
+
+        foreach (['avatar', 'avatar_path', 'profile_image', 'profile_photo', 'image'] as $field) {
+            $value = data_get($user, $field);
+
+            if (is_string($value) && trim($value) !== '') {
+                $path = trim($value);
+                break;
+            }
+        }
+
+        if ($path === null) {
+            return null;
+        }
+
+        if (preg_match('#^https?://#i', $path)) {
+            return $path;
+        }
+
+        if (str_starts_with($path, '/storage/')) {
+            return url($path);
+        }
+
+        if (str_starts_with($path, 'storage/')) {
+            return asset($path);
+        }
+
+        return asset('storage/' . ltrim($path, '/'));
+    }
+
     private function initials(?string $name): string
     {
         $name = trim((string) $name);
@@ -493,3 +627,5 @@ class MeetingAttendController extends Controller
         );
     }
 }
+
+
