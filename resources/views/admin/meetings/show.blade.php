@@ -10,9 +10,11 @@
         $organizerHasJoined = !empty($meeting->organizer_joined_at)
             || !empty($meeting->actual_start);
 
-        // Participants section must contain ONLY participant users.
-        // If the organizer also exists in the meeting_participants table,
-        // exclude that organizer record from this UI.
+        // Show normal participants plus the logged-in admin when the admin
+        // is also invited through the meeting_participants record.
+        //
+        // The organizer remains in the separate Organizer section, so do not
+        // duplicate the organizer inside the Participants section.
         $displayParticipants = $meeting->participants
             ->filter(function ($participant) use ($organizer) {
                 $participantUser = $participant->user;
@@ -25,7 +27,11 @@
                     return false;
                 }
 
-                return $participantUser->role === 'participant';
+                return $participantUser->role === 'participant'
+                    || (
+                        auth()->check()
+                        && (int) $participantUser->id === (int) auth()->id()
+                    );
             })
             ->values();
 
