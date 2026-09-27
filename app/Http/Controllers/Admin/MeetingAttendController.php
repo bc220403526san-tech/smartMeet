@@ -236,7 +236,7 @@ class MeetingAttendController extends Controller
             $organizerJoined = true;
         }
 
-        return view('admin.meetings.attend', compact(
+        return view('participant.meetings.attend', compact(
             'meeting',
             'allUserIds',
             'alreadyJoined',
