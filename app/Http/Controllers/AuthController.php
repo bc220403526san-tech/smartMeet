@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Meeting;
+use App\Models\MeetingParticipant;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -13,12 +16,16 @@ use Illuminate\Validation\Rules\Password as PasswordRule;
 
 class AuthController extends Controller
 {
-    // REGISTER
     public function register(Request $request)
     {
         $request->validate([
             'name' => 'required',
-            'email' => 'required|email:rfc,dns|unique:users,email',
+            'email' => [
+                'required',
+                'email:rfc',
+                'regex:/^.+@.+\..+$/',
+                'unique:users,email',
+            ],
             'password' => [
                 'required',
                 'confirmed',
@@ -31,7 +38,8 @@ class AuthController extends Controller
             'role' => 'required|in:organizer,participant',
             'terms' => 'accepted',
         ], [
-            'email.email' => 'Please enter a valid email address with a real mail domain.',
+            'email.email' => 'Please enter a valid email address, for example name@example.com.',
+            'email.regex' => 'This email address is invalid. Please use a complete email address such as name@example.com.',
             'password.min' => 'Password must be at least 8 characters long.',
         ]);
 
@@ -45,63 +53,33 @@ class AuthController extends Controller
         Auth::login($user);
         $request->session()->regenerate();
 
-        session()->flash('show_welcome_banner', true);
-        session()->flash('welcome_type', 'register');
-        session()->flash('welcome_title', 'Welcome aboard, ' . $user->name . '!');
-        session()->flash('success', 'Registration successful! Welcome to your dashboard.');
+        $this->setWelcomeSession($user, 'register');
 
-        // Pending meeting join check
-        if (session()->has('pending_meeting_code')) {
-            $code = session()->pull('pending_meeting_code');
-            $meeting = \App\Models\Meeting::where('unique_code', $code)->first();
-
-            if ($meeting && $meeting->isJoinable()) {
-                $meeting->participants()->updateOrCreate(
-                    ['user_id' => $user->id],
-                    ['status' => 'invited']
-                );
-
-                if ($user->role === 'organizer') {
-                    return redirect()
-                        ->route('organizer.meetings.index', ['highlight' => $meeting->id])
-                        ->with('info', 'Meeting has been added to My Meetings.');
-                }
-
-                if ($user->role === 'admin') {
-                    return redirect()
-                        ->route('admin.dashboard')
-                        ->with('info', 'You have been added to the meeting invitation.');
-                }
-
-                if ($meeting->status !== 'active') {
-                    return redirect()->route('participant.meetings.index')
-                        ->with('info', 'You have been added to "' . $meeting->title . '". It will start soon — you can join from here once it begins.');
-                }
-
-                return redirect()
-                    ->route('participant.meetings.attend', $meeting->id)
-                    ->with('success', 'You have joined the meeting: ' . $meeting->title);
-            }
+        if ($redirect = $this->handlePendingMeetingInvite($user)) {
+            return $redirect;
         }
 
-        if ($user->role == 'organizer') {
-            return redirect('/organizer/dashboard');
-        }
-
-        return redirect('/participant/dashboard');
+        return $user->role === 'organizer'
+            ? redirect()->route('organizer.dashboard')
+            : redirect()->route('participant.dashboard');
     }
 
-    // LOGIN
     public function login(Request $request)
     {
         $request->validate([
-            'email' => 'required|email:rfc,dns',
+            'email' => [
+                'required',
+                'email:rfc',
+                'regex:/^.+@.+\..+$/',
+            ],
             'password' => 'required',
         ], [
-            'email.email' => 'Please enter a valid email address with a real mail domain.',
+            'email.email' => 'Please enter a valid email address, for example name@example.com.',
+            'email.regex' => 'This email address is invalid. Please use a complete email address such as name@example.com.',
         ]);
 
         $email = strtolower(trim($request->email));
+
         $credentials = [
             'email' => $email,
             'password' => $request->password,
@@ -112,8 +90,9 @@ class AuthController extends Controller
         if ($user && !is_null($user->provider)) {
             return back()->with(
                 'error',
-                'This account uses ' . ucfirst($user->provider) .
-                ' login. Please use that instead.'
+                'This account uses '
+                . ucfirst($user->provider)
+                . ' login. Please use that instead.'
             );
         }
 
@@ -124,92 +103,87 @@ class AuthController extends Controller
             );
         }
 
-        if (Auth::attempt($credentials)) {
-            $request->session()->regenerate();
-            $user = Auth::user();
-
-            session()->flash('show_welcome_banner', true);
-            session()->flash('welcome_type', 'login');
-            session()->flash('welcome_title', 'Welcome back, ' . $user->name . '!');
-            session()->flash('success', 'Login successful! Welcome back.');
-
-            if (session()->has('pending_meeting_code')) {
-                $code = session()->pull('pending_meeting_code');
-                $meeting = \App\Models\Meeting::where('unique_code', $code)->first();
-
-                if ($meeting && $meeting->isJoinable()) {
-                    $meeting->participants()->updateOrCreate(
-                        ['user_id' => $user->id],
-                        ['status' => 'invited']
-                    );
-
-                    if ($user->role === 'organizer') {
-                        return redirect()
-                            ->route('organizer.meetings.index', ['highlight' => $meeting->id])
-                            ->with(
-                                $meeting->status === 'active' ? 'success' : 'info',
-                                $meeting->status === 'active'
-                                    ? 'Meeting is active. It has been added to My Meetings. Click Attend to join as a participant.'
-                                    : 'Meeting has been added to My Meetings and is visible as an upcoming meeting.'
-                            );
-                    }
-
-                    if ($user->role === 'admin') {
-                        return redirect()
-                            ->route('admin.dashboard')
-                            ->with(
-                                $meeting->status === 'active' ? 'success' : 'info',
-                                $meeting->status === 'active'
-                                    ? 'You have joined the meeting invitation. The meeting is active.'
-                                    : 'You have been added to the meeting invitation.'
-                            );
-                    }
-
-                    if ($meeting->status !== 'active') {
-                        return redirect()->route('participant.meetings.index')
-                            ->with(
-                                'info',
-                                'You have been added to "' . $meeting->title . '". It will start soon — you can join from here once it begins.'
-                            );
-                    }
-
-                    return redirect()
-                        ->route('participant.meetings.attend', $meeting->id)
-                        ->with('success', 'You have joined the meeting: ' . $meeting->title);
-                }
-            }
-
-            if ($user->role == 'admin') {
-                return redirect('/admin/dashboard');
-            }
-
-            if ($user->role == 'organizer') {
-                return redirect('/organizer/dashboard');
-            }
-
-            return redirect('/participant/dashboard');
+        if (!Auth::attempt($credentials)) {
+            return back()->with('error', 'Invalid credentials.');
         }
 
-        return back()->with('error', 'Invalid credentials.');
+        $request->session()->regenerate();
+
+        $user = Auth::user();
+
+        /*
+         * Repair legacy/incorrect plural role values created by older
+         * role-request code. This also persists the corrected value so
+         * subsequent requests use the valid SmartMeet role.
+         */
+        $rawRole = strtolower(
+            trim((string) $user->getRawOriginal('role'))
+        );
+
+        $normalizedRole = match ($rawRole) {
+            'organizers' => 'organizer',
+            'participants' => 'participant',
+            'admins' => 'admin',
+            default => $rawRole,
+        };
+
+        if (
+            $normalizedRole !== $rawRole &&
+            in_array(
+                $normalizedRole,
+                ['admin', 'organizer', 'participant'],
+                true
+            )
+        ) {
+            $user->forceFill([
+                'role' => $normalizedRole,
+            ])->save();
+
+            $user->refresh();
+        }
+
+        $this->setWelcomeSession($user, 'login');
+
+        /*
+         * IMPORTANT:
+         * If the user opened a meeting invite link before login,
+         * complete that invite flow before sending them to their
+         * normal dashboard.
+         */
+        if ($redirect = $this->handlePendingMeetingInvite($user)) {
+            return $redirect;
+        }
+
+        return match ($normalizedRole) {
+            'admin' => redirect()->route('admin.dashboard'),
+            'organizer' => redirect()->route('organizer.dashboard'),
+            'participant' => redirect()->route('participant.dashboard'),
+            default => $this->logoutInvalidRole($request),
+        };
     }
 
-    // LOGOUT
     public function logout(Request $request)
     {
         Auth::logout();
+
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect('/login');
+        return redirect()->route('login');
     }
 
-    // FORGOT PASSWORD
     public function sendResetLink(Request $request)
     {
         $request->validate([
-            'email' => 'required|email:rfc,dns|exists:users,email',
+            'email' => [
+                'required',
+                'email:rfc',
+                'regex:/^.+@.+\..+$/',
+                'exists:users,email',
+            ],
         ], [
-            'email.email' => 'Please enter a valid email address with a real mail domain.',
+            'email.email' => 'Please enter a valid email address, for example name@example.com.',
+            'email.regex' => 'This email address is invalid. Please use a complete email address such as name@example.com.',
             'email.exists' => 'No SmartMeet account was found with this email address.',
         ]);
 
@@ -229,7 +203,6 @@ class AuthController extends Controller
                 Log::info('Password reset email accepted by mailer', [
                     'email' => $email,
                     'mailer' => config('mail.default'),
-                    'note' => 'Mailer accepted the message; this is not final delivery confirmation.',
                 ]);
 
                 return back()->with(
@@ -238,23 +211,14 @@ class AuthController extends Controller
                 );
             }
 
-            Log::warning('Password reset email was not sent', [
-                'email' => $email,
-                'status' => __($status),
-                'mailer' => config('mail.default'),
-            ]);
-
             return back()->withErrors([
                 'email' => __($status),
             ]);
         } catch (\Throwable $exception) {
             Log::error('Password reset email sending failed', [
                 'email' => $email,
-                'mailer' => config('mail.default'),
                 'exception' => get_class($exception),
                 'error' => $exception->getMessage(),
-                'file' => $exception->getFile(),
-                'line' => $exception->getLine(),
             ]);
 
             return back()->withErrors([
@@ -263,7 +227,6 @@ class AuthController extends Controller
         }
     }
 
-    // RESET PASSWORD
     public function showResetForm(Request $request, string $token)
     {
         return view('auth.reset-password', [
@@ -276,7 +239,12 @@ class AuthController extends Controller
     {
         $request->validate([
             'token' => 'required',
-            'email' => 'required|email:rfc,dns|exists:users,email',
+            'email' => [
+                'required',
+                'email:rfc',
+                'regex:/^.+@.+\..+$/',
+                'exists:users,email',
+            ],
             'password' => [
                 'required',
                 'confirmed',
@@ -287,12 +255,14 @@ class AuthController extends Controller
                     ->symbols(),
             ],
         ], [
-            'email.email' => 'Please enter a valid email address with a real mail domain.',
+            'email.email' => 'Please enter a valid email address, for example name@example.com.',
+            'email.regex' => 'This email address is invalid. Please use a complete email address such as name@example.com.',
             'email.exists' => 'No SmartMeet account was found with this email address.',
             'password.min' => 'Password must be at least 8 characters long.',
         ]);
 
         $email = strtolower(trim($request->email));
+
         $user = User::where('email', $email)->first();
 
         if ($user && Hash::check($request->password, $user->password)) {
@@ -318,8 +288,314 @@ class AuthController extends Controller
         );
 
         return $status === Password::PASSWORD_RESET
-            ? redirect()->route('login')
-                ->with('success', 'Password reset successfully! Please log in.')
-            : back()->withErrors(['email' => __($status)]);
+            ? redirect()
+                ->route('login')
+                ->with(
+                    'success',
+                    'Password reset successfully! Please log in.'
+                )
+            : back()->withErrors([
+                'email' => __($status),
+            ]);
+    }
+
+    private function setWelcomeSession(User $user, string $type): void
+    {
+        session()->flash('show_welcome_banner', true);
+        session()->flash('welcome_type', $type);
+
+        session()->flash(
+            'welcome_title',
+            $type === 'register'
+                ? 'Welcome aboard, ' . $user->name . '!'
+                : 'Welcome back, ' . $user->name . '!'
+        );
+
+        session()->flash(
+            'success',
+            $type === 'register'
+                ? 'Registration successful! Welcome to your dashboard.'
+                : 'Login successful! Welcome back.'
+        );
+
+        /*
+         * Organizer gets a persistent one-time marker.
+         * The organizer dashboard consumes it with session()->pull().
+         * This survives an extra redirect but still shows only once.
+         */
+        if ($user->role === 'organizer') {
+            session()->put('organizer_welcome_banner', true);
+        }
+    }
+
+    private function logoutInvalidRole(Request $request)
+    {
+        Auth::logout();
+
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return redirect()
+            ->route('login')
+            ->with(
+                'error',
+                'Your account has an invalid role. Please contact support.'
+            );
+    }
+
+    /**
+     * Complete an invite-link flow after normal login or registration.
+     *
+     * Flow:
+     *
+     * Admin:
+     *   Invite link -> Login/Register -> My Meeting Invitations
+     *
+     * Organizer:
+     *   Invite link -> Login/Register -> Organizer My Meetings
+     *
+     * Participant:
+     *   Invite link -> Login/Register -> Participant My Meetings
+     *
+     * Active meetings are shown as Active and can be attended
+     * from the relevant meetings page.
+     *
+     * Upcoming meetings remain Upcoming.
+     */
+    private function handlePendingMeetingInvite(User $user)
+    {
+        $code = session('pending_meeting_code');
+
+        if (!$code) {
+            return null;
+        }
+
+        $meeting = Meeting::where('unique_code', $code)->first();
+
+        /*
+         * Invite no longer exists.
+         */
+        if (!$meeting) {
+            session()->forget('pending_meeting_code');
+
+            $dashboardRoute = match ($user->role) {
+                'admin' => 'admin.meetings.invited',
+                'organizer' => 'organizer.meetings.index',
+                default => 'participant.meetings.index',
+            };
+
+            return redirect()
+                ->route($dashboardRoute)
+                ->with(
+                    'error',
+                    'The meeting invite link is no longer valid.'
+                );
+        }
+
+        /*
+         * Synchronize the meeting status before deciding where
+         * and how the meeting should be displayed.
+         *
+         * Upcoming -> Active when scheduled start time has arrived.
+         */
+        $this->syncMeetingStatus($meeting);
+
+        $meeting->refresh();
+
+        /*
+         * Terminal meetings cannot be joined.
+         */
+        if (
+            in_array(
+                $meeting->status,
+                ['cancelled', 'completed', 'ended'],
+                true
+            )
+        ) {
+            session()->forget('pending_meeting_code');
+
+            $message = match ($meeting->status) {
+                'cancelled' => 'This meeting was cancelled by the organizer.',
+                'ended' => 'This meeting was ended by the organizer.',
+                default => 'This meeting has already completed.',
+            };
+
+            $dashboardRoute = match ($user->role) {
+                'admin' => 'admin.meetings.invited',
+                'organizer' => 'organizer.meetings.index',
+                default => 'participant.meetings.index',
+            };
+
+            return redirect()
+                ->route($dashboardRoute)
+                ->with('info', $message);
+        }
+
+        /*
+         * Invite links can be used by:
+         *
+         * - Admin
+         * - Organizer
+         * - Participant
+         */
+        if (!in_array($user->role, ['admin', 'organizer', 'participant'], true)) {
+            session()->forget('pending_meeting_code');
+
+            return redirect()
+                ->route('login')
+                ->with(
+                    'error',
+                    'Your account role cannot use meeting invite links.'
+                );
+        }
+
+        /*
+         * Persist invite membership directly in meeting_participants.
+         *
+         * updateOrCreate prevents duplicate records when the same
+         * invite link is opened more than once.
+         *
+         * This is important because Admin and Organizer should also
+         * appear as participants when they attend through an invite link.
+         */
+        MeetingParticipant::updateOrCreate(
+            [
+                'meeting_id' => $meeting->id,
+                'user_id' => $user->id,
+            ],
+            [
+                'status' => 'invited',
+            ]
+        );
+
+        session()->forget('pending_meeting_code');
+
+        /*
+         * ADMIN
+         *
+         * Always go directly to:
+         *
+         * /admin/meetings/invited-meetings
+         *
+         * The page separates Active and Upcoming meetings.
+         *
+         * If Active:
+         *   Attend button is available.
+         *
+         * If Upcoming:
+         *   It appears under Upcoming Meetings.
+         */
+        if ($user->role === 'admin') {
+            return redirect()
+                ->route('admin.meetings.invited')
+                ->with(
+                    $meeting->status === 'active'
+                        ? 'success'
+                        : 'info',
+                    $meeting->status === 'active'
+                        ? 'Meeting is active. Click Attend to join.'
+                        : 'Meeting has been added to My Meeting Invitations and is currently upcoming.'
+                );
+        }
+
+        /*
+         * ORGANIZER
+         *
+         * The organizer is added to the meeting as a participant.
+         * They can attend it as a participant rather than becoming
+         * the owner/host of the meeting.
+         */
+        if ($user->role === 'organizer') {
+            return redirect()
+                ->route(
+                    'organizer.meetings.index',
+                    [
+                        'highlight' => $meeting->id,
+                    ]
+                )
+                ->with(
+                    $meeting->status === 'active'
+                        ? 'success'
+                        : 'info',
+                    $meeting->status === 'active'
+                        ? 'Meeting is active. Click Attend to join as a participant.'
+                        : 'Meeting has been added to My Meetings and is currently upcoming.'
+                );
+        }
+
+        /*
+         * PARTICIPANT
+         */
+        return redirect()
+            ->route(
+                'participant.meetings.index',
+                [
+                    'highlight' => $meeting->id,
+                ]
+            )
+            ->with(
+                $meeting->status === 'active'
+                    ? 'success'
+                    : 'info',
+                $meeting->status === 'active'
+                    ? 'Meeting is active. Click Attend to join.'
+                    : 'Meeting has been added to your upcoming meetings.'
+            );
+    }
+
+    private function syncMeetingStatus(Meeting $meeting): void
+    {
+        $meeting->refresh();
+
+        /*
+         * Only an upcoming meeting can become active here.
+         *
+         * We do not change active -> completed here.
+         * The meeting-room timer/end flow remains responsible for
+         * final completion.
+         */
+        if ($meeting->status !== 'upcoming') {
+            return;
+        }
+
+        if (!$meeting->date || !$meeting->time) {
+            return;
+        }
+
+        $timezone = $meeting->timezone
+            ?: config('app.timezone', 'Asia/Karachi');
+
+        try {
+            $start = Carbon::parse(
+                trim($meeting->date . ' ' . $meeting->time),
+                $timezone
+            )->utc();
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return;
+        }
+
+        /*
+         * Meeting has not started yet.
+         */
+        if (now('UTC')->lt($start)) {
+            return;
+        }
+
+        /*
+         * Meeting start time has arrived.
+         *
+         * Conditional update prevents overwriting a status that
+         * another process may have changed meanwhile.
+         */
+        Meeting::query()
+            ->whereKey($meeting->id)
+            ->where('status', 'upcoming')
+            ->update([
+                'status' => 'active',
+            ]);
+
+        $meeting->refresh();
     }
 }
