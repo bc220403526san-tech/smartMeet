@@ -10,6 +10,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class UserController extends Controller
@@ -84,12 +85,25 @@ class UserController extends Controller
             ->with('success', 'User created successfully!');
     }
 
+    private function setImageUrl(User $user): void
+    {
+        $user->image_url = $user->image
+            ? (
+            str_starts_with($user->image, 'http')
+                ? $user->image
+                : Storage::url($user->image)
+            )
+            : asset('images/default-avatar.png');
+    }
+
     public function show(User $user)
     {
+        $this->setImageUrl($user);
+
         $meetingCount = match ($user->role) {
             'participant' => Meeting::query()
                 ->whereHas('participants', function ($query) use ($user) {
-                    $query->where('user_id', $user->id);
+                    $query->where('users.id', $user->id);
                 })
                 ->count(),
 
@@ -107,6 +121,8 @@ class UserController extends Controller
             in_array($user->role, ['participant', 'organizer'], true),
             404
         );
+
+        $this->setImageUrl($user);
 
         $meetings = $user->role === 'organizer'
             ? $this->organizerMeetingHistory($user)
@@ -153,7 +169,7 @@ class UserController extends Controller
         $participantMeetings = Meeting::query()
             ->with('organizer')
             ->whereHas('participants', function ($query) use ($user) {
-                $query->where('user_id', $user->id);
+                $query->where('users.id', $user->id);
             })
             ->orderByDesc('date')
             ->orderByDesc('time')
@@ -177,8 +193,13 @@ class UserController extends Controller
 
                 $lastSession = $sessions
                     ->sortByDesc(function ($session) {
-                        $leftAt = $session->left_at ? Carbon::parse($session->left_at) : null;
-                        $joinedAt = $session->joined_at ? Carbon::parse($session->joined_at) : null;
+                        $leftAt = $session->left_at
+                            ? Carbon::parse($session->left_at)
+                            : null;
+
+                        $joinedAt = $session->joined_at
+                            ? Carbon::parse($session->joined_at)
+                            : null;
 
                         return $leftAt?->timestamp
                             ?? $joinedAt?->timestamp
@@ -254,7 +275,8 @@ class UserController extends Controller
                 Storage::disk('public')->delete($user->image);
             }
 
-            $data['image'] = $request->file('image')->store('user_images', 'public');
+            $data['image'] = $request->file('image')
+                ->store('user_images', 'public');
         }
 
         $user->update($data);
@@ -264,8 +286,11 @@ class UserController extends Controller
 
     public function destroy(User $user)
     {
-        if (auth()->check() && auth()->user()->is($user)) {
-            return back()->with('error', 'You cannot remove your own account.');
+        if ($user->id === auth()->id()) {
+            return back()->with(
+                'error',
+                'You cannot delete your own account!'
+            );
         }
 
         if ($user->image && !str_starts_with($user->image, 'http')) {
@@ -281,32 +306,56 @@ class UserController extends Controller
 
     public function toggleStatus(User $user)
     {
-        if (auth()->check() && auth()->user()->is($user)) {
-            return back()->with('error', 'You cannot deactivate your own account.');
+        if ($user->id === auth()->id()) {
+            return back()->with(
+                'error',
+                'You cannot deactivate your own account!'
+            );
         }
 
         $newStatus = !$user->is_active;
 
+        // Core action: always update the account status first.
         $user->update([
             'is_active' => $newStatus,
         ]);
 
-        Notification::create([
-            'user_id' => $user->id,
-            'title' => $newStatus ? 'Account Activated' : 'Account Deactivated',
-            'message' => $newStatus
-                ? 'Your account has been activated by an administrator. You now have full access again.'
-                : 'Your account has been deactivated by an administrator.',
-            'link' => null,
-        ]);
+        // Notification is secondary. If notification storage has a problem,
+        // the account activation/deactivation must still succeed.
+        try {
+            Notification::create([
+                'user_id' => $user->id,
+                'title' => $newStatus
+                    ? 'Account Activated'
+                    : 'Account Deactivated',
+                'message' => $newStatus
+                    ? 'Your account has been activated by an administrator. You now have full access again.'
+                    : 'Your account has been deactivated by an administrator.',
+                'link' => null,
+            ]);
+        } catch (\Throwable $exception) {
+            Log::warning('User status notification could not be created.', [
+                'user_id' => $user->id,
+                'new_status' => $newStatus,
+                'error' => $exception->getMessage(),
+            ]);
+        }
 
-        return back()->with('success', 'User status updated.');
+        return back()->with(
+            'success',
+            $newStatus
+                ? 'User activated successfully.'
+                : 'User deactivated successfully.'
+        );
     }
 
     public function changeRole(Request $request, User $user)
     {
-        if (auth()->check() && auth()->user()->is($user)) {
-            return back()->with('error', 'You cannot change your own role.');
+        if ($user->id === auth()->id()) {
+            return back()->with(
+                'error',
+                'You cannot change your own role!'
+            );
         }
 
         $request->validate([
@@ -317,7 +366,10 @@ class UserController extends Controller
         $newRole = $request->role;
 
         if ($oldRole === $newRole) {
-            return back()->with('success', 'No change — user already has this role.');
+            return back()->with(
+                'success',
+                'No change — user already has this role.'
+            );
         }
 
         $user->update([
@@ -337,7 +389,9 @@ class UserController extends Controller
 
         return back()->with(
             'success',
-            'User role changed to ' . ucfirst($newRole) . ' successfully!'
+            'User role changed to '
+            . ucfirst($newRole)
+            . ' successfully!'
         );
     }
 }

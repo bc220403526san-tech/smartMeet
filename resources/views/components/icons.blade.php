@@ -29,8 +29,8 @@
                 <i class="fa-solid fa-user-gear text-sm group-hover:scale-110 transition-transform"></i>
             </button>
 
-            <div class="dropdown-menu hidden fixed w-48 bg-white rounded-xl
-                        shadow-xl border border-gray-200 py-1 z-[9999] overflow-hidden">
+            <div class="dropdown-menu hidden fixed w-52 bg-white rounded-xl
+                        shadow-2xl border border-gray-200 py-1 z-[9999] overflow-hidden">
 
                 <div class="px-3 py-2 border-b border-gray-100">
                     <p class="text-[10px] font-bold uppercase tracking-wider text-gray-400">
@@ -74,9 +74,8 @@
                     <button type="submit"
                             name="role"
                             value="participant"
-                            class="w-full flex items-center gap-2.5 text-sm text-left
-                                   px-3 py-2.5 text-gray-700 hover:bg-green-50
-                                   hover:text-green-700 transition
+                            class="w-full flex items-center gap-2.5 text-left px-3 py-2.5 text-sm
+                                   text-gray-700 hover:bg-green-50 hover:text-green-700 transition
                                    {{ $user->role === 'participant' ? 'bg-green-50 text-green-700' : '' }}">
                         <i class="fa-solid fa-user w-4 text-green-500"></i>
                         <span class="flex-1">Participant</span>
@@ -107,16 +106,19 @@
                     title="{{ $user->is_active ? 'Deactivate User' : 'Activate User' }}"
                     aria-label="{{ $user->is_active ? 'Deactivate User' : 'Activate User' }}"
                     class="w-8 h-8 inline-flex items-center justify-center rounded-lg
-                           text-gray-400 hover:text-emerald-600 hover:bg-gray-50
-                           transition-colors duration-150">
+                           hover:bg-gray-50 transition-colors duration-150">
 
                 @if($user->is_active)
-                    <span class="relative block w-7 h-4 rounded-full bg-emerald-500">
-                        <span class="absolute top-0.5 right-0.5 w-3 h-3 rounded-full bg-white shadow-sm"></span>
+                    <span class="relative block w-7 h-4 rounded-full bg-emerald-500
+                                 shadow-[inset_0_1px_2px_rgba(0,0,0,0.15)]">
+                        <span class="absolute top-0.5 right-0.5 w-3 h-3 rounded-full
+                                     bg-white shadow-sm"></span>
                     </span>
                 @else
-                    <span class="relative block w-7 h-4 rounded-full bg-gray-300">
-                        <span class="absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white shadow-sm"></span>
+                    <span class="relative block w-7 h-4 rounded-full bg-gray-300
+                                 shadow-[inset_0_1px_2px_rgba(0,0,0,0.12)]">
+                        <span class="absolute top-0.5 left-0.5 w-3 h-3 rounded-full
+                                     bg-white shadow-sm"></span>
                     </span>
                 @endif
             </button>
@@ -175,10 +177,31 @@
         }
 
         const rect = button.getBoundingClientRect();
+        const menuWidth = 208;
+        const menuHeight = 176;
+        const gap = 6;
 
-        dropdown.style.top = `${rect.bottom + 6}px`;
-        dropdown.style.left = `${Math.max(8, rect.right - 192)}px`;
+        let left = rect.right - menuWidth;
+        let top = rect.bottom + gap;
 
+        if (left < 8) {
+            left = 8;
+        }
+
+        if (left + menuWidth > window.innerWidth - 8) {
+            left = window.innerWidth - menuWidth - 8;
+        }
+
+        if (top + menuHeight > window.innerHeight - 8) {
+            top = rect.top - menuHeight - gap;
+        }
+
+        if (top < 8) {
+            top = 8;
+        }
+
+        dropdown.style.top = `${top}px`;
+        dropdown.style.left = `${left}px`;
         dropdown.classList.remove('hidden');
     }
 
