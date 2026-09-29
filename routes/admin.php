@@ -317,14 +317,13 @@ Route::middleware(['auth', 'role:admin'])
 
                 Route::patch('/{user}/change-role', [
                     UserController::class,
-                    'change-role'
+                    'changeRole'
                 ])->name('change-role');
 
                 Route::patch('/{user}/toggle-status', [
                     UserController::class,
-                    'toggle-status'
+                    'toggleStatus'
                 ])->name('toggle-status');
             });
     });
-
 
