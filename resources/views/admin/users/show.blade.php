@@ -7,7 +7,7 @@
         $isProtectedAdmin = $user->role === 'admin';
     @endphp
 
-    <div class="p-3 sm:p-4 bg-gray-50 rounded-2xl m-2 mt-0 space-y-4">
+    <div class="p-3 sm:p-4 bg-gray-50 rounded-2xl m-2 mt-0 space-y-4 min-h-screen">
         <x-success />
         <x-error />
 
@@ -193,3 +193,4 @@
         </div>
     </div>
 </x-layouts.app>
+
