@@ -143,9 +143,7 @@
                             </td>
 
                             <td class="px-5 py-4">
-                                @if($meeting->status === 'active')
-                                    <x-meeting-actions :meeting="$meeting" />
-                                @endif
+                                <x-meeting-actions :meeting="$meeting" />
                             </td>
                         </tr>
                     @empty
@@ -167,3 +165,4 @@
         </div>
     </div>
 </x-layouts.app>
+
