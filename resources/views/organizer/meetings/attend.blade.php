@@ -2392,28 +2392,104 @@
     }
 
     // ---------- Clear/loud remote meeting audio ----------
-    // HTMLMediaElement.volume cannot go above 1. Web Audio gives quiet remote
-    // microphones a controlled boost while a compressor prevents clipping.
+    // Keep remote voice in a dedicated Web Audio path so quiet microphones are
+    // easier to hear without changing the actual LiveKit media track. A gentle
+    // compressor prevents the boost from becoming harsh or clipping.
     let meetingAudioContext=null;
     const remoteAudioNodes={};
 
-    function getMeetingAudioContext(){ return null; }
+    function getMeetingAudioContext(){
+        if(meetingAudioContext && meetingAudioContext.state!=='closed') return meetingAudioContext;
+        const AudioCtx=window.AudioContext||window.webkitAudioContext;
+        if(!AudioCtx) return null;
+        try{
+            meetingAudioContext=new AudioCtx({latencyHint:'interactive'});
+        }catch(e){
+            try{ meetingAudioContext=new AudioCtx(); }catch(error){ return null; }
+        }
+        return meetingAudioContext;
+    }
 
     function disposeRemoteAudioBoost(uid){
-        delete remoteAudioNodes[String(uid)];
+        uid=String(uid);
+        const node=remoteAudioNodes[uid];
+        if(!node) return;
+        try{ node.source?.disconnect(); }catch(e){}
+        try{ node.gain?.disconnect(); }catch(e){}
+        try{ node.compressor?.disconnect(); }catch(e){}
+        delete remoteAudioNodes[uid];
     }
 
     function attachBoostedRemoteAudio(uid, track, audioEl){
-        // CPU-safe mode: use the browser's native audio playback path.
-        if(audioEl){
-            audioEl.muted=false;
-            audioEl.defaultMuted=false;
-            audioEl.volume=1;
+        if(!track || track.kind!=='audio' || track.readyState==='ended') return false;
+
+        const ctx=getMeetingAudioContext();
+        if(!ctx) return false;
+
+        uid=String(uid);
+        const existing=remoteAudioNodes[uid];
+        if(existing?.trackId===track.id && existing?.context===ctx){
+            if(audioEl){
+                audioEl.muted=true;
+                audioEl.defaultMuted=true;
+                audioEl.volume=1;
+            }
+            return true;
         }
-        return false;
+
+        disposeRemoteAudioBoost(uid);
+
+        try{
+            const stream=new MediaStream([track]);
+            const source=ctx.createMediaStreamSource(stream);
+            const gain=ctx.createGain();
+            const compressor=ctx.createDynamicsCompressor();
+
+            // Clear/loud speech focus: moderate gain + compression.
+            gain.gain.value=1.35;
+            compressor.threshold.value=-24;
+            compressor.knee.value=18;
+            compressor.ratio.value=4;
+            compressor.attack.value=0.003;
+            compressor.release.value=0.22;
+
+            source.connect(gain);
+            gain.connect(compressor);
+            compressor.connect(ctx.destination);
+
+            remoteAudioNodes[uid]={
+                context:ctx,
+                trackId:track.id,
+                source,
+                gain,
+                compressor,
+                stream
+            };
+
+            if(audioEl){
+                // The Web Audio graph is the only audible path; this prevents
+                // duplicate/phasey audio from HTMLMediaElement playback.
+                audioEl.muted=true;
+                audioEl.defaultMuted=true;
+                audioEl.volume=1;
+            }
+
+            return true;
+        }catch(error){
+            console.warn('[SmartMeet] boosted remote audio setup failed',error);
+            disposeRemoteAudioBoost(uid);
+            return false;
+        }
     }
 
-    async function resumeMeetingAudioContext(){ return; }
+    async function resumeMeetingAudioContext(){
+        const ctx=getMeetingAudioContext();
+        if(!ctx) return false;
+        try{
+            if(ctx.state==='suspended') await ctx.resume();
+        }catch(e){}
+        return ctx.state==='running';
+    }
 
 
     function scheduleRemoteAttach(uid, delay=90){
@@ -4019,7 +4095,7 @@
             recognitionRunning=true;
             recognitionStopping=false;
             transcriptNetworkFailures=0;
-            setTranscriptListening(true,'Listening for your speech…');
+            setTranscriptListening(true,'Listening continuously…');
         };
 
         instance.onspeechstart=()=>{
@@ -4098,7 +4174,7 @@
                         instance.abort();
                     }catch(e){}
                 }
-                if(shouldRecognitionRun()) scheduleRecognitionRestart(500);
+                if(shouldRecognitionRun()) scheduleRecognitionRestart(80);
                 return;
             }
 
@@ -4119,8 +4195,8 @@
 
             // Browser speech services periodically close even continuous sessions.
             // Re-open them automatically so silence does not permanently stop transcription.
-            setTranscriptListening(true,'Reconnecting transcription…');
-            const retryDelay=transcriptNetworkFailures>0 ? Math.min(1000*transcriptNetworkFailures,5000) : 250;
+            setTranscriptListening(true,'Listening continuously…');
+            const retryDelay=transcriptNetworkFailures>0 ? Math.min(350*transcriptNetworkFailures,1800) : 60;
             scheduleRecognitionRestart(retryDelay);
         };
     }
@@ -4744,55 +4820,16 @@
     }
 
     /* ---------- Presence / reconnection ---------- */
-    function liveKitParticipantInfo(participant, uid){
-        uid=String(uid);
-        const existing=knownParticipants[uid] || {};
-        let metadata={};
-
-        try{
-            if(participant?.metadata){
-                const parsed=JSON.parse(participant.metadata);
-                if(parsed && typeof parsed==='object') metadata=parsed;
-            }
-        }catch(error){
-            console.warn('[LiveKit] participant metadata parse failed:', error);
-        }
-
-        const name=String(
-            participant?.name ||
-            metadata.name ||
-            existing.name ||
-            ('User '+uid)
-        ).trim() || ('User '+uid);
-
-        const initials=String(
-            metadata.initials ||
-            existing.initials ||
-            (name.trim().charAt(0).toUpperCase() || 'U')
-        ).trim();
-
-        return {
-            ...existing,
-            userId:uid,
-            name,
-            initials,
-            avatarUrl:metadata.avatarUrl || existing.avatarUrl || null,
-            isOrganizer:Boolean(
-                metadata.isOrganizer ||
-                existing.isOrganizer ||
-                uid===String(ORGANIZER_ID)
-            ),
-            hasJoined:true
-        };
-    }
-
-    function registerLiveKitParticipant(uid, participant=null){
+    function registerLiveKitParticipant(uid){
         uid=String(uid);
         if(uid===String(MY_USER_ID)) return;
 
-        const info=liveKitParticipantInfo(participant, uid);
+        const info=knownParticipants[uid];
+        if(!info){
+            console.warn('[LiveKit] unknown participant identity:', uid);
+            return;
+        }
 
-        knownParticipants[uid]=info;
         leftUsers.delete(uid);
 
         addParticipantTile(
@@ -5007,7 +5044,7 @@
         const uid=liveKitMediaUserId(participant);
         if(!uid || uid===String(MY_USER_ID) || !track) return;
 
-        registerLiveKitParticipant(uid, participant);
+        registerLiveKitParticipant(uid);
 
         const mediaTrack=track.mediaStreamTrack;
         if(!mediaTrack) return;
@@ -5143,12 +5180,12 @@
 
         window.addEventListener('smartmeet:livekit-participant-connected', event=>{
             const uid=liveKitUserId(event.detail?.participant);
-            if(uid) registerLiveKitParticipant(uid, participant);
+            if(uid) registerLiveKitParticipant(uid);
         });
 
         window.addEventListener('smartmeet:livekit-participant-disconnected', event=>{
             const uid=liveKitUserId(event.detail?.participant);
-            if(uid) unregisterLiveKitParticipant(uid, participant);
+            if(uid) unregisterLiveKitParticipant(uid);
         });
     }
 
@@ -5158,7 +5195,7 @@
 
         room.remoteParticipants.forEach(participant=>{
             const uid=liveKitUserId(participant);
-            if(uid) registerLiveKitParticipant(uid, participant);
+            if(uid) registerLiveKitParticipant(uid);
         });
     }
 
