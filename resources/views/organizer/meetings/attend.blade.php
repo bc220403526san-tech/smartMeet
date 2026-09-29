@@ -4744,16 +4744,55 @@
     }
 
     /* ---------- Presence / reconnection ---------- */
-    function registerLiveKitParticipant(uid){
+    function liveKitParticipantInfo(participant, uid){
+        uid=String(uid);
+        const existing=knownParticipants[uid] || {};
+        let metadata={};
+
+        try{
+            if(participant?.metadata){
+                const parsed=JSON.parse(participant.metadata);
+                if(parsed && typeof parsed==='object') metadata=parsed;
+            }
+        }catch(error){
+            console.warn('[LiveKit] participant metadata parse failed:', error);
+        }
+
+        const name=String(
+            participant?.name ||
+            metadata.name ||
+            existing.name ||
+            ('User '+uid)
+        ).trim() || ('User '+uid);
+
+        const initials=String(
+            metadata.initials ||
+            existing.initials ||
+            (name.trim().charAt(0).toUpperCase() || 'U')
+        ).trim();
+
+        return {
+            ...existing,
+            userId:uid,
+            name,
+            initials,
+            avatarUrl:metadata.avatarUrl || existing.avatarUrl || null,
+            isOrganizer:Boolean(
+                metadata.isOrganizer ||
+                existing.isOrganizer ||
+                uid===String(ORGANIZER_ID)
+            ),
+            hasJoined:true
+        };
+    }
+
+    function registerLiveKitParticipant(uid, participant=null){
         uid=String(uid);
         if(uid===String(MY_USER_ID)) return;
 
-        const info=knownParticipants[uid];
-        if(!info){
-            console.warn('[LiveKit] unknown participant identity:', uid);
-            return;
-        }
+        const info=liveKitParticipantInfo(participant, uid);
 
+        knownParticipants[uid]=info;
         leftUsers.delete(uid);
 
         addParticipantTile(
@@ -4968,7 +5007,7 @@
         const uid=liveKitMediaUserId(participant);
         if(!uid || uid===String(MY_USER_ID) || !track) return;
 
-        registerLiveKitParticipant(uid);
+        registerLiveKitParticipant(uid, participant);
 
         const mediaTrack=track.mediaStreamTrack;
         if(!mediaTrack) return;
@@ -5104,12 +5143,12 @@
 
         window.addEventListener('smartmeet:livekit-participant-connected', event=>{
             const uid=liveKitUserId(event.detail?.participant);
-            if(uid) registerLiveKitParticipant(uid);
+            if(uid) registerLiveKitParticipant(uid, participant);
         });
 
         window.addEventListener('smartmeet:livekit-participant-disconnected', event=>{
             const uid=liveKitUserId(event.detail?.participant);
-            if(uid) unregisterLiveKitParticipant(uid);
+            if(uid) unregisterLiveKitParticipant(uid, participant);
         });
     }
 
@@ -5119,7 +5158,7 @@
 
         room.remoteParticipants.forEach(participant=>{
             const uid=liveKitUserId(participant);
-            if(uid) registerLiveKitParticipant(uid);
+            if(uid) registerLiveKitParticipant(uid, participant);
         });
     }
 
