@@ -807,14 +807,30 @@
     const MY_NAME         = @json(auth()->user()->name);
     const MY_INITIALS     = @json($userInitials);
     const MY_AVATAR_URL   = @json($myAvatarUrl ?? null);
-    const LIVEKIT_TOKEN_URL = @json(route('admin.meetings.livekit-token', $meeting));
-    const SIGNAL_URL      = @json(route('admin.meetings.signal', $meeting));
-    const TRANSCRIPT_URL  = @json(route('admin.meetings.transcript', $meeting));
-    const MARK_LEFT_URL   = @json(route('admin.meetings.markLeft', $meeting));
-    const COMPLETE_BY_TIME_URL = @json(route('admin.meetings.completeByTime', $meeting));
-    const SESSION_METADATA_URL = @json(route('admin.meetings.session-metadata', $meeting));
+    const LIVEKIT_TOKEN_URL = @json(
+        auth()->user()->role === 'admin'
+            ? route('admin.meetings.livekit-token', $meeting)
+            : route('participant.meetings.livekit-token', $meeting)
+    );
+    const SIGNAL_URL = @json(auth()->user()->role === 'admin'
+        ? route('admin.meetings.signal', $meeting)
+        : route('participant.meetings.signal', $meeting));
+    const TRANSCRIPT_URL = @json(auth()->user()->role === 'admin'
+        ? route('admin.meetings.transcript', $meeting)
+        : route('participant.meetings.transcript', $meeting));
+    const MARK_LEFT_URL = @json(auth()->user()->role === 'admin'
+        ? route('admin.meetings.markLeft', $meeting)
+        : route('participant.meetings.markLeft', $meeting));
+    const COMPLETE_BY_TIME_URL = @json(auth()->user()->role === 'admin'
+        ? route('admin.meetings.completeByTime', $meeting)
+        : route('participant.meetings.completeByTime', $meeting));
+    const SESSION_METADATA_URL = @json(auth()->user()->role === 'admin'
+        ? route('admin.meetings.session-metadata', $meeting)
+        : route('participant.meetings.session-metadata', $meeting));
     const AUDIT_SESSION_UUID = @json($auditSessionUuid);
-    const LEAVE_URL       = @json(route('admin.meetings.invited'));
+    const LEAVE_URL = @json(auth()->user()->role === 'admin'
+        ? route('admin.meetings.invited')
+        : route('participant.meetings.index'));
     const CANCELLED_PAGE_URL = @json(route('meetings.cancelled', $meeting));
     const ENDED_PAGE_URL     = @json(route('meetings.ended', $meeting));
     const CSRF            = @json(csrf_token());
