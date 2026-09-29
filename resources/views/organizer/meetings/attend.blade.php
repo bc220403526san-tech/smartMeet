@@ -2415,6 +2415,7 @@
         const node=remoteAudioNodes[uid];
         if(!node) return;
         try{ node.source?.disconnect(); }catch(e){}
+        try{ node.highpass?.disconnect(); }catch(e){}
         try{ node.gain?.disconnect(); }catch(e){}
         try{ node.compressor?.disconnect(); }catch(e){}
         delete remoteAudioNodes[uid];
@@ -2442,18 +2443,24 @@
         try{
             const stream=new MediaStream([track]);
             const source=ctx.createMediaStreamSource(stream);
+            const highpass=ctx.createBiquadFilter();
             const gain=ctx.createGain();
             const compressor=ctx.createDynamicsCompressor();
 
-            // Clear/loud speech focus: moderate gain + compression.
-            gain.gain.value=1.35;
-            compressor.threshold.value=-24;
-            compressor.knee.value=18;
-            compressor.ratio.value=4;
+            // Speech-focused playback: remove low rumble, add moderate clarity/
+            // loudness, then gently compress peaks so speech stays consistent.
+            highpass.type='highpass';
+            highpass.frequency.value=80;
+            highpass.Q.value=0.7;
+            gain.gain.value=1.45;
+            compressor.threshold.value=-26;
+            compressor.knee.value=16;
+            compressor.ratio.value=3.5;
             compressor.attack.value=0.003;
-            compressor.release.value=0.22;
+            compressor.release.value=0.20;
 
-            source.connect(gain);
+            source.connect(highpass);
+            highpass.connect(gain);
             gain.connect(compressor);
             compressor.connect(ctx.destination);
 
@@ -2461,6 +2468,7 @@
                 context:ctx,
                 trackId:track.id,
                 source,
+                highpass,
                 gain,
                 compressor,
                 stream
@@ -4130,8 +4138,9 @@
 
             for(const normalized of finals){
                 const now=Date.now();
-                if(normalized.toLocaleLowerCase()===transcriptLastFinal.toLocaleLowerCase() && now-transcriptLastFinalAt<3000) continue;
-                transcriptLastFinal=normalized;
+                const finalKey=normalized.toLocaleLowerCase().replace(/\s+/g,' ').trim();
+                if(finalKey===transcriptLastFinal.toLocaleLowerCase() && now-transcriptLastFinalAt<5000) continue;
+                transcriptLastFinal=finalKey;
                 transcriptLastFinalAt=now;
                 showLocalTranscript(normalized,false);
                 Promise.resolve(saveTranscript(normalized)).catch(error=>{
@@ -4349,21 +4358,37 @@
         body.scrollTop=body.scrollHeight;
     }
 
+    // TranscriptUpdated is the single realtime transcript source.
+    // Also guard against duplicate delivery from reconnects/broadcast retries.
     const receivedTranscriptIds=new Set();
+    const receivedTranscriptKeys=new Map();
 
     function handleRemoteTranscript(data){
-        const transcriptId=String(data?.transcriptId||'').trim();
-        if(transcriptId){
-            if(receivedTranscriptIds.has(transcriptId)) return;
-            receivedTranscriptIds.add(transcriptId);
-            if(receivedTranscriptIds.size>500){
-                const first=receivedTranscriptIds.values().next().value;
-                if(first) receivedTranscriptIds.delete(first);
-            }
-        }
         if(!data || String(data.userId)===String(MY_USER_ID)) return;
-        const text=String(data.text||'').trim();
+        const text=String(data.text||'').replace(/\s+/g,' ').trim();
         if(!text) return;
+
+        const transcriptId=String(data?.transcriptId||'').trim();
+        const userId=String(data?.userId||'');
+        const spokenAt=String(data?.spokenAt||'');
+        const key=(transcriptId || `${userId}|${text.toLocaleLowerCase()}|${spokenAt}`).slice(0,500);
+
+        if(transcriptId && receivedTranscriptIds.has(transcriptId)) return;
+        const duplicateAt=receivedTranscriptKeys.get(key);
+        if(duplicateAt && Date.now()-duplicateAt<5000) return;
+
+        if(transcriptId) receivedTranscriptIds.add(transcriptId);
+        receivedTranscriptKeys.set(key,Date.now());
+
+        if(receivedTranscriptIds.size>500){
+            const first=receivedTranscriptIds.values().next().value;
+            if(first) receivedTranscriptIds.delete(first);
+        }
+        if(receivedTranscriptKeys.size>500){
+            const first=receivedTranscriptKeys.keys().next().value;
+            if(first) receivedTranscriptKeys.delete(first);
+        }
+
         const body=document.getElementById('transcript-body'); if(!body) return;
         body.querySelector('[data-empty]')?.remove();
         const name=String(data.userName||knownParticipants?.[String(data.userId)]?.name||'User');
@@ -4378,45 +4403,32 @@
     async function saveTranscript(text){
         const clean=String(text||'').replace(/\s+/g,' ').trim();
         if(!clean) return false;
-        for(let attempt=0;attempt<3;attempt++){
-            let timer=null;
-            try{
-                const ctrl=new AbortController();
-                timer=setTimeout(()=>ctrl.abort(),7000);
-                const res=await fetch(TRANSCRIPT_URL,{
-                    method:'POST',
-                    headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':CSRF},
-                    body:JSON.stringify({text:clean}),
-                    signal:ctrl.signal
-                });
-                clearTimeout(timer);
-                if(res.ok){
-                    const transcriptId=`${MY_USER_ID}:${Date.now()}:${clean.slice(0,48)}`;
-                    try{
-                        await sendSignal('all','chat',{
-                            smartmeetControl:'transcript-line',
-                            transcriptId,
-                            userId:MY_USER_ID,
-                            userName:MY_NAME,
-                            userInitials:MY_INITIALS,
-                            text:clean,
-                            spokenAt:new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})
-                        });
-                    }catch(e){
-                        console.warn('[SmartMeet] transcript realtime fallback failed',e);
-                    }
-                    return true;
-                }
-                console.error('[SmartMeet] transcript save failed',res.status);
-                if(res.status>=400 && res.status<500) return false;
-            }catch(e){
-                if(timer) clearTimeout(timer);
-                if(e?.name!=='AbortError') console.error('[SmartMeet] transcript save error',e);
-            }
-            await new Promise(r=>setTimeout(r,400*(attempt+1)));
+
+        // Save exactly once. Retrying the same POST can create duplicate DB
+        // transcript rows if the server saves successfully but the browser
+        // times out before receiving the response. TranscriptUpdated already
+        // provides realtime delivery to the other meeting users.
+        let timer=null;
+        try{
+            const ctrl=new AbortController();
+            timer=setTimeout(()=>ctrl.abort(),7000);
+            const res=await fetch(TRANSCRIPT_URL,{
+                method:'POST',
+                headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':CSRF},
+                body:JSON.stringify({text:clean}),
+                signal:ctrl.signal
+            });
+            clearTimeout(timer);
+
+            if(res.ok) return true;
+
+            console.error('[SmartMeet] transcript save failed',res.status);
+            return false;
+        }catch(e){
+            if(timer) clearTimeout(timer);
+            if(e?.name!=='AbortError') console.error('[SmartMeet] transcript save error',e);
+            return false;
         }
-        showToast('📝 A transcript line could not be saved.');
-        return false;
     }
     /* ---------- Chat ---------- */
     const chatOwnMessages=new Map();
