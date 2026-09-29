@@ -3,7 +3,7 @@
         <x-header.search-bar placeholder="Search for users, roles, or status..." />
     </x-slot>
 
-    <div class="p-4 bg-gray-50 rounded-2xl m-2 mt-0 space-y-4 min-h-full">
+    <div class="p-4 bg-gray-50 rounded-2xl m-2 mt-0 space-y-4 min-h-screen">
         <x-success />
         <x-error />
 
@@ -36,7 +36,7 @@
                                  class="w-4 h-4 text-gray-400 shrink-0">
                                 <path stroke-linecap="round"
                                       stroke-linejoin="round"
-                                      d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75"/>
+                                      d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 1 0-3 0m-9.75 0h9.75"/>
                             </svg>
 
                             <form method="GET"
@@ -60,8 +60,7 @@
                 </div>
             </div>
 
-            <div class="hidden md:grid md:grid-cols-5 text-xs font-semibold text-gray-500 uppercase tracking-wider
-                        bg-gray-50 border-b border-gray-100 px-5 py-3">
+            <div class="hidden md:grid md:grid-cols-5 text-xs font-semibold text-gray-500 uppercase tracking-wider bg-gray-50 border-b border-gray-100 px-5 py-3">
                 <p>Name</p>
                 <p>Email</p>
                 <p>Role</p>
@@ -100,7 +99,7 @@
                             </span>
                         </div>
 
-                        <div class="flex gap-2 text-gray-500">
+                        <div class="flex gap-1.5 text-gray-500">
                             <x-icons :user="$user" />
                         </div>
                     </div>
@@ -133,7 +132,7 @@
                                 {{ $user->is_active ? 'Active' : 'Inactive' }}
                             </div>
 
-                            <div class="flex gap-2 text-gray-500">
+                            <div class="flex gap-1.5 text-gray-500">
                                 <x-icons :user="$user" />
                             </div>
                         </div>
