@@ -338,16 +338,25 @@ class UserController extends Controller
             'role' => $newRole,
         ]);
 
-        Notification::create([
-            'user_id' => $user->id,
-            'title' => 'Your Role Has Been Updated',
-            'message' => 'Your role has been changed from '
-                . ucfirst($oldRole)
-                . ' to '
-                . ucfirst($newRole)
-                . '.',
-            'link' => null,
-        ]);
+        try {
+            Notification::create([
+                'user_id' => $user->id,
+                'title' => 'Your Role Has Been Updated',
+                'message' => 'Your role has been changed from '
+                    . ucfirst($oldRole)
+                    . ' to '
+                    . ucfirst($newRole)
+                    . '.',
+                'link' => null,
+            ]);
+        } catch (\Throwable $exception) {
+            Log::warning('User role-change notification could not be created.', [
+                'user_id' => $user->id,
+                'old_role' => $oldRole,
+                'new_role' => $newRole,
+                'error' => $exception->getMessage(),
+            ]);
+        }
 
         return back()->with(
             'success',
@@ -355,4 +364,3 @@ class UserController extends Controller
         );
     }
 }
-
