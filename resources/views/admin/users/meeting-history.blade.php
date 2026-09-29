@@ -3,7 +3,7 @@
         <x-header.page-title title="Admin Dashboard" />
     </x-slot:header>
 
-    <div class="p-3 sm:p-4 bg-gray-50 rounded-2xl m-2 mt-0 space-y-4">
+    <div class="p-3 sm:p-4 bg-gray-50 rounded-2xl m-2 mt-0 space-y-4 min-h-screen">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
                 <a href="{{ route('admin.users.show', $user) }}"
