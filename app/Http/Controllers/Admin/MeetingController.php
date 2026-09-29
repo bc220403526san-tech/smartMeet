@@ -265,10 +265,10 @@ class MeetingController extends Controller
     {
         $meeting->refresh();
 
-        if (! in_array($meeting->status, ['upcoming', 'active'], true)) {
+        if ($meeting->status !== 'active') {
             return back()->with(
                 'error',
-                'Only upcoming or active meetings can be cancelled.'
+                'Only active meetings can be cancelled.'
             );
         }
 
@@ -276,7 +276,7 @@ class MeetingController extends Controller
 
         $updated = Meeting::query()
             ->whereKey($meeting->id)
-            ->whereIn('status', ['upcoming', 'active'])
+            ->where('status', 'active')
             ->update([
                 'status' => 'cancelled',
                 'previous_status' => $previousStatus,
@@ -361,3 +361,4 @@ class MeetingController extends Controller
             ->with('success', 'Meeting deleted successfully.');
     }
 }
+

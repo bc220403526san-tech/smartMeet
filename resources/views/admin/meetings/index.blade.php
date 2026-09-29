@@ -143,7 +143,9 @@
                             </td>
 
                             <td class="px-5 py-4">
-                                <x-meeting-actions :meeting="$meeting" />
+                                @if($meeting->status === 'active')
+                                    <x-meeting-actions :meeting="$meeting" />
+                                @endif
                             </td>
                         </tr>
                     @empty
