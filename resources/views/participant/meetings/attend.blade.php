@@ -2291,6 +2291,19 @@
 
     let audioUnlockArmed=false;
     async function unlockRemoteAudio(){
+        // LiveKit requires Room.startAudio() to be called from a real user gesture
+        // when browser autoplay policy has blocked remote audio. This function is
+        // invoked by pointerdown/click unlock handlers, so unlock the LiveKit
+        // audio pipeline before attempting HTMLAudioElement.play().
+        try{
+            const room=window.SmartMeetLiveKit?.room;
+            if(room?.canPlaybackAudio===false){
+                await room.startAudio();
+            }
+        }catch(error){
+            console.warn("[LiveKit] audio playback unlock failed",error);
+        }
+
         await resumeMeetingAudioContext();
 
         const seen=new Set();
@@ -4815,10 +4828,6 @@
         }
 
         const play=async()=>{
-            try{
-                await window.SmartMeetLiveKit?.room?.startAudio?.();
-            }catch(e){}
-
             try{
                 await audio.play();
             }catch(error){
