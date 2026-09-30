@@ -146,6 +146,23 @@ class SmartMeetLiveKit {
             throw new Error('LiveKit room is not connected.');
         }
 
+        // The microphone button is a trusted user gesture. Use that gesture
+        // to unlock LiveKit remote playback before changing the local mic.
+        try {
+            await this.room.startAudio();
+        } catch (error) {
+            // Playback may already be unlocked or the browser may still require
+            // another gesture; the meeting page will retry on interaction.
+        }
+
+        // The mic button is a trusted user gesture, so use it to unlock
+        // LiveKit remote playback before changing the local microphone.
+        try {
+            await this.room.startAudio();
+        } catch (error) {
+            // The browser may already be unlocked or may require another gesture.
+        }
+
         return this.room.localParticipant.setMicrophoneEnabled(
             Boolean(enabled),
             {
