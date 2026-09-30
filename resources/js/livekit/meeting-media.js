@@ -47,14 +47,10 @@ class SmartMeetLiveKit {
                 noiseSuppression: true,
                 autoGainControl: true,
                 channelCount: 1,
-                sampleRate: { ideal: 48000 },
-                sampleSize: { ideal: 16 },
-                latency: { ideal: 0.02, max: 0.15 },
-                voiceIsolation: true,
             },
             publishDefaults: {
                 audioPreset: AudioPresets.speech,
-                dtx: false,
+                dtx: true,
                 red: true,
                 stopMicTrackOnMute: false,
             },
@@ -131,6 +127,14 @@ class SmartMeetLiveKit {
 
         await room.connect(data.server_url, data.token);
 
+        // Best-effort autoplay unlock. Browsers may reject this outside a user
+        // gesture; the meeting page also retries from pointer/keyboard/mic actions.
+        try {
+            await room.startAudio();
+        } catch (error) {
+            // Expected when browser user activation has not happened yet.
+        }
+
         this.room = room;
         this.connected = true;
 
@@ -149,14 +153,10 @@ class SmartMeetLiveKit {
                 noiseSuppression: true,
                 autoGainControl: true,
                 channelCount: 1,
-                sampleRate: { ideal: 48000 },
-                sampleSize: { ideal: 16 },
-                latency: { ideal: 0.02, max: 0.15 },
-                voiceIsolation: true,
             },
             {
                 audioPreset: AudioPresets.speech,
-                dtx: false,
+                dtx: true,
                 red: true,
                 source: Track.Source.Microphone,
                 stopMicTrackOnMute: false,

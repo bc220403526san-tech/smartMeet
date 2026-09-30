@@ -1848,6 +1848,8 @@
     }
 
     async function negotiatePeer(uid, iceRestart=false){
+        // Disabled: LiveKit owns all audio/video transport.
+        return false;
         uid=String(uid);
         const pc=peers[uid];
         if(!pc || pc.signalingState==='closed' || leftUsers.has(uid)) return false;
@@ -1883,6 +1885,8 @@
     }
 
     function armPeerWatchdog(uid, pc){
+        // Disabled: LiveKit handles reconnect/ICE/media recovery.
+        return;
         if(!pc || pc.signalingState==='closed') return;
         clearTimeout(pc.__connectWatchdog);
         pc.__connectWatchdog=setTimeout(()=>{
@@ -1966,6 +1970,8 @@
     }
 
     function createPeerConnection(uid){
+        // LiveKit is the sole media transport. Legacy mesh is intentionally disabled.
+        return null;
         uid=String(uid);
         if(uid===String(MY_USER_ID) || leftUsers.has(uid)) return null;
         let pc=peers[uid];
@@ -2273,6 +2279,8 @@
     }
 
     async function syncTracksToEveryPeer(){
+        // Disabled: there is no P2P peer mesh anymore.
+        return;
         const ids=Object.keys(peers).filter(uid=>{
             const pc=peers[uid];
             return pc && pc.signalingState!=='closed' && !leftUsers.has(String(uid));
@@ -2808,6 +2816,8 @@
     function decodeSdp(sdp){ if(!sdp) return ''; try{ return decodeURIComponent(escape(atob(sdp))); }catch(e){ return sdp; } }
 
     async function handleOffer(from, data){
+        // Legacy Reverb SDP/ICE is ignored; Reverb is metadata-only.
+        return;
         console.log('[SmartMeet] received offer <-', from);
         const pc=createPeerConnection(from); if(!pc) return;
         const polite=isPolite(from);
@@ -2842,6 +2852,8 @@
         }catch(err){ console.warn('[SmartMeet] offer handling failed', from, err); }
     }
     async function handleAnswer(from, data){
+        // Legacy Reverb SDP/ICE is ignored; Reverb is metadata-only.
+        return;
         console.log('[SmartMeet] received answer <-', from);
         const pc=peers[from]; if(!pc) return;
         // An answer is valid only while our local offer is outstanding.
@@ -2866,6 +2878,8 @@
         }catch(err){ console.warn('[SmartMeet] answer handling failed', from, err); }
     }
     async function handleIceCandidate(from, data){
+        // Legacy Reverb SDP/ICE is ignored; Reverb is metadata-only.
+        return;
         const candidate=data.candidate; if(!candidate) return;
         const pc=peers[from];
         if(!pc || !pc.remoteDescription){ (pendingCandidates[from]=pendingCandidates[from]||[]).push(candidate); return; }
@@ -4949,11 +4963,7 @@
         markOnline(uid);
         renderPeopleList();
 
-        // LiveKit owns media transport once connected.
-        // Keep Reverb presence/UI updates, but do not create a legacy mesh peer.
-        if(!window.SmartMeetLiveKit?.connected){
-            createPeerConnection(uid);
-        }
+        // Reverb is metadata/presence only. Never create a legacy media peer.
     }
     function sendPresence(to='all'){
         return sendSignal(to,'presence-response',{
@@ -4963,6 +4973,8 @@
         });
     }
     function connectToAll(){
+        // Disabled: LiveKit room membership replaces the P2P mesh.
+        return;
         Object.keys(knownParticipants).forEach(uid=>{
             uid=String(uid);
             if(uid===String(MY_USER_ID) || leftUsers.has(uid)) return;
@@ -5014,8 +5026,6 @@
     async function repairMeetingMedia(forcePresence=false){
         if(document.visibilityState!=='visible') return;
 
-        // Recovery is event-driven. Prevent overlapping repair/renegotiation storms
-        // when online/pageshow/visibility/device events fire close together.
         const now=Date.now();
         if(recoveryRunning) return;
         if(!forcePresence && now-lastRecoveryAt<1500) return;
@@ -5024,51 +5034,17 @@
 
         try{
             const liveKit=window.SmartMeetLiveKit;
-
             if(liveKit?.connected && liveKit?.room){
-                // LiveKit owns media transport. Keep SmartMeet presence/UI recovery,
-                // but do not rebuild the legacy mesh-P2P media connections.
                 syncExistingLiveKitParticipants();
                 requestPresence(forcePresence);
                 unlockRemoteMedia();
-
                 if(IS_MOBILE_BROWSER){
                     await recoverMobileLocalMedia();
                 }
-
-                return;
+            }else{
+                // Do not fall back to the old P2P mesh. Wait for LiveKit and retry.
+                requestPresence(forcePresence);
             }
-
-            connectToAll();
-
-            Object.keys(peers).forEach(uid=>{
-                const pc=peers[uid];
-                if(!pc || pc.connectionState==='closed' || leftUsers.has(String(uid))) return;
-
-                const connected=(
-                    pc.connectionState==='connected' ||
-                    pc.iceConnectionState==='connected' ||
-                    pc.iceConnectionState==='completed'
-                );
-
-                if(connected){
-                    attachRemoteStream(uid);
-                    return;
-                }
-
-                if(pc.connectionState==='failed' || pc.iceConnectionState==='failed'){
-                    if(shouldInitiate(uid)) restartPeer(uid);
-                    else requestPresence(false);
-                    return;
-                }
-
-                if(pc.connectionState==='connecting' || pc.iceConnectionState==='checking' || pc.connectionState==='disconnected'){
-                    armPeerWatchdog(uid,pc);
-                }
-            });
-
-            requestPresence(forcePresence);
-            unlockRemoteAudio();
         }finally{
             recoveryRunning=false;
         }
