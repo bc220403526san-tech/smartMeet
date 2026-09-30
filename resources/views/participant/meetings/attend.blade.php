@@ -4036,8 +4036,13 @@
     }
 
     const receivedTranscriptIds=new Set();
+    const recentTranscriptFallbacks=new Map();
 
     function handleRemoteTranscript(data){
+        if(!data || String(data.userId)===String(MY_USER_ID)) return;
+        const text=String(data.text||'').replace(/\s+/g,' ').trim();
+        if(!text) return;
+
         const transcriptId=String(data?.transcriptId||'').trim();
         if(transcriptId){
             if(receivedTranscriptIds.has(transcriptId)) return;
@@ -4046,10 +4051,23 @@
                 const first=receivedTranscriptIds.values().next().value;
                 if(first) receivedTranscriptIds.delete(first);
             }
+        }else{
+            // The same transcript can arrive once through the transcript event
+            // and once through the realtime signal. Suppress only an identical
+            // fallback payload for a very short window so a later repeated
+            // sentence is still displayed normally.
+            const fallbackKey=`${String(data.userId)}|${text}|${String(data.spokenAt||'')}`;
+            const now=Date.now();
+            const previous=recentTranscriptFallbacks.get(fallbackKey)||0;
+            if(now-previous<3000) return;
+            recentTranscriptFallbacks.set(fallbackKey,now);
+            if(recentTranscriptFallbacks.size>200){
+                const cutoff=now-10000;
+                for(const [key,time] of recentTranscriptFallbacks){
+                    if(time<cutoff) recentTranscriptFallbacks.delete(key);
+                }
+            }
         }
-        if(!data || String(data.userId)===String(MY_USER_ID)) return;
-        const text=String(data.text||'').trim();
-        if(!text) return;
         const body=document.getElementById('transcript-body'); if(!body) return;
         body.querySelector('[data-empty]')?.remove();
         const name=String(data.userName||knownParticipants?.[String(data.userId)]?.name||'User');
@@ -4941,12 +4959,12 @@
 
         window.addEventListener('smartmeet:livekit-participant-connected', event=>{
             const uid=liveKitUserId(event.detail?.participant);
-            if(uid) registerLiveKitParticipant(uid, participant);
+            if(uid) registerLiveKitParticipant(uid, event.detail?.participant);
         });
 
         window.addEventListener('smartmeet:livekit-participant-disconnected', event=>{
             const uid=liveKitUserId(event.detail?.participant);
-            if(uid) unregisterLiveKitParticipant(uid, participant);
+            if(uid) unregisterLiveKitParticipant(uid);
         });
     }
 
@@ -4956,7 +4974,7 @@
 
         room.remoteParticipants.forEach(participant=>{
             const uid=liveKitUserId(participant);
-            if(uid) registerLiveKitParticipant(uid, participant);
+            if(uid) registerLiveKitParticipant(uid, event.detail?.participant);
         });
     }
 
