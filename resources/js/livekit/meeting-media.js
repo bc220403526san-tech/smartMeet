@@ -142,6 +142,15 @@ class SmartMeetLiveKit {
             throw new Error('LiveKit room is not connected.');
         }
 
+        // If this method is reached from the mic button click, startAudio()
+        // can consume the browser's user activation before async publishing.
+        try {
+            await this.room.startAudio();
+        } catch (error) {
+            // Playback may already be unlocked or the call may not have a user
+            // gesture; microphone publishing must continue regardless.
+        }
+
         await this.room.localParticipant.setMicrophoneEnabled(
             Boolean(enabled),
             {
@@ -167,6 +176,12 @@ class SmartMeetLiveKit {
     async setCameraEnabled(enabled) {
         if (!this.room) {
             throw new Error('LiveKit room is not connected.');
+        }
+
+        try {
+            await this.room.startAudio();
+        } catch (error) {
+            // Audio playback unlock must never block camera publishing.
         }
 
         await this.room.localParticipant.setCameraEnabled(Boolean(enabled));
