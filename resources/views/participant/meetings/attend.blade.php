@@ -2345,6 +2345,15 @@
 
         const unlock=()=>{
             if(document.visibilityState!=='visible') return;
+
+            // LiveKit requires startAudio() to run inside the actual user
+            // interaction. Do this before any async work can consume the
+            // browser's user-activation window.
+            const room=window.SmartMeetLiveKit?.room;
+            if(room){
+                room.startAudio().catch(()=>{});
+            }
+
             unlockRemoteAudio().catch(()=>{});
         };
 
@@ -3331,6 +3340,12 @@
     async function toggleMic(){
         if(toggleMic.busy) return;
         toggleMic.busy=true;
+
+        // Preserve the browser's user-activation window for LiveKit audio
+        // playback. This must happen before permission/network awaits.
+        try{
+            window.SmartMeetLiveKit?.room?.startAudio?.().catch(()=>{});
+        }catch(e){}
 
         try{
             const targetOn=!isMicOn;
