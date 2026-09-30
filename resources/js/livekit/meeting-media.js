@@ -36,25 +36,18 @@ class SmartMeetLiveKit {
             throw new Error('Invalid LiveKit token response.');
         }
 
-        // LiveKit is the single owner of meeting media. Voice capture is tuned
-        // for real-time speech: mono, echo cancellation, noise suppression,
-        // AGC and voice isolation where the browser supports it.
         const room = new Room({
             adaptiveStream: true,
             dynacast: true,
             audioCaptureDefaults: {
+                autoGainControl: true,
                 echoCancellation: true,
                 noiseSuppression: true,
-                autoGainControl: true,
                 channelCount: 1,
-                sampleRate: { ideal: 48000 },
-                sampleSize: { ideal: 16 },
-                latency: { ideal: 0.02, max: 0.15 },
-                voiceIsolation: true,
             },
             publishDefaults: {
                 audioPreset: AudioPresets.speech,
-                dtx: false,
+                dtx: true,
                 red: true,
                 stopMicTrackOnMute: false,
             },
@@ -131,6 +124,10 @@ class SmartMeetLiveKit {
 
         await room.connect(data.server_url, data.token);
 
+        try {
+            await room.startAudio();
+        } catch (_) {}
+
         this.room = room;
         this.connected = true;
 
@@ -142,34 +139,18 @@ class SmartMeetLiveKit {
             throw new Error('LiveKit room is not connected.');
         }
 
-        // If this method is reached from the mic button click, startAudio()
-        // can consume the browser's user activation before async publishing.
         try {
             await this.room.startAudio();
-        } catch (error) {
-            // Playback may already be unlocked or the call may not have a user
-            // gesture; microphone publishing must continue regardless.
-        }
+        } catch (_) {}
 
         await this.room.localParticipant.setMicrophoneEnabled(
             Boolean(enabled),
             {
+                autoGainControl: true,
                 echoCancellation: true,
                 noiseSuppression: true,
-                autoGainControl: true,
                 channelCount: 1,
-                sampleRate: { ideal: 48000 },
-                sampleSize: { ideal: 16 },
-                latency: { ideal: 0.02, max: 0.15 },
-                voiceIsolation: true,
-            },
-            {
-                audioPreset: AudioPresets.speech,
-                dtx: false,
-                red: true,
-                source: Track.Source.Microphone,
-                stopMicTrackOnMute: false,
-            },
+            }
         );
     }
 
@@ -180,9 +161,7 @@ class SmartMeetLiveKit {
 
         try {
             await this.room.startAudio();
-        } catch (error) {
-            // Audio playback unlock must never block camera publishing.
-        }
+        } catch (_) {}
 
         await this.room.localParticipant.setCameraEnabled(Boolean(enabled));
     }
