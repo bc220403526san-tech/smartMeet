@@ -2018,7 +2018,7 @@
             const compressor=ctx.createDynamicsCompressor();
 
             // Clear/loud speech focus: moderate gain + compression.
-            gain.gain.value=1.35;
+            gain.gain.value=1.5;
             compressor.threshold.value=-24;
             compressor.knee.value=18;
             compressor.ratio.value=4;
@@ -3006,22 +3006,12 @@
         audioPriorityMode = shouldPrioritizeAudio;
 
         if(audioPriorityMode){
-            // Stop camera capture/encoding completely. This is the biggest CPU and
-            // uplink saving in a peer-to-peer mesh and keeps microphone RTP healthy.
-            if(isCameraOn){
-                isCameraOn=false;
-                const cam=liveLocalTrack('video');
-                if(cam){
-                    try{ localStream?.removeTrack(cam); }catch(e){}
-                    try{ cam.stop(); }catch(e){}
-                }
-                setCameraButton(false);
-                broadcastMyCameraStatus();
-            }
-
+            // Keep the camera control available even in larger meetings. LiveKit
+            // owns the actual media transport, so audio-priority mode must never
+            // silently switch the user's camera off or disable the camera button.
             if(!audioPriorityNoticeShown){
                 audioPriorityNoticeShown=true;
-                showToast('🎙️ Audio priority enabled for this larger meeting. Camera is paused to keep everyone’s voice stable.');
+                showToast('🎙️ Audio priority enabled for this larger meeting.');
             }
 
             // Do not block UI while every peer sender is updated.
@@ -3042,9 +3032,9 @@
             return screenTrack;
         }
 
-        // Camera video is intentionally not sent in audio-priority mode.
-        if(audioPriorityMode) return null;
-
+        // Audio-priority mode must not disable the user's camera.
+        // LiveKit remains the primary media path, while the legacy P2P fallback
+        // keeps the current camera state available if it is ever needed.
         return liveLocalTrack('video');
     }
 
@@ -3397,11 +3387,6 @@
         try{
             const targetOn=!isCameraOn;
 
-            if(targetOn && audioPriorityMode){
-                showToast('🎙️ Camera is paused in larger meetings so everyone’s voice stays stable.');
-                return;
-            }
-
             const liveKit=window.SmartMeetLiveKit;
 
             if(!liveKit?.connected || !liveKit?.room){
@@ -3604,7 +3589,7 @@
                         await liveKit.setMicrophoneEnabled(true);
                     }
 
-                    if(isCameraOn && !audioPriorityMode){
+                    if(isCameraOn){
                         await liveKit.setCameraEnabled(true);
 
                         const publication=liveKit.room.localParticipant
@@ -4753,12 +4738,20 @@
             audio.playsInline=true;
             audio.setAttribute('playsinline','');
             audio.setAttribute('aria-hidden','true');
-            audio.style.display='none';
+            // Keep the element active for browser media playback without showing
+            // a player/control in the meeting UI.
+            audio.style.position='fixed';
+            audio.style.left='-9999px';
+            audio.style.top='0';
+            audio.style.width='1px';
+            audio.style.height='1px';
+            audio.style.opacity='0';
+            audio.style.pointerEvents='none';
             document.body.appendChild(audio);
         }
 
-        // LiveKit is the ONLY remote audio source once connected. Remove any
-        // legacy/P2P audio track for this user so the same voice can never play twice.
+        // LiveKit is the ONLY remote audio source once connected. Never mix a
+        // legacy/P2P audio track with the LiveKit track for the same participant.
         const stream=remoteStreams[uid];
         if(stream){
             stream.getAudioTracks().forEach(t=>{
@@ -4777,30 +4770,53 @@
         audio.playbackRate=1;
         try{ audio.preservesPitch=true; }catch(e){}
 
-        const current=audio.srcObject?.getAudioTracks?.()[0];
-        if(!current || current.id!==mediaTrack.id){
+        const currentId=audio.__smartMeetLiveKitTrackId;
+        if(currentId!==mediaTrack.sid && currentId!==mediaTrack.id){
+            // Detach any previous LiveKit audio from this single audio element.
+            try{ mediaTrack.detach(audio); }catch(e){}
             try{ audio.pause(); }catch(e){}
-            audio.srcObject=new MediaStream([mediaTrack]);
-            audio.__smartMeetLiveKitTrackId=mediaTrack.id;
+            try{ audio.srcObject=null; }catch(e){}
+
+            // IMPORTANT: use LiveKit's native track.attach() path for remote
+            // audio. This avoids the custom WebAudio graph being suspended by
+            // browser autoplay policy and guarantees the subscribed LiveKit
+            // track is actually routed to the laptop speakers.
+            try{
+                mediaTrack.attach(audio);
+                audio.__smartMeetLiveKitTrackId=mediaTrack.sid || mediaTrack.id;
+            }catch(error){
+                console.warn('[LiveKit] remote audio attach failed',error);
+                return;
+            }
         }
 
-        const play=()=>audio.play().catch(()=>{
-            try{ window.SmartMeetLiveKit?.room?.startAudio?.(); }catch(e){}
-            try{ audio.play().catch(()=>{}); }catch(e){}
-            armAudioUnlock();
-        });
+        const play=async()=>{
+            try{
+                await window.SmartMeetLiveKit?.room?.startAudio?.();
+            }catch(e){}
 
-        if(mediaTrack.readyState==='live') play();
+            try{
+                await audio.play();
+            }catch(error){
+                // Browser autoplay can require a user gesture. Keep the audio
+                // element attached and let the existing unlock handler retry.
+                armAudioUnlock();
+            }
+        };
+
+        if(mediaTrack.readyState==='live'){
+            void play();
+        }
 
         if(!audio.__smartMeetLiveKitAudioBound){
             audio.__smartMeetLiveKitAudioBound=true;
-            audio.addEventListener('canplay',play);
-            audio.addEventListener('loadedmetadata',play);
+            audio.addEventListener('canplay',()=>void play());
+            audio.addEventListener('loadedmetadata',()=>void play());
             audio.addEventListener('stalled',()=>{
-                if(mediaTrack.readyState==='live') setTimeout(play,80);
+                if(mediaTrack.readyState==='live') setTimeout(()=>void play(),100);
             });
             audio.addEventListener('waiting',()=>{
-                if(mediaTrack.readyState==='live') setTimeout(play,80);
+                if(mediaTrack.readyState==='live') setTimeout(()=>void play(),100);
             });
         }
     }
@@ -4909,6 +4925,16 @@
             const existing=stream.getTracks().find(t=>t.id===mediaTrack.id);
             if(existing){
                 try{ stream.removeTrack(existing); }catch(e){}
+            }
+        }
+
+        if(mediaTrack?.kind==='audio'){
+            const audio=document.getElementById('audio-'+uid);
+            if(audio && audio.__smartMeetLiveKitTrackId===((mediaTrack.sid || mediaTrack.id))){
+                try{ mediaTrack.detach(audio); }catch(e){}
+                try{ audio.pause(); }catch(e){}
+                try{ audio.srcObject=null; }catch(e){}
+                audio.__smartMeetLiveKitTrackId=null;
             }
         }
 
