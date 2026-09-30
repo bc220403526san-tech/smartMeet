@@ -5332,7 +5332,7 @@
 
         room.remoteParticipants.forEach(participant=>{
             const uid=liveKitUserId(participant);
-            if(uid) registerLiveKitParticipant(uid, event.detail?.participant);
+            if(uid) registerLiveKitParticipant(uid, participant);
         });
     }
 
