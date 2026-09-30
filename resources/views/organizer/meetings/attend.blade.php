@@ -2616,7 +2616,7 @@
         // LiveKit owns remote audio whenever the SFU is connected. The legacy
         // MediaStream/WebAudio path must not run in parallel with LiveKit.
         if(window.SmartMeetLiveKit?.connected){
-            const liveAudio=document.getElementById('audio-'+uid);
+            const liveAudio=document.getElementById('lk-audio-'+uid);
             if(liveAudio){
                 liveAudio.muted=false;
                 liveAudio.defaultMuted=false;
@@ -2743,14 +2743,14 @@
         await resumeMeetingAudioContext();
 
         const seen=new Set();
-        const audios=[...document.querySelectorAll('audio[id^="audio-"]')].filter(a=>{
+        const audios=[...document.querySelectorAll('audio[data-livekit-audio="1"]')].filter(a=>{
             if(!a.id || seen.has(a.id)) return false;
             seen.add(a.id);
             return true;
         });
 
         await Promise.allSettled(audios.map(a=>{
-            const uid=String(a.id).replace(/^audio-/,'');
+            const uid=String(a.id).replace(/^lk-audio-/,'');
             if(window.SmartMeetLiveKit?.connected){
                 a.muted=false;
                 a.defaultMuted=false;
@@ -5103,10 +5103,11 @@
         const mediaTrack=liveKitTrack.mediaStreamTrack;
         if(!mediaTrack) return;
 
-        let audio=document.getElementById('audio-'+uid);
+        let audio=document.getElementById('lk-audio-'+uid);
         if(!audio){
             audio=document.createElement('audio');
-            audio.id='audio-'+uid;
+            audio.id='lk-audio-'+uid;
+            audio.dataset.livekitAudio='1';
             audio.autoplay=true;
             audio.playsInline=true;
             audio.setAttribute('playsinline','');
@@ -5121,7 +5122,7 @@
             audio.style.height='1px';
             audio.style.opacity='0.01';
             audio.style.pointerEvents='none';
-            audio.style.zIndex='-1';
+            audio.style.zIndex='2147483647';
             document.body.appendChild(audio);
         }
 
@@ -5137,7 +5138,7 @@
         audio.style.height='1px';
         audio.style.opacity='0.01';
         audio.style.pointerEvents='none';
-        audio.style.zIndex='-1';
+        audio.style.zIndex='2147483647';
 
         // LiveKit is the ONLY remote audio source once connected. Never mix a
         // legacy/P2P audio track with the LiveKit track for the same participant.
@@ -5248,7 +5249,7 @@
                 });
                 mediaTrack.addEventListener('ended',()=>{
                     micStatus[uid]=true;
-                    const audio=document.getElementById('audio-'+uid);
+                    const audio=document.getElementById('lk-audio-'+uid);
                     if(audio && audio.__smartMeetLiveKitTrackId===(track.sid || mediaTrack.id)){
                         try{ track.detach(audio); }catch(e){}
                         try{ audio.pause(); }catch(e){}
@@ -5307,7 +5308,7 @@
 
         const mediaTrack=track.mediaStreamTrack;
         if(mediaTrack?.kind==='audio'){
-            const audio=document.getElementById('audio-'+uid);
+            const audio=document.getElementById('lk-audio-'+uid);
             if(audio && audio.__smartMeetLiveKitTrackId===(track.sid || mediaTrack?.id)){
                 try{ track.detach(audio); }catch(e){}
                 try{ audio.pause(); }catch(e){}
