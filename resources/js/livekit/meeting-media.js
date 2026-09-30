@@ -43,9 +43,9 @@ class SmartMeetLiveKit {
             adaptiveStream: true,
             dynacast: true,
             audioCaptureDefaults: {
+                autoGainControl: true,
                 echoCancellation: true,
                 noiseSuppression: true,
-                autoGainControl: true,
                 channelCount: 1,
             },
             publishDefaults: {
@@ -127,13 +127,11 @@ class SmartMeetLiveKit {
 
         await room.connect(data.server_url, data.token);
 
-        // Best-effort autoplay unlock. Browsers may reject this outside a user
-        // gesture; the meeting page also retries from pointer/keyboard/mic actions.
+        // Try immediately; if autoplay is blocked, the real user-gesture
+        // unlock in the meeting page will retry startAudio().
         try {
             await room.startAudio();
-        } catch (error) {
-            // Expected when browser user activation has not happened yet.
-        }
+        } catch (error) {}
 
         this.room = room;
         this.connected = true;
@@ -146,29 +144,16 @@ class SmartMeetLiveKit {
             throw new Error('LiveKit room is not connected.');
         }
 
-        // The microphone button is a trusted user gesture. Use that gesture
-        // to unlock LiveKit remote playback before changing the local mic.
         try {
             await this.room.startAudio();
-        } catch (error) {
-            // Playback may already be unlocked or the browser may still require
-            // another gesture; the meeting page will retry on interaction.
-        }
-
-        // The mic button is a trusted user gesture, so use it to unlock
-        // LiveKit remote playback before changing the local microphone.
-        try {
-            await this.room.startAudio();
-        } catch (error) {
-            // The browser may already be unlocked or may require another gesture.
-        }
+        } catch (error) {}
 
         return this.room.localParticipant.setMicrophoneEnabled(
             Boolean(enabled),
             {
+                autoGainControl: true,
                 echoCancellation: true,
                 noiseSuppression: true,
-                autoGainControl: true,
                 channelCount: 1,
             },
             {
@@ -186,7 +171,13 @@ class SmartMeetLiveKit {
             throw new Error('LiveKit room is not connected.');
         }
 
-        return this.room.localParticipant.setCameraEnabled(Boolean(enabled));
+        try {
+            await this.room.startAudio();
+        } catch (error) {
+            // Audio playback unlock must never block camera publishing.
+        }
+
+        await this.room.localParticipant.setCameraEnabled(Boolean(enabled));
     }
 
     async setScreenShareEnabled(enabled) {

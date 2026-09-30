@@ -1420,8 +1420,6 @@
     }
 
     async function negotiatePeer(uid, iceRestart=false){
-        // Disabled: LiveKit owns all audio/video transport.
-        return false;
         uid=String(uid);
         const pc=peers[uid];
         if(!pc || pc.signalingState==='closed' || leftUsers.has(uid)) return false;
@@ -1457,8 +1455,6 @@
     }
 
     function armPeerWatchdog(uid, pc){
-        // Disabled: LiveKit handles reconnect/ICE/media recovery.
-        return;
         if(!pc || pc.signalingState==='closed') return;
         clearTimeout(pc.__connectWatchdog);
         pc.__connectWatchdog=setTimeout(()=>{
@@ -1542,8 +1538,6 @@
     }
 
     function createPeerConnection(uid){
-        // LiveKit is the sole media transport. Legacy mesh is intentionally disabled.
-        return null;
         uid=String(uid);
         if(uid===String(MY_USER_ID) || leftUsers.has(uid)) return null;
         let pc=peers[uid];
@@ -1851,8 +1845,6 @@
     }
 
     async function syncTracksToEveryPeer(){
-        // Disabled: there is no P2P peer mesh anymore.
-        return;
         const ids=Object.keys(peers).filter(uid=>{
             const pc=peers[uid];
             return pc && pc.signalingState!=='closed' && !leftUsers.has(String(uid));
@@ -2188,6 +2180,8 @@
         // LiveKit owns remote audio whenever the SFU is connected. The legacy
         // MediaStream/WebAudio path must not run in parallel with LiveKit.
         if(window.SmartMeetLiveKit?.connected){
+            // LiveKit owns remote audio completely. Legacy P2P/WebAudio must not
+            // attach, replace srcObject, boost, mute, or replay this element.
             const liveAudio=document.getElementById('audio-'+uid);
             if(liveAudio){
                 liveAudio.muted=false;
@@ -2315,7 +2309,7 @@
         await resumeMeetingAudioContext();
 
         const seen=new Set();
-        const audios=[...document.querySelectorAll('audio[id^="livekit-audio-"]')].filter(a=>{
+        const audios=[...document.querySelectorAll('audio[id^="audio-"]')].filter(a=>{
             if(!a.id || seen.has(a.id)) return false;
             seen.add(a.id);
             return true;
@@ -2388,8 +2382,6 @@
     function decodeSdp(sdp){ if(!sdp) return ''; try{ return decodeURIComponent(escape(atob(sdp))); }catch(e){ return sdp; } }
 
     async function handleOffer(from, data){
-        // Legacy Reverb SDP/ICE is ignored; Reverb is metadata-only.
-        return;
         console.log('[SmartMeet] received offer <-', from);
         const pc=createPeerConnection(from); if(!pc) return;
         const polite=isPolite(from);
@@ -2424,8 +2416,6 @@
         }catch(err){ console.warn('[SmartMeet] offer handling failed', from, err); }
     }
     async function handleAnswer(from, data){
-        // Legacy Reverb SDP/ICE is ignored; Reverb is metadata-only.
-        return;
         console.log('[SmartMeet] received answer <-', from);
         const pc=peers[from]; if(!pc) return;
         // An answer is valid only while our local offer is outstanding.
@@ -2450,8 +2440,6 @@
         }catch(err){ console.warn('[SmartMeet] answer handling failed', from, err); }
     }
     async function handleIceCandidate(from, data){
-        // Legacy Reverb SDP/ICE is ignored; Reverb is metadata-only.
-        return;
         const candidate=data.candidate; if(!candidate) return;
         const pc=peers[from];
         if(!pc || !pc.remoteDescription){ (pendingCandidates[from]=pendingCandidates[from]||[]).push(candidate); return; }
@@ -2712,9 +2700,8 @@
                 }
             }
 
-            // Transcript lines are delivered by the dedicated .transcript
-            // event only. Do not render transcript-line chat fallbacks.
             if(control==='transcript-line'){
+                handleRemoteTranscript(data.data || {});
                 return;
             }
             const controlUser=String(data.data?.userId || from);
@@ -4141,9 +4128,20 @@
                 });
                 clearTimeout(timer);
                 if(res.ok){
-                    // The transcript endpoint is the single realtime source.
-                    // Do not also send the same line through the Reverb signal/chat
-                    // channel; that created duplicate transcript entries.
+                    const transcriptId=`${MY_USER_ID}:${Date.now()}:${clean.slice(0,48)}`;
+                    try{
+                        await sendSignal('all','chat',{
+                            smartmeetControl:'transcript-line',
+                            transcriptId,
+                            userId:MY_USER_ID,
+                            userName:MY_NAME,
+                            userInitials:MY_INITIALS,
+                            text:clean,
+                            spokenAt:new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})
+                        });
+                    }catch(e){
+                        console.warn('[SmartMeet] transcript realtime fallback failed',e);
+                    }
                     return true;
                 }
                 console.error('[SmartMeet] transcript save failed',res.status);
@@ -4604,7 +4602,11 @@
         markOnline(uid);
         renderPeopleList();
 
-        // Reverb is metadata/presence only. Never create a legacy media peer.
+        // LiveKit owns media transport once connected.
+        // Keep Reverb presence/UI updates, but do not create a legacy mesh peer.
+        if(!window.SmartMeetLiveKit?.connected){
+            createPeerConnection(uid);
+        }
     }
     function sendPresence(to='all'){
         return sendSignal(to,'presence-response',{
@@ -4615,8 +4617,6 @@
         });
     }
     function connectToAll(){
-        // Disabled: LiveKit room membership replaces the P2P mesh.
-        return;
         Object.keys(knownParticipants).forEach(uid=>{
             uid=String(uid);
             if(uid===String(MY_USER_ID) || leftUsers.has(uid)) return;
@@ -4668,6 +4668,8 @@
     async function repairMeetingMedia(forcePresence=false){
         if(document.visibilityState!=='visible') return;
 
+        // Recovery is event-driven. Prevent overlapping repair/renegotiation storms
+        // when online/pageshow/visibility/device events fire close together.
         const now=Date.now();
         if(recoveryRunning) return;
         if(!forcePresence && now-lastRecoveryAt<1500) return;
@@ -4676,17 +4678,51 @@
 
         try{
             const liveKit=window.SmartMeetLiveKit;
+
             if(liveKit?.connected && liveKit?.room){
+                // LiveKit owns media transport. Keep SmartMeet presence/UI recovery,
+                // but do not rebuild the legacy mesh-P2P media connections.
                 syncExistingLiveKitParticipants();
                 requestPresence(forcePresence);
                 unlockRemoteMedia();
+
                 if(IS_MOBILE_BROWSER){
                     await recoverMobileLocalMedia();
                 }
-            }else{
-                // Do not fall back to the old P2P mesh. Wait for LiveKit and retry.
-                requestPresence(forcePresence);
+
+                return;
             }
+
+            connectToAll();
+
+            Object.keys(peers).forEach(uid=>{
+                const pc=peers[uid];
+                if(!pc || pc.connectionState==='closed' || leftUsers.has(String(uid))) return;
+
+                const connected=(
+                    pc.connectionState==='connected' ||
+                    pc.iceConnectionState==='connected' ||
+                    pc.iceConnectionState==='completed'
+                );
+
+                if(connected){
+                    attachRemoteStream(uid);
+                    return;
+                }
+
+                if(pc.connectionState==='failed' || pc.iceConnectionState==='failed'){
+                    if(shouldInitiate(uid)) restartPeer(uid);
+                    else requestPresence(false);
+                    return;
+                }
+
+                if(pc.connectionState==='connecting' || pc.iceConnectionState==='checking' || pc.connectionState==='disconnected'){
+                    armPeerWatchdog(uid,pc);
+                }
+            });
+
+            requestPresence(forcePresence);
+            unlockRemoteAudio();
         }finally{
             recoveryRunning=false;
         }
@@ -4739,126 +4775,59 @@
     }
 
     function attachLiveKitRemoteAudio(uid, liveKitTrack){
-        uid=String(uid);
-        if(!uid || !liveKitTrack || liveKitTrack.kind!=='audio') return;
+        uid = String(uid);
+        if(!uid || !liveKitTrack || liveKitTrack.kind !== 'audio') return;
 
-        const mediaTrack=liveKitTrack.mediaStreamTrack;
-        if(!mediaTrack) return;
-
-        // Keep LiveKit audio completely separate from the legacy P2P audio element.
-        // The old attachRemoteStream/WebAudio code still exists for compatibility;
-        // sharing audio-{uid} lets it overwrite LiveKit playback.
-        const legacyAudio=document.getElementById('audio-'+uid);
-        if(legacyAudio){
-            try{ legacyAudio.pause(); }catch(e){}
-            try{ legacyAudio.srcObject=null; }catch(e){}
-        }
-
-        const liveKitAudioId='livekit-audio-'+uid;
-        let audio=document.getElementById(liveKitAudioId);
+        let audio = document.getElementById('audio-' + uid);
         if(!audio){
-            audio=document.createElement('audio');
-            audio.id=liveKitAudioId;
-            audio.autoplay=true;
-            audio.playsInline=true;
-            audio.setAttribute('playsinline','');
-            audio.setAttribute('aria-hidden','true');
-            // Keep a real, active media element. Do not use display:none or
-            // move it off-screen; some browsers can block/restrict playback
-            // for fully hidden media elements.
-            audio.style.position='fixed';
-            audio.style.left='0';
-            audio.style.top='0';
-            audio.style.width='1px';
-            audio.style.height='1px';
-            audio.style.opacity='0.01';
-            audio.style.pointerEvents='none';
-            audio.style.zIndex='-1';
+            audio = document.createElement('audio');
+            audio.id = 'audio-' + uid;
+            audio.autoplay = true;
+            audio.playsInline = true;
+            audio.setAttribute('playsinline', '');
+            audio.setAttribute('aria-hidden', 'true');
+            audio.style.position = 'absolute';
+            audio.style.width = '1px';
+            audio.style.height = '1px';
+            audio.style.opacity = '0.01';
+            audio.style.pointerEvents = 'none';
+            audio.style.zIndex = '-1';
             document.body.appendChild(audio);
         }
 
-        // This element may have been created earlier by the legacy path.
-        // Reactivate it for native LiveKit playback and prevent a stale
-        // display:none state from surviving the LiveKit handoff.
-        audio.style.display='block';
-        audio.style.visibility='visible';
-        audio.style.position='fixed';
-        audio.style.left='0';
-        audio.style.top='0';
-        audio.style.width='1px';
-        audio.style.height='1px';
-        audio.style.opacity='0.01';
-        audio.style.pointerEvents='none';
-        audio.style.zIndex='-1';
+        audio.muted = false;
+        audio.defaultMuted = false;
+        audio.volume = 1.0;
+        audio.autoplay = true;
+        audio.playsInline = true;
 
-        // LiveKit is the ONLY remote audio source once connected. Never mix a
-        // legacy/P2P audio track with the LiveKit track for the same participant.
-        const stream=remoteStreams[uid];
-        if(stream){
-            stream.getAudioTracks().forEach(t=>{
-                if(t!==mediaTrack && !t.__smartMeetLiveKit){
-                    try{ stream.removeTrack(t); }catch(e){}
-                }
-            });
+        try {
+            liveKitTrack.attach(audio);
+            try { liveKitTrack.start(); } catch (e) {}
+            try { liveKitTrack.setVolume(1); } catch (e) {}
+            audio.__smartMeetLiveKitTrackId = liveKitTrack.sid || liveKitTrack.mediaStreamTrack?.id;
+        } catch (e) {
+            console.warn('[LiveKit] Remote audio attach failed:', e);
+            return;
         }
 
-        mediaTrack.__smartMeetLiveKit=true;
-        audio.autoplay=true;
-        audio.playsInline=true;
-        audio.muted=false;
-        audio.defaultMuted=false;
-        audio.volume=1;
-        audio.playbackRate=1;
-        try{ audio.preservesPitch=true; }catch(e){}
-
-        const currentId=audio.__smartMeetLiveKitTrackId;
-        if(currentId!==mediaTrack.sid && currentId!==mediaTrack.id){
-            // Detach any previous LiveKit audio from this single audio element.
-            try{ liveKitTrack.detach(audio); }catch(e){}
-            try{ audio.pause(); }catch(e){}
-            try{ audio.srcObject=null; }catch(e){}
-
-            // IMPORTANT: use LiveKit's native track.attach() path for remote
-            // audio. This avoids the custom WebAudio graph being suspended by
-            // browser autoplay policy and guarantees the subscribed LiveKit
-            // track is actually routed to the laptop speakers.
-            try{
-                // IMPORTANT: attach the LiveKit RemoteAudioTrack itself.
-                // mediaStreamTrack is only the browser MediaStreamTrack and does
-                // not own LiveKit's attach/detach lifecycle.
-                liveKitTrack.attach(audio);
-                try{ liveKitTrack.start(); }catch(e){}
-                try{ liveKitTrack.setVolume(1); }catch(e){}
-                audio.__smartMeetLiveKitTrackId=liveKitTrack.sid || mediaTrack.id;
-            }catch(error){
-                console.warn('[LiveKit] remote audio attach failed',error);
-                return;
-            }
-        }
-
-        const play=async()=>{
-            try{
-                await audio.play();
-            }catch(error){
-                // Browser autoplay can require a user gesture. Keep the audio
-                // element attached and let the existing unlock handler retry.
-                armAudioUnlock();
+        const playAudio = () => {
+            if (!audio || audio.muted) return;
+            audio.volume = 1.0;
+            if (audio.paused) {
+                audio.play().catch(() => armAudioUnlock());
             }
         };
 
-        if(mediaTrack.readyState==='live'){
-            void play();
-        }
+        playAudio();
 
-        if(!audio.__smartMeetLiveKitAudioBound){
-            audio.__smartMeetLiveKitAudioBound=true;
-            audio.addEventListener('canplay',()=>void play());
-            audio.addEventListener('loadedmetadata',()=>void play());
-            audio.addEventListener('stalled',()=>{
-                if(mediaTrack.readyState==='live') setTimeout(()=>void play(),100);
-            });
-            audio.addEventListener('waiting',()=>{
-                if(mediaTrack.readyState==='live') setTimeout(()=>void play(),100);
+        if(!audio.__smartMeetAudioBound){
+            audio.__smartMeetAudioBound = true;
+            audio.addEventListener('canplay', playAudio);
+            audio.addEventListener('loadedmetadata', playAudio);
+            audio.addEventListener('playing', () => {
+                audio.muted = false;
+                audio.volume = 1.0;
             });
         }
     }
