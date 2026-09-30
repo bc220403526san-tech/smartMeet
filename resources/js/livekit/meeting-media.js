@@ -99,6 +99,24 @@ class SmartMeetLiveKit {
             }));
         });
 
+        room.on(RoomEvent.TrackStreamStateChanged, (publication, streamState, participant) => {
+            window.dispatchEvent(new CustomEvent('smartmeet:livekit-track-stream-state-changed', {
+                detail: {
+                    publication,
+                    streamState,
+                    participant,
+                },
+            }));
+        });
+
+        room.on(RoomEvent.AudioPlaybackStatusChanged, () => {
+            window.dispatchEvent(new CustomEvent('smartmeet:livekit-audio-playback-changed', {
+                detail: {
+                    canPlaybackAudio: Boolean(room.canPlaybackAudio),
+                },
+            }));
+        });
+
         room.on(RoomEvent.ParticipantConnected, (participant) => {
             window.dispatchEvent(new CustomEvent('smartmeet:livekit-participant-connected', {
                 detail: { participant },
