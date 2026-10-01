@@ -672,17 +672,24 @@
     $palette     = ['#3b82f6,#06b6d4', '#8b5cf6,#ec4899', '#22c55e,#06b6d4', '#f59e0b,#ef4444', '#64748b,#334155', '#ec4899,#f59e0b'];
     $userInitials = strtoupper(substr(auth()->user()->name, 0, 1) . substr(strrchr(auth()->user()->name, ' ') ?: ' ', 1, 1));
     $tz = $meeting->timezone ?? 'Asia/Karachi';
-
-    // The actual room start is set by the controller when the first user enters.
-    // Never use the scheduled meeting time as the room timer start.
-    $startForCalc = $meeting->actual_start
-        ? \Carbon\Carbon::parse($meeting->actual_start)->utc()
-        : null;
-
-    $durationMinutes = max(1, (int) ($meeting->duration_minutes ?? $meeting->duration ?? 1));
-    $meetingEnd = $startForCalc
-        ? $startForCalc->copy()->addMinutes($durationMinutes)->utc()->toIso8601String()
-        : null;
+    $meetingEnd = null;
+    if (!empty($meeting->end_time)) {
+        $meetingEnd = \Carbon\Carbon::parse($meeting->end_time, $tz)->utc()->toIso8601String();
+    } else {
+        $durationMinutes = $meeting->duration_minutes ?? $meeting->duration ?? null;
+        if ($durationMinutes) {
+            // Use scheduled start + duration. Refresh/rejoin must not move the natural end time.
+            $startForCalc = \Carbon\Carbon::parse(
+                $meeting->date . ' ' . $meeting->time,
+                $tz
+            );
+            $meetingEnd = $startForCalc
+                ->copy()
+                ->addMinutes((int) $durationMinutes)
+                ->utc()
+                ->toIso8601String();
+        }
+    }
 @endphp
 <body>
 
@@ -834,16 +841,9 @@
     const ORGANIZER_AVATAR_URL = @json($organizerAvatarUrl ?? null);
     const ORGANIZER_JOINED   = @json($organizerJoined ?? false);
     const MEETING_END_TIME   = @json($meetingEnd);
-    const ACTUAL_START = @json($meeting->actual_start ? \Carbon\Carbon::parse($meeting->actual_start)->utc()->toIso8601String() : now('UTC')->toIso8601String());
+    const ACTUAL_START = @json($meeting->actual_start ? \Carbon\Carbon::parse($meeting->actual_start)->utc()->toIso8601String() : now()->utc()->toIso8601String());
     const COLORS = ['#3b82f6,#06b6d4','#8b5cf6,#ec4899','#22c55e,#06b6d4','#f59e0b,#ef4444','#64748b,#334155','#ec4899,#f59e0b'];
     const IS_MOBILE_BROWSER = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-
-    function liveKitOwnsMedia(){
-        return Boolean(
-            window.SmartMeetLiveKit?.isMediaOwner?.() ||
-            window.SmartMeetLiveKit?.connected
-        );
-    }
 
 
     /* ---------- Participant audit metadata (background only; no UI/layout changes) ---------- */
@@ -1023,39 +1023,14 @@
     });
 
     /* ---------- Timer ---------- */
-    // Keep the meeting timer tied to the real meeting start/end timestamps.
-    // It starts at 00:00:00, remains accurate after refresh/rejoin, and stops
-    // exactly at the configured meeting end time instead of drifting.
-    const meetingStartMs = Number.isFinite(new Date(ACTUAL_START).getTime())
-        ? new Date(ACTUAL_START).getTime()
-        : Date.now();
-    const meetingEndMs = MEETING_END_TIME
-        ? new Date(MEETING_END_TIME).getTime()
-        : null;
-
-    function getMeetingElapsedSeconds(){
-        const now = Date.now();
-        let elapsed = Math.max(0, Math.floor((now - meetingStartMs) / 1000));
-
-        if(Number.isFinite(meetingEndMs) && meetingEndMs >= meetingStartMs){
-            const maxElapsed = Math.floor((meetingEndMs - meetingStartMs) / 1000);
-            elapsed = Math.min(elapsed, Math.max(0, maxElapsed));
-        }
-
-        return elapsed;
-    }
-
-    function renderMeetingTimer(){
-        const seconds = getMeetingElapsedSeconds();
+    let seconds = Math.max(0, Math.floor((Date.now()-new Date(ACTUAL_START).getTime())/1000));
+    const meetingClockInterval=setInterval(()=>{
+        seconds++;
         const h=String(Math.floor(seconds/3600)).padStart(2,'0');
         const m=String(Math.floor((seconds%3600)/60)).padStart(2,'0');
         const s=String(seconds%60).padStart(2,'0');
-        const el=document.getElementById('timer');
-        if(el) el.textContent=`${h}:${m}:${s}`;
-    }
-
-    renderMeetingTimer();
-    const meetingClockInterval=setInterval(renderMeetingTimer,1000);
+        const el=document.getElementById('timer'); if(el) el.textContent=`${h}:${m}:${s}`;
+    },1000);
 
     function scheduleAutoEnd(){
         if(!MEETING_END_TIME) return;
@@ -1564,7 +1539,7 @@
 
     function createPeerConnection(uid){
         uid=String(uid);
-        if(liveKitOwnsMedia()) return null;
+        if(window.SmartMeetLiveKit?.isMediaOwner?.()) return null;
         if(uid===String(MY_USER_ID) || leftUsers.has(uid)) return null;
         let pc=peers[uid];
         if(pc && pc.signalingState!=='closed' && pc.connectionState!=='closed') return pc;
@@ -2133,7 +2108,7 @@
             // LiveKit is the media source of truth once the SFU connection is up.
             // A legacy P2P receiver may still exist briefly during migration, but
             // it must never outrank a subscribed LiveKit track.
-            if(liveKitOwnsMedia()){
+            if(window.SmartMeetLiveKit?.connected && kind==='audio'){
                 const liveKitTracks=cachedTracks
                     .filter(t=>t.kind===kind && t.__smartMeetLiveKit)
                     .sort((a,b)=>{
@@ -2205,7 +2180,7 @@
         // -------- Remote audio --------
         // LiveKit owns remote audio whenever the SFU is connected. The legacy
         // MediaStream/WebAudio path must not run in parallel with LiveKit.
-        if(liveKitOwnsMedia()){
+        if(window.SmartMeetLiveKit?.connected){
             // LiveKit owns remote audio completely. Legacy P2P/WebAudio must not
             // attach, replace srcObject, boost, mute, or replay this element.
             const liveAudio=document.getElementById('audio-'+uid);
@@ -2280,59 +2255,40 @@
         const video=document.getElementById('rvideo-'+uid);
         const avatar=document.getElementById('avatar-'+uid);
         if(video){
+            const wantedVideo=bestVideo?[bestVideo]:[];
+            if(!sameTrackSet(video.srcObject,wantedVideo)){
+                video.srcObject=new MediaStream(wantedVideo);
+            }
+
             video.muted=true;
             video.autoplay=true;
             video.playsInline=true;
             video.setAttribute('playsinline','');
 
-            // LiveKit RemoteVideoTrack.attach() is the authoritative rendering
-            // path for SFU video. Do not replace its srcObject with a legacy
-            // MediaStream, because doing so can leave the remote tile blank.
-            const liveKitVideoTrack = video.__smartMeetLiveKitTrack;
-            if(liveKitOwnsMedia() && liveKitVideoTrack){
-                const liveMediaTrack = liveKitVideoTrack.mediaStreamTrack;
-                const show = Boolean(
-                    liveMediaTrack &&
-                    liveMediaTrack.readyState === 'live' &&
-                    !liveMediaTrack.muted
-                );
+            // Actual received frames are the source of truth.
+            // A stale camera-status signal must not hide a real unmuted track.
+            const show=Boolean(bestVideo && bestVideo.readyState==='live' && !bestVideo.muted && camStatus[uid] !== false);
+            video.style.display=show?'block':'none';
+            if(avatar) avatar.style.display=show?'none':'flex';
 
-                video.style.display=show?'block':'none';
-                if(avatar) avatar.style.display=show?'none':'flex';
-
-                if(show){
-                    video.play().catch(()=>{});
-                }
-
-                camStatus[uid]=show;
-            }else{
-                const wantedVideo=bestVideo?[bestVideo]:[];
-                if(!sameTrackSet(video.srcObject,wantedVideo)){
-                    video.srcObject=new MediaStream(wantedVideo);
-                }
-
-                // Actual received frames are the source of truth.
-                // A stale camera-status signal must not hide a real live track.
-                const show=Boolean(bestVideo && bestVideo.readyState==='live' && !bestVideo.muted);
-                video.style.display=show?'block':'none';
-                if(avatar) avatar.style.display=show?'none':'flex';
-
-                if(show){
-                    const playVideo=()=>video.play().catch(()=>{});
-                    playVideo();
-                    setTimeout(playVideo,120);
-                    setTimeout(playVideo,600);
-                    if(!video.__smartMeetPlayBound){
-                        video.__smartMeetPlayBound=true;
-                        video.addEventListener('loadedmetadata',()=>video.play().catch(()=>{}));
-                        video.addEventListener('canplay',()=>video.play().catch(()=>{}));
-                    }
-                }
-
-                if(bestVideo && bestVideo.readyState==='live' && !bestVideo.muted){
-                    camStatus[uid]=true;
+            if(show){
+                const playVideo=()=>video.play().catch(()=>{});
+                playVideo();
+                setTimeout(playVideo,120);
+                setTimeout(playVideo,600);
+                if(!video.__smartMeetPlayBound){
+                    video.__smartMeetPlayBound=true;
+                    video.addEventListener('loadedmetadata',()=>video.play().catch(()=>{}));
+                    video.addEventListener('canplay',()=>video.play().catch(()=>{}));
                 }
             }
+        }
+
+        if(bestVideo && bestVideo.readyState==='live'){
+            // A muted remote track can stay muted indefinitely when the remote camera
+            // is OFF. Never poll attachRemoteStream() recursively here: that created
+            // an endless ~180ms DOM/media loop per peer and could freeze Chromium.
+            if(!bestVideo.muted && camStatus[uid] !== false) camStatus[uid]=true;
         }
     }
 
@@ -2946,7 +2902,7 @@
         // Ignore only legacy mesh WebRTC signaling; Reverb still handles
         // presence, chat, moderation and UI status events.
         if(
-            window.SmartMeetLiveKit?.connected &&
+            window.SmartMeetLiveKit?.isMediaOwner?.() &&
             ['reconnect-request','offer','answer','ice-candidate'].includes(data.type)
         ){
             console.log('[LiveKit] ignored legacy P2P signal:', data.type, 'from', from);
@@ -3614,7 +3570,7 @@
             screenTrack=null;
             screenStream=null;
 
-            if(liveKitOwnsMedia()){
+            if(liveKit?.connected && liveKit?.room){
                 try{
                     await liveKit.setScreenShareEnabled(false);
                 }catch(err){
@@ -3676,7 +3632,7 @@
 
             // Once LiveKit is connected, it owns microphone/camera recovery.
             // Do not recreate or republish the old mesh-P2P local tracks.
-            if(liveKitOwnsMedia() && liveKit?.room){
+            if(liveKit?.isMediaOwner?.() && liveKit?.room){
                 try{
                     if(isMicOn){
                         await liveKit.setMicrophoneEnabled(true);
@@ -4610,25 +4566,12 @@
         knownParticipants[uid]=info;
         leftUsers.delete(uid);
 
-        const isOrganizer = Boolean(info.isOrganizer || uid===String(ORGANIZER_ID));
-        const existingTile = document.getElementById('tile-'+uid);
-        if(existingTile){
-            const nameEl = existingTile.querySelector('.tile-name');
-            if(nameEl){
-                nameEl.innerHTML = `${isOrganizer ? '<i class="fa fa-crown" style="color:#fbbf24;font-size:10px;"></i> ' : ''}${escapeHtml(info.name)}<span class="role-badge ${isOrganizer?'organizer':'participant'}">${isOrganizer?'Organizer':'Participant'}</span>`;
-            }
-            const avatar = existingTile.querySelector('#avatar-'+uid);
-            if(avatar && !info.avatarUrl){
-                avatar.textContent = escapeHtml(info.initials || initialsOf(info.name));
-            }
-        }else{
-            addParticipantTile(
-                uid,
-                info.name,
-                info.initials,
-                isOrganizer
-            );
-        }
+        addParticipantTile(
+            uid,
+            info.name,
+            info.initials,
+            Boolean(info.isOrganizer || uid===String(ORGANIZER_ID))
+        );
 
         markOnline(uid);
         renderPeopleList();
@@ -4637,6 +4580,9 @@
     function unregisterLiveKitParticipant(uid){
         uid=String(uid);
         if(uid===String(MY_USER_ID)) return;
+
+        try{ disposeRemoteAudioBoost(uid); }catch(e){}
+        document.getElementById('audio-'+uid)?.remove();
 
         removeParticipantTile(uid, false);
         markOffline(uid);
@@ -4662,7 +4608,7 @@
 
         // LiveKit owns media transport once connected.
         // Keep Reverb presence/UI updates, but do not create a legacy mesh peer.
-        if(!liveKitOwnsMedia()){
+        if(!window.SmartMeetLiveKit?.isMediaOwner?.()){
             createPeerConnection(uid);
         }
     }
@@ -4675,7 +4621,7 @@
         });
     }
     function connectToAll(){
-        if(liveKitOwnsMedia()) return;
+        if(window.SmartMeetLiveKit?.isMediaOwner?.()) return;
         Object.keys(knownParticipants).forEach(uid=>{
             uid=String(uid);
             if(uid===String(MY_USER_ID) || leftUsers.has(uid)) return;
@@ -4738,7 +4684,7 @@
         try{
             const liveKit=window.SmartMeetLiveKit;
 
-            if(liveKitOwnsMedia()){
+            if(liveKit?.isMediaOwner?.()){
                 // LiveKit owns media transport. Keep SmartMeet presence/UI recovery,
                 // but do not rebuild the legacy mesh-P2P media connections.
                 syncExistingLiveKitParticipants();
@@ -4945,44 +4891,15 @@
             return;
         }
 
-        // VIDEO: use LiveKit's native RemoteVideoTrack.attach() path.
-        // This avoids replacing the SFU track with a reconstructed MediaStream.
-        let video = document.getElementById('rvideo-'+uid);
-        let avatar = document.getElementById('avatar-'+uid);
-
-        if(!video){
-            const info=knownParticipants[uid];
-            addParticipantTile(
-                uid,
-                info?.name || ('User '+uid),
-                info?.initials || initialsOf(info?.name || ('User '+uid)),
-                Boolean(info?.isOrganizer)
-            );
-            video=document.getElementById('rvideo-'+uid);
-            avatar=document.getElementById('avatar-'+uid);
-        }
-
-        const previousTrack = video?.__smartMeetLiveKitTrack;
-        if(previousTrack && previousTrack !== track){
-            try{ previousTrack.detach(video); }catch(e){}
-        }
+        // VIDEO keeps the existing participant/video rendering path.
+        const stream=getOrCreateRemoteStream(uid);
+        stream.getTracks()
+            .filter(t=>t.__smartMeetLiveKit && t.kind==='video' && t.id!==mediaTrack.id)
+            .forEach(t=>{ try{ stream.removeTrack(t); }catch(e){} });
 
         mediaTrack.__smartMeetLiveKit=true;
-
-        if(video){
-            try{
-                track.attach(video);
-                video.__smartMeetLiveKitTrack=track;
-                video.muted=true;
-                video.autoplay=true;
-                video.playsInline=true;
-                video.setAttribute('playsinline','');
-                video.style.display=mediaTrack.muted?'none':'block';
-                if(avatar) avatar.style.display=mediaTrack.muted?'flex':'none';
-                if(!mediaTrack.muted) video.play().catch(()=>{});
-            }catch(error){
-                console.warn('[LiveKit] Remote video attach failed:', error);
-            }
+        if(!stream.getTracks().some(t=>t.id===mediaTrack.id)){
+            try{ stream.addTrack(mediaTrack); }catch(e){}
         }
 
         camStatus[uid]=!mediaTrack.muted;
@@ -4991,45 +4908,22 @@
             mediaTrack.__smartMeetLiveKitStateBound=true;
             mediaTrack.addEventListener('mute',()=>{
                 camStatus[uid]=false;
-                const currentVideo=document.getElementById('rvideo-'+uid);
-                const currentAvatar=document.getElementById('avatar-'+uid);
-                if(currentVideo){
-                    currentVideo.style.display='none';
-                }
-                if(currentAvatar){
-                    currentAvatar.style.display='flex';
-                }
+                attachRemoteStream(uid);
                 renderPersonRow(uid);
             });
             mediaTrack.addEventListener('unmute',()=>{
                 camStatus[uid]=true;
-                const currentVideo=document.getElementById('rvideo-'+uid);
-                const currentAvatar=document.getElementById('avatar-'+uid);
-                if(currentVideo){
-                    currentVideo.style.display='block';
-                    currentVideo.play().catch(()=>{});
-                }
-                if(currentAvatar){
-                    currentAvatar.style.display='none';
-                }
+                attachRemoteStream(uid);
                 renderPersonRow(uid);
             });
             mediaTrack.addEventListener('ended',()=>{
                 camStatus[uid]=false;
-                const currentVideo=document.getElementById('rvideo-'+uid);
-                const currentAvatar=document.getElementById('avatar-'+uid);
-                if(currentVideo){
-                    try{ track.detach(currentVideo); }catch(e){}
-                    currentVideo.__smartMeetLiveKitTrack=null;
-                    currentVideo.style.display='none';
-                }
-                if(currentAvatar){
-                    currentAvatar.style.display='flex';
-                }
+                attachRemoteStream(uid);
                 renderPersonRow(uid);
             });
         }
 
+        attachRemoteStream(uid);
         console.log('[LiveKit] remote video attached', uid);
     }
 
@@ -5060,19 +4954,7 @@
             if(existing){ try{ stream.removeTrack(existing); }catch(e){} }
         }
 
-        if(mediaTrack?.kind==='video'){
-            const video=document.getElementById('rvideo-'+uid);
-            if(video && video.__smartMeetLiveKitTrack===track){
-                try{ track.detach(video); }catch(e){}
-                video.__smartMeetLiveKitTrack=null;
-                video.srcObject=null;
-                video.style.display='none';
-            }
-            const avatar=document.getElementById('avatar-'+uid);
-            if(avatar) avatar.style.display='flex';
-            camStatus[uid]=false;
-        }
-
+        if(mediaTrack?.kind==='video') camStatus[uid]=false;
         attachRemoteStream(uid);
         console.log('[LiveKit] remote video detached', uid);
     }

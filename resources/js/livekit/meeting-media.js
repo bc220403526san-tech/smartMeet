@@ -20,43 +20,6 @@ class SmartMeetLiveKit {
         return this.mediaMode === 'livekit';
     }
 
-    normalizeServerUrl(serverUrl) {
-        let value = String(serverUrl || '').trim();
-
-        if (!value) {
-            throw new Error('LiveKit server URL is missing.');
-        }
-
-        // The LiveKit JS SDK expects the base WebSocket server URL, for example
-        // wss://livekit.smartmeet.live. It builds the /rtc connection endpoint
-        // itself. Older backend values may contain /rtc or /rtc/v1 already;
-        // remove those suffixes to prevent malformed URLs such as
-        // /rtc/v1/access_token=....
-        if (!/^wss?:\/\//i.test(value)) {
-            value = `wss://${value}`;
-        }
-
-        try {
-            const url = new URL(value);
-
-            if (url.protocol === 'http:') url.protocol = 'ws:';
-            if (url.protocol === 'https:') url.protocol = 'wss:';
-
-            const path = url.pathname.replace(/\/+$/, '');
-
-            if (path === '/rtc' || path === '/rtc/v1') {
-                url.pathname = '';
-            }
-
-            url.search = '';
-            url.hash = '';
-
-            return url.toString().replace(/\/$/, '');
-        } catch (error) {
-            throw new Error(`Invalid LiveKit server URL: ${value}`);
-        }
-    }
-
     async connect({ tokenUrl, csrfToken }) {
         if (this.room) {
             return this.room;
@@ -82,8 +45,9 @@ class SmartMeetLiveKit {
             throw new Error('Invalid LiveKit token response.');
         }
 
-        const serverUrl = this.normalizeServerUrl(data.server_url);
-
+        // LiveKit is the single owner of meeting media. Voice capture is tuned
+        // for real-time speech: mono, echo cancellation, noise suppression,
+        // AGC and voice isolation where the browser supports it.
         const room = new Room({
             adaptiveStream: true,
             dynacast: true,
@@ -158,18 +122,10 @@ class SmartMeetLiveKit {
             }));
         });
 
-        try {
-            await room.connect(serverUrl, data.token, {
-                autoSubscribe: true,
-            });
-        } catch (error) {
-            try {
-                await room.disconnect();
-            } catch (disconnectError) {}
+        await room.connect(data.server_url, data.token);
 
-            throw error;
-        }
-
+        // Try immediately; if autoplay is blocked, the real user-gesture
+        // unlock in the meeting page will retry startAudio().
         try {
             await room.startAudio();
         } catch (error) {}
