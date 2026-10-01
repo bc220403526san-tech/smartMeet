@@ -5257,25 +5257,36 @@
         const avatar=document.getElementById('avatar-'+uid);
         if(!video) return;
 
-        camStatus[uid]=!mediaTrack.muted;
+        // LiveKit is the only remote-media renderer. Do not wait for the native
+        // MediaStreamTrack to report a particular readyState: RemoteVideoTrack
+        // can be attached before the first frame is available, and LiveKit will
+        // update the element as frames arrive.
         mediaTrack.__smartMeetLiveKit=true;
+        video.autoplay=true;
+        video.playsInline=true;
+        video.muted=true;
+        video.setAttribute('playsinline','');
 
         const showVideo=()=>{
-            const live=mediaTrack.readyState==='live' && !mediaTrack.muted;
-            if(live){
+            const muted=Boolean(mediaTrack.muted);
+            camStatus[uid]=!muted;
+
+            if(!muted){
                 video.style.display='block';
                 if(avatar) avatar.style.display='none';
-                video.muted=true;
-                video.autoplay=true;
-                video.playsInline=true;
-                video.setAttribute('playsinline','');
-                try{ track.attach(video); }catch(e){ console.warn('[LiveKit] remote video attach failed:',e); }
-                video.play().catch(()=>{});
+                try{
+                    track.attach(video);
+                    const playPromise=video.play();
+                    if(playPromise?.catch) playPromise.catch(()=>{});
+                }catch(e){
+                    console.warn('[LiveKit] remote video attach failed:',e);
+                }
             }else{
+                try{ track.detach(video); }catch(e){}
                 video.style.display='none';
                 if(avatar) avatar.style.display='flex';
-                try{ track.detach(video); }catch(e){}
             }
+            renderPersonRow(uid);
         };
 
         if(!mediaTrack.__smartMeetLiveKitStateBound){
@@ -5290,7 +5301,6 @@
             mediaTrack.addEventListener('unmute',()=>{
                 camStatus[uid]=true;
                 showVideo();
-                renderPersonRow(uid);
             });
             mediaTrack.addEventListener('ended',()=>{
                 camStatus[uid]=false;
@@ -5301,8 +5311,26 @@
             });
         }
 
-        showVideo();
-        console.log('[LiveKit] remote video attached', uid);
+        // Attach immediately. The LiveKit track remains attached while frames
+        // are being delivered, instead of falling back to the old P2P renderer.
+        try{
+            track.attach(video);
+            const playPromise=video.play();
+            if(playPromise?.catch) playPromise.catch(()=>{});
+        }catch(e){
+            console.warn('[LiveKit] remote video attach failed:',e);
+        }
+        if(mediaTrack.muted){
+            video.style.display='none';
+            if(avatar) avatar.style.display='flex';
+            camStatus[uid]=false;
+        }else{
+            video.style.display='block';
+            if(avatar) avatar.style.display='none';
+            camStatus[uid]=true;
+        }
+        renderPersonRow(uid);
+        console.log('[LiveKit] remote video attached', uid, 'track=', track.sid || mediaTrack.id);
     }
 
     function detachLiveKitRemoteTrack(track, participant){
@@ -5629,4 +5657,3 @@
 
 </body>
 </html>
-
