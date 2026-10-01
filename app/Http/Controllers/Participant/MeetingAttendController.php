@@ -43,9 +43,26 @@ class MeetingAttendController extends Controller
 
         /*
          * actual_start is the real room start, not the scheduled start.
-         * This keeps the shared room timer at 00:00:00 for the first join.
+         * If nobody is currently inside the room, the first person entering
+         * starts a fresh room timer from 00:00:00. This also repairs legacy
+         * active meetings whose actual_start was incorrectly saved as the
+         * scheduled start time by the previous implementation.
          */
-        if ($meeting->actual_start === null) {
+        $meeting->loadMissing(['participants', 'organizer']);
+
+        $organizerCurrentlyJoined =
+            $meeting->organizer_joined_at !== null
+            && (
+                $meeting->organizer_left_at === null
+                || Carbon::parse($meeting->organizer_joined_at)
+                    ->gt(Carbon::parse($meeting->organizer_left_at))
+            );
+
+        $participantCurrentlyJoined = $meeting->participants->contains(
+            fn ($participant) => $this->participantIsCurrentlyJoined($participant)
+        );
+
+        if (! $organizerCurrentlyJoined && ! $participantCurrentlyJoined) {
             $meeting->update([
                 'actual_start' => now($timezone)->utc(),
             ]);

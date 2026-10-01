@@ -751,9 +751,11 @@
 
     // The actual room start is set once by the first user who enters the room.
     // The meeting duration is measured from that real start, not from the scheduled clock time.
+    // The controller always sets actual_start when the first person enters the room.
+    // If it is ever missing, use the current server time rather than the scheduled time.
     $startForCalc = $meeting->actual_start
         ? \Carbon\Carbon::parse($meeting->actual_start)->utc()
-        : \Carbon\Carbon::parse($meeting->date . ' ' . $meeting->time, $tz)->utc();
+        : now('UTC');
 
     $durationMinutes = max(1, (int) ($meeting->duration_minutes ?? $meeting->duration ?? 1));
     $meetingEnd = $startForCalc
@@ -949,7 +951,7 @@
     const CSRF            = @json(csrf_token());
     const ALL_PARTICIPANTS = @json($allParticipants);
     const MEETING_END_TIME   = @json($meetingEnd);
-    const ACTUAL_START = @json($meeting->actual_start ? \Carbon\Carbon::parse($meeting->actual_start)->utc()->toIso8601String() : now()->utc()->toIso8601String());
+    const ACTUAL_START = @json($meeting->actual_start ? \Carbon\Carbon::parse($meeting->actual_start)->utc()->toIso8601String() : now('UTC')->toIso8601String());
     const COLORS = ['#3b82f6,#06b6d4','#8b5cf6,#ec4899','#22c55e,#06b6d4','#f59e0b,#ef4444','#64748b,#334155','#ec4899,#f59e0b'];
     const IS_MOBILE_BROWSER = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
