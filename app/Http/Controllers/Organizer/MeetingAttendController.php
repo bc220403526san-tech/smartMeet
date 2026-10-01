@@ -208,17 +208,18 @@ class MeetingAttendController extends Controller
             return response()->json(['status' => $meeting->status], 422);
         }
 
-        // Never fall back to the scheduled meeting time here.
-        // The room timer starts only when the first person actually enters.
-        if ($meeting->actual_start === null) {
-            return response()->json([
-                'status' => $meeting->status,
-                'message' => 'Meeting room has not been started yet.',
-            ], 422);
-        }
-
-        $start = Carbon::parse($meeting->actual_start)->utc();
-        $meetingEnd = $start->copy()->addMinutes(max(1, (int) $meeting->duration));
+        // The meeting has one fixed scheduled end time.
+        // A late joiner gets only the remaining time; joining late must
+        // never extend the original meeting end time.
+        $timezone = $meeting->timezone ?: 'Asia/Karachi';
+        $scheduledStart = Carbon::parse(
+            $meeting->date . ' ' . $meeting->time,
+            $timezone
+        );
+        $meetingEnd = $scheduledStart
+            ->copy()
+            ->addMinutes(max(1, (int) $meeting->duration))
+            ->utc();
 
         if (now('UTC')->lt($meetingEnd)) {
             return response()->json([
