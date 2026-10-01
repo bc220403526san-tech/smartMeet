@@ -5356,10 +5356,11 @@
         });
 
         window.addEventListener('smartmeet:livekit-track-stream-state-changed', event=>{
-            const track=event.detail?.publication?.track;
+            const publication=event.detail?.publication;
+            const track=publication?.track;
             const participant=event.detail?.participant;
-            if(track?.kind==='audio' && event.detail?.streamState==='active'){
-                attachLiveKitRemoteAudio(liveKitMediaUserId(participant), track);
+            if(event.detail?.streamState==='active' && track){
+                attachLiveKitRemoteTrack(track, participant);
                 unlockRemoteMedia();
             }
         });
@@ -5376,11 +5377,7 @@
             const room=window.SmartMeetLiveKit?.room;
             if(!room) return;
             room.remoteParticipants.forEach(participant=>{
-                participant.trackPublications?.forEach(publication=>{
-                    if(publication.track){
-                        attachLiveKitRemoteTrack(publication.track, participant);
-                    }
-                });
+                syncLiveKitRemoteTracks(participant);
             });
             unlockRemoteMedia();
         });
@@ -5401,13 +5398,35 @@
         liveKitPresenceBound=true;
 
         window.addEventListener('smartmeet:livekit-participant-connected', event=>{
-            const uid=liveKitUserId(event.detail?.participant);
-            if(uid) registerLiveKitParticipant(uid, event.detail?.participant);
+            const participant=event.detail?.participant;
+            const uid=liveKitUserId(participant);
+            if(uid) registerLiveKitParticipant(uid, participant);
+            syncLiveKitRemoteTracks(participant);
         });
 
         window.addEventListener('smartmeet:livekit-participant-disconnected', event=>{
             const uid=liveKitUserId(event.detail?.participant);
             if(uid) unregisterLiveKitParticipant(uid);
+        });
+    }
+
+    function syncLiveKitRemoteTracks(participant){
+        if(!participant) return;
+
+        participant.trackPublications?.forEach(publication=>{
+            // Keep remote media explicitly subscribed. This is important when a
+            // participant publishes camera before another user finishes joining.
+            try{
+                if(typeof publication.setSubscribed === 'function' && !publication.isSubscribed){
+                    publication.setSubscribed(true);
+                }
+            }catch(error){
+                console.warn('[LiveKit] remote track subscribe request failed:', error);
+            }
+
+            if(publication.track){
+                attachLiveKitRemoteTrack(publication.track, participant);
+            }
         });
     }
 
@@ -5418,6 +5437,7 @@
         room.remoteParticipants.forEach(participant=>{
             const uid=liveKitUserId(participant);
             if(uid) registerLiveKitParticipant(uid, participant);
+            syncLiveKitRemoteTracks(participant);
         });
     }
 
