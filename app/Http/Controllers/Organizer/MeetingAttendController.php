@@ -38,12 +38,30 @@ class MeetingAttendController extends Controller
 
         /*
          * actual_start is the real room start, not the scheduled start.
-         * This keeps the room timer at 00:00:00 when the first person enters.
+         * If nobody is currently inside the room, the first person entering
+         * starts a fresh room timer from 00:00:00. This also repairs legacy
+         * active meetings whose actual_start was incorrectly saved as the
+         * scheduled start time by the previous implementation.
          */
-        if ($meeting->actual_start === null) {
+        $meeting->loadMissing('participants');
+
+        $organizerCurrentlyJoined =
+            $meeting->organizer_joined_at !== null
+            && (
+                $meeting->organizer_left_at === null
+                || Carbon::parse($meeting->organizer_joined_at)
+                    ->gt(Carbon::parse($meeting->organizer_left_at))
+            );
+
+        $participantCurrentlyJoined = $meeting->participants->contains(
+            fn ($participant) => $this->participantIsCurrentlyJoined($participant)
+        );
+
+        if (! $organizerCurrentlyJoined && ! $participantCurrentlyJoined) {
             $meeting->update([
                 'actual_start' => now($timezone)->utc(),
             ]);
+            $meeting->refresh();
         }
 
         $meeting->update([
@@ -190,10 +208,16 @@ class MeetingAttendController extends Controller
             return response()->json(['status' => $meeting->status], 422);
         }
 
-        $timezone = $meeting->timezone ?: 'Asia/Karachi';
-        $start = $meeting->actual_start
-            ? Carbon::parse($meeting->actual_start)->utc()
-            : Carbon::parse($meeting->date . ' ' . $meeting->time, $timezone)->utc();
+        // Never fall back to the scheduled meeting time here.
+        // The room timer starts only when the first person actually enters.
+        if ($meeting->actual_start === null) {
+            return response()->json([
+                'status' => $meeting->status,
+                'message' => 'Meeting room has not been started yet.',
+            ], 422);
+        }
+
+        $start = Carbon::parse($meeting->actual_start)->utc();
         $meetingEnd = $start->copy()->addMinutes(max(1, (int) $meeting->duration));
 
         if (now('UTC')->lt($meetingEnd)) {

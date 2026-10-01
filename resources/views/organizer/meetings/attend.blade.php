@@ -748,39 +748,17 @@
     $palette     = ['#3b82f6,#06b6d4', '#8b5cf6,#ec4899', '#22c55e,#06b6d4', '#f59e0b,#ef4444', '#64748b,#334155', '#ec4899,#f59e0b'];
     $userInitials = strtoupper(substr(auth()->user()->name, 0, 1) . substr(strrchr(auth()->user()->name, ' ') ?: ' ', 1, 1));
     $tz = $meeting->timezone ?? 'Asia/Karachi';
-    $meetingEnd = null;
-    $startForCalc = \Carbon\Carbon::parse(
-        $meeting->date . ' ' . $meeting->time,
-        $tz
-    );
 
-    if (!empty($meeting->end_time)) {
-        $rawEndTime = trim((string) $meeting->end_time);
+    // The actual room start is set by the controller when the first user enters.
+    // Never use the scheduled meeting time as the room timer start.
+    $startForCalc = $meeting->actual_start
+        ? \Carbon\Carbon::parse($meeting->actual_start)->utc()
+        : null;
 
-        // end_time is commonly stored as HH:MM[:SS]. Anchor time-only values
-        // to the meeting date so the browser receives the correct absolute end.
-        if (preg_match('/^\d{1,2}:\d{2}(?::\d{2})?$/', $rawEndTime)) {
-            $meetingEnd = \Carbon\Carbon::parse(
-                $meeting->date . ' ' . $rawEndTime,
-                $tz
-            )->utc()->toIso8601String();
-        } else {
-            $meetingEnd = \Carbon\Carbon::parse(
-                $rawEndTime,
-                $tz
-            )->utc()->toIso8601String();
-        }
-    } else {
-        $durationMinutes = $meeting->duration_minutes ?? $meeting->duration ?? null;
-        if ($durationMinutes) {
-            // Use scheduled start + duration. Refresh/rejoin must not move the natural end time.
-            $meetingEnd = $startForCalc
-                ->copy()
-                ->addMinutes((int) $durationMinutes)
-                ->utc()
-                ->toIso8601String();
-        }
-    }
+    $durationMinutes = max(1, (int) ($meeting->duration_minutes ?? $meeting->duration ?? 1));
+    $meetingEnd = $startForCalc
+        ? $startForCalc->copy()->addMinutes($durationMinutes)->utc()->toIso8601String()
+        : null;
 @endphp
 <body>
 
@@ -969,7 +947,7 @@
     const CSRF            = @json(csrf_token());
     const ALL_PARTICIPANTS = @json($allParticipants);
     const MEETING_END_TIME   = @json($meetingEnd);
-    const ACTUAL_START = @json($meeting->actual_start ? \Carbon\Carbon::parse($meeting->actual_start)->utc()->toIso8601String() : now()->utc()->toIso8601String());
+    const ACTUAL_START = @json($meeting->actual_start ? \Carbon\Carbon::parse($meeting->actual_start)->utc()->toIso8601String() : now('UTC')->toIso8601String());
     const COLORS = ['#3b82f6,#06b6d4','#8b5cf6,#ec4899','#22c55e,#06b6d4','#f59e0b,#ef4444','#64748b,#334155','#ec4899,#f59e0b'];
     const IS_MOBILE_BROWSER = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
