@@ -34,15 +34,15 @@ class MeetingAttendController extends Controller
         }
 
         $user = auth()->user();
+        $timezone = $meeting->timezone ?: 'Asia/Karachi';
 
+        /*
+         * actual_start is the real room start, not the scheduled start.
+         * This keeps the room timer at 00:00:00 when the first person enters.
+         */
         if ($meeting->actual_start === null) {
-            $scheduledStart = Carbon::parse(
-                $meeting->date . ' ' . $meeting->time,
-                $meeting->timezone ?: 'Asia/Karachi'
-            )->utc();
-
             $meeting->update([
-                'actual_start' => $scheduledStart,
+                'actual_start' => now($timezone)->utc(),
             ]);
         }
 
@@ -121,18 +121,13 @@ class MeetingAttendController extends Controller
         $type = $validated['type'];
         $data = $validated['data'];
 
-        /*
-         * Realtime chat identity is server-authenticated. Normal chat, typing,
-         * and seen receipts may not impersonate another meeting user.
-         * Organizer moderation controls intentionally keep their existing
-         * target userId payload unchanged.
-         */
         $isChatControl = $type === 'chat' && filled($data['smartmeetControl'] ?? null);
         if (in_array($type, ['chat', 'chat-typing', 'chat-seen'], true) && ! $isChatControl) {
             $user = auth()->user();
             $data['userId'] = $fromUserId;
             $data['name'] = $user?->name ?: 'User';
         }
+
         $broadcastTypes = ['chat','chat-typing','chat-seen','mic-status','camera-status','presence-request','user-joined','user-left','meeting-cancelled','meeting-ended'];
 
         if (in_array($type, $broadcastTypes, true)) {
@@ -174,16 +169,12 @@ class MeetingAttendController extends Controller
     {
         $this->authorizeOrganizer($meeting);
         $user = auth()->user();
-
-        // PRESENCE ONLY. Leave / refresh / back / tab close NEVER changes meetings.status.
         $meeting->update(['organizer_left_at' => now()]);
-
         $this->broadcastSignal($meeting, (string) $user->id, 'all', 'user-left', [
             'userId' => (string) $user->id,
             'name' => $user->name,
             'isOrganizer' => true,
         ]);
-
         return response()->json(['status' => 'left']);
     }
 
@@ -200,21 +191,21 @@ class MeetingAttendController extends Controller
         }
 
         $timezone = $meeting->timezone ?: 'Asia/Karachi';
-        $scheduledEnd = Carbon::parse(
-            $meeting->date . ' ' . $meeting->time,
-            $timezone
-        )->utc()->addMinutes((int) $meeting->duration);
+        $start = $meeting->actual_start
+            ? Carbon::parse($meeting->actual_start)->utc()
+            : Carbon::parse($meeting->date . ' ' . $meeting->time, $timezone)->utc();
+        $meetingEnd = $start->copy()->addMinutes(max(1, (int) $meeting->duration));
 
-        if (now('UTC')->lt($scheduledEnd)) {
+        if (now('UTC')->lt($meetingEnd)) {
             return response()->json([
                 'status' => $meeting->status,
-                'message' => 'Meeting scheduled time has not ended yet.',
+                'message' => 'Meeting duration has not ended yet.',
             ], 422);
         }
 
         Meeting::query()->whereKey($meeting->id)
             ->whereIn('status', ['active', 'live'])
-            ->update(['status' => 'completed']);
+            ->update(['status' => 'ended']);
 
         $meeting->refresh();
         return response()->json(['status' => $meeting->status]);
@@ -271,4 +262,3 @@ class MeetingAttendController extends Controller
         return strtoupper($initials);
     }
 }
-

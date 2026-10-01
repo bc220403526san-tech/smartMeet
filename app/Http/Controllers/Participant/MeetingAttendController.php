@@ -39,6 +39,18 @@ class MeetingAttendController extends Controller
 
         $user = auth()->user();
         $now = now();
+        $timezone = $meeting->timezone ?: 'Asia/Karachi';
+
+        /*
+         * actual_start is the real room start, not the scheduled start.
+         * This keeps the shared room timer at 00:00:00 for the first join.
+         */
+        if ($meeting->actual_start === null) {
+            $meeting->update([
+                'actual_start' => now($timezone)->utc(),
+            ]);
+            $meeting->refresh();
+        }
 
         // Create one immutable audit row for this room load/join session.
         // Public IP and user-agent are captured server-side and are never trusted from JavaScript.
@@ -330,21 +342,21 @@ class MeetingAttendController extends Controller
         }
 
         $timezone = $meeting->timezone ?: 'Asia/Karachi';
-        $scheduledEnd = Carbon::parse(
-            $meeting->date . ' ' . $meeting->time,
-            $timezone
-        )->utc()->addMinutes((int) $meeting->duration);
+        $start = $meeting->actual_start
+            ? Carbon::parse($meeting->actual_start)->utc()
+            : Carbon::parse($meeting->date . ' ' . $meeting->time, $timezone)->utc();
+        $meetingEnd = $start->copy()->addMinutes(max(1, (int) $meeting->duration));
 
-        if (now('UTC')->lt($scheduledEnd)) {
+        if (now('UTC')->lt($meetingEnd)) {
             return response()->json([
                 'status' => $meeting->status,
-                'message' => 'Meeting scheduled time has not ended yet.',
+                'message' => 'Meeting duration has not ended yet.',
             ], 422);
         }
 
         Meeting::query()->whereKey($meeting->id)
             ->whereIn('status', ['active', 'live'])
-            ->update(['status' => 'completed']);
+            ->update(['status' => 'ended']);
 
         $meeting->refresh();
         return response()->json(['status' => $meeting->status]);
@@ -526,6 +538,3 @@ class MeetingAttendController extends Controller
         return strtoupper($initials);
     }
 }
-
-
-
