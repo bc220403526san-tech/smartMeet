@@ -1045,19 +1045,39 @@
     });
 
     /* ---------- Timer ---------- */
-    let seconds = Math.max(0, Math.floor((Date.now()-new Date(ACTUAL_START).getTime())/1000));
+    // Keep the meeting timer tied to the real meeting start/end timestamps.
+    // It starts at 00:00:00, remains accurate after refresh/rejoin, and stops
+    // exactly at the configured meeting end time instead of drifting.
+    const meetingStartMs = Number.isFinite(new Date(ACTUAL_START).getTime())
+        ? new Date(ACTUAL_START).getTime()
+        : Date.now();
+    const meetingEndMs = MEETING_END_TIME
+        ? new Date(MEETING_END_TIME).getTime()
+        : null;
+
+    function getMeetingElapsedSeconds(){
+        const now = Date.now();
+        let elapsed = Math.max(0, Math.floor((now - meetingStartMs) / 1000));
+
+        if(Number.isFinite(meetingEndMs) && meetingEndMs >= meetingStartMs){
+            const maxElapsed = Math.floor((meetingEndMs - meetingStartMs) / 1000);
+            elapsed = Math.min(elapsed, Math.max(0, maxElapsed));
+        }
+
+        return elapsed;
+    }
+
     function renderMeetingTimer(){
+        const seconds = getMeetingElapsedSeconds();
         const h=String(Math.floor(seconds/3600)).padStart(2,'0');
         const m=String(Math.floor((seconds%3600)/60)).padStart(2,'0');
         const s=String(seconds%60).padStart(2,'0');
         const el=document.getElementById('timer');
         if(el) el.textContent=`${h}:${m}:${s}`;
     }
+
     renderMeetingTimer();
-    const meetingClockInterval=setInterval(()=>{
-        seconds++;
-        renderMeetingTimer();
-    },1000);
+    const meetingClockInterval=setInterval(renderMeetingTimer,1000);
 
     function scheduleAutoEnd(){
         if(!MEETING_END_TIME) return;
@@ -2282,40 +2302,59 @@
         const video=document.getElementById('rvideo-'+uid);
         const avatar=document.getElementById('avatar-'+uid);
         if(video){
-            const wantedVideo=bestVideo?[bestVideo]:[];
-            if(!sameTrackSet(video.srcObject,wantedVideo)){
-                video.srcObject=new MediaStream(wantedVideo);
-            }
-
             video.muted=true;
             video.autoplay=true;
             video.playsInline=true;
             video.setAttribute('playsinline','');
 
-            // Actual received frames are the source of truth.
-            // A stale camera-status signal must not hide a real unmuted track.
-            const show=Boolean(bestVideo && bestVideo.readyState==='live' && !bestVideo.muted && camStatus[uid] !== false);
-            video.style.display=show?'block':'none';
-            if(avatar) avatar.style.display=show?'none':'flex';
+            // LiveKit RemoteVideoTrack.attach() is the authoritative rendering
+            // path for SFU video. Do not replace its srcObject with a legacy
+            // MediaStream, because doing so can leave the remote tile blank.
+            const liveKitVideoTrack = video.__smartMeetLiveKitTrack;
+            if(liveKitOwnsMedia() && liveKitVideoTrack){
+                const liveMediaTrack = liveKitVideoTrack.mediaStreamTrack;
+                const show = Boolean(
+                    liveMediaTrack &&
+                    liveMediaTrack.readyState === 'live' &&
+                    !liveMediaTrack.muted
+                );
 
-            if(show){
-                const playVideo=()=>video.play().catch(()=>{});
-                playVideo();
-                setTimeout(playVideo,120);
-                setTimeout(playVideo,600);
-                if(!video.__smartMeetPlayBound){
-                    video.__smartMeetPlayBound=true;
-                    video.addEventListener('loadedmetadata',()=>video.play().catch(()=>{}));
-                    video.addEventListener('canplay',()=>video.play().catch(()=>{}));
+                video.style.display=show?'block':'none';
+                if(avatar) avatar.style.display=show?'none':'flex';
+
+                if(show){
+                    video.play().catch(()=>{});
+                }
+
+                camStatus[uid]=show;
+            }else{
+                const wantedVideo=bestVideo?[bestVideo]:[];
+                if(!sameTrackSet(video.srcObject,wantedVideo)){
+                    video.srcObject=new MediaStream(wantedVideo);
+                }
+
+                // Actual received frames are the source of truth.
+                // A stale camera-status signal must not hide a real live track.
+                const show=Boolean(bestVideo && bestVideo.readyState==='live' && !bestVideo.muted);
+                video.style.display=show?'block':'none';
+                if(avatar) avatar.style.display=show?'none':'flex';
+
+                if(show){
+                    const playVideo=()=>video.play().catch(()=>{});
+                    playVideo();
+                    setTimeout(playVideo,120);
+                    setTimeout(playVideo,600);
+                    if(!video.__smartMeetPlayBound){
+                        video.__smartMeetPlayBound=true;
+                        video.addEventListener('loadedmetadata',()=>video.play().catch(()=>{}));
+                        video.addEventListener('canplay',()=>video.play().catch(()=>{}));
+                    }
+                }
+
+                if(bestVideo && bestVideo.readyState==='live' && !bestVideo.muted){
+                    camStatus[uid]=true;
                 }
             }
-        }
-
-        if(bestVideo && bestVideo.readyState==='live'){
-            // A muted remote track can stay muted indefinitely when the remote camera
-            // is OFF. Never poll attachRemoteStream() recursively here: that created
-            // an endless ~180ms DOM/media loop per peer and could freeze Chromium.
-            if(!bestVideo.muted && camStatus[uid] !== false) camStatus[uid]=true;
         }
     }
 
@@ -4928,15 +4967,44 @@
             return;
         }
 
-        // VIDEO keeps the existing participant/video rendering path.
-        const stream=getOrCreateRemoteStream(uid);
-        stream.getTracks()
-            .filter(t=>t.__smartMeetLiveKit && t.kind==='video' && t.id!==mediaTrack.id)
-            .forEach(t=>{ try{ stream.removeTrack(t); }catch(e){} });
+        // VIDEO: use LiveKit's native RemoteVideoTrack.attach() path.
+        // This avoids replacing the SFU track with a reconstructed MediaStream.
+        let video = document.getElementById('rvideo-'+uid);
+        let avatar = document.getElementById('avatar-'+uid);
+
+        if(!video){
+            const info=knownParticipants[uid];
+            addParticipantTile(
+                uid,
+                info?.name || ('User '+uid),
+                info?.initials || initialsOf(info?.name || ('User '+uid)),
+                Boolean(info?.isOrganizer)
+            );
+            video=document.getElementById('rvideo-'+uid);
+            avatar=document.getElementById('avatar-'+uid);
+        }
+
+        const previousTrack = video?.__smartMeetLiveKitTrack;
+        if(previousTrack && previousTrack !== track){
+            try{ previousTrack.detach(video); }catch(e){}
+        }
 
         mediaTrack.__smartMeetLiveKit=true;
-        if(!stream.getTracks().some(t=>t.id===mediaTrack.id)){
-            try{ stream.addTrack(mediaTrack); }catch(e){}
+
+        if(video){
+            try{
+                track.attach(video);
+                video.__smartMeetLiveKitTrack=track;
+                video.muted=true;
+                video.autoplay=true;
+                video.playsInline=true;
+                video.setAttribute('playsinline','');
+                video.style.display=mediaTrack.muted?'none':'block';
+                if(avatar) avatar.style.display=mediaTrack.muted?'flex':'none';
+                if(!mediaTrack.muted) video.play().catch(()=>{});
+            }catch(error){
+                console.warn('[LiveKit] Remote video attach failed:', error);
+            }
         }
 
         camStatus[uid]=!mediaTrack.muted;
@@ -4945,22 +5013,45 @@
             mediaTrack.__smartMeetLiveKitStateBound=true;
             mediaTrack.addEventListener('mute',()=>{
                 camStatus[uid]=false;
-                attachRemoteStream(uid);
+                const currentVideo=document.getElementById('rvideo-'+uid);
+                const currentAvatar=document.getElementById('avatar-'+uid);
+                if(currentVideo){
+                    currentVideo.style.display='none';
+                }
+                if(currentAvatar){
+                    currentAvatar.style.display='flex';
+                }
                 renderPersonRow(uid);
             });
             mediaTrack.addEventListener('unmute',()=>{
                 camStatus[uid]=true;
-                attachRemoteStream(uid);
+                const currentVideo=document.getElementById('rvideo-'+uid);
+                const currentAvatar=document.getElementById('avatar-'+uid);
+                if(currentVideo){
+                    currentVideo.style.display='block';
+                    currentVideo.play().catch(()=>{});
+                }
+                if(currentAvatar){
+                    currentAvatar.style.display='none';
+                }
                 renderPersonRow(uid);
             });
             mediaTrack.addEventListener('ended',()=>{
                 camStatus[uid]=false;
-                attachRemoteStream(uid);
+                const currentVideo=document.getElementById('rvideo-'+uid);
+                const currentAvatar=document.getElementById('avatar-'+uid);
+                if(currentVideo){
+                    try{ track.detach(currentVideo); }catch(e){}
+                    currentVideo.__smartMeetLiveKitTrack=null;
+                    currentVideo.style.display='none';
+                }
+                if(currentAvatar){
+                    currentAvatar.style.display='flex';
+                }
                 renderPersonRow(uid);
             });
         }
 
-        attachRemoteStream(uid);
         console.log('[LiveKit] remote video attached', uid);
     }
 
@@ -4991,7 +5082,19 @@
             if(existing){ try{ stream.removeTrack(existing); }catch(e){} }
         }
 
-        if(mediaTrack?.kind==='video') camStatus[uid]=false;
+        if(mediaTrack?.kind==='video'){
+            const video=document.getElementById('rvideo-'+uid);
+            if(video && video.__smartMeetLiveKitTrack===track){
+                try{ track.detach(video); }catch(e){}
+                video.__smartMeetLiveKitTrack=null;
+                video.srcObject=null;
+                video.style.display='none';
+            }
+            const avatar=document.getElementById('avatar-'+uid);
+            if(avatar) avatar.style.display='flex';
+            camStatus[uid]=false;
+        }
+
         attachRemoteStream(uid);
         console.log('[LiveKit] remote video detached', uid);
     }

@@ -53,13 +53,6 @@
                         {{ $cancelledMeetings }}
                     </h3>
                 </div>
-
-                <div class="bg-white border border-gray-100 rounded-2xl px-4 py-3 shadow-sm">
-                    <p class="text-xs text-gray-400 mb-1">Ended</p>
-                    <h3 id="stat-ended" class="text-xl font-bold text-slate-600">
-                        {{ $endedMeetings }}
-                    </h3>
-                </div>
             </div>
         </div>
 
@@ -103,11 +96,6 @@
                                 'label' => 'Cancelled',
                                 'active' => 'bg-red-600 text-white',
                                 'inactive' => 'border border-gray-200 text-gray-500 hover:bg-red-50 hover:text-red-600',
-                            ],
-                            'ended' => [
-                                'label' => 'Ended',
-                                'active' => 'bg-slate-600 text-white',
-                                'inactive' => 'border border-gray-200 text-gray-500 hover:bg-slate-100 hover:text-slate-700',
                             ],
                         ];
                     @endphp
@@ -298,9 +286,6 @@
 
                 document.getElementById('stat-cancelled').textContent =
                     stats.cancelled;
-
-                const endedStat = document.getElementById('stat-ended');
-                if (endedStat) endedStat.textContent = stats.ended ?? 0;
             }
 
             function updateServerClock(serverNowMs) {
@@ -582,70 +567,6 @@
             }, 30_000);
 
             scheduleExactMeetingRefresh();
-
-            /* Live countdown: UI only; Laravel remains the source of truth. */
-            function formatDuration(ms) {
-                const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-                const hours = Math.floor(totalSeconds / 3600);
-                const minutes = Math.floor((totalSeconds % 3600) / 60);
-                const seconds = totalSeconds % 60;
-
-                if (hours > 0) {
-                    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-                }
-
-                return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-            }
-
-            function formatRemaining(ms) {
-                const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-                const hours = Math.floor(totalSeconds / 3600);
-                const minutes = Math.floor((totalSeconds % 3600) / 60);
-                const seconds = totalSeconds % 60;
-
-                if (hours > 0) {
-                    return `${hours}h ${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`;
-                }
-
-                return `${minutes}m ${String(seconds).padStart(2, '0')}s`;
-            }
-
-            function updateMeetingTimers() {
-                const now = currentServerTimeMs();
-
-                document.querySelectorAll('[data-meeting-timer]').forEach(timer => {
-                    const row = timer.closest('[data-meeting-id]');
-                    if (!row) return;
-
-                    const status = String(row.dataset.currentStatus || '').toLowerCase();
-                    const startMs = Number(row.dataset.startMs);
-                    const endMs = Number(row.dataset.endMs);
-
-                    if (status === 'upcoming' && Number.isFinite(startMs)) {
-                        const remaining = startMs - now;
-                        timer.textContent = remaining <= 0
-                            ? 'Starting now'
-                            : `Starts in ${formatRemaining(remaining)}`;
-                    } else if (
-                        status === 'active' &&
-                        Number.isFinite(startMs) &&
-                        Number.isFinite(endMs)
-                    ) {
-                        const elapsed = Math.min(
-                            Math.max(0, now - startMs),
-                            Math.max(0, endMs - startMs)
-                        );
-
-                        const totalDuration = Math.max(0, endMs - startMs);
-
-                        timer.textContent =
-                            `${formatDuration(elapsed)} / ${formatDuration(totalDuration)}`;
-                    }
-                });
-            }
-
-            updateMeetingTimers();
-            setInterval(updateMeetingTimers, 1000);
         })();
     </script>
 

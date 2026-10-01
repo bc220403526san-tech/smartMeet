@@ -11,12 +11,14 @@ use App\Models\MeetingParticipant;
 use App\Models\Notification;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class MeetingController extends Controller
 {
@@ -25,17 +27,21 @@ class MeetingController extends Controller
         $organizerId = auth()->id();
 
         /*
-         * Meeting status is synchronized against the current server time on
-         * every normal or AJAX request. This removes dependency on a cron job
-         * that may only run once per minute.
+         * Visible meetings for an Organizer are:
+         * 1) meetings created by this organizer
+         * 2) meetings where this organizer was added to meeting_participants
+         *    by opening an invite link.
          */
         $this->syncMeetingStatuses($organizerId);
 
         $status = (string) $request->query('status', '');
         $search = trim((string) $request->query('search', ''));
 
-        $query = Meeting::with(['participants'])
-            ->where('organizer_id', $organizerId);
+        $query = (clone $this->accessibleMeetingQuery($organizerId))
+            ->with([
+                'participants',
+                'organizer',
+            ]);
 
         if ($status !== '') {
             $query->where('status', $status);
@@ -84,7 +90,6 @@ class MeetingController extends Controller
             'upcomingMeetings' => $stats['upcoming'],
             'completedMeetings' => $stats['completed'],
             'cancelledMeetings' => $stats['cancelled'],
-            'endedMeetings' => $stats['ended'],
             'serverNowMs' => $serverNow->valueOf(),
             'nextTransitionMs' => $nextTransition?->valueOf(),
         ]);
@@ -120,9 +125,6 @@ class MeetingController extends Controller
             'agenda_description.*' => 'nullable|string',
         ]);
 
-        // Validate every optional invite address before the meeting is created.
-        // The UI accepts multiple comma/semicolon/new-line separated addresses,
-        // so each address is checked with Laravel's RFC + domain-dot validation.
         if (trim((string) $request->invite_emails) !== '') {
             $this->validateInviteEmailList(
                 (string) $request->invite_emails,
@@ -218,7 +220,15 @@ class MeetingController extends Controller
 
     public function show(Meeting $meeting)
     {
-        $this->authorizeOrganizer($meeting);
+        /*
+         * An Organizer may VIEW:
+         * 1) a meeting they own, OR
+         * 2) a meeting they joined through an invite link.
+         *
+         * Edit/update/cancel/end remain owner-only because those actions
+         * still call authorizeOrganizer().
+         */
+        $this->authorizeAccessibleMeeting($meeting);
         $this->syncSingleMeetingStatus($meeting);
 
         $meeting->refresh()->load([
@@ -226,7 +236,14 @@ class MeetingController extends Controller
             'participants.user',
         ]);
 
-        return view('organizer.meetings.show', compact('meeting'));
+        $isMeetingOwner =
+            (string) $meeting->organizer_id ===
+            (string) auth()->id();
+
+        return view(
+            'organizer.meetings.show',
+            compact('meeting', 'isMeetingOwner')
+        );
     }
 
     public function edit(Meeting $meeting)
@@ -347,20 +364,6 @@ class MeetingController extends Controller
             ->with('success', 'Meeting updated successfully!');
     }
 
-    /**
-     * Explicit organizer action from the live room.
-     *
-     * IMPORTANT:
-     * - Organizer index/status exact-time synchronization remains unchanged.
-     * - Leave / refresh / tab close MUST NOT call this method.
-     * - Explicit End Meeting stores status = ended.
-     * - Natural scheduled expiry remains status = completed.
-     *
-     * Realtime room notification is intentionally sent by the organizer room
-     * through the existing signal endpoint AFTER this database write succeeds.
-     * That keeps a transient Reverb/broadcast failure from turning this endpoint
-     * into HTTP 500 after the organizer deliberately presses End.
-     */
     public function end(Meeting $meeting)
     {
         $this->authorizeOrganizer($meeting);
@@ -385,23 +388,30 @@ class MeetingController extends Controller
             ], 422);
         }
 
-        /*
-         * "completed" is accepted only for the tiny exact-time race where the
-         * index/status synchronizer reaches the scheduled boundary at the same
-         * instant the organizer presses End from an already-open room.
-         */
-        if (!in_array($meeting->status, ['active', 'live', 'completed'], true)) {
-            return response()->json([
-                'message' => 'This meeting cannot be ended from the meeting room.',
-            ], 422);
-        }
-
         try {
-            $meeting->update([
-                'status' => 'ended',
-            ]);
+            $updated = Meeting::query()
+                ->whereKey($meeting->id)
+                ->whereIn('status', ['active', 'live'])
+                ->update([
+                    'status' => 'ended',
+                ]);
 
             $meeting->refresh();
+
+            if ($updated === 0) {
+                $message = match ($meeting->status) {
+                    'ended' => 'Meeting has already been ended.',
+                    'cancelled' => 'A cancelled meeting cannot be ended.',
+                    'completed' => 'This meeting has already completed because its scheduled time ended.',
+                    'upcoming' => 'This meeting has not started yet.',
+                    default => 'This meeting cannot be ended from the meeting room.',
+                };
+
+                return response()->json([
+                    'status' => $meeting->status,
+                    'message' => $message,
+                ], $meeting->status === 'ended' ? 200 : 422);
+            }
         } catch (\Throwable $exception) {
             Log::error('Explicit meeting end status update failed', [
                 'meeting_id' => $meeting->id,
@@ -417,7 +427,7 @@ class MeetingController extends Controller
         }
 
         return response()->json([
-            'status' => $meeting->status,
+            'status' => 'ended',
             'message' => 'Meeting ended successfully.',
         ]);
     }
@@ -425,21 +435,31 @@ class MeetingController extends Controller
     public function cancel(Meeting $meeting)
     {
         $this->authorizeOrganizer($meeting);
+
         $this->syncSingleMeetingStatus($meeting);
         $meeting->refresh();
 
-        if (!in_array($meeting->status, ['upcoming', 'active'], true)) {
+        $updated = Meeting::query()
+            ->whereKey($meeting->id)
+            ->whereIn('status', ['upcoming', 'active'])
+            ->update([
+                'status' => 'cancelled',
+            ]);
+
+        $meeting->refresh();
+
+        if ($updated === 0) {
             return back()->with(
                 'error',
-                'This meeting cannot be cancelled.'
+                match ($meeting->status) {
+                    'cancelled' => 'Meeting has already been cancelled.',
+                    'ended' => 'An ended meeting cannot be cancelled.',
+                    'completed' => 'A completed meeting cannot be cancelled.',
+                    default => 'This meeting cannot be cancelled.',
+                }
             );
         }
 
-        /*
-         * Broadcast BEFORE the DB write so anyone currently sitting in the
-         * live room (organizer_attend / participant_attend blade) is kicked
-         * out immediately, even if something below throws.
-         */
         broadcast(new MeetingSignal(
             meetingId: (string) $meeting->id,
             fromUserId: (string) auth()->id(),
@@ -449,10 +469,6 @@ class MeetingController extends Controller
                 'by' => auth()->user()->name,
             ]
         ))->toOthers();
-
-        $meeting->update([
-            'status' => 'cancelled',
-        ]);
 
         return redirect()
             ->route('organizer.meetings.index')
@@ -469,8 +485,8 @@ class MeetingController extends Controller
             explode(',', (string) $request->query('ids', ''))
         );
 
-        $meetings = Meeting::whereIn('id', $ids)
-            ->where('organizer_id', $organizerId)
+        $meetings = (clone $this->accessibleMeetingQuery($organizerId))
+            ->whereIn('id', $ids)
             ->get(['id', 'status']);
 
         $serverNow = now('UTC');
@@ -551,11 +567,6 @@ class MeetingController extends Controller
         ]);
     }
 
-    /**
-     * Convert a comma/semicolon/new-line separated email string into a clean,
-     * unique list. Actual RFC + domain-dot validation is handled separately so invalid
-     * addresses are never silently discarded.
-     */
     private function parseInviteEmails(?string $value): array
     {
         if ($value === null || trim($value) === '') {
@@ -572,13 +583,6 @@ class MeetingController extends Controller
             ->all();
     }
 
-    /**
-     * Validate every invite address with Laravel's RFC + domain-dot checks.
-     *
-     * This is the multi-email equivalent of:
-     * $request->validate(['email' => ['required', 'email:rfc',
-    'regex:/^.+@.+\\..+$/']]);
-     */
     private function validateInviteEmailList(
         string $value,
         string $fieldName
@@ -602,8 +606,13 @@ class MeetingController extends Controller
         foreach ($emails as $email) {
             $validator = Validator::make(
                 ['email' => $email],
-                ['email' => ['required', 'email:rfc',
-                    'regex:/^.+@.+\\..+$/']]
+                [
+                    'email' => [
+                        'required',
+                        'email:rfc',
+                        'regex:/^.+@.+\..+$/',
+                    ],
+                ]
             );
 
             if ($validator->fails()) {
@@ -623,11 +632,6 @@ class MeetingController extends Controller
         }
     }
 
-    /**
-     * Send meeting invitations without making meeting creation depend on
-     * successful mail delivery. Existing SmartMeet users are attached to the
-     * meeting; new users receive a tokenized registration link.
-     */
     private function sendMeetingInvites(
         Meeting $meeting,
         array $emails,
@@ -760,10 +764,35 @@ class MeetingController extends Controller
         ];
     }
 
+    private function accessibleMeetingQuery(
+        int|string $organizerId
+    ): Builder {
+        /*
+         * Use the meeting_participants table directly.
+         * This makes invited-organizer visibility independent of Eloquent
+         * relation interpretation and matches MeetingJoinController::firstOrCreate().
+         */
+        return Meeting::query()
+            ->where(function (Builder $query) use ($organizerId) {
+                $query
+                    ->where('organizer_id', $organizerId)
+                    ->orWhereIn(
+                        'id',
+                        DB::table('meeting_participants')
+                            ->select('meeting_id')
+                            ->where('user_id', $organizerId)
+                    );
+            });
+    }
+
     private function syncMeetingStatuses(int|string $organizerId): void
     {
-        $meetings = Meeting::where('organizer_id', $organizerId)
-            ->whereIn('status', ['upcoming', 'active'])
+        /*
+         * Includes both owned meetings and meetings this organizer joined
+         * through an invite link.
+         */
+        $meetings = (clone $this->accessibleMeetingQuery($organizerId))
+            ->where('status', 'upcoming')
             ->get();
 
         foreach ($meetings as $meeting) {
@@ -773,49 +802,24 @@ class MeetingController extends Controller
 
     private function syncSingleMeetingStatus(Meeting $meeting): void
     {
-        /*
-         * IMPORTANT:
-         * ended / cancelled / completed are FINAL statuses.
-         *
-         * Always refresh first, then use an atomic conditional UPDATE below.
-         * This prevents a stale request that loaded the meeting as "active"
-         * from later overwriting a newer organizer action such as ended/cancelled.
-         */
         $meeting->refresh();
 
-        if (!in_array($meeting->status, ['upcoming', 'active'], true)) {
+        if ($meeting->status !== 'upcoming') {
             return;
         }
 
         $now = now('UTC');
         $startTime = $this->getMeetingStartTime($meeting);
-        $endTime = $startTime
-            ->copy()
-            ->addMinutes((int) $meeting->duration);
 
         if ($now->lt($startTime)) {
-            $correctStatus = 'upcoming';
-        } elseif ($now->gte($endTime)) {
-            $correctStatus = 'ended';
-        } else {
-            $correctStatus = 'active';
-        }
-
-        if ($meeting->status === $correctStatus) {
             return;
         }
 
-        /*
-         * Atomic guard:
-         * Update ONLY when the database row is still upcoming/active.
-         * If another request has already set ended/cancelled/completed,
-         * this UPDATE affects 0 rows and the final status stays untouched.
-         */
         Meeting::query()
             ->whereKey($meeting->id)
-            ->whereIn('status', ['upcoming', 'active'])
+            ->where('status', 'upcoming')
             ->update([
-                'status' => $correctStatus,
+                'status' => 'active',
             ]);
 
         $meeting->refresh();
@@ -847,33 +851,22 @@ class MeetingController extends Controller
         $now = now('UTC');
         $nextTransition = null;
 
-        $meetings = Meeting::where('organizer_id', $organizerId)
-            ->whereIn('status', ['upcoming', 'active'])
+        $meetings = (clone $this->accessibleMeetingQuery($organizerId))
+            ->where('status', 'upcoming')
             ->get();
 
         foreach ($meetings as $meeting) {
             $startTime = $this->getMeetingStartTime($meeting);
 
-            $endTime = $startTime
-                ->copy()
-                ->addMinutes((int) $meeting->duration);
-
-            if ($now->lt($startTime)) {
-                $candidate = $startTime;
-            } elseif ($now->lt($endTime)) {
-                $candidate = $endTime;
-            } else {
-                $candidate = null;
+            if ($now->gte($startTime)) {
+                continue;
             }
 
             if (
-                $candidate !== null &&
-                (
-                    $nextTransition === null ||
-                    $candidate->lt($nextTransition)
-                )
+                $nextTransition === null ||
+                $startTime->lt($nextTransition)
             ) {
-                $nextTransition = $candidate;
+                $nextTransition = $startTime;
             }
         }
 
@@ -882,7 +875,7 @@ class MeetingController extends Controller
 
     private function getMeetingStats(int|string $organizerId): array
     {
-        $query = Meeting::where('organizer_id', $organizerId);
+        $query = $this->accessibleMeetingQuery($organizerId);
 
         return [
             'total' => (clone $query)->count(),
@@ -893,19 +886,37 @@ class MeetingController extends Controller
                 ->where('status', 'upcoming')
                 ->count(),
             'completed' => (clone $query)
-                ->where('status', 'completed')
+                ->whereIn('status', ['completed', 'ended'])
                 ->count(),
             'cancelled' => (clone $query)
                 ->where('status', 'cancelled')
                 ->count(),
-            'ended' => (clone $query)
-                ->where('status', 'ended')
-                ->count(),
         ];
+    }
+
+    private function authorizeAccessibleMeeting(Meeting $meeting): void
+    {
+        $organizerId = auth()->id();
+
+        $isOwner =
+            (string) $meeting->organizer_id ===
+            (string) $organizerId;
+
+        $isInvited = DB::table('meeting_participants')
+            ->where('meeting_id', $meeting->id)
+            ->where('user_id', $organizerId)
+            ->exists();
+
+        abort_unless($isOwner || $isInvited, 403);
     }
 
     private function authorizeOrganizer(Meeting $meeting): void
     {
+        /*
+         * Do NOT relax this.
+         * Invited organizers remain normal participants and cannot manage,
+         * edit, cancel or end another organizer's meeting.
+         */
         abort_unless(
             (string) $meeting->organizer_id === (string) auth()->id(),
             403
