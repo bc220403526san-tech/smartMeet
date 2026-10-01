@@ -9,15 +9,6 @@ class SmartMeetLiveKit {
     constructor() {
         this.room = null;
         this.connected = false;
-
-        // LiveKit is the single owner of meeting media. Keep this ownership
-        // flag true even while LiveKit is temporarily reconnecting so the
-        // legacy mesh-P2P layer can never take over during a short outage.
-        this.mediaMode = 'livekit';
-    }
-
-    isMediaOwner() {
-        return this.mediaMode === 'livekit';
     }
 
     async connect({ tokenUrl, csrfToken }) {
@@ -72,8 +63,6 @@ class SmartMeetLiveKit {
 
         room.on(RoomEvent.Disconnected, () => {
             this.connected = false;
-            // Do NOT change mediaMode here. A transient LiveKit disconnect or
-            // reconnect window must never activate legacy mesh-P2P media.
             window.dispatchEvent(new CustomEvent('smartmeet:livekit-disconnected'));
         });
 
@@ -88,25 +77,39 @@ class SmartMeetLiveKit {
 
         room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
             window.dispatchEvent(new CustomEvent('smartmeet:livekit-track-subscribed', {
-                detail: { track, publication, participant },
+                detail: {
+                    track,
+                    publication,
+                    participant,
+                },
             }));
         });
 
         room.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
             window.dispatchEvent(new CustomEvent('smartmeet:livekit-track-unsubscribed', {
-                detail: { track, publication, participant },
+                detail: {
+                    track,
+                    publication,
+                    participant,
+                },
             }));
         });
 
         room.on(RoomEvent.TrackStreamStateChanged, (publication, streamState, participant) => {
             window.dispatchEvent(new CustomEvent('smartmeet:livekit-track-stream-state-changed', {
-                detail: { publication, streamState, participant },
+                detail: {
+                    publication,
+                    streamState,
+                    participant,
+                },
             }));
         });
 
         room.on(RoomEvent.AudioPlaybackStatusChanged, () => {
             window.dispatchEvent(new CustomEvent('smartmeet:livekit-audio-playback-changed', {
-                detail: { canPlaybackAudio: Boolean(room.canPlaybackAudio) },
+                detail: {
+                    canPlaybackAudio: Boolean(room.canPlaybackAudio),
+                },
             }));
         });
 
@@ -212,8 +215,6 @@ class SmartMeetLiveKit {
 
         this.room = null;
         this.connected = false;
-        // Keep mediaMode='livekit'. disconnect() is only used during page
-        // cleanup; it must not hand media ownership back to the mesh layer.
     }
 }
 

@@ -1539,7 +1539,6 @@
 
     function createPeerConnection(uid){
         uid=String(uid);
-        if(window.SmartMeetLiveKit?.isMediaOwner?.()) return null;
         if(uid===String(MY_USER_ID) || leftUsers.has(uid)) return null;
         let pc=peers[uid];
         if(pc && pc.signalingState!=='closed' && pc.connectionState!=='closed') return pc;
@@ -1593,10 +1592,6 @@
         };
 
         pc.ontrack = (event)=>{
-            // LiveKit is the single media owner. Legacy P2P ontrack events may
-            // still arrive during migration/reconnection; never let them
-            // overwrite a LiveKit remote video/audio element.
-            if(window.SmartMeetLiveKit?.isMediaOwner?.()) return;
             if(leftUsers.has(uid)) return;
             const info=knownParticipants[uid];
             if(info){ info.hasJoined=true; addParticipantTile(uid, info.name, info.initials, Boolean(info.isOrganizer)); markOnline(uid); }
@@ -2256,12 +2251,6 @@
         }
 
         // -------- Remote video --------
-        // LiveKit owns the remote video element directly. The legacy P2P
-        // renderer must never replace LiveKit's attached track or hide it.
-        if(window.SmartMeetLiveKit?.isMediaOwner?.()){
-            return;
-        }
-
         const video=document.getElementById('rvideo-'+uid);
         const avatar=document.getElementById('avatar-'+uid);
         if(video){
@@ -2912,7 +2901,7 @@
         // Ignore only legacy mesh WebRTC signaling; Reverb still handles
         // presence, chat, moderation and UI status events.
         if(
-            window.SmartMeetLiveKit?.isMediaOwner?.() &&
+            window.SmartMeetLiveKit?.connected &&
             ['reconnect-request','offer','answer','ice-candidate'].includes(data.type)
         ){
             console.log('[LiveKit] ignored legacy P2P signal:', data.type, 'from', from);
@@ -3642,7 +3631,7 @@
 
             // Once LiveKit is connected, it owns microphone/camera recovery.
             // Do not recreate or republish the old mesh-P2P local tracks.
-            if(liveKit?.isMediaOwner?.() && liveKit?.room){
+            if(liveKit?.connected && liveKit?.room){
                 try{
                     if(isMicOn){
                         await liveKit.setMicrophoneEnabled(true);
@@ -4591,9 +4580,6 @@
         uid=String(uid);
         if(uid===String(MY_USER_ID)) return;
 
-        try{ disposeRemoteAudioBoost(uid); }catch(e){}
-        document.getElementById('audio-'+uid)?.remove();
-
         removeParticipantTile(uid, false);
         markOffline(uid);
         renderPeopleList();
@@ -4618,7 +4604,7 @@
 
         // LiveKit owns media transport once connected.
         // Keep Reverb presence/UI updates, but do not create a legacy mesh peer.
-        if(!window.SmartMeetLiveKit?.isMediaOwner?.()){
+        if(!window.SmartMeetLiveKit?.connected){
             createPeerConnection(uid);
         }
     }
@@ -4631,7 +4617,6 @@
         });
     }
     function connectToAll(){
-        if(window.SmartMeetLiveKit?.isMediaOwner?.()) return;
         Object.keys(knownParticipants).forEach(uid=>{
             uid=String(uid);
             if(uid===String(MY_USER_ID) || leftUsers.has(uid)) return;
@@ -4694,7 +4679,7 @@
         try{
             const liveKit=window.SmartMeetLiveKit;
 
-            if(liveKit?.isMediaOwner?.()){
+            if(liveKit?.connected && liveKit?.room){
                 // LiveKit owns media transport. Keep SmartMeet presence/UI recovery,
                 // but do not rebuild the legacy mesh-P2P media connections.
                 syncExistingLiveKitParticipants();
@@ -4901,88 +4886,40 @@
             return;
         }
 
-        // VIDEO: LiveKit owns the remote video element directly. Do not route the
-        // LiveKit RemoteVideoTrack through the legacy MediaStream/P2P renderer,
-        // because that path can select a stale receiver and leave the participant
-        // video blank even though LiveKit is receiving frames.
-        const video=document.getElementById('rvideo-'+uid);
-        const avatar=document.getElementById('avatar-'+uid);
-        if(!video) return;
+        // VIDEO keeps the existing participant/video rendering path.
+        const stream=getOrCreateRemoteStream(uid);
+        stream.getTracks()
+            .filter(t=>t.__smartMeetLiveKit && t.kind==='video' && t.id!==mediaTrack.id)
+            .forEach(t=>{ try{ stream.removeTrack(t); }catch(e){} });
 
-        // LiveKit is the only remote-media renderer. Do not wait for the native
-        // MediaStreamTrack to report a particular readyState: RemoteVideoTrack
-        // can be attached before the first frame is available, and LiveKit will
-        // update the element as frames arrive.
         mediaTrack.__smartMeetLiveKit=true;
-        video.autoplay=true;
-        video.playsInline=true;
-        video.muted=true;
-        video.setAttribute('playsinline','');
+        if(!stream.getTracks().some(t=>t.id===mediaTrack.id)){
+            try{ stream.addTrack(mediaTrack); }catch(e){}
+        }
 
-        const showVideo=()=>{
-            const muted=Boolean(mediaTrack.muted);
-            camStatus[uid]=!muted;
-
-            if(!muted){
-                video.style.display='block';
-                if(avatar) avatar.style.display='none';
-                try{
-                    track.attach(video);
-                    const playPromise=video.play();
-                    if(playPromise?.catch) playPromise.catch(()=>{});
-                }catch(e){
-                    console.warn('[LiveKit] remote video attach failed:',e);
-                }
-            }else{
-                try{ track.detach(video); }catch(e){}
-                video.style.display='none';
-                if(avatar) avatar.style.display='flex';
-            }
-            renderPersonRow(uid);
-        };
+        camStatus[uid]=!mediaTrack.muted;
 
         if(!mediaTrack.__smartMeetLiveKitStateBound){
             mediaTrack.__smartMeetLiveKitStateBound=true;
             mediaTrack.addEventListener('mute',()=>{
                 camStatus[uid]=false;
-                try{ track.detach(video); }catch(e){}
-                video.style.display='none';
-                if(avatar) avatar.style.display='flex';
+                attachRemoteStream(uid);
                 renderPersonRow(uid);
             });
             mediaTrack.addEventListener('unmute',()=>{
                 camStatus[uid]=true;
-                showVideo();
+                attachRemoteStream(uid);
+                renderPersonRow(uid);
             });
             mediaTrack.addEventListener('ended',()=>{
                 camStatus[uid]=false;
-                try{ track.detach(video); }catch(e){}
-                video.style.display='none';
-                if(avatar) avatar.style.display='flex';
+                attachRemoteStream(uid);
                 renderPersonRow(uid);
             });
         }
 
-        // Attach immediately. The LiveKit track remains attached while frames
-        // are being delivered, instead of falling back to the old P2P renderer.
-        try{
-            track.attach(video);
-            const playPromise=video.play();
-            if(playPromise?.catch) playPromise.catch(()=>{});
-        }catch(e){
-            console.warn('[LiveKit] remote video attach failed:',e);
-        }
-        if(mediaTrack.muted){
-            video.style.display='none';
-            if(avatar) avatar.style.display='flex';
-            camStatus[uid]=false;
-        }else{
-            video.style.display='block';
-            if(avatar) avatar.style.display='none';
-            camStatus[uid]=true;
-        }
-        renderPersonRow(uid);
-        console.log('[LiveKit] remote video attached', uid, 'track=', track.sid || mediaTrack.id);
+        attachRemoteStream(uid);
+        console.log('[LiveKit] remote video attached', uid);
     }
 
     function detachLiveKitRemoteTrack(track, participant){
@@ -5006,18 +4943,15 @@
             return;
         }
 
-        if(mediaTrack?.kind==='video'){
-            const video=document.getElementById('rvideo-'+uid);
-            const avatar=document.getElementById('avatar-'+uid);
-
-            try{ track.detach(video || undefined); }catch(e){}
-
-            camStatus[uid]=false;
-            if(video) video.style.display='none';
-            if(avatar) avatar.style.display='flex';
-            renderPersonRow(uid);
-            console.log('[LiveKit] remote video detached', uid);
+        const stream=remoteStreams[uid];
+        if(stream && mediaTrack){
+            const existing=stream.getTracks().find(t=>t.id===mediaTrack.id);
+            if(existing){ try{ stream.removeTrack(existing); }catch(e){} }
         }
+
+        if(mediaTrack?.kind==='video') camStatus[uid]=false;
+        attachRemoteStream(uid);
+        console.log('[LiveKit] remote video detached', uid);
     }
 
     function bindLiveKitMedia(){
@@ -5039,11 +4973,10 @@
         });
 
         window.addEventListener('smartmeet:livekit-track-stream-state-changed', event=>{
-            const publication=event.detail?.publication;
-            const track=publication?.track;
+            const track=event.detail?.publication?.track;
             const participant=event.detail?.participant;
-            if(event.detail?.streamState==='active' && track){
-                attachLiveKitRemoteTrack(track, participant);
+            if(track?.kind==='audio' && event.detail?.streamState==='active'){
+                attachLiveKitRemoteAudio(liveKitMediaUserId(participant), track);
                 unlockRemoteMedia();
             }
         });
@@ -5060,7 +4993,11 @@
             const room=window.SmartMeetLiveKit?.room;
             if(!room) return;
             room.remoteParticipants.forEach(participant=>{
-                syncLiveKitRemoteTracks(participant);
+                participant.trackPublications?.forEach(publication=>{
+                    if(publication.track){
+                        attachLiveKitRemoteTrack(publication.track, participant);
+                    }
+                });
             });
             unlockRemoteMedia();
         });
@@ -5081,35 +5018,13 @@
         liveKitPresenceBound=true;
 
         window.addEventListener('smartmeet:livekit-participant-connected', event=>{
-            const participant=event.detail?.participant;
-            const uid=liveKitUserId(participant);
-            if(uid) registerLiveKitParticipant(uid, participant);
-            syncLiveKitRemoteTracks(participant);
+            const uid=liveKitUserId(event.detail?.participant);
+            if(uid) registerLiveKitParticipant(uid, event.detail?.participant);
         });
 
         window.addEventListener('smartmeet:livekit-participant-disconnected', event=>{
             const uid=liveKitUserId(event.detail?.participant);
             if(uid) unregisterLiveKitParticipant(uid);
-        });
-    }
-
-    function syncLiveKitRemoteTracks(participant){
-        if(!participant) return;
-
-        participant.trackPublications?.forEach(publication=>{
-            // Keep remote media explicitly subscribed. This is important when a
-            // participant publishes camera before another user finishes joining.
-            try{
-                if(typeof publication.setSubscribed === 'function' && !publication.isSubscribed){
-                    publication.setSubscribed(true);
-                }
-            }catch(error){
-                console.warn('[LiveKit] remote track subscribe request failed:', error);
-            }
-
-            if(publication.track){
-                attachLiveKitRemoteTrack(publication.track, participant);
-            }
         });
     }
 
@@ -5120,7 +5035,6 @@
         room.remoteParticipants.forEach(participant=>{
             const uid=liveKitUserId(participant);
             if(uid) registerLiveKitParticipant(uid, participant);
-            syncLiveKitRemoteTracks(participant);
         });
     }
 
@@ -5313,4 +5227,3 @@
 
 </body>
 </html>
-
