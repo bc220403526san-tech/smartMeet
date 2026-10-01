@@ -9,6 +9,16 @@ class SmartMeetLiveKit {
     constructor() {
         this.room = null;
         this.connected = false;
+
+        // Start in an undecided state so the existing P2P fallback can still
+        // work if LiveKit cannot make its initial connection. Once LiveKit has
+        // connected successfully, it permanently owns meeting media for this
+        // page. A later reconnect/disconnect must never hand media back to P2P.
+        this.mediaMode = 'unknown';
+    }
+
+    isMediaOwner() {
+        return this.mediaMode === 'livekit';
     }
 
     async connect({ tokenUrl, csrfToken }) {
@@ -36,9 +46,6 @@ class SmartMeetLiveKit {
             throw new Error('Invalid LiveKit token response.');
         }
 
-        // LiveKit is the single owner of meeting media. Voice capture is tuned
-        // for real-time speech: mono, echo cancellation, noise suppression,
-        // AGC and voice isolation where the browser supports it.
         const room = new Room({
             adaptiveStream: true,
             dynacast: true,
@@ -58,11 +65,16 @@ class SmartMeetLiveKit {
 
         room.on(RoomEvent.Connected, () => {
             this.connected = true;
+            // This is the important transition: from this point onward LiveKit
+            // remains the sole media owner, including during reconnect windows.
+            this.mediaMode = 'livekit';
             window.dispatchEvent(new CustomEvent('smartmeet:livekit-connected'));
         });
 
         room.on(RoomEvent.Disconnected, () => {
             this.connected = false;
+            // Do NOT change mediaMode here. If LiveKit temporarily disconnects,
+            // the legacy P2P layer must not suddenly create a mesh of peers.
             window.dispatchEvent(new CustomEvent('smartmeet:livekit-disconnected'));
         });
 
@@ -72,44 +84,31 @@ class SmartMeetLiveKit {
 
         room.on(RoomEvent.Reconnected, () => {
             this.connected = true;
+            this.mediaMode = 'livekit';
             window.dispatchEvent(new CustomEvent('smartmeet:livekit-reconnected'));
         });
 
         room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
             window.dispatchEvent(new CustomEvent('smartmeet:livekit-track-subscribed', {
-                detail: {
-                    track,
-                    publication,
-                    participant,
-                },
+                detail: { track, publication, participant },
             }));
         });
 
         room.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
             window.dispatchEvent(new CustomEvent('smartmeet:livekit-track-unsubscribed', {
-                detail: {
-                    track,
-                    publication,
-                    participant,
-                },
+                detail: { track, publication, participant },
             }));
         });
 
         room.on(RoomEvent.TrackStreamStateChanged, (publication, streamState, participant) => {
             window.dispatchEvent(new CustomEvent('smartmeet:livekit-track-stream-state-changed', {
-                detail: {
-                    publication,
-                    streamState,
-                    participant,
-                },
+                detail: { publication, streamState, participant },
             }));
         });
 
         room.on(RoomEvent.AudioPlaybackStatusChanged, () => {
             window.dispatchEvent(new CustomEvent('smartmeet:livekit-audio-playback-changed', {
-                detail: {
-                    canPlaybackAudio: Boolean(room.canPlaybackAudio),
-                },
+                detail: { canPlaybackAudio: Boolean(room.canPlaybackAudio) },
             }));
         });
 
@@ -127,14 +126,13 @@ class SmartMeetLiveKit {
 
         await room.connect(data.server_url, data.token);
 
-        // Try immediately; if autoplay is blocked, the real user-gesture
-        // unlock in the meeting page will retry startAudio().
         try {
             await room.startAudio();
         } catch (error) {}
 
         this.room = room;
         this.connected = true;
+        this.mediaMode = 'livekit';
 
         return room;
     }
@@ -215,6 +213,8 @@ class SmartMeetLiveKit {
 
         this.room = null;
         this.connected = false;
+        // Keep mediaMode='livekit'. disconnect() is page cleanup, not a signal
+        // to start the legacy P2P mesh again.
     }
 }
 

@@ -1967,6 +1967,9 @@
 
     function createPeerConnection(uid){
         uid=String(uid);
+        // LiveKit is the media owner after a successful LiveKit connection.
+        // A temporary LiveKit reconnect must never trigger a legacy mesh peer.
+        if(window.SmartMeetLiveKit?.isMediaOwner?.()) return null;
         if(uid===String(MY_USER_ID) || leftUsers.has(uid)) return null;
         let pc=peers[uid];
         if(pc && pc.signalingState!=='closed' && pc.connectionState!=='closed') return pc;
@@ -3252,7 +3255,7 @@
         // Ignore only legacy mesh WebRTC signaling; Reverb still handles
         // presence, chat, moderation and UI status events.
         if(
-            window.SmartMeetLiveKit?.connected &&
+            window.SmartMeetLiveKit?.isMediaOwner?.() &&
             ['reconnect-request','offer','answer','ice-candidate'].includes(data.type)
         ){
             console.log('[LiveKit] ignored legacy P2P signal:', data.type, 'from', from);
@@ -3885,7 +3888,7 @@
             screenTrack=null;
             screenStream=null;
 
-            if(liveKit?.connected && liveKit?.room){
+            if(liveKit?.isMediaOwner?.()){
                 try{
                     await liveKit.setScreenShareEnabled(false);
                 }catch(err){
@@ -3947,7 +3950,7 @@
 
             // Once LiveKit is connected, it owns microphone/camera recovery.
             // Do not recreate or republish the old mesh-P2P local tracks.
-            if(liveKit?.connected && liveKit?.room){
+            if(liveKit?.isMediaOwner?.() && liveKit?.room){
                 try{
                     if(isMicOn){
                         await liveKit.setMicrophoneEnabled(true);
@@ -4939,6 +4942,8 @@
         uid=String(uid);
         if(uid===String(MY_USER_ID)) return;
 
+        try{ disposeRemoteAudioBoost(uid); }catch(e){}
+        document.getElementById('audio-'+uid)?.remove();
         removeParticipantTile(uid, false);
         markOffline(uid);
         renderPeopleList();
@@ -4963,7 +4968,7 @@
 
         // LiveKit owns media transport once connected.
         // Keep Reverb presence/UI updates, but do not create a legacy mesh peer.
-        if(!window.SmartMeetLiveKit?.connected){
+        if(!window.SmartMeetLiveKit?.isMediaOwner?.()){
             createPeerConnection(uid);
         }
     }
@@ -4975,6 +4980,7 @@
         });
     }
     function connectToAll(){
+        if(window.SmartMeetLiveKit?.isMediaOwner?.()) return;
         Object.keys(knownParticipants).forEach(uid=>{
             uid=String(uid);
             if(uid===String(MY_USER_ID) || leftUsers.has(uid)) return;
@@ -5107,7 +5113,7 @@
             clearTimeout(mediaDeviceChangeTimer);
             mediaDeviceChangeTimer=setTimeout(()=>{
                 if(document.visibilityState!=='visible') return;
-                if(window.SmartMeetLiveKit?.connected){
+                if(window.SmartMeetLiveKit?.isMediaOwner?.()){
                     repairMeetingMedia(true);
                     return;
                 }
