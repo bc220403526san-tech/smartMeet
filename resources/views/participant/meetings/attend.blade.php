@@ -1023,26 +1023,14 @@
     });
 
     /* ---------- Timer ---------- */
-    // Always show the REMAINING meeting time.
-    // A late joiner gets only the time left until the original scheduled end.
-    function getRemainingMeetingSeconds(){
-        if(!MEETING_END_TIME) return 0;
-        const endMs = new Date(MEETING_END_TIME).getTime();
-        if(!Number.isFinite(endMs)) return 0;
-        return Math.max(0, Math.ceil((endMs - Date.now()) / 1000));
-    }
-
-    function renderMeetingTimer(){
-        const remaining = getRemainingMeetingSeconds();
-        const h=String(Math.floor(remaining/3600)).padStart(2,'0');
-        const m=String(Math.floor((remaining%3600)/60)).padStart(2,'0');
-        const s=String(remaining%60).padStart(2,'0');
-        const el=document.getElementById('timer');
-        if(el) el.textContent=`${h}:${m}:${s}`;
-    }
-
-    renderMeetingTimer();
-    const meetingClockInterval=setInterval(renderMeetingTimer,1000);
+    let seconds = Math.max(0, Math.floor((Date.now()-new Date(ACTUAL_START).getTime())/1000));
+    const meetingClockInterval=setInterval(()=>{
+        seconds++;
+        const h=String(Math.floor(seconds/3600)).padStart(2,'0');
+        const m=String(Math.floor((seconds%3600)/60)).padStart(2,'0');
+        const s=String(seconds%60).padStart(2,'0');
+        const el=document.getElementById('timer'); if(el) el.textContent=`${h}:${m}:${s}`;
+    },1000);
 
     function scheduleAutoEnd(){
         if(!MEETING_END_TIME) return;
@@ -1605,6 +1593,10 @@
         };
 
         pc.ontrack = (event)=>{
+            // LiveKit is the single media owner. Legacy P2P ontrack events may
+            // still arrive during migration/reconnection; never let them
+            // overwrite a LiveKit remote video/audio element.
+            if(window.SmartMeetLiveKit?.isMediaOwner?.()) return;
             if(leftUsers.has(uid)) return;
             const info=knownParticipants[uid];
             if(info){ info.hasJoined=true; addParticipantTile(uid, info.name, info.initials, Boolean(info.isOrganizer)); markOnline(uid); }
@@ -2264,6 +2256,12 @@
         }
 
         // -------- Remote video --------
+        // LiveKit owns the remote video element directly. The legacy P2P
+        // renderer must never replace LiveKit's attached track or hide it.
+        if(window.SmartMeetLiveKit?.isMediaOwner?.()){
+            return;
+        }
+
         const video=document.getElementById('rvideo-'+uid);
         const avatar=document.getElementById('avatar-'+uid);
         if(video){
@@ -5008,15 +5006,18 @@
             return;
         }
 
-        const stream=remoteStreams[uid];
-        if(stream && mediaTrack){
-            const existing=stream.getTracks().find(t=>t.id===mediaTrack.id);
-            if(existing){ try{ stream.removeTrack(existing); }catch(e){} }
-        }
+        if(mediaTrack?.kind==='video'){
+            const video=document.getElementById('rvideo-'+uid);
+            const avatar=document.getElementById('avatar-'+uid);
 
-        if(mediaTrack?.kind==='video') camStatus[uid]=false;
-        attachRemoteStream(uid);
-        console.log('[LiveKit] remote video detached', uid);
+            try{ track.detach(video || undefined); }catch(e){}
+
+            camStatus[uid]=false;
+            if(video) video.style.display='none';
+            if(avatar) avatar.style.display='flex';
+            renderPersonRow(uid);
+            console.log('[LiveKit] remote video detached', uid);
+        }
     }
 
     function bindLiveKitMedia(){
@@ -5312,3 +5313,4 @@
 
 </body>
 </html>
+
