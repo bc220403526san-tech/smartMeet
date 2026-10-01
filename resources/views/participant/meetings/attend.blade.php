@@ -673,16 +673,31 @@
     $userInitials = strtoupper(substr(auth()->user()->name, 0, 1) . substr(strrchr(auth()->user()->name, ' ') ?: ' ', 1, 1));
     $tz = $meeting->timezone ?? 'Asia/Karachi';
     $meetingEnd = null;
+    $startForCalc = \Carbon\Carbon::parse(
+        $meeting->date . ' ' . $meeting->time,
+        $tz
+    );
+
     if (!empty($meeting->end_time)) {
-        $meetingEnd = \Carbon\Carbon::parse($meeting->end_time, $tz)->utc()->toIso8601String();
+        $rawEndTime = trim((string) $meeting->end_time);
+
+        // end_time is commonly stored as HH:MM[:SS]. Anchor time-only values
+        // to the meeting date so the browser receives the correct absolute end.
+        if (preg_match('/^\d{1,2}:\d{2}(?::\d{2})?$/', $rawEndTime)) {
+            $meetingEnd = \Carbon\Carbon::parse(
+                $meeting->date . ' ' . $rawEndTime,
+                $tz
+            )->utc()->toIso8601String();
+        } else {
+            $meetingEnd = \Carbon\Carbon::parse(
+                $rawEndTime,
+                $tz
+            )->utc()->toIso8601String();
+        }
     } else {
         $durationMinutes = $meeting->duration_minutes ?? $meeting->duration ?? null;
         if ($durationMinutes) {
             // Use scheduled start + duration. Refresh/rejoin must not move the natural end time.
-            $startForCalc = \Carbon\Carbon::parse(
-                $meeting->date . ' ' . $meeting->time,
-                $tz
-            );
             $meetingEnd = $startForCalc
                 ->copy()
                 ->addMinutes((int) $durationMinutes)
@@ -844,6 +859,13 @@
     const ACTUAL_START = @json($meeting->actual_start ? \Carbon\Carbon::parse($meeting->actual_start)->utc()->toIso8601String() : now()->utc()->toIso8601String());
     const COLORS = ['#3b82f6,#06b6d4','#8b5cf6,#ec4899','#22c55e,#06b6d4','#f59e0b,#ef4444','#64748b,#334155','#ec4899,#f59e0b'];
     const IS_MOBILE_BROWSER = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+
+    function liveKitOwnsMedia(){
+        return Boolean(
+            window.SmartMeetLiveKit?.isMediaOwner?.() ||
+            window.SmartMeetLiveKit?.connected
+        );
+    }
 
 
     /* ---------- Participant audit metadata (background only; no UI/layout changes) ---------- */
@@ -1024,12 +1046,17 @@
 
     /* ---------- Timer ---------- */
     let seconds = Math.max(0, Math.floor((Date.now()-new Date(ACTUAL_START).getTime())/1000));
-    const meetingClockInterval=setInterval(()=>{
-        seconds++;
+    function renderMeetingTimer(){
         const h=String(Math.floor(seconds/3600)).padStart(2,'0');
         const m=String(Math.floor((seconds%3600)/60)).padStart(2,'0');
         const s=String(seconds%60).padStart(2,'0');
-        const el=document.getElementById('timer'); if(el) el.textContent=`${h}:${m}:${s}`;
+        const el=document.getElementById('timer');
+        if(el) el.textContent=`${h}:${m}:${s}`;
+    }
+    renderMeetingTimer();
+    const meetingClockInterval=setInterval(()=>{
+        seconds++;
+        renderMeetingTimer();
     },1000);
 
     function scheduleAutoEnd(){
@@ -1539,9 +1566,7 @@
 
     function createPeerConnection(uid){
         uid=String(uid);
-        // LiveKit is the media owner after a successful LiveKit connection.
-        // A temporary LiveKit reconnect must never trigger a legacy mesh peer.
-        if(window.SmartMeetLiveKit?.isMediaOwner?.()) return null;
+        if(liveKitOwnsMedia()) return null;
         if(uid===String(MY_USER_ID) || leftUsers.has(uid)) return null;
         let pc=peers[uid];
         if(pc && pc.signalingState!=='closed' && pc.connectionState!=='closed') return pc;
@@ -2110,7 +2135,7 @@
             // LiveKit is the media source of truth once the SFU connection is up.
             // A legacy P2P receiver may still exist briefly during migration, but
             // it must never outrank a subscribed LiveKit track.
-            if(window.SmartMeetLiveKit?.connected && kind==='audio'){
+            if(liveKitOwnsMedia()){
                 const liveKitTracks=cachedTracks
                     .filter(t=>t.kind===kind && t.__smartMeetLiveKit)
                     .sort((a,b)=>{
@@ -2182,7 +2207,7 @@
         // -------- Remote audio --------
         // LiveKit owns remote audio whenever the SFU is connected. The legacy
         // MediaStream/WebAudio path must not run in parallel with LiveKit.
-        if(window.SmartMeetLiveKit?.connected){
+        if(liveKitOwnsMedia()){
             // LiveKit owns remote audio completely. Legacy P2P/WebAudio must not
             // attach, replace srcObject, boost, mute, or replay this element.
             const liveAudio=document.getElementById('audio-'+uid);
@@ -2904,7 +2929,7 @@
         // Ignore only legacy mesh WebRTC signaling; Reverb still handles
         // presence, chat, moderation and UI status events.
         if(
-            window.SmartMeetLiveKit?.isMediaOwner?.() &&
+            window.SmartMeetLiveKit?.connected &&
             ['reconnect-request','offer','answer','ice-candidate'].includes(data.type)
         ){
             console.log('[LiveKit] ignored legacy P2P signal:', data.type, 'from', from);
@@ -3572,7 +3597,7 @@
             screenTrack=null;
             screenStream=null;
 
-            if(liveKit?.isMediaOwner?.()){
+            if(liveKitOwnsMedia()){
                 try{
                     await liveKit.setScreenShareEnabled(false);
                 }catch(err){
@@ -3634,7 +3659,7 @@
 
             // Once LiveKit is connected, it owns microphone/camera recovery.
             // Do not recreate or republish the old mesh-P2P local tracks.
-            if(liveKit?.isMediaOwner?.() && liveKit?.room){
+            if(liveKitOwnsMedia() && liveKit?.room){
                 try{
                     if(isMicOn){
                         await liveKit.setMicrophoneEnabled(true);
@@ -4568,12 +4593,25 @@
         knownParticipants[uid]=info;
         leftUsers.delete(uid);
 
-        addParticipantTile(
-            uid,
-            info.name,
-            info.initials,
-            Boolean(info.isOrganizer || uid===String(ORGANIZER_ID))
-        );
+        const isOrganizer = Boolean(info.isOrganizer || uid===String(ORGANIZER_ID));
+        const existingTile = document.getElementById('tile-'+uid);
+        if(existingTile){
+            const nameEl = existingTile.querySelector('.tile-name');
+            if(nameEl){
+                nameEl.innerHTML = `${isOrganizer ? '<i class="fa fa-crown" style="color:#fbbf24;font-size:10px;"></i> ' : ''}${escapeHtml(info.name)}<span class="role-badge ${isOrganizer?'organizer':'participant'}">${isOrganizer?'Organizer':'Participant'}</span>`;
+            }
+            const avatar = existingTile.querySelector('#avatar-'+uid);
+            if(avatar && !info.avatarUrl){
+                avatar.textContent = escapeHtml(info.initials || initialsOf(info.name));
+            }
+        }else{
+            addParticipantTile(
+                uid,
+                info.name,
+                info.initials,
+                isOrganizer
+            );
+        }
 
         markOnline(uid);
         renderPeopleList();
@@ -4583,8 +4621,6 @@
         uid=String(uid);
         if(uid===String(MY_USER_ID)) return;
 
-        try{ disposeRemoteAudioBoost(uid); }catch(e){}
-        document.getElementById('audio-'+uid)?.remove();
         removeParticipantTile(uid, false);
         markOffline(uid);
         renderPeopleList();
@@ -4609,7 +4645,7 @@
 
         // LiveKit owns media transport once connected.
         // Keep Reverb presence/UI updates, but do not create a legacy mesh peer.
-        if(!window.SmartMeetLiveKit?.isMediaOwner?.()){
+        if(!liveKitOwnsMedia()){
             createPeerConnection(uid);
         }
     }
@@ -4622,7 +4658,7 @@
         });
     }
     function connectToAll(){
-        if(window.SmartMeetLiveKit?.isMediaOwner?.()) return;
+        if(liveKitOwnsMedia()) return;
         Object.keys(knownParticipants).forEach(uid=>{
             uid=String(uid);
             if(uid===String(MY_USER_ID) || leftUsers.has(uid)) return;
@@ -4685,7 +4721,7 @@
         try{
             const liveKit=window.SmartMeetLiveKit;
 
-            if(liveKit?.connected && liveKit?.room){
+            if(liveKitOwnsMedia()){
                 // LiveKit owns media transport. Keep SmartMeet presence/UI recovery,
                 // but do not rebuild the legacy mesh-P2P media connections.
                 syncExistingLiveKitParticipants();
@@ -4755,7 +4791,7 @@
             clearTimeout(mediaDeviceChangeTimer);
             mediaDeviceChangeTimer=setTimeout(()=>{
                 if(document.visibilityState!=='visible') return;
-                if(window.SmartMeetLiveKit?.isMediaOwner?.()){
+                if(window.SmartMeetLiveKit?.connected){
                     repairMeetingMedia(true);
                     return;
                 }
