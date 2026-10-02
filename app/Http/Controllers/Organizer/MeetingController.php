@@ -6,7 +6,6 @@ use App\Events\MeetingSignal;
 use App\Http\Controllers\Controller;
 use App\Mail\MeetingInviteMail;
 use App\Models\Meeting;
-use App\Models\MeetingInvite;
 use App\Models\MeetingParticipant;
 use App\Models\Notification;
 use App\Models\User;
@@ -17,7 +16,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class MeetingController extends Controller
@@ -698,19 +696,22 @@ class MeetingController extends Controller
                         'link' => $link,
                     ]);
                 } else {
-                    $invite = MeetingInvite::firstOrCreate(
-                        [
-                            'meeting_id' => $meeting->id,
-                            'email' => $email,
-                        ],
-                        [
-                            'invite_token' => Str::random(40),
-                        ]
+                    /*
+                     * IMPORTANT:
+                     *
+                     * New/guest users must also enter the normal meeting
+                     * join flow. Do NOT send them directly to the register
+                     * page with a separate invite_token flow.
+                     *
+                     * The join controller saves pending_meeting_code in
+                     * the session and then sends the guest to Login.
+                     * After Login/Register, AuthController consumes that
+                     * session value and adds the user to meeting_participants.
+                     */
+                    $link = route(
+                        'meetings.join.link',
+                        $meeting->unique_code
                     );
-
-                    $link = route('register') .
-                        '?invite_token=' .
-                        $invite->invite_token;
 
                     Log::info('Meeting invite send attempt', [
                         'meeting_id' => $meeting->id,

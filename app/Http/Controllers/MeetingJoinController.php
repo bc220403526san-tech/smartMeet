@@ -32,11 +32,11 @@ class MeetingJoinController extends Controller
         }
 
         /*
-         * Keep the invite code through login/registration.
-         * AuthController will continue the same join flow after login.
+         * If the visitor is not logged in, preserve the meeting code.
+         * AuthController consumes this value after successful login/register.
          */
         if (!auth()->check()) {
-            session(['pending_meeting_code' => $meeting->unique_code]);
+            session()->put('pending_meeting_code', $meeting->unique_code);
 
             return redirect()
                 ->route('login')
@@ -48,11 +48,6 @@ class MeetingJoinController extends Controller
 
         $user = auth()->user();
 
-        /*
-         * Participants and organizers may use an invite link.
-         * An organizer who joins through an invite link is treated as a
-         * normal participant inside this meeting room.
-         */
         if (!in_array($user->role, ['participant', 'organizer', 'admin'], true)) {
             return redirect()
                 ->route('admin.dashboard')
@@ -63,9 +58,8 @@ class MeetingJoinController extends Controller
         }
 
         /*
-         * Persist the invite membership directly in meeting_participants.
-         * updateOrCreate makes the operation idempotent and removes any
-         * ambiguity around relationship-generated foreign keys.
+         * Add the logged-in user to this meeting.
+         * updateOrCreate makes repeated clicks safe.
          */
         MeetingParticipant::updateOrCreate(
             [
@@ -80,14 +74,8 @@ class MeetingJoinController extends Controller
         session()->forget('pending_meeting_code');
 
         /*
-         * IMPORTANT FLOW:
-         * Opening an invite link NEVER jumps straight into the live room.
-         *
-         * - Organizer -> Organizer My Meetings index
-         * - Participant -> Participant My Meetings index
-         *
-         * If the meeting is active, the index page shows Attend and the user
-         * explicitly enters the room from there.
+         * Never auto-enter the live room from an invite link.
+         * Add the meeting first, then let the user click Attend.
          */
         if ($user->role === 'organizer') {
             return redirect()
